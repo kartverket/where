@@ -8,9 +8,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 
-    <link href="./images/favicon.ico" rel="icon">
+    <link href="https://kartverket.github.io/where/images/favicon.ico" rel="icon">
 
-<link rel="canonical" href="./quickstart.html">
+<link rel="canonical" href="https://kartverket.github.io/where/quickstart.html">
 
         <meta name="author" content="Norwegian Mapping Authority" />
         <meta name="keywords" content="vlbi,where,there" />
@@ -19,7 +19,7 @@
         <meta property="og:site_name" content="Where" />
         <meta property="og:type" content="article"/>
         <meta property="og:title" content="Quickstart"/>
-        <meta property="og:url" content="./quickstart.html"/>
+        <meta property="og:url" content="https://kartverket.github.io/where/quickstart.html"/>
         <meta property="og:description" content="Get started using Where for VLBI analysis."/>
         <meta property="article:published_time" content="2018-06-05" />
             <meta property="article:section" content="How-to" />
@@ -31,11 +31,11 @@
 
 
     <!-- Bootstrap -->
-        <link rel="stylesheet" href="./theme/css/bootstrap.cerulean.min.css" type="text/css"/>
-    <link href="./theme/css/font-awesome.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://kartverket.github.io/where/theme/css/bootstrap.cerulean.min.css" type="text/css"/>
+    <link href="https://kartverket.github.io/where/theme/css/font-awesome.min.css" rel="stylesheet">
 
-    <link href="./theme/css/pygments/native.css" rel="stylesheet">
-    <link rel="stylesheet" href="./theme/css/style.css" type="text/css"/>
+    <link href="https://kartverket.github.io/where/theme/css/pygments/native.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://kartverket.github.io/where/theme/css/style.css" type="text/css"/>
 
 
 
@@ -53,22 +53,22 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a href="./" class="navbar-brand">
+            <a href="https://kartverket.github.io/where/" class="navbar-brand">
 Where            </a>
         </div>
         <div class="collapse navbar-collapse navbar-ex1-collapse">
             <ul class="nav navbar-nav">
-                         <li><a href="./pages/acknowledging.html">
+                         <li><a href="https://kartverket.github.io/where/pages/acknowledging.html">
                              Acknowledging
                           </a></li>
-                         <li><a href="./pages/contact.html">
+                         <li><a href="https://kartverket.github.io/where/pages/contact.html">
                              Contact
                           </a></li>
                         <li >
-                            <a href="./category/download.html">Download</a>
+                            <a href="https://kartverket.github.io/where/category/download.html">Download</a>
                         </li>
                         <li class="active">
-                            <a href="./category/how-to.html">How-to</a>
+                            <a href="https://kartverket.github.io/where/category/how-to.html">How-to</a>
                         </li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
@@ -89,7 +89,7 @@ Where            </a>
         <article>
             <header class="page-header">
                 <h1>
-                    <a href="./quickstart.html"
+                    <a href="https://kartverket.github.io/where/quickstart.html"
                        rel="bookmark"
                        title="Permalink to Quickstart">
                         Quickstart
@@ -110,40 +110,33 @@ Where            </a>
 
 
 <span class="label label-default">Tags</span>
-	<a href="./tag/vlbi.html">vlbi</a>
+	<a href="https://kartverket.github.io/where/tag/vlbi.html">vlbi</a>
         /
-	<a href="./tag/where.html">where</a>
+	<a href="https://kartverket.github.io/where/tag/where.html">where</a>
         /
-	<a href="./tag/there.html">there</a>
+	<a href="https://kartverket.github.io/where/tag/there.html">there</a>
     
 </footer><!-- /.post-info -->                    </div>
                 </div>
-                <h2>How to analyze VLBI with <strong>Where</strong>.</h2>
+                <h2 id="how-to-analyze-vlbi-with-where">How to analyze VLBI with <strong>Where</strong>.</h2>
 <p><strong>Where</strong> needs to know which data you want to analyze and which pipeline you want to analyze it with: <code>where &lt;date&gt; &lt;pipeline&gt;</code></p>
-<p>Example:</p>
-<div class="highlight"><pre><span></span>where 2009 11 2 -v 
-</pre></div>
-
-
-<p>for more info on other options just type <code>where</code></p>
+<p>Example:
+```
+where 2009 11 2 -v </p>
+<p><code>``
+for more info on other options just type</code>where`</p>
 <p><strong>Where</strong> can run multiple analysis in a batch by specifing a time frame and a pipeline: <code>where &lt;from date inclusive&gt; &lt;to date inclusive&gt; &lt;pipeline&gt;</code></p>
 <p>Example:</p>
-<div class="highlight"><pre><span></span>where_runner 2015 1 1 2015 2 4 -v
-</pre></div>
-
-
+<p><code>where_runner 2015 1 1 2015 2 4 -v</code></p>
 <p><code>where_runner</code> accepts the same input arguments as <code>where</code> and will pass along any options to <code>where</code>.</p>
-<h2>How to look at the results</h2>
+<h2 id="how-to-look-at-the-results">How to look at the results</h2>
 <p><strong>Where</strong> comes with a graphical tool called <strong>There</strong> to inspect the results of a analyzed dataset. Just type <code>there -v</code> and select the desired dataset from the dropdown menues. It can also be specified on the command line.</p>
 <p>Example:</p>
-<div class="highlight"><pre><span></span>there 2009 11 2 -v
-</pre></div>
-
-
+<p><code>there 2009 11 2 -v</code></p>
 <p>The option <code>-v</code> add buttons and options that are relevant for a VLBI analysis. Type <code>there -h</code> for more info on other options.</p>
-<h3>Timeseries</h3>
+<h3 id="timeseries">Timeseries</h3>
 <p>Timeseries is a special dataset that is stored under the date 19700101. This dataset contains many fields with one value for each processed session. For instance by selecting <em>variance_factor</em> for the Y-axis this value can be showed for all processed sessions. Clicking on a point in the plot will print some info about the point in the command line window used to start <strong>There</strong>. This way sessions with abnormal variance factors can be identified and investigated further.</p>
-<h3>Single sessions</h3>
+<h3 id="single-sessions">Single sessions</h3>
 <p>A single session may to some extent be manipulated through <code>there</code> by using the buttons. For instance by selecting a station in the dropdown menu and then pressing <em>Ignore station</em> the station will be added to the ignore_station field in the configuration file. By pressing <em>Rerun</em> the session with be analyzed again and all data from the station will be removed from the analysis. Clock breaks may also be added by selecting the <em>Add clock break</em> behaviour for <em>Double click</em>, selecting the station that has the clock break and then double clicking on the plot where the clock break should be added. Do the analysis again with <em>Rerun</em>. </p>
             </div>
             <!-- /.entry-content -->
@@ -205,16 +198,16 @@ Where            </a>
       </div>
    </div>
 </footer>
-<script src="./theme/js/jquery.min.js"></script>
+<script src="https://kartverket.github.io/where/theme/js/jquery.min.js"></script>
 
 <!-- Include all compiled plugins (below), or include individual files as needed -->
-<script src="./theme/js/bootstrap.min.js"></script>
+<script src="https://kartverket.github.io/where/theme/js/bootstrap.min.js"></script>
 
 <!-- Enable responsive features in IE8 with Respond.js (https://github.com/scottjehl/Respond) -->
-<script src="./theme/js/respond.min.js"></script>
+<script src="https://kartverket.github.io/where/theme/js/respond.min.js"></script>
 
 
-    <script src="./theme/js/bodypadding.js"></script>
+    <script src="https://kartverket.github.io/where/theme/js/bodypadding.js"></script>
 
 
 </body>
