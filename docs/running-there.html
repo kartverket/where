@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: http://ogp.me/ns# fb: https://www.facebook.com/2008/fbml">
+<head>
+    <title>Running There - Where</title>
+    <!-- Using the latest rendering mode for IE -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+    <link href="./images/favicon.ico" rel="icon">
+
+<link rel="canonical" href="./running-there.html">
+
+        <meta name="author" content="Norwegian Mapping Authority" />
+        <meta name="keywords" content="there,vlbi,gui" />
+        <meta name="description" content="Use There to interactively explore the results of a Where analysis." />
+
+        <meta property="og:site_name" content="Where" />
+        <meta property="og:type" content="article"/>
+        <meta property="og:title" content="Running There"/>
+        <meta property="og:url" content="./running-there.html"/>
+        <meta property="og:description" content="Use There to interactively explore the results of a Where analysis."/>
+        <meta property="article:published_time" content="2018-06-05" />
+            <meta property="article:section" content="How-to" />
+            <meta property="article:tag" content="there" />
+            <meta property="article:tag" content="vlbi" />
+            <meta property="article:tag" content="gui" />
+            <meta property="article:author" content="Norwegian Mapping Authority" />
+
+
+
+    <!-- Bootstrap -->
+        <link rel="stylesheet" href="./theme/css/bootstrap.cerulean.min.css" type="text/css"/>
+    <link href="./theme/css/font-awesome.min.css" rel="stylesheet">
+
+    <link href="./theme/css/pygments/native.css" rel="stylesheet">
+    <link rel="stylesheet" href="./theme/css/style.css" type="text/css"/>
+
+
+
+
+
+</head>
+<body>
+
+<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-ex1-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a href="./" class="navbar-brand">
+Where            </a>
+        </div>
+        <div class="collapse navbar-collapse navbar-ex1-collapse">
+            <ul class="nav navbar-nav">
+                         <li><a href="./pages/acknowledging.html">
+                             Acknowledging
+                          </a></li>
+                         <li><a href="./pages/contact.html">
+                             Contact
+                          </a></li>
+                        <li >
+                            <a href="./category/download.html">Download</a>
+                        </li>
+                        <li class="active">
+                            <a href="./category/how-to.html">How-to</a>
+                        </li>
+            </ul>
+            <ul class="nav navbar-nav navbar-right">
+            </ul>
+        </div>
+        <!-- /.navbar-collapse -->
+    </div>
+</div> <!-- /.navbar -->
+
+<!-- Banner -->
+<!-- End Banner -->
+
+<!-- Content Container -->
+<div class="container">
+    <div class="row">
+        <div class="col-sm-9">
+    <section id="content">
+        <article>
+            <header class="page-header">
+                <h1>
+                    <a href="./running-there.html"
+                       rel="bookmark"
+                       title="Permalink to Running There">
+                        Running There
+                    </a>
+                </h1>
+            </header>
+            <div class="entry-content">
+                <div class="panel">
+                    <div class="panel-body">
+<footer class="post-info">
+    <span class="label label-default">Date</span>
+    <span class="published">
+        <i class="fa fa-calendar"></i><time datetime="2018-06-05T00:00:00+02:00"> Tue 05 June 2018</time>
+    </span>
+
+
+
+
+
+<span class="label label-default">Tags</span>
+	<a href="./tag/there.html">there</a>
+        /
+	<a href="./tag/vlbi.html">vlbi</a>
+        /
+	<a href="./tag/gui.html">gui</a>
+    
+</footer><!-- /.post-info -->                    </div>
+                </div>
+                <p><strong>There</strong> is a companion tool to <strong>Where</strong>, and is installed as part of the
+Where software package.</p>
+<h1>What can There do?</h1>
+<p><em>There</em> is of course the answer to the question <em>Where?</em> As such There - the
+software program - is used to interactively explore the results of a Where
+analysis.</p>
+<p>The result of a Where analysis is a <a href="">dataset</a> which contains timeseries of all
+relevant variables in the analysis. A normal use of There is to plot timeseries
+of residuals or estimation parameters, as is seen in the following screenshot:</p>
+<p><img alt="A timeseries plotted in There" src="images/there_residuals.png"></p>
+<p><strong>Figure:</strong> <em>A timeseries plotted in There showing the pre-fit residuals after
+  analyzing the VLBI XA-session on December 27 2016</em></p>
+<p>However, There also has more advanced capabilities including:</p>
+<ul>
+<li>
+<p>Plotting related timeseries like for instance <em>x</em>, <em>y</em> and <em>z</em>-site coordinates
+  side-by-side or as a 3-dimensional plot</p>
+</li>
+<li>
+<p>Comparing timeseries</p>
+</li>
+<li>
+<p>Filtering timeseries to investigate given stations, radio sources and baselines</p>
+</li>
+</ul>
+<p>There also supports your analysis workflow, by letting you</p>
+<ul>
+<li>
+<p>Identify and add clock breaks to an analysis</p>
+</li>
+<li>
+<p>Update the configuration of an analysis</p>
+</li>
+<li>
+<p>Rerun an analysis</p>
+</li>
+</ul>
+<h1>Running There</h1>
+<p>You can start the There program quite simply by issuing the command</p>
+<div class="highlight"><pre><span></span>$ there
+</pre></div>
+
+
+<p>on the command line. This will open the There program. Inside There you can then
+explore all the analyses you have already done with Where.</p>
+<blockquote>
+<p><strong>Note:</strong> On Windows the command to start There is <code>gd_there</code>. In all examples
+in this tutorial you should use <code>gd_there</code> instead of <code>there</code> if you are
+running on Windows.</p>
+</blockquote>
+<h2>Opening a specific analysis</h2>
+<p>You can also choose to open There showing a specific analysis, by using a
+command very similar to the one you used for running the analysis. For instance,
+to open an analysis of the VLBI XA-session for December 27 2016 you would do:</p>
+<div class="highlight"><pre><span></span>$ there <span class="m">2016</span> <span class="m">12</span> <span class="m">27</span> -v --session<span class="o">=</span>XA
+</pre></div>
+
+
+<h2>Customizing There</h2>
+<p>It is possible to customize much of the look and behavior of There. As with
+Where, you do this through the configuration. To see the current configuration,
+simply add <code>-S</code> or <code>--showconfig</code> to your command:</p>
+<div class="highlight"><pre><span></span>$ there <span class="m">2016</span> <span class="m">12</span> <span class="m">27</span> -v --session<span class="o">=</span>XA -S
+</pre></div>
+
+
+<p>Any of the settings listed can be changed on the command line. For instance, to
+change the colormap and the marker symbol used for scatter plots, you can do:</p>
+<div class="highlight"><pre><span></span>$ there <span class="m">2016</span> <span class="m">12</span> <span class="m">27</span> -v --session<span class="o">=</span>XA --colormap<span class="o">=</span>rainbow --scatter:marker<span class="o">=</span>+
+</pre></div>
+
+
+<p>There also uses <a href="todo">configuration profiles</a> to simplify setting commonly used
+configuration settings. As with Where you can explicitly specify one or more
+profiles to apply on the command line:</p>
+<div class="highlight"><pre><span></span>$ there <span class="m">2016</span> <span class="m">12</span> <span class="m">27</span> -v --session<span class="o">=</span>XA --profile<span class="o">=</span>projector
+</pre></div>
+
+
+<p>The <code>projector</code> profile contains some settings that makes There better suited
+for being displayed on the lower resolution that projectors normally deliver. In
+addition, there might be profiles associated with pipelines (like VLBI) or
+users. These are automatically applied.</p>
+<p>To see all available configuration profiles, see the file
+<a href="https://github.com/kartverket/where/blob/master/config/there.conf"><code>there.conf</code></a>.</p>
+<!-- # The There user interface -->
+            </div>
+            <!-- /.entry-content -->
+        </article>
+    </section>
+
+        </div>
+        <div class="col-sm-3" id="sidebar">
+            <aside>
+<!-- Sidebar -->
+<section class="well well-sm">
+  <ul class="list-group list-group-flush">
+
+<!-- Sidebar/Social -->
+<li class="list-group-item">
+  <h4><i class="fa fa-home fa-lg"></i><span class="icon-label">Social</span></h4>
+  <ul class="list-group" id="social">
+    <li class="list-group-item"><a href="https://github.com/kartverket/where"><i class="fa fa-github-square fa-lg"></i> github</a></li>
+  </ul>
+</li>
+<!-- End Sidebar/Social -->
+
+<!-- Sidebar/Links -->
+<li class="list-group-item">
+  <h4><i class="fa fa-external-link-square fa-lg"></i><span class="icon-label">Links</span></h4>
+  <ul class="list-group" id="links">
+    <li class="list-group-item">
+      <a href="https://github.com/kartverket/midgard" target="_blank">Midgard</a>
+    </li>
+    <li class="list-group-item">
+      <a href="https://www.anaconda.com/download" target="_blank">Anaconda Python</a>
+    </li>
+    <li class="list-group-item">
+      <a href="https://ivscc.gsfc.nasa.gov/" target="_blank">International VLBI Service</a>
+    </li>
+    <li class="list-group-item">
+      <a href="https://www.iers.org/IERS/EN/Publications/TechnicalNotes/tn36.html" target="_blank">IERS Conventions 2010</a>
+    </li>
+  </ul>
+</li>
+<!-- End Sidebar/Links -->
+  </ul>
+</section>
+<!-- End Sidebar -->            </aside>
+        </div>
+    </div>
+</div>
+<!-- End Content Container -->
+
+<footer>
+   <div class="container">
+      <hr>
+      <div class="row">
+         <div class="col-xs-10">&copy; 2018 Norwegian Mapping Authority
+            &middot; Powered by <a href="https://github.com/getpelican/pelican-themes/tree/master/pelican-bootstrap3" target="_blank">pelican-bootstrap3</a>,
+            <a href="http://docs.getpelican.com/" target="_blank">Pelican</a>,
+            <a href="http://getbootstrap.com" target="_blank">Bootstrap</a>         </div>
+         <div class="col-xs-2"><p class="pull-right"><i class="fa fa-arrow-up"></i> <a href="#">Back to top</a></p></div>
+      </div>
+   </div>
+</footer>
+<script src="./theme/js/jquery.min.js"></script>
+
+<!-- Include all compiled plugins (below), or include individual files as needed -->
+<script src="./theme/js/bootstrap.min.js"></script>
+
+<!-- Enable responsive features in IE8 with Respond.js (https://github.com/scottjehl/Respond) -->
+<script src="./theme/js/respond.min.js"></script>
+
+
+    <script src="./theme/js/bodypadding.js"></script>
+
+
+</body>
+</html>
