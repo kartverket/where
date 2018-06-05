@@ -1,0 +1,12 @@
+# This is the the local WHERE configuration file. Any settings here will override the same settings in the main WHERE
+# configuration file (where.conf).
+#
+# To use this file, copy it to where_local.conf
+#
+# This file can be named either .wherelocalrc, wherelocalrc or where_local.conf.  WHERE will look for this file first
+# in the current directory, then in the home direcory of the user, and finally in the system-wide /etc-directory.
+# Thus, if you want to make changes in this file that should not be checked into the main version control repository,
+# you can copy this file to your home directory and make changes there.
+
+# The most common use will probably be to set paths different on a local machine from what is used on servers.
+[path]

@@ -1,0 +1,22 @@
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python>=3.6
+  - astropy
+  - bumpversion
+  - colorama
+  - cython
+  - h5py
+  - ipython
+  - matplotlib
+  - mypy
+  - netCDF4
+  - numpy
+  - pandas
+  - pytest
+  - pytest-cov
+  - python-editor
+  - requests
+  - scipy
+  - seaborn

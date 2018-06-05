@@ -1,0 +1,16 @@
+# This file should be renamed to trf_local.conf. It may contain local modifications to custom positions used by
+# apriori.get('trf', ...)
+#
+# Each site should be defined as its own section. The section header is used as
+# a key in the TRF. It must have a field called pos_itrs, with the
+# coordinates. The other fields are made available as meta information.
+
+# Example
+#
+# [7331]
+# cdp           = 7331
+# pos_itrs      = 1202462.56765918, 252734.495572318, 6237766.17460896
+# name          = NYALES20
+# description   = Ny-Ålesund custom position
+# domes         = 10317
+# marker        = S003

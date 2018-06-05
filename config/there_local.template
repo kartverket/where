@@ -1,0 +1,25 @@
+# This is the the local THERE configuration file. Any settings here will override the same settings in the main THERE
+# configuration file (there.conf).
+#
+# To use this file, copy it to there_local.conf
+#
+# This file can be named either .therelocalrc, therelocalrc or there_local.conf.  THERE will look for this file first
+# in the current directory, then in the home direcory of the user, and finally in the system-wide /etc-directory.
+# Thus, if you want to make changes in this file that should not be checked into the main version control repository,
+# you can copy this file to your home directory and make changes there.
+
+[general]
+
+[initial_settings]
+
+
+#
+# Example of profile for --user=hjegei
+#
+[general__hjegei]
+style                  = dark
+filters                = station, source, baseline, status
+
+[initial_settings__hjegei]
+color                  = baseline
+size                   = residual
