@@ -14,9 +14,6 @@ Reads station information (e.g. approximated station coordinates, receiver and a
 ...) igs.snx file in SINEX format.
 
 
-$Revision: 15027 $
-$Date: 2018-05-08 15:26:26 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 # Standard library imports
 from datetime import datetime

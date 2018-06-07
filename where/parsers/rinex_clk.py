@@ -16,9 +16,6 @@ This routine reads so far only GPS satellite clock bias values given for every 5
 given in seconds, but is converted to meters.
 
 
-$Revision: 15027 $
-$Date: 2018-05-08 15:26:26 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 
 """
 

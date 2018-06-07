@@ -7,9 +7,6 @@ Suspected clock breaks are added as events to the dataset.
 
 
 
-$Revision: 15267 $
-$Date: 2018-06-06 01:18:55 +0200 (Wed, 06 Jun 2018) $
-$LastChangedBy: hjegei $
 
 """
 # Standard library imports

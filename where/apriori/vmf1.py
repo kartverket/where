@@ -26,9 +26,6 @@ References:
 @todo which interpolators should be used?
 
 
-$Revision: 15052 $
-$Date: 2018-05-09 13:30:14 +0200 (Wed, 09 May 2018) $
-$LastChangedBy: kirann $
 
 """
 

@@ -26,9 +26,6 @@ The file to be parsed should be specified like:
     parser = parsers.parse('orbit_sp3', file_path=file_path, rundate=rundate)
 
 
-$Revision: 15027 $
-$Date: 2018-05-08 15:26:26 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 
 # Where imports

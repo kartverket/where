@@ -18,9 +18,6 @@ References:
     https://github.com/astropy/astropy
 
 
-$Revision: 15123 $
-$Date: 2018-05-16 18:00:58 +0200 (Wed, 16 May 2018) $
-$LastChangedBy: dahmic $
 
 """
 # Standard library imports

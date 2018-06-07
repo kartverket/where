@@ -5,9 +5,6 @@ Description:
 asdf.
 
 
-$Revision: 15133 $
-$Date: 2018-05-18 12:50:25 +0200 (Fri, 18 May 2018) $
-$LastChangedBy: dahmic $
 
 """
 

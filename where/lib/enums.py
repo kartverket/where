@@ -6,9 +6,6 @@ Description:
 Custom enumerations used by Where for structured names.
 
 
-$Revision: 15216 $
-$Date: 2018-05-31 11:23:18 +0200 (Thu, 31 May 2018) $
-$LastChangedBy: hjegei $
 """
 
 # Standard library imports

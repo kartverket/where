@@ -20,9 +20,6 @@ similar. In particular, they accept all the same keyword arguments (like for ins
 files are properly closed they should normally be used with a context manager as in the example above.
 
 
-$Revision: 15267 $
-$Date: 2018-06-06 01:18:55 +0200 (Wed, 06 Jun 2018) $
-$LastChangedBy: hjegei $
 
 """
 

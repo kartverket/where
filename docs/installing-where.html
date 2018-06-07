@@ -127,11 +127,120 @@ Where            </a>
     
 </footer><!-- /.post-info -->                    </div>
                 </div>
-                <p>The Where software is mainly written in Python.</p>
+                <h2 id="download-where">Download Where</h2>
+<p>In order to install Where, you first need to download it. Please
+<a href="where-latest.html">Download the latest version of Where</a>, and unpack it at a
+convenient location on your computer.</p>
+<p>All commands shown in this guide should be performed in a terminal from inside
+the <code>where</code>-directory you just downloaded.</p>
 <h2 id="prerequisites">Prerequisites</h2>
-<h2 id="downloading-and-building-external-libraries">Downloading and Building External Libraries</h2>
+<p>The Where software is mainly written in Python. As such, it is dependent on
+having a modern Python (&gt;= 3.6) installed on your system, including several
+packages from the scientific stack. Where also utilizes
+<a href="http://cython.org/">Cython</a> (essentially a Python-to-C-translator) for better
+performance. Finally, Where depends on some Fortran libraries with community
+implementations of conventional models.</p>
+<h3 id="step-1-install-anaconda-python">Step 1: Install Anaconda Python</h3>
+<p>We recommend using <a href="https://www.anaconda.com/download"><strong>Anaconda Python</strong></a>. This is
+a Python distribution that comes with its own package manager (<a href="https://conda.io/">conda</a>) that
+makes it easier to install other Python packages, especially on Windows.</p>
+<p>Once Anaconda is installed, you should install the Python packages needed by
+Where by doing:</p>
+<pre><code>conda update -f environment.yml
+</code></pre>
+<h3 id="step-2-install-a-fortran-compiler-windows-only">Step 2: Install a Fortran compiler (Windows only)</h3>
+<p>Windows typically does not come with a Fortran compiler preinstalled.</p>
+<h3 id="step-3-install-a-c-compiler-windows-only">Step 3: Install a C compiler (Windows only)</h3>
+<p>Windows typically does not come with a C compiler preinstalled.</p>
+<h2 id="downloading-external-libraries">Downloading external libraries</h2>
+<p>Where depends on three external libraries that are not included in the
+download. These are all available online and can be downloaded as follows:</p>
+<h3 id="sofa">SOFA</h3>
+<p>The
+<a href="https://www.iausofa.org/">SOFA (Standards of Fundamental Astronomy) software library</a>
+is used for fundamental astronomy calculations, such as Celestial to Terrestrial
+transformations.</p>
+<p>The latest version of the library should be downloaded from
+<a href="http://www.iausofa.org/current_F.html">the SOFA web page</a> and stored in the
+<code>external/sofa/</code> directory. This can be done automatically by running</p>
+<pre><code>python download_sofa.py
+</code></pre>
+<p>The library depends on a catalog of leap seconds, and should as such be updated
+regularly.</p>
+<h3 id="iers-software">IERS software</h3>
+<p>In companionship with the IERS Convention 2010, the IERS has made available
+implementations of several conventional models. Where uses these models directly
+whenever possible.</p>
+<p>The latest version of the library should be downloaded from
+<a href="http://iers-conventions.obspm.fr/2010/2010_update/">the IERS web page</a> and
+stored in the <code>external/iers/</code> directory. This can be done automatically by
+running</p>
+<pre><code>python download_iers.py
+</code></pre>
+<p>The library depends on a catalog of leap seconds, and should as such be updated
+regularly.</p>
+<h3 id="gpt2w">GPT2w</h3>
+<p>One of the available troposphere models in Where is the GPT2w. This is
+implemented using the <a href="">original GPT2w model</a> by
+<a href="https://doi.org/10.1007/s10291-014-0403-7"><em>Böhm, J., Möller, G., Schindelegger, M. et al. GPS Solut (2015) 19: 433.</em></a></p>
+<p>The latest version of the Fortran library should be downloaded from
+<a href="http://ggosatm.hg.tuwien.ac.at/DELAY/SOURCE/GPT2w/">the GPT2w web page</a> and
+stored in the <code>external/gpt2w/</code> directory. This can be done automatically by
+running</p>
+<pre><code>python download_gpt2w.py
+</code></pre>
 <h2 id="installing-where">Installing Where</h2>
-<h2 id="obtaining-data-files">Obtaining Data Files</h2>
+<p>The actual installation of Where happens in three steps:</p>
+<ul>
+<li>Compile the external Fortran libraries and build them as a Python module using
+  <a href=""><code>f2py</code></a>.</li>
+<li>Compile and build the Cython code.</li>
+<li>Install Where on your computer.</li>
+</ul>
+<p>All these three steps are carried out automatically by running the Make-command:</p>
+<pre><code>make
+</code></pre>
+<p>You can confirm that the installation succeeded by asking for help about Where:</p>
+<pre><code>where -h
+</code></pre>
+<p>If you get an error saying that Where is an unknown command, you most likely
+need to add Where to your path.</p>
+<blockquote>
+<p><strong>Note:</strong> On Windows the command to start Where is <code>gd_where</code>. In the example
+above you should run <code>gd_where -h</code>.</p>
+</blockquote>
+<h2 id="set-up-paths-used-by-where">Set up paths used by Where</h2>
+<p>Where uses a few different directories. The location of these are controlled by
+the Where configuration. You should create a new text file called
+<code>where_local.conf</code> inside the <code>where/config</code> directory.</p>
+<p>Add the following contents and save the file:</p>
+<pre><code>[path]
+data     = ~/where_data
+work     = ~/where_work
+archive  = ~/where_archive
+log      = ~/where_log
+</code></pre>
+<p>This specifies the location of four different directories:</p>
+<ul>
+<li><code>data</code>: The data directory will contain all data needed to analyze a session,
+  including observation files, reference frames, and a priori model information.</li>
+<li><code>work</code>: The work directory will contain all active analysis files, including
+  configuration, analysis <a href="https://kartverket.github.io/where/the-where-software.html#dataset">datasets</a> and
+  output products.</li>
+<li><code>archive</code>: When an analysis is
+  <a href="https://kartverket.github.io/where/running-where.html#archiving-deleting-and-resetting-the-configuration">archived</a>
+  it is moved to the archive directory.</li>
+<li><code>log</code>: The log directory will contain log files with information from
+  <a href="https://kartverket.github.io/where/running-where.html#running-many-analyses">running many Where analyses</a>. Log
+  files for single sessions are stored in their respective directories inside
+  the <code>work</code> directory.</li>
+</ul>
+<p>Using the default above, these directories are created as four separate
+directories named <code>where_data</code>, <code>where_work</code>, <code>where_archive</code>, and <code>where_log</code>
+inside your home directory. Feel free to change these according to your taste.</p>
+<h2 id="obtaining-data-files">Obtaining data files</h2>
+<pre><code>python download_data.py
+</code></pre>
             </div>
             <!-- /.entry-content -->
         </article>

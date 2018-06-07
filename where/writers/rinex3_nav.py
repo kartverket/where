@@ -10,9 +10,6 @@ apriori broadcast ephemeris. In this case the given Dataset has to be overwritte
 Dataset.
 
 
-$Revision: 15117 $
-$Date: 2018-05-16 10:32:31 +0200 (Wed, 16 May 2018) $
-$LastChangedBy: dahmic $
 """
 # Standard library imports
 from datetime import datetime, timedelta

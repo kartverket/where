@@ -18,9 +18,6 @@ References:
 
 
 
-$Revision: 15116 $
-$Date: 2018-05-15 17:11:13 +0200 (Tue, 15 May 2018) $
-$LastChangedBy: dahmic $
 """
 
 # Standard library imports

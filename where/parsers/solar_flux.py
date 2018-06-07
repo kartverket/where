@@ -16,9 +16,6 @@ References:
            (leftovers from old GEOSAT). Do something about this?
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 

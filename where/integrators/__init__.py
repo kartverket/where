@@ -14,9 +14,6 @@ needs to be decorated with the :func:`~where.lib.plugins.register` decorator as 
 
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 

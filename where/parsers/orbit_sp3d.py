@@ -34,9 +34,6 @@ TODO:
 Important: Bad satellites has to be removed from observation Dataset!!!! E.g. indicated by bad satellite clock values.
 
 
-$Revision: 15128 $
-$Date: 2018-05-18 09:31:55 +0200 (Fri, 18 May 2018) $
-$LastChangedBy: dahmic $
 
 """
 

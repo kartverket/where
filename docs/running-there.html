@@ -120,7 +120,7 @@ Where            </a>
                 </div>
                 <p><strong>There</strong> is a companion tool to <strong>Where</strong>, and is installed as part of the
 Where software package.</p>
-<h1 id="what-can-there-do">What can There do?</h1>
+<h2 id="what-can-there-do">What can There do?</h2>
 <p><em>There</em> is of course the answer to the question <em>Where?</em> As such There - the
 software program - is used to interactively explore the results of a Where
 analysis.</p>
@@ -156,10 +156,10 @@ of residuals or estimation parameters, as is seen in the following screenshot:</
 <p>Rerun an analysis</p>
 </li>
 </ul>
-<h1 id="running-there">Running There</h1>
+<h2 id="running-there">Running There</h2>
 <p>You can start the There program quite simply by issuing the command</p>
-<p><code>shell
-$ there</code></p>
+<pre><code>$ there
+</code></pre>
 <p>on the command line. This will open the There program. Inside There you can then
 explore all the analyses you have already done with Where.</p>
 <blockquote>
@@ -167,35 +167,35 @@ explore all the analyses you have already done with Where.</p>
 in this tutorial you should use <code>gd_there</code> instead of <code>there</code> if you are
 running on Windows.</p>
 </blockquote>
-<h2 id="opening-a-specific-analysis">Opening a specific analysis</h2>
+<h3 id="opening-a-specific-analysis">Opening a specific analysis</h3>
 <p>You can also choose to open There showing a specific analysis, by using a
 command very similar to the one you used for running the analysis. For instance,
 to open an analysis of the VLBI XA-session for December 27 2016 you would do:</p>
-<p><code>shell
-$ there 2016 12 27 -v --session=XA</code></p>
-<h2 id="customizing-there">Customizing There</h2>
+<pre><code>$ there 2016 12 27 -v --session=XA
+</code></pre>
+<h3 id="customizing-there">Customizing There</h3>
 <p>It is possible to customize much of the look and behavior of There. As with
 Where, you do this through the configuration. To see the current configuration,
 simply add <code>-S</code> or <code>--showconfig</code> to your command:</p>
-<p><code>shell
-$ there 2016 12 27 -v --session=XA -S</code></p>
+<pre><code>$ there 2016 12 27 -v --session=XA -S
+</code></pre>
 <p>Any of the settings listed can be changed on the command line. For instance, to
 change the colormap and the marker symbol used for scatter plots, you can do:</p>
-<p><code>shell
-$ there 2016 12 27 -v --session=XA --colormap=rainbow --scatter:marker=+</code></p>
+<pre><code>$ there 2016 12 27 -v --session=XA --colormap=rainbow --scatter:marker=+
+</code></pre>
 <p>There also uses
 <a href="https://kartverket.github.io/where/the-where-software.html#configuration-profile">configuration profiles</a> to
 simplify setting commonly used configuration settings. As with Where you can
 explicitly specify one or more profiles to apply on the command line:</p>
-<p><code>shell
-$ there 2016 12 27 -v --session=XA --profile=projector</code></p>
+<pre><code>$ there 2016 12 27 -v --session=XA --profile=projector
+</code></pre>
 <p>The <code>projector</code> profile contains some settings that makes There better suited
 for being displayed on the lower resolution that projectors normally deliver. In
 addition, there might be profiles associated with pipelines (like VLBI) or
 users. These are automatically applied.</p>
 <p>To see all available configuration profiles, see the file
 <a href="https://github.com/kartverket/where/blob/master/config/there.conf"><code>there.conf</code></a>.</p>
-<!-- # The There user interface -->
+<!-- ## The There user interface -->
             </div>
             <!-- /.entry-content -->
         </article>

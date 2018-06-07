@@ -8,9 +8,6 @@ Handle both position and velocity in one structure.
 -------
 
 
-$Revision: 15189 $
-$Date: 2018-05-28 23:34:20 +0200 (Mon, 28 May 2018) $
-$LastChangedBy: dahmic $
 
 """
 

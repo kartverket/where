@@ -7,9 +7,6 @@ Write data in the Rinex navigation file format 2.11 (see :cite:`rinex2`).
 TODO: BUG: All orbit information of three days are written in each daily navigation file.
 
 
-$Revision: 15029 $
-$Date: 2018-05-08 15:26:47 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 from datetime import timedelta
 

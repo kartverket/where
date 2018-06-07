@@ -13,9 +13,6 @@ Description:
 This module will provide functions for GNSS modeling.
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 """
 
 # External library imports
@@ -42,8 +39,8 @@ def check_satellite_eclipse(dset):
         dset(Dataset):    Model data
     """
     cos_gamma = np.einsum(
-        "ij,ij->i", mathp.unit_vector(dset.sat_posvel.itrs_pos), dset.sat_posvel.itrs_pos_sun()
-    )  # dot product -> better solution dot() function in mathp
+        "ij,ij->i", mathp.unit_vector(dset.sat_posvel.itrs_pos), dset.sat_posvel.itrs_pos_sun
+    )  # TODO:  dot product -> better solution dot() function in mathp
     h = np.linalg.norm(dset.sat_posvel.itrs_pos, axis=1) * np.sqrt(1.0 - cos_gamma ** 2)
 
     satellites_in_eclipse = list()

@@ -18,9 +18,6 @@ Authors:
 
 * Ann-Silje Kirkvik <ann-silje.kirkvik@kartverket.no>
 
-$Revision: 15235 $
-$Date: 2018-06-01 09:45:02 +0200 (Fri, 01 Jun 2018) $
-$LastChangedBy: kirann $
 """
 # Standard library imports
 import os

@@ -8,9 +8,6 @@ position is used for all time epochs.
 
 
 
-$Revision: 15220 $
-$Date: 2018-05-31 13:51:15 +0200 (Thu, 31 May 2018) $
-$LastChangedBy: hjegei $
 """
 # External library imports
 import numpy as np

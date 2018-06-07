@@ -4,28 +4,25 @@
 # --------
 #
 # * Geir Arne Hjelle <geir.arne.hjelle@kartverket.no>
-#
-# $Revision: 15244 $
-# $Date: 2018-06-01 23:58:09 +0200 (Fri, 01 Jun 2018) $
-# $LastChangedBy: hjegei $
 
 # Programs and directories
 F2PY = f2py
 F2PYEXTENSION = .cpython-36m-x86_64-linux-gnu.so
 
-DOCSDIR = $(CURDIR)/documents/docs
-DOCSDIR_WWW = /home/geosat/doc-where
 EXTDIR = $(CURDIR)/where/ext
 SOFADIR = $(CURDIR)/external/sofa/src
 IERSDIR = $(CURDIR)/external/iers/src
 GPT2WDIR = $(CURDIR)/external/gpt2w/src
 
 # Define phony targets (targets that are not files)
-.PHONY: develop install cython doc test typing format external sofa iers_2010 gpt2w
+.PHONY: all develop install cython doc test typing format external sofa iers_2010 gpt2w
+
+# Everything needed for installation
+all:	external cython develop
 
 # Install in developer mode (no need to reinstall after changing source)
 develop:
-	pip install --user -e .[optional,dev_tools]
+	pip install -e .[optional,dev_tools]
 
 # Install on server: Developer mode for ease of switching tags
 server:
@@ -39,10 +36,6 @@ install:
 cython:
 	python setup_cython.py
 
-# Create documentation
-doc:
-	( cd $(DOCSDIR) && make html && cp -R build/html $(DOCSDIR_WWW) )
-
 # Run tests
 test:
 	pytest -m quick --cov=where
@@ -53,7 +46,7 @@ test_system:
 typing:
 	mypy --ignore-missing-imports where
 
-# Reformat code (for now, only see what black would have done)
+# Reformat code
 black:
 	black --line-length 119 where/ analysis/ tests/
 

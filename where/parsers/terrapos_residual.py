@@ -13,9 +13,6 @@ Description:
 Reads data from files in Terrapos residual format.
 
 
-$Revision: 15027 $
-$Date: 2018-05-08 15:26:26 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 # External library imports
 import numpy as np

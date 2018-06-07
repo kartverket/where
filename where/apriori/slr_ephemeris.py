@@ -5,9 +5,6 @@ Description:
 Reads data from CPF file
 
 
-$Revision: 15221 $
-$Date: 2018-05-31 14:50:42 +0200 (Thu, 31 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 import numpy as np

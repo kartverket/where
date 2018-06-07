@@ -5,9 +5,6 @@ Description:
 The module includes a class for handling apriori GNSS bias corrections. Read SINEX bias file (see :cite:`sinex_bias`).
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 """
 # Standard library imports
 import datetime

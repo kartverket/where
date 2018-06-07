@@ -121,46 +121,46 @@ Where            </a>
     
 </footer><!-- /.post-info -->                    </div>
                 </div>
-                <h1 id="about-where">About Where</h1>
+                <h2 id="about-where">About Where</h2>
 <p><strong>Where</strong> is a Python Software package used for analyzing geodetic data.
 Currently, the software only supports VLBI data, but work is underway also for
 other techniques. The Where software is made available to the geodetic
 community as an open source,
 <a href="https://choosealicense.com/licenses/mit/">MIT-licensed</a> project.</p>
-<h1 id="getting-where">Getting Where</h1>
-<p>The latest release of Where is <strong>version 0.7.0</strong>. It can be
+<h2 id="getting-where">Getting Where</h2>
+<p>The latest release of Where is <strong>version 0.7.2</strong>. It can be
 <a href="where-latest.html">downloaded through GitHub</a>. See
 <a href="https://kartverket.github.io/where/installing-where.html">Installing Where</a> for details on how to install
 the software.</p>
-<h1 id="license">License</h1>
+<h2 id="license">License</h2>
 <p>Where is developed at the
 <a href="https://kartverket.no/en/">Norwegian Mapping Authority</a> and made available
 under an <a href="https://choosealicense.com/licenses/mit/"><strong>MIT license</strong></a>. The MIT
 license is permissive allowing you to use, modify and distribute the software,
 as long as copyright and license notices are preserved.</p>
-<h1 id="acknowledgement-and-citing">Acknowledgement and Citing</h1>
+<h2 id="acknowledgement-and-citing">Acknowledgement and Citing</h2>
 <p>If you are using Where for work or research, in presentations or as part of a
 code or analysis project, we ask that you
 <a href="https://kartverket.github.io/where/pages/acknowledging.html"><strong>acknowledge or cite</strong> Where as appropriate</a>.</p>
-<h1 id="software-overview">Software Overview</h1>
+<h2 id="software-overview">Software Overview</h2>
 <p>For information on how to <strong>get started</strong> using Where, see the
 <a href="https://kartverket.github.io/where/quickstart.html">Quickstart</a> tutorial.</p>
 <p>Where is built as a modular software so that it is easy to customize how the
 analysis done, change which models are used, and even write new models. The
 following describes some <strong>key concepts</strong> of the Where software.</p>
-<h2 id="pipeline">Pipeline</h2>
+<h3 id="pipeline">Pipeline</h3>
 <p>A <strong>pipeline</strong> is a description of a particular analysis. Currently, Where only
 supports the VLBI pipeline which can analyze VLBI data. Through
 <a href="#configuration-profile">configuration profiles</a> the VLBI pipeline can be set up
 to analyze different kinds of VLBI sessions, including R1/R4- and intensive
 sessions.</p>
-<h2 id="analysis">Analysis</h2>
+<h3 id="analysis">Analysis</h3>
 <p>An <strong>analysis</strong> is a pipeline applied to specific data. Typically, an analysis
 is the result of running Where on one VLBI session. The product of an analysis
 is a <a href="#dataset">dataset</a> containing all the input and output of the analysis. In
 addition, further products like sinex files, estimation parameters, maps etc may
 be written at the end of an analysis.</p>
-<h2 id="configuration">Configuration</h2>
+<h3 id="configuration">Configuration</h3>
 <p>Each Where pipeline has a <strong>configuration</strong> which defines the details of how the
 analysis is done. Examples of configuration settings for VLBI include</p>
 <ul>
@@ -173,14 +173,14 @@ analysis is done. Examples of configuration settings for VLBI include</p>
 <p>For each analysis, the pipeline configuration is copied and can be tailored to
 the specific session that is being analyzed, for instance by specifying clock
 breaks, or that observations for a given radio source should be discarded.</p>
-<h2 id="configuration-profile">Configuration Profile</h2>
+<h3 id="configuration-profile">Configuration Profile</h3>
 <p>In order to simplify configuring Where for different kinds of VLBI sessions,
 several <strong>configuration profiles</strong> are defined. The default configuration for
 VLBI is tuned for R1/R4 24-hour sessions. The same configuration does not work
 well for intensive sessions, for example, due to there being much fewer
 observations so that only a few variables should be estimated. This is supported
 by using the <code>intensives</code> configuration profile.</p>
-<h2 id="dataset">Dataset</h2>
+<h3 id="dataset">Dataset</h3>
 <p>Both input data and results from the modeling are stored in a Where
 <strong>dataset</strong>. A dataset essentially consists of corresponding time series for all
 relevant variables in an analysis.</p>

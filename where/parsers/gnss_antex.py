@@ -13,9 +13,6 @@ Description:
 Reads data from files in the GNSS Antenna Exchange (ANTEX) file format version 1.4 (see :cite:`antex`).
 
 
-$Revision: 15134 $
-$Date: 2018-05-18 13:05:43 +0200 (Fri, 18 May 2018) $
-$LastChangedBy: dahmic $
 """
 
 # Standard library imports

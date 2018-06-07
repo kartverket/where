@@ -5,9 +5,6 @@ Description:
 
 
 
-$Revision: 15029 $
-$Date: 2018-05-08 15:26:47 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 
 # Where imports

@@ -26,9 +26,6 @@ References:
 
 
 
-$Revision: 15044 $
-$Date: 2018-05-08 23:23:38 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 # External library imports

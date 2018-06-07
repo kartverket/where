@@ -5,9 +5,6 @@ Description:
 The module includes a class for handling apriori GNSS antenna corrections. Read GNSS ANTEX file (see :cite:`hilla2010`).
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 """
 # Standard library imports
 import datetime

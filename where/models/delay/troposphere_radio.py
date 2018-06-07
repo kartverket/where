@@ -19,9 +19,6 @@ TODO:
     * Test Dataset needed to assure better unit testing. So far all models are tested against output of the GIPSY
       program 'tropnominal', except GPT2w model.
 
-$Revision: 15052 $
-$Date: 2018-05-09 13:30:14 +0200 (Wed, 09 May 2018) $
-$LastChangedBy: kirann $
 
 """
 # External library imports

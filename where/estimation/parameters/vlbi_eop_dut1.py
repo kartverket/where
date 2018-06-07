@@ -10,9 +10,6 @@ This is done according to equations (2.34) - (2.36) in Teke :cite:`teke2011`.
 
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 

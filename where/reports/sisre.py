@@ -8,9 +8,6 @@ asdf
 
 
 
-$Revision: 15246 $
-$Date: 2018-06-03 22:32:05 +0200 (Sun, 03 Jun 2018) $
-$LastChangedBy: dahmic $
 """
 # Standard library imports
 from datetime import datetime
@@ -57,13 +54,10 @@ def write_session_report(rundate, tech):
     dset = dsets["orbit"][session]
     sisre_writer.sisre_writer(dset)
 
-    #with files.open("output_gnss_session_report", mode="wt") as fid:
+    # with files.open("output_gnss_session_report", mode="wt") as fid:
     #     rejected_satellites_per_station(fid, dsets)
     #     rejected_satellite_observations(fid, dsets)
     #     rejected_station_observations(fid, dsets)
-
-
-
 
 
 def rejected_satellites_per_station(fid, dsets):
@@ -135,6 +129,3 @@ def rejected_station_observations(fid, dsets):
             "| {sat:5s} | {obs:6d} | {eobs:6d} | {eobsp:6.0f} |\n"
             "".format(sat=sat, obs=sum_num_obs, eobs=sum_num_edit_obs, eobsp=100 * sum_num_edit_obs / sum_num_obs)
         )
-
-
-

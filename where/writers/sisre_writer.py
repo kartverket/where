@@ -5,9 +5,6 @@ Description:
 TODO: Has IGS monitoring group defined a SISRE format?
 
 
-$Revision: 15127 $
-$Date: 2018-05-16 19:46:18 +0200 (Wed, 16 May 2018) $
-$LastChangedBy: hjegei $
 """
 # Standard library imports
 from collections import namedtuple

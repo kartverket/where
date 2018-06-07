@@ -27,9 +27,6 @@ The navigation message is not defined for GALILEO, BeiDou, QZSS and IRNSS in RIN
 3.03 definition is used (see :cite:`rinex3`).
 
 
-$Revision: 15027 $
-$Date: 2018-05-08 15:26:26 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 
 # Standard library imports

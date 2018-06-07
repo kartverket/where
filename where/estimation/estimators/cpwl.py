@@ -8,9 +8,6 @@ Asdf.
 
 
 
-$Revision: 15204 $
-$Date: 2018-05-30 14:59:11 +0200 (Wed, 30 May 2018) $
-$LastChangedBy: kirann $
 
 """
 

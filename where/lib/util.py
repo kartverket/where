@@ -11,9 +11,6 @@ script. In particular handling of command line arguments and default
 options including --help are done.
 
 
-$Revision: 15267 $
-$Date: 2018-06-06 01:18:55 +0200 (Wed, 06 Jun 2018) $
-$LastChangedBy: hjegei $
 
 """
 
@@ -28,6 +25,7 @@ import sys
 
 # Where imports
 import where
+from where import pipelines
 from where.lib import config
 from where.lib import files
 from where.lib import log
@@ -152,6 +150,29 @@ def parse_args(*param_types, doc_module=None):
         return arguments
     elif arguments:
         return arguments[0]
+
+
+def parse_pipeline():
+    """Read pipeline from command line options
+
+    Looks for command line options in both long form (--pipeline) and short form (-p) where the first character of the
+    pipeline name is used. The pipelines recognized come from the pipelines.names() list. Take care to avoid clashes
+    (especially for the short form) when adding other pipelines or options.
+
+    Returns:
+        String: Pipeline specified at the command line.
+    """
+    available_pipes = pipelines.options()
+    option = check_options(*available_pipes)
+    if not option:
+        from where.lib.exceptions import UnknownPipelineError
+
+        raise UnknownPipelineError(
+            "Could not recognize the pipeline.\nUse one of {} to specify the pipeline"
+            "".format(", ".join(available_pipes))
+        )
+
+    return available_pipes[option]
 
 
 def not_implemented():

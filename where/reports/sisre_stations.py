@@ -5,9 +5,6 @@ Description:
 
 Normally the SISRE analysis is based only on one session/station. But in principle the SISRE analysis can be used for several station navigation files. In this case the session option in the configuration file is used for defining a list of stations, which are processed within the SISRE analysis. 
 
-$Revision: 15190 $
-$Date: 2018-05-28 23:34:49 +0200 (Mon, 28 May 2018) $
-$LastChangedBy: dahmic $
 """
 # Standard library imports
 from datetime import datetime

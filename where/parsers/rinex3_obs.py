@@ -12,9 +12,6 @@ Description:
 Reads data from files in the RINEX file format version 3.03 (see :cite:`rinex3`).
 
 
-$Revision: 15027 $
-$Date: 2018-05-08 15:26:26 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: dahmic $
 """
 
 # Standard library imports

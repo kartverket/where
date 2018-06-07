@@ -31,9 +31,6 @@ The following example shows output from a VLBI analysis of three stations::
     YARRA12M  KATH12M     888   2360367.26   -0.00579    0.10621 **
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 # Standard library imports

@@ -54,9 +54,6 @@ Note that `pint` has a system for defining new units and constants if necessary,
 
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 
 """
 

@@ -50,9 +50,6 @@ R = [ ey ] = [ -0.115836, 0.835705,  0.536822 ]   # reference system
 and the belonging unit vector pointing from the satellite to Sun is r_sun = (-0.959930, 0.044658, -0.276657) m
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
 """
 
 # Standard library imports

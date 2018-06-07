@@ -17,9 +17,6 @@ The following assumption is made by this parser:
 *) A data block is identified with a 5 digit domes number
 
 
-$Revision: 15038 $
-$Date: 2018-05-08 15:54:43 +0200 (Tue, 08 May 2018) $
-$LastChangedBy: kirann $
 
 """
 
