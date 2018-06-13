@@ -39,6 +39,7 @@
 
     <link href="https://kartverket.github.io/where/theme/css/pygments/native.css" rel="stylesheet">
     <link rel="stylesheet" href="https://kartverket.github.io/where/theme/css/style.css" type="text/css"/>
+        <link href="https://kartverket.github.io/where/static/css/custom.css" rel="stylesheet">
 
 
 
@@ -154,7 +155,9 @@ Where by doing:</p>
 <p>Windows typically does not come with a C compiler preinstalled.</p>
 <h2 id="downloading-external-libraries">Downloading external libraries</h2>
 <p>Where depends on three external libraries that are not included in the
-download. These are all available online and can be downloaded as follows:</p>
+download. These are all available online and can be downloaded separately. The
+downloading of these libraries is part of the <code>make</code>-process, so you do not need
+to do it explicitly.</p>
 <h3 id="sofa">SOFA</h3>
 <p>The
 <a href="https://www.iausofa.org/">SOFA (Standards of Fundamental Astronomy) software library</a>
@@ -163,7 +166,7 @@ transformations.</p>
 <p>The latest version of the library should be downloaded from
 <a href="http://www.iausofa.org/current_F.html">the SOFA web page</a> and stored in the
 <code>external/sofa/</code> directory. This can be done automatically by running</p>
-<pre><code>python download_sofa.py
+<pre><code>python download.py sofa
 </code></pre>
 <p>The library depends on a catalog of leap seconds, and should as such be updated
 regularly.</p>
@@ -175,25 +178,26 @@ whenever possible.</p>
 <a href="http://iers-conventions.obspm.fr/2010/2010_update/">the IERS web page</a> and
 stored in the <code>external/iers/</code> directory. This can be done automatically by
 running</p>
-<pre><code>python download_iers.py
+<pre><code>python download.py iers_2010
 </code></pre>
 <p>The library depends on a catalog of leap seconds, and should as such be updated
 regularly.</p>
 <h3 id="gpt2w">GPT2w</h3>
 <p>One of the available troposphere models in Where is the GPT2w. This is
-implemented using the <a href="">original GPT2w model</a> by
+implemented using the
+<a href="http://ggosatm.hg.tuwien.ac.at/DELAY/SOURCE/GPT2w/">original GPT2w model</a> by
 <a href="https://doi.org/10.1007/s10291-014-0403-7"><em>Böhm, J., Möller, G., Schindelegger, M. et al. GPS Solut (2015) 19: 433.</em></a></p>
 <p>The latest version of the Fortran library should be downloaded from
 <a href="http://ggosatm.hg.tuwien.ac.at/DELAY/SOURCE/GPT2w/">the GPT2w web page</a> and
 stored in the <code>external/gpt2w/</code> directory. This can be done automatically by
 running</p>
-<pre><code>python download_gpt2w.py
+<pre><code>python download.py gpt2w
 </code></pre>
 <h2 id="installing-where">Installing Where</h2>
 <p>The actual installation of Where happens in three steps:</p>
 <ul>
 <li>Compile the external Fortran libraries and build them as a Python module using
-  <a href=""><code>f2py</code></a>.</li>
+  <a href="https://docs.scipy.org/doc/numpy/f2py/"><code>f2py</code></a>.</li>
 <li>Compile and build the Cython code.</li>
 <li>Install Where on your computer.</li>
 </ul>
@@ -239,7 +243,7 @@ log      = ~/where_log
 directories named <code>where_data</code>, <code>where_work</code>, <code>where_archive</code>, and <code>where_log</code>
 inside your home directory. Feel free to change these according to your taste.</p>
 <h2 id="obtaining-data-files">Obtaining data files</h2>
-<pre><code>python download_data.py
+<pre><code>python download.py data
 </code></pre>
             </div>
             <!-- /.entry-content -->

@@ -1,0 +1,5 @@
+@media only screen and (max-device-width: 800px) {
+    #banner {
+        background-image: url("./images/banner_wide.jpg");
+    }
+}

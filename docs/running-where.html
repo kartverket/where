@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# fb: https://www.facebook.com/2008/fbml">
 <head>
-    <title>Quickstart - Where</title>
+    <title>Running Where - Where</title>
     <!-- Using the latest rendering mode for IE -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta charset="utf-8">
@@ -10,17 +10,17 @@
 
     <link href="https://kartverket.github.io/where/images/favicon.ico" rel="icon">
 
-<link rel="canonical" href="https://kartverket.github.io/where/quickstart.html">
+<link rel="canonical" href="https://kartverket.github.io/where/running-where.html">
 
         <meta name="author" content="Norwegian Mapping Authority" />
         <meta name="keywords" content="vlbi,where,there" />
-        <meta name="description" content="Get started using Where for VLBI analysis." />
+        <meta name="description" content="Use Where to run a VLBI analysis" />
 
         <meta property="og:site_name" content="Where" />
         <meta property="og:type" content="article"/>
-        <meta property="og:title" content="Quickstart"/>
-        <meta property="og:url" content="https://kartverket.github.io/where/quickstart.html"/>
-        <meta property="og:description" content="Get started using Where for VLBI analysis."/>
+        <meta property="og:title" content="Running Where"/>
+        <meta property="og:url" content="https://kartverket.github.io/where/running-where.html"/>
+        <meta property="og:description" content="Use Where to run a VLBI analysis"/>
         <meta property="article:published_time" content="2018-06-05" />
             <meta property="article:section" content="How-to" />
             <meta property="article:tag" content="vlbi" />
@@ -90,10 +90,10 @@ Where            </a>
         <article>
             <header class="page-header">
                 <h1>
-                    <a href="https://kartverket.github.io/where/quickstart.html"
+                    <a href="https://kartverket.github.io/where/running-where.html"
                        rel="bookmark"
-                       title="Permalink to Quickstart">
-                        Quickstart
+                       title="Permalink to Running Where">
+                        Running Where
                     </a>
                 </h1>
             </header>
@@ -128,68 +128,82 @@ basic Where command looks something like</p>
 <pre><code>where 2016 12 27 --vlbi --session=XA
 </code></pre>
 <p>This command can be extended by setting any of the many configuration options
-available for an analysis. More details about the configuration settings are in
-a <a href="https://kartverket.github.io/where/running-where.html#configuration">separate page</a> You can also run
-<code>where --help</code> for a quick overview.</p>
+available for an analysis. Some of these will be described below. You can also
+run <code>where --help</code> for a quick overview.</p>
+<h2 id="configuration">Configuration</h2>
+<p>Every Where analysis is based on a
+<a href="https://kartverket.github.io/where/the-where-software.html#configuration"><strong>configuration</strong></a> which describes
+in detail how the analysis is performed, including</p>
+<ul>
+<li>which models are being used,</li>
+<li>which version of each model that is being applied, and</li>
+<li>which parameters are being estimated.</li>
+</ul>
+<p>If you run Where like above - without specifying any particular settings - the
+default configuration is used.</p>
+<p>To take more control of the configuration, you should use the <code>where_setup</code>
+command. It has the same form as the <code>where</code> command:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA
+</code></pre>
+<p>Instead of running an analysis, this will only set up the configuration and show
+it to you. The configuration itself is stored in a text file at the location
+noted at the bottom of the configuration.</p>
+<p>There are a few options for changing the configuration settings. You can edit
+the text file yourself, using your regular tools. In addition, you can change
+individual settings by rerunning the <code>where_setup</code> command. For instance, to
+change the observation format and the elevation cut-off used, do:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA --obs_format=vgosdb --elevation:cut_off=3
+</code></pre>
+<p>You can also use the <code>-E</code> or <code>--edit</code> option to open the configuration in your
+standard editor and change it:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA -E
+</code></pre>
+<p>When you are happy with the configuration, run the analysis with the <code>where</code>
+command as above:</p>
+<pre><code>where 2016 12 27 --vlbi --session=XA
+</code></pre>
+<h3 id="archiving-deleting-and-resetting-the-configuration">Archiving, deleting and resetting the configuration</h3>
+<p>A configuration can be archived with the <code>-A</code> / <code>--archive</code> option. This will
+move the configuration (and any analysis done) to an archival directory:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA -A
+</code></pre>
+<p>If you want to delete a configuration (and any analysis done) you can use the
+<code>-D</code> / <code>--delete</code> option:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA -D
+</code></pre>
+<p>To reset the configuration without deleting any of the previous analysis done,
+use the <code>-N</code> / <code>--new</code> option:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA -N
+</code></pre>
+<p>The same option can be combined with the archive or delete option, to
+immediately start a new configuration:</p>
+<pre><code>where_setup 2016 12 27 --vlbi --session=XA --archive --new
+</code></pre>
+<h3 id="configuration-profiles">Configuration profiles</h3>
+<p>The default configuration for VLBI is tuned for analyzing R1/R4 sessions. To
+make it easy to analyze other kinds of sessions you can apply</p>
 <h2 id="comparative-analysis">Comparative analysis</h2>
-<p>If you want to do several analyses of the same session (for instance to compare
-different models etc), you need to mark the analysis with their own <strong>ids</strong>. For
-instance,</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA --elevation:cut_off=0 --id=zero
-where 2016 12 27 --vlbi --session=XA --elevation:cut_off=3 --id=three
-</code></pre>
-<p>This will run two Where analyses with different elevation cut-offs, stored with
-the ids of <code>zero</code> and <code>three</code>.</p>
 <h2 id="running-many-analyses">Running many analyses</h2>
-<p>To analyze many sessions at once, use the <code>where_runner</code> tool. It has the same
-form as the regular <code>where</code> command, except that it needs to dates: The start
-date and end date of the analysis (both inclusive).</p>
-<pre><code>where_runner 2016 1 1 2016 12 31 --vlbi
-</code></pre>
-<p>The <code>where_runner</code> command does not need a <code>--session</code> option. It will run all
-kinds of sessions that it finds. If you want to specify that only one or a few
-types of sessions should be analyzed, you can still list them with the
-<code>--session</code> option:</p>
-<pre><code>where_runner 2016 1 1 2016 12 31 --vlbi --session=XA,XE
-</code></pre>
 <h2 id="exploring-the-analysis-results">Exploring the analysis results</h2>
-<p>To look at the results of your analysis, you can use the companion tool
-<strong>There</strong>.  The <code>there</code> command works similarly to <code>where</code>, so to see the
-results from the analysis earlier you can do:</p>
-<pre><code>there 2016 12 27 --vlbi --session=XA
-</code></pre>
-<p>More details about There can be found on a
-<a href="https://kartverket.github.io/where/running-there.html">separate page</a>.</p>
+<p><strong>Where</strong> needs to know which data you want to analyze and which pipeline you want to analyze it with: <code>where &lt;date&gt; &lt;pipeline&gt;</code></p>
+<p>Example:
+```
+where 2009 11 2 -v </p>
+<p><code>``
+for more info on other options just type</code>where`</p>
+<p><strong>Where</strong> can run multiple analysis in a batch by specifing a time frame and a pipeline: <code>where &lt;from date inclusive&gt; &lt;to date inclusive&gt; &lt;pipeline&gt;</code></p>
+<p>Example:</p>
+<p><code>where_runner 2015 1 1 2015 2 4 -v</code></p>
+<p><code>where_runner</code> accepts the same input arguments as <code>where</code> and will pass along any options to <code>where</code>.</p>
+<h2 id="how-to-look-at-the-results">How to look at the results</h2>
+<p><strong>Where</strong> comes with a graphical tool called <strong>There</strong> to inspect the results of a analyzed dataset. Just type <code>there -v</code> and select the desired dataset from the dropdown menues. It can also be specified on the command line.</p>
+<p>Example:</p>
+<p><code>there 2009 11 2 -v</code></p>
+<p>The option <code>-v</code> add buttons and options that are relevant for a VLBI analysis. Type <code>there -h</code> for more info on other options.</p>
 <h3 id="timeseries">Timeseries</h3>
-<p>You can also compare some parameters across different analyses, by opening the
-the special <strong>timeseries</strong> dataset. This is done by starting There without
-specifying a date:</p>
-<pre><code>there --vlbi
-</code></pre>
-<p>Timeseries is a special dataset that is stored with the date 19700101. This
-dataset contains many fields with one value for each processed session. For
-instance by selecting <em>variance_factor</em> for the Y-axis this value can be showed
-for all processed sessions. Clicking on a point in the plot will print some info
-about the point in the command line window used to start There. This way
-sessions with abnormal variance factors can be identified and investigated
-further.</p>
-<h3 id="rerunning-single-sessions">Rerunning single sessions</h3>
-<p>A single session may to some extent be manipulated through There. For instance
-by selecting a station in the dropdown menu and then pressing <em>Ignore station</em>
-the station will be added to the ignore_station field in the configuration
-file. By pressing <em>Rerun</em> the session with be analyzed again and all data from
-the station will be removed from the analysis.</p>
-<p>Clock breaks may also be added by selecting the <em>Add clock break</em> behaviour for
-<em>Double click</em>, selecting the station that has the clock break and then double
-clicking on the plot where the clock break should be added. Do the analysis
-again with <em>Rerun</em>.</p>
-<h3 id="exploring-with-python">Exploring with Python</h3>
-<p>If you are comfortable using the Python programming language, you can also
-explore the analysis results in a Python interactive shell. Run Where with the
-<code>-I</code> / <code>--interactive</code> option. This will open an interactive Python (<code>ipython</code>)
-shell the analysis preloaded into variables named <code>v0</code>, <code>v1</code> and so on:</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA -I
-</code></pre>
+<p>Timeseries is a special dataset that is stored under the date 19700101. This dataset contains many fields with one value for each processed session. For instance by selecting <em>variance_factor</em> for the Y-axis this value can be showed for all processed sessions. Clicking on a point in the plot will print some info about the point in the command line window used to start <strong>There</strong>. This way sessions with abnormal variance factors can be identified and investigated further.</p>
+<h3 id="single-sessions">Single sessions</h3>
+<p>A single session may to some extent be manipulated through <code>there</code> by using the buttons. For instance by selecting a station in the dropdown menu and then pressing <em>Ignore station</em> the station will be added to the ignore_station field in the configuration file. By pressing <em>Rerun</em> the session with be analyzed again and all data from the station will be removed from the analysis. Clock breaks may also be added by selecting the <em>Add clock break</em> behaviour for <em>Double click</em>, selecting the station that has the clock break and then double clicking on the plot where the clock break should be added. Do the analysis again with <em>Rerun</em>. </p>
             </div>
             <!-- /.entry-content -->
         </article>
