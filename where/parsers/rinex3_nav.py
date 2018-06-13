@@ -585,7 +585,27 @@ class Rinex3NavParser(parser.Parser):
         for E5a-E1 (I/NAV message) and if bit 9 (e.g. 513, 516, 517) is set, than the satellite clock correction is
         given for E5b-E1 (F/NAV message).
         """
-        nav_mask = {0b1000000000: "INAV", 0b0100000000: "FNAV"}  # Mask definition for Galileo navigation messages
+        # TODO: Does it exist a better solution to detect INAV and FNAV message types?
+        # Mask definition for Galileo navigation messages
+        nav_mask = {
+            0b1000000001: "INAV_E1",  # = 513  <- normally used
+            0b1000001001: "INAV_E1",  # = 521
+            0b1000010001: "INAV_E1",  # = 529
+            0b1000011001: "INAV_E1",  # = 537
+            0b1000000100: "INAV_E5b",  # = 516  <- normally used
+            0b1000001100: "INAV_E5b",  # = 524
+            0b1000010100: "INAV_E5b",  # = 532
+            0b1000011100: "INAV_E5b",  # = 540
+            0b1000000101: "INAV_E1E5b",  # = 517  <- normally used
+            0b1000001101: "INAV_E1E5b",  # = 525
+            0b1000010101: "INAV_E1E5b",  # = 533
+            0b1000011101: "INAV_E1E5b",  # = 541
+            0b0100000010: "FNAV_E5a",  # = 258  <- normally used
+            0b0100001010: "FNAV_E5a",  # = 266
+            0b0100010010: "FNAV_E5a",  # = 274
+            0b0100011010: "FNAV_E5a",  # = 282
+        }
+
         self.data["nav_type"] = np.full(len(self.data["time"]), "", dtype=object)
 
         for sys in set(self.data["system"]):
@@ -610,7 +630,8 @@ class Rinex3NavParser(parser.Parser):
 
                 # Loop over different Galileo navigation masks for navigation message detection
                 for mask, nav_type in nav_mask.items():
-                    mask_idx = np.bitwise_and(data_source.astype(int), mask).astype(bool)
+                    # mask_idx = np.bitwise_and(data_source.astype(int), mask).astype(bool)
+                    mask_idx = data_source.astype(int) == mask
                     type_tmp[mask_idx] = nav_type
 
                 self.data["nav_type"][idx] = type_tmp

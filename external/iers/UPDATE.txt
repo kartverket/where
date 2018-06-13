@@ -1,0 +1,69 @@
+Installation and update instructions for using the IERS routines in WHERE
+==========================================================================
+
+To download or update the IERS routines, run the download.py script as follows:
+
+    cd ~/where
+    python download.py iers_2010
+
+See the file ~/where/config/download_iers_2010.conf for details about what is
+being downloaded.
+
+At first install, we also created and manually updated the
+iers_2010.pyf-signature file needed by the F2PY compiler. Creation of
+the signature file was done as follows (do NOT do this):
+
+    # cd ~/where/external/iers/src_2010
+    # f2py -h ../iers_2010.pyf *.F
+
+You should NOT do this when updating the library, as this will
+overwrite the manually updated, existing signature file. Instead, add
+any new IERS routines to the existing iers_2010.pyf-signature file by
+hand.
+
+There are some issues with the downloaded files. These are fixed by applying
+patches. The patches are created by
+
+    diff -u file.orig file > file.patch
+
+1. The HARDISP.F is written as a program, and not as a subroutine. We need it
+   to be a subroutine. Therefore we changed PROGRAM to SUBROUTINE and removed
+   reading of command line parameters. The changes are described in the
+   patch-file HARDISP.patch.
+
+2. For proper linking the compiler directive -fPIC needs to be added to the
+   makefile of the libiers-hardisp library (at the end of the line starting
+   with FF = ...). This change is described in the patch-file
+   hardisp-makefile.patch.
+
+3. There seems to be a bug in DAT.F in the libiers-dehant library. In the file,
+   CAL2JD is called as iau_CAL2JD (the original name in SOFA). Change the line
+   `CALL iau_CAL2JD ...` to `CALL CAL2JD ...` inside DAT.F. This change is
+   described in the patch-file dehant-DAT.patch.
+
+4. For proper linking the compiler directive -fPIC needs to be added to the
+   makefile of the libiers-dehant library (at the end of the line starting
+   with FF = ...). This change is described in the patch-file
+   dehant-makefile.patch.
+
+In order to simplify compilation, we have added iers_2010 as an external target
+in the WHERE Makefile. This will typically not need any changes when updating
+the library. The Makefile includes downloading the source code if
+necessary. Thus, the library can be updated by running:
+
+    cd ~/where
+    make iers_2010
+
+In the future we may need to support different IERS conventions in addition to
+2010. The idea is to keep all files here in different src_yyyy directories,
+each compiled to its own python module. The correct one can then be imported
+using something like
+
+    from where.ext import iers_2010 as iers
+
+
+Contact:
+--------
+
++ Geir Arne Hjelle <geir.arne.hjelle@kartverket.no>
+

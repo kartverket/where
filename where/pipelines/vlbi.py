@@ -50,7 +50,9 @@ def sessions(rundate):
     obs_format = config.tech.get("obs_format", section=TECH).str  # TODO: This always falls back on config.where ...
     file_vars = config.create_file_vars(rundate, TECH, session=None)
     del file_vars["session"]  # TODO: Do not add None variables to file_vars?
-    found_sessions = files.glob_variable(f"vlbi_obs_{obs_format}", variable="session", pattern=r"\w{2}", file_vars=file_vars)
+    found_sessions = files.glob_variable(
+        f"vlbi_obs_{obs_format}", variable="session", pattern=r"\w{2}", file_vars=file_vars
+    )
     return found_sessions
 
 

@@ -1,0 +1,179 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module iers_2010 ! in
+    interface  ! in :iers_2010
+        subroutine apg(dlat,dlon,az,el,d,grn,gre) ! in APG.F
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: dlon
+            double precision, intent(in) :: az
+            double precision, intent(in) :: el
+            double precision, intent(out) :: d
+            double precision, intent(out) :: grn
+            double precision, intent(out) :: gre
+        end subroutine apg
+        subroutine arg2(iyear,day,angle) ! in ARG2.F
+            integer, intent(in) :: iyear
+            double precision, intent(in) :: day
+            double precision dimension(11), intent(out) :: angle
+        end subroutine arg2
+        subroutine cnmtx(dmjd,h) ! in CNMTX.F
+            double precision, intent(in) :: dmjd
+            double precision dimension(12), intent(out) :: h
+        end subroutine cnmtx
+        subroutine dehanttideinel(xsta,yr,month,day,fhr,xsun,xmon,dxtide) ! in DEHANTTIDEINEL.F
+            double precision dimension(3), intent(in) :: xsta
+            integer, intent(in) :: yr
+            integer, intent(in) :: month
+            integer, intent(in) :: day
+            double precision, intent(in) :: fhr
+            double precision dimension(3), intent(in) :: xsun
+            double precision dimension(3), intent(in) :: xmon
+            double precision dimension(3), intent(out) :: dxtide
+        end subroutine dehanttideinel
+        subroutine fcnnut(mjd,x,y,dx,dy) ! in FCNNUT.F
+            double precision, intent(in) :: mjd
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+            double precision, intent(out) :: dx
+            double precision, intent(out) :: dy
+        end subroutine fcnnut
+        function fcul_a(latitude,height_m,t_k,elev_deg) ! in FCUL_A.F
+            double precision, intent(in) :: latitude
+            double precision, intent(in) :: height_m
+            double precision, intent(in) :: t_k
+            double precision, intent(in) :: elev_deg
+            double precision, intent(out) :: fcul_a
+        end function fcul_a
+        function fcul_b(latitude,height_m,doy,elev_deg) ! in FCUL_B.F
+            double precision, intent(in) :: latitude
+            double precision, intent(in) :: height_m
+            double precision, intent(in) :: doy
+            double precision, intent(in) :: elev_deg
+            double precision, intent(out) :: fcul_b
+        end function fcul_b
+        subroutine fculzd_hpa(latitude,ellip_ht,pressure,wvp,lambda_um,fcul_ztd,fcul_zhd,fcul_zwd) ! in FCUL_ZD_HPA.F
+            double precision, intent(in) :: latitude
+            double precision, intent(in) :: ellip_ht
+            double precision, intent(in) :: pressure
+            double precision, intent(in) :: wvp
+            double precision, intent(in) :: lambda_um
+            double precision, intent(out) :: fcul_ztd
+            double precision, intent(out) :: fcul_zhd
+            double precision, intent(out) :: fcul_zwd
+        end subroutine fculzd_hpa
+        subroutine fundarg(t,l,lp,f,d,om) ! in FUNDARG.F
+            double precision, intent(in) :: t
+            double precision, intent(out) :: l
+            double precision, intent(out) :: lp
+            double precision, intent(out) :: f
+            double precision, intent(out) :: d
+            double precision, intent(out) :: om
+        end subroutine fundarg
+        subroutine gconv2(a,f,x,y,z,phi,lambda,h) ! in GCONV2.F
+            double precision, intent(in) :: a
+            double precision, intent(in) :: f
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(in) :: z
+            double precision, intent(out) :: phi
+            double precision, intent(out) :: lambda
+            double precision, intent(out) :: h
+        end subroutine gconv2
+        subroutine gmf(dmjd,dlat,dlon,dhgt,zd,gmfh,gmfw) ! in GMF.F
+            double precision, intent(in) :: dmjd
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: dlon
+            double precision, intent(in) :: dhgt
+            double precision, intent(in) :: zd
+            double precision, intent(out) :: gmfh
+            double precision, intent(out) :: gmfw
+        end subroutine gmf
+        subroutine gpt(dmjd,dlat,dlon,dhgt,pres,temp,undu) ! in GPT.F
+            double precision, intent(in) :: dmjd
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: dlon
+            double precision, intent(in) :: dhgt
+            double precision, intent(out) :: pres
+            double precision, intent(out) :: temp
+            double precision, intent(out) :: undu
+        end subroutine gpt
+        subroutine gpt2(dmjd,dlat,dlon,hell,nstat,it,p,t,dt,e,ah,aw,undu) ! in GPT2.F
+            double precision, intent(in) :: dmjd
+            double precision depend(nstat), intent(in) :: dlat
+            double precision depend(nstat), intent(in) :: dlon
+            double precision depend(nstat), intent(in) :: hell
+            integer, intent(in) :: nstat
+            integer, intent(in) :: it
+            double precision dimension(nstat), intent(out) :: p
+            double precision dimension(nstat), intent(out) :: t
+            double precision dimension(nstat), intent(out) :: dt
+            double precision dimension(nstat), intent(out) :: e
+            double precision dimension(nstat), intent(out) :: ah
+            double precision dimension(nstat), intent(out) :: aw
+            double precision dimension(nstat), intent(out) :: undu
+        end subroutine gpt2
+        subroutine hardisp(dt, tamp, tph, irnt, samp, dz, ds, dw) ! in HARDISP.F
+            integer dimension(5), intent(in) :: dt
+            real dimension(3,11), intent(in) :: tamp
+            real dimension(3,11), intent(in) :: tph
+            integer, intent(in) :: irnt
+            real, intent(in) :: samp
+            real dimension(600), intent(out) :: dz
+            real dimension(600), intent(out) :: ds
+            real dimension(600), intent(out) :: dw
+        end subroutine hardisp
+        function hf2002_iers(tjd) ! in HF2002_IERS.F
+            double precision, intent(in) :: tjd
+            double precision, intent(out) :: hf2002_iers
+        end function hf2002_iers
+        subroutine iers_cmp_2015(version,epoch,x,y,error) ! in IERS_CMP_2015.F
+            integer, intent(in) :: version
+            real*8, intent(in) :: epoch
+            real*8, intent(out) :: x
+            real*8, intent(out) :: y
+            integer, intent(out) :: error
+        end subroutine iers_cmp_2015
+        subroutine ortho_eop(time,eop) ! in ORTHO_EOP.F
+            double precision, intent(in) :: time
+            double precision dimension(3), intent(out) :: eop
+        end subroutine ortho_eop
+        subroutine pmsdnut2(rmjd,pm) ! in PMSDNUT2.F
+            double precision, intent(in) :: rmjd
+            double precision dimension(2), intent(out) :: pm
+        end subroutine pmsdnut2
+        subroutine rg_zont2(t,dut,dlod,domega) ! in RG_ZONT2.F
+            double precision, intent(in) :: t
+            double precision, intent(out) :: dut
+            double precision, intent(out) :: dlod
+            double precision, intent(out) :: domega
+        end subroutine rg_zont2
+        subroutine utlibr(rmjd,dut1,dlod) ! in UTLIBR.F
+            double precision, intent(in) :: rmjd
+            double precision, intent(out) :: dut1
+            double precision, intent(out) :: dlod
+        end subroutine utlibr
+        subroutine vmf1(ah,aw,dmjd,dlat,zd,vmf1h,vmf1w) ! in VMF1.F
+            double precision, intent(in) :: ah
+            double precision, intent(in) :: aw
+            double precision, intent(in) :: dmjd
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: zd
+            double precision, intent(out) :: vmf1h
+            double precision, intent(out) :: vmf1w
+        end subroutine vmf1
+        subroutine vmf1_ht(ah,aw,dmjd,dlat,ht,zd,vmf1h,vmf1w) ! in VMF1_HT.F
+            double precision, intent(in) :: ah
+            double precision, intent(in) :: aw
+            double precision, intent(in) :: dmjd
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: ht
+            double precision, intent(in) :: zd
+            double precision, intent(out) :: vmf1h
+            double precision, intent(out) :: vmf1w
+        end subroutine vmf1_ht
+    end interface
+end python module iers_2010
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/

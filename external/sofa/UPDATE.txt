@@ -1,0 +1,39 @@
+Installation and update instructions for using the SOFA library in WHERE
+=========================================================================
+
+To download or update the SOFA library, run the download.py script as follows:
+
+    cd ~/where
+    python download.py sofa
+
+See the file ~/where/config/download_sofa.conf for details about what is being
+downloaded.
+
+The version/issue of the SOFA library currently installed can be found in the
+00READ.ME file. If a new version is available from the SOFA webpage
+(http://www.iausofa.org/) update the version in the download configuration file
+~/where/config/download_sofa.conf and run the download script again.
+
+At first install, we also created and manually updated the sofa.pyf-signature
+file needed by the F2PY compiler. Creation of the signature file was done as
+follows (do NOT do this):
+
+    # cd ~/where/external/sofa/src
+    # f2py -c ../sofa.pyf *.for
+
+You should NOT do this when updating the library, as this will overwrite the
+manually updated, existing signature file. Instead, add any new sofa routines
+to the existing sofa.pyf-signature file by hand.
+
+In order to simplify compilation, we have added sofa as an external target in
+the WHERE Makefile. This will typically not need any changes when updating the
+library. The Makefile includes downloading the source code if necessary. Thus,
+the library can be updated by running:
+
+    make sofa
+
+
+Contact:
+--------
+
++ Geir Arne Hjelle <geir.arne.hjelle@kartverket.no>

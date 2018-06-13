@@ -311,17 +311,14 @@ class There(tk.Tk):
             web_map.web_map_writer(self.figure.dataset)
         webbrowser.open(map_path.as_uri())
 
-    def show_config(self, file_key):
-        cfg_path = files.path(file_key, file_vars=self.vars)
+    def button_config(self):
+        cfg_path = files.path("config", file_vars=self.vars)
         if not cfg_path.exists():
             log.warn(f"Config file '{cfg_path}' does not exist")
             return
 
         editor.edit(cfg_path)
-        setup.add_timestamp(self.vars["rundate"], self.vars["tech"], self.vars["session"], "edited")
-
-    def button_config(self):
-        setup.edit_config(self.vars["rundate"], self.vars["tech"], self.vars["session"])
+        setup.add_timestamp(self.vars["rundate"], self.vars["tech"], self.vars["session"], "last update")
 
     def button_rerun(self):
         """Rerun the current analysis
@@ -573,7 +570,8 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             self.update_plot()
 
             # Add to config file
-            with config.update_tech_config(self.vars["rundate"], self.vars["tech"], self.vars["dataset_name"]) as cfg:
+            with config.update_tech_config(use_options=False, **self.vars) as cfg:
+                print(cfg.sources)
                 current = cfg.vlbi_clock_correction.clock_breaks.as_list(", *")
                 updated = ", ".join(sorted(current + [clock_break]))
                 cfg.update("vlbi_clock_correction", "clock_breaks", updated, source=util.get_program_name())
@@ -585,7 +583,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             log.error("Choose a baseline in the filter menu to ignore it")
         else:
             log.info(f"Adding {self.vars['baseline']} to ignore_baseline")
-            with config.update_tech_config(self.vars["rundate"], self.vars["tech"], self.vars["dataset_name"]) as cfg:
+            with config.update_tech_config(use_options=False, **self.vars) as cfg:
                 current = cfg.vlbi_ignore_baseline.baselines.as_list(", *")
                 updated = ", ".join(sorted(current + [self.vars["baseline"]]))
                 cfg.update("vlbi_ignore_baseline", "baselines", updated, source=util.get_program_name())
@@ -595,7 +593,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             log.error("Choose a station in the filter menu to ignore it")
         else:
             log.info(f"Adding {self.vars['station']} to ignore_station")
-            with config.update_tech_config(self.vars["rundate"], self.vars["tech"], self.vars["dataset_name"]) as cfg:
+            with config.update_tech_config(use_options=False, **self.vars) as cfg:
                 current = cfg.ignore_station.stations.as_list(", *")
                 updated = ", ".join(sorted(current + [self.vars["station"]]))
                 cfg.update("ignore_station", "stations", updated, source=util.get_program_name())
@@ -605,7 +603,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             log.error("Choose a source in the filter menu to ignore it")
         else:
             log.info(f"Adding {self.vars['source']} to ignore_source")
-            with config.update_tech_config(self.vars["rundate"], self.vars["tech"], self.vars["dataset_name"]) as cfg:
+            with config.update_tech_config(use_options=False, **self.vars) as cfg:
                 current = cfg.vlbi_ignore_source.sources.as_list(", *")
                 updated = ", ".join(sorted(current + [self.vars["source"]]))
                 cfg.update("vlbi_ignore_source", "sources", updated, source=util.get_program_name())

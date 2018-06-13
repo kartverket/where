@@ -324,7 +324,7 @@ class PosVelTable(PositionTable):
         """
         return (self._acr2itrs @ acr[:, :, None])[:, :, 0]
 
-    @cache.dependent_property.pos  # TODO Why does this not work, if uncommented?
+    @cache.dependent_property.pos
     def itrs_pos_sun(self):
         """Determine unit vector pointing from given position to Sun in ITRS
 
@@ -339,9 +339,9 @@ class PosVelTable(PositionTable):
         eph = apriori.get("ephemerides", time=self._time.tdb)  # TODO: is self._time.tdb correct
 
         # TODO:
-        # Actually the JPL ephemeris are given in the BCRS with Solar System barycenter as origin and not Earth mass center.
-        # So in principle the sun position vector has to be transformed from the BCRS to the GCRS. What are the consequences,
-        # if we do not consider these corrections?
+        # Actually the JPL ephemeris are given in the BCRS with Solar System barycenter as origin and not Earth mass
+        # center. So in principle the sun position vector has to be transformed from the BCRS to the GCRS. What are
+        # the consequences, if we do not consider these corrections?
         earth_sun = eph.itrs("earth", "sun")  # vector pointing from Earth to Sun mass center
 
         # Determination of vector between given position and Sun

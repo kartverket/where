@@ -1,0 +1,11 @@
+--- external/iers/src_2010/libiers-hardisp/makefile.orig	2018-06-13 11:21:25.454807753 +0200
++++ external/iers/src_2010/libiers-hardisp/makefile	2018-06-13 11:22:58.776569848 +0200
+@@ -22,7 +22,7 @@
+ # here.
+ 
+ FC = gfortran 
+-FF = -c -O 
++FF = -c -O -fPIC
+ 
+ #----YOU SHOULDN'T HAVE TO MODIFY ANYTHING BELOW THIS LINE---------
+ 

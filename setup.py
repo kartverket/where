@@ -52,7 +52,19 @@ setup(
     packages=["config", "where"] + ["where." + p for p in find_packages(where="where")],
     # List run-time dependencies here.  These will be installed by pip when your project is installed. For an analysis
     # of "install_requires" vs pip's requirements files see: https://packaging.python.org/en/latest/requirements.html
-    install_requires=["astropy", "cython", "IPython", "jplephem", "matplotlib", "numpy", "pandas", "pint", "scipy"],
+    install_requires=[
+        "astropy",
+        "cython",
+        "IPython",
+        "jplephem",
+        "matplotlib",
+        "midgard",
+        "numpy",
+        "pandas",
+        "pint",
+        "pycurl",
+        "scipy",
+    ],
     # List additional groups of dependencies here (e.g. development dependencies). You can install these using the
     # following syntax, for example:
     #   $ pip install -e .[optional,dev_tools]

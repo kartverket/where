@@ -239,8 +239,8 @@ def _config_paths(cfg_name):
 
 
 @contextmanager
-def update_tech_config(rundate, pipeline, session):
-    file_vars = create_file_vars(rundate, pipeline, session)
+def update_tech_config(rundate, tech, session, **kwargs):
+    file_vars = create_file_vars(rundate, tech, session, **kwargs)
     cfg_path = files.config.directory.replace(**file_vars).path / files.config.filename.replace(**file_vars).path
 
     with mg_config.Configuration.update_on_file(cfg_path) as cfg:

@@ -1,0 +1,50 @@
+Installation and update instructions for using the GPT2w library in WHERE
+=========================================================================
+
+To download or update the GPT2w library, run the download.py script as follows:
+
+    cd ~/where
+    python download.py gpt2w
+
+See the file ~/where/config/download_gpt2w.conf for details about what is being
+downloaded.
+
+At first install, we also created and manually updated the gpt2w.pyf-signature
+file needed by the F2PY compiler. Creation of the signature file was done as
+follows (do NOT do this):
+
+    # cd ~/where/external/gpt2w/src
+    # f2py -h ../gpt2w.pyf *.f
+
+You should NOT do this when updating the library, as this will overwrite the
+manually updated, existing signature file. Instead, add any new gpt2w routines
+to the existing gpt2w.pyf-signature file by hand.
+
+The following manual preparation of the signature file was carried out:
+
+1. Indication if arguments are input or output arguments by using intent(in) or
+   intent(out)
+ 
+2. An indication of the resulting module is needed. This is done by adding:
+         python module gpt2w ! in
+            interface  ! in :gpt2w
+                subroutine asknewet(....)
+                ...
+                end subroutine vmf1_ht
+            end interface
+         end python module gpt2w
+
+In order to simplify compilation, we have added gpt2w as an external target in
+the WHERE Makefile. This will typically not need any changes when updating the
+library. This also includes downloading the source code if necessary. Thus, the
+library can be updated by running:
+
+    cd ~/where
+    make gpt2w
+
+
+Contact:
+--------
+
++ Geir Arne Hjelle <geir.arne.hjelle@kartverket.no>
+

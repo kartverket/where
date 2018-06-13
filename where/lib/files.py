@@ -33,11 +33,55 @@ import shutil
 
 # External library imports
 import h5py
-import requests
+import pycurl
+
+# Midgard imports
+from midgard.dev import console
 
 # Where imports
 from where.lib import config
 from where.lib import log
+
+
+class URL(str):
+    """Simple wrapper around String to have URLs work similar to pathlib.Path
+
+    TODO: Move this to Midgard, add concatenation with "/"
+    """
+
+    @property
+    def name(self):
+        """Part of URL after the last /"""
+        return self.split("/")[-1]
+
+    def with_name(self, name):
+        """Replace part of URL after the last / with a new name
+
+        Args:
+            name (String):  New name.
+
+        Return:
+            URL:  URL with part after the last / replaced with the new name.
+        """
+        base_url, slash, _ = self.rpartition("/")
+        return self.__class__(f"{base_url}{slash}{name}")
+
+    def exists(self):
+        """Check whether the given URL returns a valid document
+
+        Try to download the first byte of the document (avoid downloading a big file if it exists).
+
+        Return:
+            Boolean:  True if URL leads to a valid document, False otherwise.
+        """
+        c = pycurl.Curl()
+        c.setopt(c.URL, self)
+        c.setopt(c.RANGE, "0-0")
+        try:
+            c.perform()
+        except pycurl.error:
+            return False
+        return True
 
 
 @contextmanager
@@ -163,25 +207,55 @@ def path(file_key, file_vars=None, default=None, is_zipped=None, download_missin
     """
     file_vars = dict() if file_vars is None else file_vars
     directory = config.files[file_key].directory.replace(default=default, **file_vars).path
-    filename = config.files[file_key].filename.replace(default=default, **file_vars).path
-    file_path = _replace_gz(directory / filename)
+    file_name = config.files[file_key].filename.replace(default=default, **file_vars).path
+    file_path = _replace_gz(directory / file_name)
 
     # Check for aliases
     if use_aliases and not path_exists(file_path):
         aliases = config.files.get("aliases", section=file_key, default="").replace(default=default, **file_vars).list
         for alias in aliases:
-            aliased_path = _replace_gz(directory / alias)
-            if aliased_path.exists():
+            aliased_path = _replace_gz(file_path.with_name(alias))
+            if path_exists(aliased_path):
                 return aliased_path
 
     # Try to download the file if it is missing
     if download_missing and not path_exists(file_path):
-        try:
-            download_file(file_key, file_vars)
-        except KeyError:
-            pass
+        downloaded_path = download_file(file_key, file_vars)
+        if downloaded_path is not None:
+            file_path = downloaded_path
 
     return file_path
+
+
+def url(file_key, file_vars=None, default=None, is_zipped=None, use_aliases=True):
+    """Construct a URL for a given file with variables
+
+    If `is_zipped` is None, and the file_path contains `<filename>{$gz}`, the file will be assumed to be a gzip-file if
+    there exists a file named `<filename>.gz` on the server.
+
+    Args:
+        file_key (String):        Key that is looked up in the Where file list.
+        file_vars (Dict):         Values used to replace variables in file name and path.
+        default (String):         Value to use for variables that are not in file_vars.
+        is_zipped (Bool/None):    True, False or None. If True, open with gzip. If None automatically decide.
+
+    Return:
+        String: Full URL with replaced variables in file name and url.
+    """
+    file_vars = dict() if file_vars is None else file_vars
+    base_url = config.files[file_key].url.replace(default=default, **file_vars).str.rstrip("/")
+    file_name = config.files[file_key].filename.replace(default=default, **file_vars).str
+    file_url = _replace_gz(URL(f"{base_url}/{file_name}"))
+
+    # Check for aliases
+    if use_aliases and not file_url.exists():
+        aliases = config.files.get("aliases", section=file_key, default="").replace(default=default, **file_vars).list
+        for alias in aliases:
+            aliased_url = _replace_gz(file_url.with_name(alias))
+            if aliased_url.exists():
+                return aliased_url
+
+    return file_url
 
 
 def _replace_gz(file_path, is_zipped=None):
@@ -191,8 +265,8 @@ def _replace_gz(file_path, is_zipped=None):
     there exists a file named `<filename>.gz`.
 
     Args:
-        file_path (Path):         Path to a file
-        is_zipped (Bool/None):    True, False or None. If True, open with gzip. If None automatically decide.
+        file_path (Path):       Path to a file
+        is_zipped (Bool/None):  True, False or None. If True, open with gzip. If None automatically decide.
 
     Returns:
         Path:  File path with {$gz} replaced.
@@ -206,6 +280,21 @@ def _replace_gz(file_path, is_zipped=None):
         return file_path.with_name(file_path.name.replace("{$gz}", ".gz"))
     else:
         return file_path.with_name(file_path.name.replace("{$gz}", ""))
+
+
+def empty_file(file_path):
+    """Check if a file is empty
+
+    Args:
+        file_path (Path):  Path to a file.
+
+    Returns:
+        Bool:  Whether path is empty or not.
+    """
+    if not path_exists(file_path):
+        log.error(f"File '{file_path}' does not exist.")
+
+    return False if file_path.stat().st_size > 0 else True
 
 
 def path_exists(file_path):
@@ -309,53 +398,50 @@ def publish_files(publish=None):
 def download_file(file_key, file_vars=None, create_dirs=True):
     """Download a file from the web and save it to disk
 
-    Todo:
-        requests does not handle ftp :(
-        requests is slow :(
+    Use pycurl (libcurl) to do the actual downloading. Request might be nicer for this, but turned out to be much
+    slower (and in practice unusable for bigger files) and also not really supporting ftp-downloads.
+
+    Args:
+        file_key (String):   File key that should be downloaded.
+        file_vars (Dict):    File variables used to find path from file_key.
+        create_dirs (Bool):  Create directories as necessary before downloading file.
     """
     if (
         "url" not in config.files[file_key]
         or not config.files[file_key].url.str
         or not config.where.files.download_missing.bool
     ):
-        return
+        return None
 
-    file_path = path(file_key, file_vars=file_vars)
+    file_path = path(file_key, file_vars=file_vars, download_missing=False)
     if file_path.exists():
-        return
+        return None
     if create_dirs:
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    file_url = "{}/{}".format(config.files[file_key].url.replace(**file_vars).str, file_path.name)
-    if file_url.startswith("ftp"):
-        # Attempt to monkey patch requests using requests_ftp
+    file_url = url(file_key, file_vars=file_vars)
+    file_path = file_path.with_name(file_url.name)
+    log.info(f"Download {file_key} from '{file_url}' to '{file_path}'")
+    with builtins.open(file_path, mode="wb") as fid:
+        c = pycurl.Curl()
+        c.setopt(c.URL, file_url)
+        c.setopt(c.WRITEDATA, fid)
         try:
-            import requests_ftp
-
-            requests.Session = requests_ftp.ftp.FTPSession
-            requests.sessions.Session = requests_ftp.ftp.FTPSession
-        except ImportError:
-            log.error(
-                "Automatic FTP download is not supported by requests out of the box.\n"
-                "       Please either\n"
-                "         Download {} manually and store it at {}, or\n"
-                "         Use requests_ftp: 'pip install requests_ftp'",
-                file_url,
-                file_path,
-            )
-            log.fatal("FTP not supported")
-
-    log.info("Download {} from {} to {}".format(file_key, file_url, file_path))
-    file_request = requests.get(file_url, stream=True)
-    if file_request.ok:
-        if file_request.apparent_encoding == "ascii":
-            with open_path(file_path, mode="w") as fid:
-                fid.write(file_request.text)
+            c.perform()
+            if not (200 <= c.getinfo(c.HTTP_CODE) <= 299):
+                raise pycurl.error()
+        except pycurl.error:
+            log.error(f"Problem downloading file: {c.getinfo(c.EFFECTIVE_URL)} ({c.getinfo(c.HTTP_CODE)})")
+            if file_path.exists():  # Print first 10 lines to console
+                head_of_file = f"Contents of '{file_path}':\n" + "\n".join(file_path.read_text().split("\n")[:10])
+                print(console.indent(head_of_file, num_spaces=8))
+                file_path.unlink()
+            log.warn(f"Try to download '{file_url}' manually and save it at '{file_path}'")
         else:
-            with open_path(file_path, mode="wb") as fid:
-                shutil.copyfileobj(file_request.raw, fid)
-    else:
-        log.warn("Problem downloading file: {r.status_code} {r.reason}", r=file_request)
+            log.info(f"Done downloading {file_key}")
+        finally:
+            c.close()
+    return file_path
 
 
 def glob_paths(file_key, file_vars=None, is_zipped=None):

@@ -1,0 +1,11 @@
+--- external/iers/src_2010/libiers-dehant/DAT.F.orig	2018-06-13 11:21:13.410580331 +0200
++++ external/iers/src_2010/libiers-dehant/DAT.F	2018-06-13 11:22:25.155935032 +0200
+@@ -221,7 +221,7 @@
+       END IF
+ 
+ *  Convert the date into an MJD.
+-      CALL iau_CAL2JD ( IY, IM, ID, DJM0, DJM, JS )
++      CALL CAL2JD ( IY, IM, ID, DJM0, DJM, JS )
+ 
+ *  If invalid year, month, or day, give up.
+       IF ( JS .LT. 0 ) GO TO 9000

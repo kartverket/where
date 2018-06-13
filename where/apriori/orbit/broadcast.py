@@ -224,6 +224,12 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         nav_type = config.tech.get("navigation_message_type", default="").dict
         if nav_type:
             for sys, type_ in nav_type.items():
+                sys = sys[0] if len(sys) > 0 else sys
+                if type_ == "INAV":
+                    type_ = ["INAV_E1", "INAV_E5b", "INAV_E1E5b"]
+                elif type_ == "FNAV":
+                    type_ = ["FNAV_E5a"]
+
                 remove_nav_type = nav_filtered.query("system == @sys and nav_type != @type_")
                 if not remove_nav_type.empty:
                     log.info(
@@ -350,6 +356,11 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             scale=self.dset_edit.transmission_time.scale,
         )
         dset.add_time("used_toe", val=self.dset_edit.toe[dset_brdc_idx], scale=self.dset_edit.toe.scale)
+
+        # Add information about group delays
+        for field in ["bgd_e1_e5a", "bgd_e1_e5b", "tgd", "tgd_b1_b3", "tgd_b2_b3"]:
+            if field in self.dset_edit.fields:
+                dset.add_float(field, val=self.dset_edit[field][dset_brdc_idx])
 
         # Add satellite clock correction to Dataset
         dset.add_float("gnss_satellite_clock", val=self.satellite_clock_correction(), unit="meter")

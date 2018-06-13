@@ -70,7 +70,10 @@ def sessions(rundate, pipeline):
     Returns:
         List: Strings with the names of the sessions.
     """
-    return plugins.call_one(package_name=__name__, plugin_name=pipeline, part="sessions", rundate=rundate)
+    try:
+        return plugins.call_one(package_name=__name__, plugin_name=pipeline, part="sessions", rundate=rundate)
+    except exceptions.UnknownPluginError:
+        return [""]  # If sessions is not defined in the pipeline, return a list with one unnamed session
 
 
 @cache.function
@@ -185,7 +188,7 @@ def run(rundate, pipeline, session=""):
     log.file_init(log_path=files.path("log"))
 
     # Read which stages to skip from technique configuration file.
-    skip_stages = config.tech.skip_stages.list
+    skip_stages = config.tech.get("skip_stages", default="").list
 
     # Register filekey suffix
     filekey_suffix = config.tech.filekey_suffix.list

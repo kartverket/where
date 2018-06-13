@@ -48,7 +48,7 @@ typing:
 
 # Reformat code
 black:
-	black --line-length 119 where/ analysis/ tests/
+	black --line-length 119 where/ analysis/ tests/ *.py
 
 
 ######################################################################
@@ -59,13 +59,19 @@ external:	sofa iers_2010 gpt2w
 # SOFA
 sofa:	$(EXTDIR)/sofa$(F2PYEXTENSION)
 
-$(EXTDIR)/sofa$(F2PYEXTENSION):	$(shell find $(SOFADIR) -type f)
+$(SOFADIR)/sofa.pyf:
+	python download.py sofa
+
+$(EXTDIR)/sofa$(F2PYEXTENSION):	$(SOFADIR)/sofa.pyf $(shell find $(SOFADIR) -type f)
 	( cd $(EXTDIR) && $(F2PY) -c $(SOFADIR)/sofa.pyf $(SOFADIR)/*.for )
 
 # IERS
 iers_2010:	$(EXTDIR)/iers_2010$(F2PYEXTENSION)
 
-$(EXTDIR)/iers_2010$(F2PYEXTENSION):	$(IERSDIR)_2010/libiers-dehant/libiers-dehant.a $(IERSDIR)_2010/libiers-hardisp/libiers-hardisp.a $(shell find $(IERSDIR)_2010 -type f)
+$(IERSDIR)_2010/iers_2010.pyf:
+	python download.py iers_2010
+
+$(EXTDIR)/iers_2010$(F2PYEXTENSION):	$(IERSDIR)_2010/iers_2010.pyf $(IERSDIR)_2010/libiers-dehant/libiers-dehant.a $(IERSDIR)_2010/libiers-hardisp/libiers-hardisp.a $(shell find $(IERSDIR)_2010 -type f)
 	( cd $(EXTDIR) && \
           $(F2PY) -c $(IERSDIR)_2010/iers_2010.pyf $(IERSDIR)_2010/*.F \
                   -liers-dehant -L$(IERSDIR)_2010/libiers-dehant -liers-hardisp -L$(IERSDIR)_2010/libiers-hardisp )
@@ -79,5 +85,8 @@ $(IERSDIR)_2010/libiers-hardisp/libiers-hardisp.a:	$(shell find $(IERSDIR)_2010/
 # GPT2w
 gpt2w:	$(EXTDIR)/gpt2w$(F2PYEXTENSION)
 
-$(EXTDIR)/gpt2w$(F2PYEXTENSION):	$(shell find $(GPT2WDIR) -type f)
+$(GPT2WDIR)/gpt2w.pyf:
+	python download.py gpt2w
+
+$(EXTDIR)/gpt2w$(F2PYEXTENSION):	$(GPT2WDIR)/gpt2w.pyf $(shell find $(GPT2WDIR) -type f)
 	( cd $(EXTDIR) && $(F2PY) -c $(GPT2WDIR)/gpt2w.pyf $(GPT2WDIR)/*.f )

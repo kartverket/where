@@ -1,0 +1,112 @@
+--- external/iers/src_2010/HARDISP.F.orig	2018-06-13 11:19:27.060572160 +0200
++++ external/iers/src_2010/HARDISP.F	2018-06-13 11:19:37.192763486 +0200
+@@ -1,4 +1,4 @@
+-      PROGRAM HARDISP
++      SUBROUTINE HARDISP(DT,TAMP,TPH,IRNT,SAMP,DZ,DS,DW)
+ *+
+ *  - - - - - - - - - - -
+ *   H A R D I S P
+@@ -198,6 +198,7 @@
+       IMPLICIT NONE
+       INTEGER I,IDAY,IDT,IMONTH,IRNT,IRHI,IRLI,IT,LUO,NB,NL,NP,NT,NTIN,
+      .        KK,NTOUT,MDAY
++      INTEGER DT
+ *+---------------------------------------------------------------------
+ *
+ *  Parameters below set the buffer size for computing the tides
+@@ -222,6 +223,7 @@
+       DIMENSION AW(NT),PW(NT),HCW(2*NT)
+       DIMENSION DZ(NL),DS(NL),DW(NL)
+       DIMENSION F(NT),SCR(3*NT),WF(NT)
++      DIMENSION DT(5)
+       COMMON/DATE/IT(5)
+       DATA DR/0.01745329252D0/,IRLI/1/
+       PARAMETER ( PI = 3.1415926535897932384626433D0 ) 
+@@ -235,72 +237,14 @@
+      .  2, 2, 0, 0, 0, 0,   1, 1, 0, 0, 0, 0,   1,-1, 0, 0, 0, 0,
+      .  1, 1,-2, 0, 0, 0,   1,-2, 0, 1, 0, 0,   0, 2, 0, 0, 0, 0,
+      .  0, 1, 0,-1, 0, 0,   0, 0, 2, 0, 0, 0/
+-*+----------------------------------------------------------------------
+-*
+-*  Check number of arguments from command line, then read them in
+-*
+-*-----------------------------------------------------------------------
+ 
+-      IF(IARGC().LT.7.OR.IARGC().GT.8) THEN
+-         WRITE(LUO,100)
+- 100     FORMAT(/,'Usage:',/,
+-     .  '   hardisp yr [d-of-yr | month day] hr min sec num samp',//,
+-     .  ' Where ',/,
+-     .  '   the UTC date given is the time of the first term output',/,
+-     .  '   num is the number of output epochs to be written out',/,
+-     .  '   samp is the sample interval (seconds)',//,
+-     .  '  The harmonics file (amp and phase of displacement) is ',/,
+-     .  '    read from standard input in the BLQ format used by  ',/,
+-     .  '    Scherneck and Bos                                   ',//,
+-     .  '  Results are written to standard output (units = m):',/,
+-     .  '      dU    dS    dW   ',/,
+-     .  '    using format: 3F14.6 ',/)
+-         STOP
+-      ENDIF
+-
+-      CALL GETARG(1,DUMM)
+-      READ(DUMM,102) IT(1)
+- 102  FORMAT(I4)
+-      IF(IARGC().EQ.7) THEN
+-        CALL GETARG(2,DUMM)
+-        READ(DUMM,102) IT(2)
+-        NB=0
+-      ENDIF
+-      IF(IARGC().EQ.8) THEN
+-        CALL GETARG(2,DUMM)
+-        READ(DUMM,102) IMONTH
+-        CALL GETARG(3,DUMM)
+-        READ(DUMM,102) IDAY
+-        NB=1
+-        IT(2) = IDAY + MDAY(IT(1),IMONTH)
+-      ENDIF
+-      CALL GETARG(NB+3,DUMM)
+-      READ(DUMM,102) IT(3)
+-      CALL GETARG(NB+4,DUMM)
+-      READ(DUMM,102) IT(4)
+-      CALL GETARG(NB+5,DUMM)
+-      READ(DUMM,102) IT(5)
+-      CALL GETARG(NB+6,DUMM)
+-      READ(DUMM,104) IRNT
+- 104  FORMAT(I6)
+-      CALL GETARG(NB+7,DUMM)
+-      READ(DUMM,106) SAMP
+- 106  FORMAT(F7.0)
+-
+-*+---------------------------------------------------------------------
+-*  Read in amplitudes and phases, in standard "Scherneck" form, from
+-*  standard input
+-*----------------------------------------------------------------------
+-      DO I=1,3
+-        READ(5,108) (TAMP(I,KK),KK=1,NTIN)
+- 108    FORMAT(1X,11F7.5)
++* Put date into common block
++      DO I=1,5
++        IT(I) = DT(I)
+       ENDDO
+-      DO I=1,3
+-        READ(5,110) (TPH(I,KK),KK=1,NTIN)
+- 110    FORMAT(1X,11F7.1)
+ 
+ * Change sign for phase, to be negative for lags
+-
++      DO I=1,3
+         DO KK=1,NTIN
+           TPH(I,KK)=-TPH(I,KK)
+         ENDDO
+@@ -365,9 +309,7 @@
+       CALL RECURS(DZ,NP,HCZ,NTOUT,WF,SCR)
+       CALL RECURS(DS,NP,HCS,NTOUT,WF,SCR)
+       CALL RECURS(DW,NP,HCW,NTOUT,WF,SCR)
+-      WRITE(LUO,120) (DZ(I),DS(I),DW(I),I=1,NP)
+- 120  FORMAT(3F14.6)
+-      IF(IRHI.EQ.IRNT) STOP
++      IF(IRHI.EQ.IRNT) RETURN
+       IRLI = IRHI + 1
+ 
+ *  Reset phases to the start of the new section

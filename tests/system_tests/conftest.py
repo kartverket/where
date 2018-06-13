@@ -49,8 +49,7 @@ def _parameters(rundate, pipeline, stage, session, **options):
     params = dict(
         command=(
             f"{where.__executable__} {rundate:%Y %m %d} --{pipeline} --session={session} -D -N "
-            f"--user={user} --output=system_test:{stage} "
-            + " ".join(f"--{o}={v}" for o, v in options.items())
+            f"--user={user} --output=system_test:{stage} " + " ".join(f"--{o}={v}" for o, v in options.items())
         ),
         file_vars=dict(
             rundate=rundate.strftime(config.FMT_date),

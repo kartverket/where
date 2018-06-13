@@ -255,6 +255,22 @@ class PreciseOrbit(orbit.AprioriOrbit):
             idx = dset.filter(satellite=sat)
             orb_idx = self.dset_edit.filter(satellite=sat)
 
+            if np.min(dset.time[idx].gps.mjd) < np.min(self.dset_edit.time[orb_idx].mjd):
+                log.fatal(
+                    "Interpolation range is exceeded by satellite {} ( {} [epoch] < {} [precise orbit])."
+                    "".format(
+                        sat, np.max(dset.time[idx].gps.datetime), np.max(self.dset_edit.time[orb_idx].gps.datetime)
+                    )
+                )
+
+            if np.max(dset.time[idx].gps.mjd) > np.max(self.dset_edit.time[orb_idx].mjd):
+                log.fatal(
+                    "Interpolation range is exceeded by satellite {} ({} [epoch] > {} [precise orbit])."
+                    "".format(
+                        sat, np.max(dset.time[idx].gps.datetime), np.max(self.dset_edit.time[orb_idx].gps.datetime)
+                    )
+                )
+
             # Interpolation for given observation epochs (transmission time)
             sat_pos[idx], sat_vel[idx] = interpolation.interpolate_with_derivative(
                 self.dset_edit.time[orb_idx].gps.sec_to_reference(ref_time),
@@ -313,6 +329,13 @@ class PreciseOrbit(orbit.AprioriOrbit):
         if clock_product == "sp3":
             all_sat_clk = self.dset_edit
         elif clock_product == "clk":
+
+            # TODO: File path information has to be improved, because 3 consecutive days are read.
+            log.info(
+                "Calculating satellite clock correction (precise) based on RINEX clock file {}.",
+                files.path(file_key="gnss_rinex_clk"),
+            )
+
             all_sat_clk = data.Dataset(
                 rundate=self.dset.rundate, tech=None, stage=None, dataset_name="gnss_sat_clk", dataset_id=0, empty=True
             )

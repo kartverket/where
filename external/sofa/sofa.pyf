@@ -1,0 +1,1708 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module sofa ! in
+    interface  ! in :sofa
+        subroutine iau_a2af(ndp,angle,sign,idmsf) ! in :sofa:a2af.for
+            integer, intent(in) :: ndp
+            double precision, intent(in) :: angle
+            character*(*), intent(out) :: sign
+            integer dimension(4), intent(out) :: idmsf
+        end subroutine iau_a2af
+        subroutine iau_a2tf(ndp,angle,sign,ihmsf) ! in :sofa:a2tf.for
+            integer, intent(in) :: ndp
+            double precision, intent(in) :: angle
+            character*(*), intent(out) :: sign
+            integer dimension(4), intent(out) :: ihmsf
+        end subroutine iau_a2tf
+        subroutine iau_ab(pnat,v,s,bm1,ppr) ! in :sofa:ab.for
+            double precision dimension(3), intent(in) :: pnat
+            double precision dimension(3), intent(in) :: v
+            double precision, intent(in) :: s
+            double precision, intent(in) :: bm1
+            double precision dimension(3), intent(out) :: ppr
+        end subroutine iau_ab
+        subroutine iau_ae2hd(az,el,phi,ha,dec) ! in :sofa:ae2hd.for
+            double precision, intent(in) :: az
+            double precision, intent(in) :: el
+            double precision, intent(in) :: phi
+            double precision, intent(out) :: ha
+            double precision, intent(out) :: dec
+        end subroutine iau_ae2hd
+        subroutine iau_af2a(s,ideg,iamin,asec,rad,j) ! in :sofa:af2a.for
+            character, intent(in) :: s
+            integer, intent(in) :: ideg
+            integer, intent(in) :: iamin
+            double precision, intent(in) :: asec
+            double precision, intent(out) :: rad
+            integer, intent(out) :: j
+        end subroutine iau_af2a
+        function iau_anp(a) ! in :sofa:anp.for
+            double precision, intent(in) :: a
+            double precision, intent(out) :: iau_anp
+        end function iau_anp
+        function iau_anpm(a) ! in :sofa:anpm.for
+            double precision, intent(in) :: a
+            double precision, intent(out) :: iau_anpm
+        end function iau_anpm
+        subroutine iau_apcg13(date1,date2,astrom) ! in :sofa:apcg13.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apcg13
+        subroutine iau_apcg(date1,date2,ebpv,ehp,astrom) ! in :sofa:apcg.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(in) :: ebpv
+            double precision dimension(3), intent(in) :: ehp
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apcg
+        subroutine iau_apci13(date1,date2,astrom,eo) ! in :sofa:apci13.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(30), intent(out) :: astrom
+            double precision, intent(out) :: eo
+        end subroutine iau_apci13
+        subroutine iau_apci(date1,date2,ebpv,ehp,x,y,s,astrom) ! in :sofa:apci.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(in) :: ebpv
+            double precision dimension(3), intent(in) :: ehp
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(in) :: s
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apci
+        subroutine iau_apco13(utc1,utc2,dut1,elong,phi,hm,xp,yp,phpa,tc,rh,wl,astrom,eo,j) ! in :sofa:apco13.for
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision dimension(30), intent(out) :: astrom
+            double precision, intent(out) :: eo
+            integer, intent(out) :: j
+        end subroutine iau_apco13
+        subroutine iau_apco(date1,date2,ebpv,ehp,x,y,s,theta,elong,phi,hm,xp,yp,sp,refa,refb,astrom) ! in :sofa:apco.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(in) :: ebpv
+            double precision dimension(3), intent(in) :: ehp
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(in) :: s
+            double precision, intent(in) :: theta
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: sp
+            double precision, intent(in) :: refa
+            double precision, intent(in) :: refb
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apco
+        subroutine iau_apcs13(date1,date2,pv,astrom) ! in :sofa:apcs13.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apcs13
+        subroutine iau_apcs(date1,date2,pv,ebpv,ehp,astrom) ! in :sofa:apcs.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(in) :: ebpv
+            double precision dimension(3), intent(in) :: ehp
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apcs
+        subroutine iau_aper13(ut11,ut12,astrom) ! in :sofa:aper13.for
+            double precision, intent(in) :: ut11
+            double precision, intent(in) :: ut12
+            double precision dimension(30), intent(inout) :: astrom
+        end subroutine iau_aper13
+        subroutine iau_aper(theta,astrom) ! in :sofa:aper.for
+            double precision, intent(in) :: theta
+            double precision dimension(30), intent(inout) :: astrom
+        end subroutine iau_aper
+        subroutine iau_apio13(utc1,utc2,dut1,elong,phi,hm,xp,yp,phpa,tc,rh,wl,astrom,j) ! in :sofa:apio13.for
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision dimension(30), intent(out) :: astrom
+            integer, intent(out) :: j
+        end subroutine iau_apio13
+        subroutine iau_apio(sp,theta,elong,phi,hm,xp,yp,refa,refb,astrom) ! in :sofa:apio.for
+            double precision, intent(in) :: sp
+            double precision, intent(in) :: theta
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: refa
+            double precision, intent(in) :: refb
+            double precision dimension(30), intent(out) :: astrom
+        end subroutine iau_apio
+        subroutine iau_atci13(rc,dc,pr,pd,px,rv,date1,date2,ri,di,eo) ! in :sofa:atci13.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: ri
+            double precision, intent(out) :: di
+            double precision, intent(out) :: eo
+        end subroutine iau_atci13
+        subroutine iau_atciq(rc,dc,pr,pd,px,rv,astrom,ri,di) ! in :sofa:atciq.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision dimension(30), intent(in) :: astrom
+            double precision, intent(out) :: ri
+            double precision, intent(out) :: di
+        end subroutine iau_atciq
+        subroutine iau_atciqn(rc,dc,pr,pd,px,rv,astrom,n,b,ri,di) ! in :sofa:atciqn.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision dimension(30), intent(in) :: astrom
+            integer, optional,check(shape(b,1)==n),depend(b), intent(in) :: n=shape(b,1)
+            double precision dimension(8,n), intent(in) :: b
+            double precision, intent(out) :: ri
+            double precision, intent(out) :: di
+        end subroutine iau_atciqn
+        subroutine iau_atciqz(rc,dc,astrom,ri,di) ! in :sofa:atciqz.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision dimension(30), intent(in) :: astrom
+            double precision, intent(out) :: ri
+            double precision, intent(out) :: di
+        end subroutine iau_atciqz
+        subroutine iau_atco13(rc,dc,pr,pd,px,rv,utc1,utc2,dut1,elong,phi,hm,xp,yp,phpa,tc,rh,wl,aob,zob,hob,dob,rob,eo,j) ! in :sofa:atco13.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision, intent(out) :: aob
+            double precision, intent(out) :: zob
+            double precision, intent(out) :: hob
+            double precision, intent(out) :: dob
+            double precision, intent(out) :: rob
+            double precision, intent(out) :: eo
+            integer, intent(out) :: j
+        end subroutine iau_atco13
+        subroutine iau_atic13(ri,di,date1,date2,rc,dc,eo) ! in :sofa:atic13.for
+            double precision, intent(in) :: ri
+            double precision, intent(in) :: di
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: rc
+            double precision, intent(out) :: dc
+            double precision, intent(out) :: eo
+        end subroutine iau_atic13
+        subroutine iau_aticq(ri,di,astrom,rc,dc) ! in :sofa:aticq.for
+            double precision, intent(in) :: ri
+            double precision, intent(in) :: di
+            double precision dimension(30), intent(in) :: astrom
+            double precision, intent(out) :: rc
+            double precision, intent(out) :: dc
+        end subroutine iau_aticq
+        subroutine iau_aticqn(ri,di,astrom,n,b,rc,dc) ! in :sofa:aticqn.for
+            double precision, intent(in) :: ri
+            double precision, intent(in) :: di
+            double precision dimension(30), intent(in) :: astrom
+            integer, optional,check(shape(b,1)==n),depend(b), intent(in) :: n=shape(b,1)
+            double precision dimension(8,n), intent(in) :: b
+            double precision, intent(out) :: rc
+            double precision, intent(out) :: dc
+        end subroutine iau_aticqn
+        subroutine iau_atio13(ri,di,utc1,utc2,dut1,elong,phi,hm,xp,yp,phpa,tc,rh,wl,aob,zob,hob,dob,rob,j) ! in :sofa:atio13.for
+            double precision, intent(in) :: ri
+            double precision, intent(in) :: di
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision, intent(out) :: aob
+            double precision, intent(out) :: zob
+            double precision, intent(out) :: hob
+            double precision, intent(out) :: dob
+            double precision, intent(out) :: rob
+            integer, intent(out) :: j
+        end subroutine iau_atio13
+        subroutine iau_atioq(ri,di,astrom,aob,zob,hob,dob,rob) ! in :sofa:atioq.for
+            double precision, intent(in) :: ri
+            double precision, intent(in) :: di
+            double precision dimension(30), intent(in) :: astrom
+            double precision, intent(out) :: aob
+            double precision, intent(out) :: zob
+            double precision, intent(out) :: hob
+            double precision, intent(out) :: dob
+            double precision, intent(out) :: rob
+        end subroutine iau_atioq
+        subroutine iau_atoc13(type_bn,ob1,ob2,utc1,utc2,dut1,elong,phi,hm,xp,yp,phpa,tc,rh,wl,rc,dc,j) ! in :sofa:atoc13.for
+            character*(*), intent(in) :: type_bn
+            double precision, intent(in) :: ob1
+            double precision, intent(in) :: ob2
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision, intent(out) :: rc
+            double precision, intent(out) :: dc
+            integer, intent(out) :: j
+        end subroutine iau_atoc13
+        subroutine iau_atoi13(type_bn,ob1,ob2,utc1,utc2,dut1,elong,phi,hm,xp,yp,phpa,tc,rh,wl,ri,di,j) ! in :sofa:atoi13.for
+            character*(*), intent(in) :: type_bn
+            double precision, intent(in) :: ob1
+            double precision, intent(in) :: ob2
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision, intent(out) :: ri
+            double precision, intent(out) :: di
+            integer, intent(out) :: j
+        end subroutine iau_atoi13
+        subroutine iau_atoiq(type_bn,ob1,ob2,astrom,ri,di) ! in :sofa:atoiq.for
+            character*(*), intent(in) :: type_bn
+            double precision, intent(in) :: ob1
+            double precision, intent(in) :: ob2
+            double precision dimension(30), intent(in) :: astrom
+            double precision, intent(out) :: ri
+            double precision, intent(out) :: di
+        end subroutine iau_atoiq
+        subroutine iau_bi00(dpsibi,depsbi,dra) ! in :sofa:bi00.for
+            double precision, intent(out) :: dpsibi
+            double precision, intent(out) :: depsbi
+            double precision, intent(out) :: dra
+        end subroutine iau_bi00
+        subroutine iau_bp00(date1,date2,rb,rp,rbp) ! in :sofa:bp00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+        end subroutine iau_bp00
+        subroutine iau_bp06(date1,date2,rb,rp,rbp) ! in :sofa:bp06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+        end subroutine iau_bp06
+        subroutine iau_bpn2xy(rbpn,x,y) ! in :sofa:bpn2xy.for
+            double precision dimension(3,3), intent(in) :: rbpn
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+        end subroutine iau_bpn2xy
+        subroutine iau_c2i00a(date1,date2,rc2i) ! in :sofa:c2i00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rc2i
+        end subroutine iau_c2i00a
+        subroutine iau_c2i00b(date1,date2,rc2i) ! in :sofa:c2i00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rc2i
+        end subroutine iau_c2i00b
+        subroutine iau_c2i06a(date1,date2,rc2i) ! in :sofa:c2i06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rc2i
+        end subroutine iau_c2i06a
+        subroutine iau_c2ibpn(date1,date2,rbpn,rc2i) ! in :sofa:c2ibpn.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(in) :: rbpn
+            double precision dimension(3,3), intent(out) :: rc2i
+        end subroutine iau_c2ibpn
+        subroutine iau_c2ixy(date1,date2,x,y,rc2i) ! in :sofa:c2ixy.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision dimension(3,3), intent(out) :: rc2i
+        end subroutine iau_c2ixy
+        subroutine iau_c2ixys(x,y,s,rc2i) ! in :sofa:c2ixys.for
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(in) :: s
+            double precision dimension(3,3), intent(out) :: rc2i
+        end subroutine iau_c2ixys
+        subroutine iau_c2s(p,theta,phi) ! in :sofa:c2s.for
+            double precision dimension(3), intent(in) :: p
+            double precision, intent(out) :: theta
+            double precision, intent(out) :: phi
+        end subroutine iau_c2s
+        subroutine iau_c2t00a(tta,ttb,uta,utb,xp,yp,rc2t) ! in :sofa:c2t00a.for
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2t00a
+        subroutine iau_c2t00b(tta,ttb,uta,utb,xp,yp,rc2t) ! in :sofa:c2t00b.for
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2t00b
+        subroutine iau_c2t06a(tta,ttb,uta,utb,xp,yp,rc2t) ! in :sofa:c2t06a.for
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2t06a
+        subroutine iau_c2tceo(rc2i,era,rpom,rc2t) ! in :sofa:c2tceo.for
+            double precision dimension(3,3), intent(in) :: rc2i
+            double precision, intent(in) :: era
+            double precision dimension(3,3), intent(in) :: rpom
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2tceo
+        subroutine iau_c2tcio(rc2i,era,rpom,rc2t) ! in :sofa:c2tcio.for
+            double precision dimension(3,3), intent(in) :: rc2i
+            double precision, intent(in) :: era
+            double precision dimension(3,3), intent(in) :: rpom
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2tcio
+        subroutine iau_c2teqx(rbpn,gst,rpom,rc2t) ! in :sofa:c2teqx.for
+            double precision dimension(3,3), intent(in) :: rbpn
+            double precision, intent(in) :: gst
+            double precision dimension(3,3), intent(in) :: rpom
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2teqx
+        subroutine iau_c2tpe(tta,ttb,uta,utb,dpsi,deps,xp,yp,rc2t) ! in :sofa:c2tpe.for
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: dpsi
+            double precision, intent(in) :: deps
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2tpe
+        subroutine iau_c2txy(tta,ttb,uta,utb,x,y,xp,yp,rc2t) ! in :sofa:c2txy.for
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision dimension(3,3), intent(out) :: rc2t
+        end subroutine iau_c2txy
+        subroutine iau_cal2jd(iy,im,id,djm0,djm,j) ! in :sofa:cal2jd.for
+            integer, intent(in) :: iy
+            integer, intent(in) :: im
+            integer, intent(in) :: id
+            double precision, intent(out) :: djm0
+            double precision, intent(out) :: djm
+            integer, intent(out) :: j
+        end subroutine iau_cal2jd
+        subroutine iau_cp(p,c) ! in :sofa:cp.for
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3), intent(out) :: c
+        end subroutine iau_cp
+        subroutine iau_cpv(pv,c) ! in :sofa:cpv.for
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(out) :: c
+        end subroutine iau_cpv
+        subroutine iau_cr(r,c) ! in :sofa:cr.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3,3), intent(out) :: c
+        end subroutine iau_cr
+        subroutine iau_d2dtf(scale,ndp,d1,d2,iy,im,id,ihmsf,j) ! in :sofa:d2dtf.for
+            character*(*), intent(in) :: scale
+            integer, intent(in) :: ndp
+            double precision, intent(in) :: d1
+            double precision, intent(in) :: d2
+            integer, intent(out) :: iy
+            integer, intent(out) :: im
+            integer, intent(out) :: id
+            integer dimension(4), intent(out) :: ihmsf
+            integer, intent(out) :: j
+        end subroutine iau_d2dtf
+        subroutine iau_d2tf(ndp,days,sign,ihmsf) ! in :sofa:d2tf.for
+            integer, intent(in) :: ndp
+            double precision, intent(in) :: days
+            character*(*), intent(out) :: sign
+            integer dimension(4), intent(out) :: ihmsf
+        end subroutine iau_d2tf
+        subroutine iau_dat(iy,im,id,fd,deltat,j) ! in :sofa:dat.for
+            integer, intent(in) :: iy
+            integer, intent(in) :: im
+            integer, intent(in) :: id
+            double precision, intent(in) :: fd
+            double precision, intent(out) :: deltat
+            integer, intent(out) :: j
+        end subroutine iau_dat
+        function iau_dtdb(date1,date2,ut,elong,u,v) ! in :sofa:dtdb.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: ut
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: u
+            double precision, intent(in) :: v
+            double precision, intent(out) :: iau_dtdb
+        end function iau_dtdb
+        subroutine iau_dtf2d(scale,iy,im,id,ihr,imn,sec,d1,d2,j) ! in :sofa:dtf2d.for
+            character*(*), intent(in) :: scale
+            integer, intent(in) :: iy
+            integer, intent(in) :: im
+            integer, intent(in) :: id
+            integer, intent(in) :: ihr
+            integer, intent(in) :: imn
+            double precision, intent(in) :: sec
+            double precision, intent(out) :: d1
+            double precision, intent(out) :: d2
+            integer, intent(out) :: j
+        end subroutine iau_dtf2d
+        subroutine iau_eceq06(date1, date2, dl, db, dr, dd) ! in :sofa:eceq06.for
+        	double precision, intent(in) :: date1
+        	double precision, intent(in) :: date2
+        	double precision, intent(in) :: dl
+        	double precision, intent(in) :: db
+        	double precision, intent(out) :: dr
+        	double precision, intent(out) :: dd
+        end subroutine iau_eceq06
+        subroutine iau_ecm06(date1,date2,rm) ! in ecm06.for
+    		double precision, intent(in) :: date1
+    		double precision, intent(in) :: date2
+    		double precision dimension(3,3), intent(out) :: rm
+		end subroutine iau_ecm06
+        function iau_ee00a(date1,date2) ! in :sofa:ee00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_ee00a
+        end function iau_ee00a
+        function iau_ee00b(date1,date2) ! in :sofa:ee00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_ee00b
+        end function iau_ee00b
+        function iau_ee00(date1,date2,epsa,dpsi) ! in :sofa:ee00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: epsa
+            double precision, intent(in) :: dpsi
+            double precision, intent(out) :: iau_ee00
+        end function iau_ee00
+        function iau_ee06a(date1,date2) ! in :sofa:ee06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_ee06a
+        end function iau_ee06a
+        function iau_eect00(date1,date2) ! in :sofa:eect00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_eect00
+        end function iau_eect00
+        subroutine iau_eform(n,a,f,j) ! in :sofa:eform.for
+            integer, intent(in) :: n
+            double precision, intent(out) :: a
+            double precision, intent(out) :: f
+            integer, intent(out) :: j
+        end subroutine iau_eform
+        function iau_eo06a(date1,date2) ! in :sofa:eo06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_eo06a
+        end function iau_eo06a
+        function iau_eors(rnpb,s) ! in :sofa:eors.for
+            double precision dimension(3,3), intent(in) :: rnpb
+            double precision, intent(in) :: s
+            double precision, intent(out) :: iau_eors
+        end function iau_eors
+        subroutine iau_epb2jd(epb,djm0,djm) ! in :sofa:epb2jd.for
+            double precision, intent(in) :: epb
+            double precision, intent(out) :: djm0
+            double precision, intent(out) :: djm
+        end subroutine iau_epb2jd
+        function iau_epb(dj1,dj2) ! in :sofa:epb.for
+            double precision, intent(in) :: dj1
+            double precision, intent(in) :: dj2
+            double precision, intent(out) :: iau_epb
+        end function iau_epb
+        subroutine iau_epj2jd(epj,djm0,djm) ! in :sofa:epj2jd.for
+            double precision, intent(in) :: epj
+            double precision, intent(out) :: djm0
+            double precision, intent(out) :: djm
+        end subroutine iau_epj2jd
+        function iau_epj(dj1,dj2) ! in :sofa:epj.for
+            double precision, intent(in) :: dj1
+            double precision, intent(in) :: dj2
+            double precision, intent(out) :: iau_epj
+        end function iau_epj
+        subroutine iau_epv00(date1,date2,pvh,pvb,jstat) ! in :sofa:epv00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(out) :: pvh
+            double precision dimension(3,2), intent(out) :: pvb
+            integer, intent(out) :: jstat
+        end subroutine iau_epv00
+        subroutine iau_eqec06(date1,date2,dr,dd,dl,db) ! in eqec06.for
+    		double precision, intent(in) :: date1
+    		double precision, intent(in) :: date2
+    		double precision, intent(in) :: dr
+    		double precision, intent(in) :: dd
+    		double precision, intent(out) :: dl
+    		double precision, intent(out) :: db
+		end subroutine iau_eqec06
+        function iau_eqeq94(date1,date2) ! in :sofa:eqeq94.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_eqeq94
+        end function iau_eqeq94
+        function iau_era00(dj1,dj2) ! in :sofa:era00.for
+            double precision, intent(in) :: dj1
+            double precision, intent(in) :: dj2
+            double precision, intent(out) :: iau_era00
+        end function iau_era00
+        function iau_fad03(t) ! in :sofa:fad03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fad03
+        end function iau_fad03
+        function iau_fae03(t) ! in :sofa:fae03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fae03
+        end function iau_fae03
+        function iau_faf03(t) ! in :sofa:faf03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_faf03
+        end function iau_faf03
+        function iau_faju03(t) ! in :sofa:faju03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_faju03
+        end function iau_faju03
+        function iau_fal03(t) ! in :sofa:fal03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fal03
+        end function iau_fal03
+        function iau_falp03(t) ! in :sofa:falp03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_falp03
+        end function iau_falp03
+        function iau_fama03(t) ! in :sofa:fama03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fama03
+        end function iau_fama03
+        function iau_fame03(t) ! in :sofa:fame03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fame03
+        end function iau_fame03
+        function iau_fane03(t) ! in :sofa:fane03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fane03
+        end function iau_fane03
+        function iau_faom03(t) ! in :sofa:faom03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_faom03
+        end function iau_faom03
+        function iau_fapa03(t) ! in :sofa:fapa03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fapa03
+        end function iau_fapa03
+        function iau_fasa03(t) ! in :sofa:fasa03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fasa03
+        end function iau_fasa03
+        function iau_faur03(t) ! in :sofa:faur03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_faur03
+        end function iau_faur03
+        function iau_fave03(t) ! in :sofa:fave03.for
+            double precision, intent(in) :: t
+            double precision, intent(out) :: iau_fave03
+        end function iau_fave03
+        subroutine iau_fk52h(r5,d5,dr5,dd5,px5,rv5,rh,dh,drh,ddh,pxh,rvh) ! in :sofa:fk52h.for
+            double precision, intent(in) :: r5
+            double precision, intent(in) :: d5
+            double precision, intent(in) :: dr5
+            double precision, intent(in) :: dd5
+            double precision, intent(in) :: px5
+            double precision, intent(in) :: rv5
+            double precision, intent(out) :: rh
+            double precision, intent(out) :: dh
+            double precision, intent(out) :: drh
+            double precision, intent(out) :: ddh
+            double precision, intent(out) :: pxh
+            double precision, intent(out) :: rvh
+        end subroutine iau_fk52h
+        subroutine iau_fk5hip(r5h,s5h) ! in :sofa:fk5hip.for
+            double precision dimension(3,3), intent(out) :: r5h
+            double precision dimension(3), intent(out) :: s5h
+        end subroutine iau_fk5hip
+        subroutine iau_fk5hz(r5,d5,date1,date2,rh,dh) ! in :sofa:fk5hz.for
+            double precision, intent(in) :: r5
+            double precision, intent(in) :: d5
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: rh
+            double precision, intent(out) :: dh
+        end subroutine iau_fk5hz
+        subroutine iau_fw2m(gamb,phib,psi,eps,r) ! in :sofa:fw2m.for
+            double precision, intent(in) :: gamb
+            double precision, intent(in) :: phib
+            double precision, intent(in) :: psi
+            double precision, intent(in) :: eps
+            double precision dimension(3,3), intent(out) :: r
+        end subroutine iau_fw2m
+        subroutine iau_fw2xy(gamb,phib,psi,eps,x,y) ! in :sofa:fw2xy.for
+            double precision, intent(in) :: gamb
+            double precision, intent(in) :: phib
+            double precision, intent(in) :: psi
+            double precision, intent(in) :: eps
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+        end subroutine iau_fw2xy
+        subroutine iau_g2icrs(dl,db,dr,dd) ! in :sofa:g2icrs.for
+            double precision, intent(in) :: dl
+            double precision, intent(in) :: db
+            double precision, intent(out) :: dr
+            double precision, intent(out) :: dd
+        end subroutine iau_g2icrs
+        subroutine iau_gc2gde(a,f,xyz,elong,phi,height,j) ! in :sofa:gc2gde.for
+            double precision, intent(in) :: a
+            double precision, intent(in) :: f
+            double precision dimension(3), intent(in) :: xyz
+            double precision, intent(out) :: elong
+            double precision, intent(out) :: phi
+            double precision, intent(out) :: height
+            integer, intent(out) :: j
+        end subroutine iau_gc2gde
+        subroutine iau_gc2gd(n,xyz,elong,phi,height,j) ! in :sofa:gc2gd.for
+            integer, intent(in) :: n
+            double precision dimension(3), intent(in) :: xyz
+            double precision, intent(out) :: elong
+            double precision, intent(out) :: phi
+            double precision, intent(out) :: height
+            integer, intent(out) :: j
+        end subroutine iau_gc2gd
+        subroutine iau_gd2gce(a,f,elong,phi,height,xyz,j) ! in :sofa:gd2gce.for
+            double precision, intent(in) :: a
+            double precision, intent(in) :: f
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: height
+            double precision dimension(3), intent(out) :: xyz
+            integer, intent(out) :: j
+        end subroutine iau_gd2gce
+        subroutine iau_gd2gc(n,elong,phi,height,xyz,j) ! in :sofa:gd2gc.for
+            integer, intent(in) :: n
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: height
+            double precision dimension(3), intent(out) :: xyz
+            integer, intent(out) :: j
+        end subroutine iau_gd2gc
+        function iau_gmst00(uta,utb,tta,ttb) ! in :sofa:gmst00.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(out) :: iau_gmst00
+        end function iau_gmst00
+        function iau_gmst06(uta,utb,tta,ttb) ! in :sofa:gmst06.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(out) :: iau_gmst06
+        end function iau_gmst06
+        function iau_gmst82(dj1,dj2) ! in :sofa:gmst82.for
+            double precision, intent(in) :: dj1
+            double precision, intent(in) :: dj2
+            double precision, intent(out) :: iau_gmst82
+        end function iau_gmst82
+        function iau_gst00a(uta,utb,tta,ttb) ! in :sofa:gst00a.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(out) :: iau_gst00a
+        end function iau_gst00a
+        function iau_gst00b(uta,utb) ! in :sofa:gst00b.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(out) :: iau_gst00b
+        end function iau_gst00b
+        function iau_gst06a(uta,utb,tta,ttb) ! in :sofa:gst06a.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision, intent(out) :: iau_gst06a
+        end function iau_gst06a
+        function iau_gst06(uta,utb,tta,ttb,rnpb) ! in :sofa:gst06.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(in) :: tta
+            double precision, intent(in) :: ttb
+            double precision dimension(3,3), intent(in) :: rnpb
+            double precision, intent(out) :: iau_gst06
+        end function iau_gst06
+        function iau_gst94(uta,utb) ! in :sofa:gst94.for
+            double precision, intent(in) :: uta
+            double precision, intent(in) :: utb
+            double precision, intent(out) :: iau_gst94
+        end function iau_gst94
+        subroutine iau_h2fk5(rh,dh,drh,ddh,pxh,rvh,r5,d5,dr5,dd5,px5,rv5) ! in :sofa:h2fk5.for
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: dh
+            double precision, intent(in) :: drh
+            double precision, intent(in) :: ddh
+            double precision, intent(in) :: pxh
+            double precision, intent(in) :: rvh
+            double precision, intent(out) :: r5
+            double precision, intent(out) :: d5
+            double precision, intent(out) :: dr5
+            double precision, intent(out) :: dd5
+            double precision, intent(out) :: px5
+            double precision, intent(out) :: rv5
+        end subroutine iau_h2fk5
+        subroutine iau_hd2ae(ha,dec,phi,az,el) ! in :sofa:hd2ae.for
+            double precision, intent(in) :: ha
+            double precision, intent(in) :: dec
+            double precision, intent(in) :: phi
+            double precision, intent(out) :: az
+            double precision, intent(out) :: el
+        end subroutine iau_hd2ae
+        function iau_hd2pa(ha,dec,phi) ! in :sofa:hd2pa.for
+            double precision, intent(in) :: ha
+            double precision, intent(in) :: dec
+            double precision, intent(in) :: phi
+            double precision, intent(out) :: iau_hd2pa
+        end function iau_hd2pa
+        subroutine iau_hfk5z(rh,dh,date1,date2,r5,d5,dr5,dd5) ! in :sofa:hfk5z.for
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: dh
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: r5
+            double precision, intent(out) :: d5
+            double precision, intent(out) :: dr5
+            double precision, intent(out) :: dd5
+        end subroutine iau_hfk5z
+        subroutine iau_icrs2g(dr,dd,dl,db) ! in :sofa:icrs2g.for
+            double precision, intent(in) :: dr
+            double precision, intent(in) :: dd
+            double precision, intent(out) :: dl
+            double precision, intent(out) :: db
+        end subroutine iau_icrs2g
+        subroutine iau_ir(r) ! in :sofa:ir.for
+            double precision dimension(3,3), intent(out) :: r
+        end subroutine iau_ir
+        subroutine iau_jd2cal(dj1,dj2,iy,im,id,fd,j) ! in :sofa:jd2cal.for
+            double precision, intent(in) :: dj1
+            double precision, intent(in) :: dj2
+            integer, intent(out) :: iy
+            integer, intent(out) :: im
+            integer, intent(out) :: id
+            double precision, intent(out) :: fd
+            integer, intent(out) :: j
+        end subroutine iau_jd2cal
+        subroutine iau_jdcalf(ndp,dj1,dj2,iymdf,j) ! in :sofa:jdcalf.for
+            integer, intent(in) :: ndp
+            double precision, intent(in) :: dj1
+            double precision, intent(in) :: dj2
+            integer dimension(4), intent(out) :: iymdf
+            integer, intent(out) :: j
+        end subroutine iau_jdcalf
+        subroutine iau_ld(bm,p,q,e,em,dlim,p1) ! in :sofa:ld.for
+            double precision, intent(in) :: bm
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3), intent(in) :: q
+            double precision dimension(3), intent(in) :: e
+            double precision, intent(in) :: em
+            double precision, intent(in) :: dlim
+            double precision dimension(3), intent(out) :: p1
+        end subroutine iau_ld
+        subroutine iau_ldn(n,b,ob,sc,sn) ! in :sofa:ldn.for
+            integer, optional,check(shape(b,1)==n),depend(b), intent(in) :: n=shape(b,1)
+            double precision dimension(8,n), intent(in) :: b
+            double precision dimension(3), intent(in) :: ob
+            double precision dimension(3), intent(in) :: sc
+            double precision dimension(3), intent(out) :: sn
+        end subroutine iau_ldn
+        subroutine iau_ldsun(p,e,em,p1) ! in :sofa:ldsun.for
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3), intent(in) :: e
+            double precision, intent(in) :: em
+            double precision dimension(3), intent(out) :: p1
+        end subroutine iau_ldsun
+        subroutine iau_lteceq(epj,dl,db,dr,dd) ! in lteceq.for
+		    double precision, intent(in) :: epj
+		    double precision, intent(in) :: dl
+		    double precision, intent(in) :: db
+		    double precision, intent(out) :: dr
+		    double precision, intent(out) :: dd
+		end subroutine iau_lteceq
+		subroutine iau_ltecm(epj,rm) ! in ltecm.for
+		    double precision, intent(in) :: epj
+		    double precision dimension(3,3), intent(out) :: rm
+		end subroutine iau_ltecm
+		subroutine iau_lteqec(epj,dr,dd,dl,db) ! in lteqec.for
+		    double precision, intent(in) :: epj
+		    double precision, intent(in) :: dr
+		    double precision, intent(in) :: dd
+		    double precision, intent(out) :: dl
+		    double precision, intent(out) :: db
+		end subroutine iau_lteqec
+		subroutine iau_ltpb(epj,rpb) ! in ltpb.for
+		    double precision, intent(in) :: epj
+		    double precision dimension(3,3), intent(out) :: rpb
+		end subroutine iau_ltpb
+		subroutine iau_ltpecl(epj,vec) ! in ltpecl.for
+		    double precision, intent(in) :: epj
+		    double precision dimension(3), intent(out) :: vec
+		end subroutine iau_ltpecl
+		subroutine iau_ltpequ(epj,veq) ! in ltpequ.for
+		    double precision, intent(in) :: epj
+		    double precision dimension(3), intent(out) :: veq
+		end subroutine iau_ltpequ
+		subroutine iau_ltp(epj,rp) ! in ltp.for
+		    double precision, intent(in) :: epj
+		    double precision dimension(3,3), intent(out) :: rp
+		end subroutine iau_ltp
+        subroutine iau_num00a(date1,date2,rmatn) ! in :sofa:num00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rmatn
+        end subroutine iau_num00a
+        subroutine iau_num00b(date1,date2,rmatn) ! in :sofa:num00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rmatn
+        end subroutine iau_num00b
+        subroutine iau_num06a(date1,date2,rmatn) ! in :sofa:num06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rmatn
+        end subroutine iau_num06a
+        subroutine iau_numat(epsa,dpsi,deps,rmatn) ! in :sofa:numat.for
+            double precision, intent(in) :: epsa
+            double precision, intent(in) :: dpsi
+            double precision, intent(in) :: deps
+            double precision dimension(3,3), intent(out) :: rmatn
+        end subroutine iau_numat
+        subroutine iau_nut00a(date1,date2,dpsi,deps) ! in :sofa:nut00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsi
+            double precision, intent(out) :: deps
+        end subroutine iau_nut00a
+        subroutine iau_nut00b(date1,date2,dpsi,deps) ! in :sofa:nut00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsi
+            double precision, intent(out) :: deps
+        end subroutine iau_nut00b
+        subroutine iau_nut06a(date1,date2,dpsi,deps) ! in :sofa:nut06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsi
+            double precision, intent(out) :: deps
+        end subroutine iau_nut06a
+        subroutine iau_nut80(date1,date2,dpsi,deps) ! in :sofa:nut80.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsi
+            double precision, intent(out) :: deps
+        end subroutine iau_nut80
+        subroutine iau_nutm80(date1,date2,rmatn) ! in :sofa:nutm80.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rmatn
+        end subroutine iau_nutm80
+        function iau_obl06(date1,date2) ! in :sofa:obl06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_obl06
+        end function iau_obl06
+        function iau_obl80(date1,date2) ! in :sofa:obl80.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_obl80
+        end function iau_obl80
+        subroutine iau_p06e(date1,date2,eps0,psia,oma,bpa,bqa,pia,bpia,epsa,chia,za,zetaa,thetaa,pa,gam,phi,psi) ! in :sofa:p06e.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: eps0
+            double precision, intent(out) :: psia
+            double precision, intent(out) :: oma
+            double precision, intent(out) :: bpa
+            double precision, intent(out) :: bqa
+            double precision, intent(out) :: pia
+            double precision, intent(out) :: bpia
+            double precision, intent(out) :: epsa
+            double precision, intent(out) :: chia
+            double precision, intent(out) :: za
+            double precision, intent(out) :: zetaa
+            double precision, intent(out) :: thetaa
+            double precision, intent(out) :: pa
+            double precision, intent(out) :: gam
+            double precision, intent(out) :: phi
+            double precision, intent(out) :: psi
+        end subroutine iau_p06e
+        subroutine iau_p2pv(p,pv) ! in :sofa:p2pv.for
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3,2), intent(out) :: pv
+        end subroutine iau_p2pv
+        subroutine iau_p2s(p,theta,phi,r) ! in :sofa:p2s.for
+            double precision dimension(3), intent(in) :: p
+            double precision, intent(out) :: theta
+            double precision, intent(out) :: phi
+            double precision, intent(out) :: r
+        end subroutine iau_p2s
+        subroutine iau_pap(a,b,theta) ! in :sofa:pap.for
+            double precision dimension(3), intent(in) :: a
+            double precision dimension(3), intent(in) :: b
+            double precision, intent(out) :: theta
+        end subroutine iau_pap
+        subroutine iau_pas(al,ap,bl,bp,theta) ! in :sofa:pas.for
+            double precision, intent(in) :: al
+            double precision, intent(in) :: ap
+            double precision, intent(in) :: bl
+            double precision, intent(in) :: bp
+            double precision, intent(out) :: theta
+        end subroutine iau_pas
+        subroutine iau_pb06(date1,date2,bzeta,bz,btheta) ! in :sofa:pb06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: bzeta
+            double precision, intent(out) :: bz
+            double precision, intent(out) :: btheta
+        end subroutine iau_pb06
+        subroutine iau_pdp(a,b,adb) ! in :sofa:pdp.for
+            double precision dimension(3), intent(in) :: a
+            double precision dimension(3), intent(in) :: b
+            double precision, intent(out) :: adb
+        end subroutine iau_pdp
+        subroutine iau_pfw06(date1,date2,gamb,phib,psib,epsa) ! in :sofa:pfw06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: gamb
+            double precision, intent(out) :: phib
+            double precision, intent(out) :: psib
+            double precision, intent(out) :: epsa
+        end subroutine iau_pfw06
+        subroutine iau_plan94(date1,date2,np,pv,j) ! in :sofa:plan94.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            integer, intent(in) :: np
+            double precision dimension(3,2), intent(out) :: pv
+            integer, intent(out) :: j
+        end subroutine iau_plan94
+        subroutine iau_pmat00(date1,date2,rbp) ! in :sofa:pmat00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rbp
+        end subroutine iau_pmat00
+        subroutine iau_pmat06(date1,date2,rbp) ! in :sofa:pmat06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rbp
+        end subroutine iau_pmat06
+        subroutine iau_pmat76(date1,date2,rmatp) ! in :sofa:pmat76.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rmatp
+        end subroutine iau_pmat76
+        subroutine iau_pm(p,r) ! in :sofa:pm.for
+            double precision dimension(3), intent(in) :: p
+            double precision, intent(out) :: r
+        end subroutine iau_pm
+        subroutine iau_pmp(a,b,amb) ! in :sofa:pmp.for
+            double precision dimension(3), intent(in) :: a
+            double precision dimension(3), intent(in) :: b
+            double precision dimension(3), intent(out) :: amb
+        end subroutine iau_pmp
+        subroutine iau_pmpx(rc,dc,pr,pd,px,rv,pmt,pob,pco) ! in :sofa:pmpx.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision, intent(in) :: pmt
+            double precision dimension(3), intent(in) :: pob
+            double precision dimension(3), intent(out) :: pco
+        end subroutine iau_pmpx
+        subroutine iau_pmsafe(ra1,dec1,pmr1,pmd1,px1,rv1,ep1a,ep1b,ep2a,ep2b,ra2,dec2,pmr2,pmd2,px2,rv2,j) ! in :sofa:pmsafe.for
+            double precision, intent(in) :: ra1
+            double precision, intent(in) :: dec1
+            double precision, intent(in) :: pmr1
+            double precision, intent(in) :: pmd1
+            double precision, intent(in) :: px1
+            double precision, intent(in) :: rv1
+            double precision, intent(in) :: ep1a
+            double precision, intent(in) :: ep1b
+            double precision, intent(in) :: ep2a
+            double precision, intent(in) :: ep2b
+            double precision, intent(out) :: ra2
+            double precision, intent(out) :: dec2
+            double precision, intent(out) :: pmr2
+            double precision, intent(out) :: pmd2
+            double precision, intent(out) :: px2
+            double precision, intent(out) :: rv2
+            integer, intent(out) :: j
+        end subroutine iau_pmsafe
+        subroutine iau_pn00a(date1,date2,dpsi,deps,epsa,rb,rp,rbp,rn,rbpn) ! in :sofa:pn00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsi
+            double precision, intent(out) :: deps
+            double precision, intent(out) :: epsa
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+            double precision dimension(3,3), intent(out) :: rn
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pn00a
+        subroutine iau_pn00b(date1,date2,dpsi,deps,epsa,rb,rp,rbp,rn,rbpn) ! in :sofa:pn00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsi
+            double precision, intent(out) :: deps
+            double precision, intent(out) :: epsa
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+            double precision dimension(3,3), intent(out) :: rn
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pn00b
+        subroutine iau_pn00(date1,date2,dpsi,deps,epsa,rb,rp,rbp,rn,rbpn) ! in :sofa:pn00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: dpsi
+            double precision, intent(in) :: deps
+            double precision, intent(out) :: epsa
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+            double precision dimension(3,3), intent(out) :: rn
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pn00
+        subroutine iau_pn06a(date1,date2,dpsi,deps,epsa,rb,rp,rbp,rn,rbpn) ! in :sofa:pn06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: dpsi
+            double precision, intent(in) :: deps
+            double precision, intent(out) :: epsa
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+            double precision dimension(3,3), intent(out) :: rn
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pn06a
+        subroutine iau_pn06(date1,date2,dpsi,deps,epsa,rb,rp,rbp,rn,rbpn) ! in :sofa:pn06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: dpsi
+            double precision, intent(in) :: deps
+            double precision, intent(out) :: epsa
+            double precision dimension(3,3), intent(out) :: rb
+            double precision dimension(3,3), intent(out) :: rp
+            double precision dimension(3,3), intent(out) :: rbp
+            double precision dimension(3,3), intent(out) :: rn
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pn06
+        subroutine iau_pn(p,r,u) ! in :sofa:pn.for
+            double precision dimension(3), intent(in) :: p
+            double precision, intent(out) :: r
+            double precision dimension(3), intent(out) :: u
+        end subroutine iau_pn
+        subroutine iau_pnm00a(date1,date2,rbpn) ! in :sofa:pnm00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pnm00a
+        subroutine iau_pnm00b(date1,date2,rbpn) ! in :sofa:pnm00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pnm00b
+        subroutine iau_pnm06a(date1,date2,rnpb) ! in :sofa:pnm06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rnpb
+        end subroutine iau_pnm06a
+        subroutine iau_pnm80(date1,date2,rmatpn) ! in :sofa:pnm80.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rmatpn
+        end subroutine iau_pnm80
+        subroutine iau_pom00(xp,yp,sp,rpom) ! in :sofa:pom00.for
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: sp
+            double precision dimension(3,3), intent(out) :: rpom
+        end subroutine iau_pom00
+        subroutine iau_ppp(a,b,apb) ! in :sofa:ppp.for
+            double precision dimension(3), intent(in) :: a
+            double precision dimension(3), intent(in) :: b
+            double precision dimension(3), intent(out) :: apb
+        end subroutine iau_ppp
+        subroutine iau_ppsp(a,s,b,apsb) ! in :sofa:ppsp.for
+            double precision dimension(3), intent(in) :: a
+            double precision, intent(in) :: s
+            double precision dimension(3), intent(in) :: b
+            double precision dimension(3), intent(out) :: apsb
+        end subroutine iau_ppsp
+        subroutine iau_pr00(date1,date2,dpsipr,depspr) ! in :sofa:pr00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: dpsipr
+            double precision, intent(out) :: depspr
+        end subroutine iau_pr00
+        subroutine iau_prec76(date01,date02,date11,date12,zeta,z,theta) ! in :sofa:prec76.for
+            double precision, intent(in) :: date01
+            double precision, intent(in) :: date02
+            double precision, intent(in) :: date11
+            double precision, intent(in) :: date12
+            double precision, intent(out) :: zeta
+            double precision, intent(out) :: z
+            double precision, intent(out) :: theta
+        end subroutine iau_prec76
+        subroutine iau_pv2p(pv,p) ! in :sofa:pv2p.for
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3), intent(out) :: p
+        end subroutine iau_pv2p
+        subroutine iau_pv2s(pv,theta,phi,r,td,pd,rd) ! in :sofa:pv2s.for
+            double precision dimension(3,2), intent(in) :: pv
+            double precision, intent(out) :: theta
+            double precision, intent(out) :: phi
+            double precision, intent(out) :: r
+            double precision, intent(out) :: td
+            double precision, intent(out) :: pd
+            double precision, intent(out) :: rd
+        end subroutine iau_pv2s
+        subroutine iau_pvdpv(a,b,adb) ! in :sofa:pvdpv.for
+            double precision dimension(3,2), intent(in) :: a
+            double precision dimension(3,2), intent(in) :: b
+            double precision dimension(2), intent(out) :: adb
+        end subroutine iau_pvdpv
+        subroutine iau_pvm(pv,r,s) ! in :sofa:pvm.for
+            double precision dimension(3,2), intent(in) :: pv
+            double precision, intent(out) :: r
+            double precision, intent(out) :: s
+        end subroutine iau_pvm
+        subroutine iau_pvmpv(a,b,amb) ! in :sofa:pvmpv.for
+            double precision dimension(3,2), intent(in) :: a
+            double precision dimension(3,2), intent(in) :: b
+            double precision dimension(3,2), intent(out) :: amb
+        end subroutine iau_pvmpv
+        subroutine iau_pvppv(a,b,apb) ! in :sofa:pvppv.for
+            double precision dimension(3,2), intent(in) :: a
+            double precision dimension(3,2), intent(in) :: b
+            double precision dimension(3,2), intent(out) :: apb
+        end subroutine iau_pvppv
+        subroutine iau_pvstar(pv,ra,dec,pmr,pmd,px,rv,j) ! in :sofa:pvstar.for
+            double precision dimension(3,2), intent(in) :: pv
+            double precision, intent(out) :: ra
+            double precision, intent(out) :: dec
+            double precision, intent(out) :: pmr
+            double precision, intent(out) :: pmd
+            double precision, intent(out) :: px
+            double precision, intent(out) :: rv
+            integer, intent(out) :: j
+        end subroutine iau_pvstar
+        subroutine iau_pvtob(elong,phi,hm,xp,yp,sp,theta,pv) ! in :sofa:pvtob.for
+            double precision, intent(in) :: elong
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: hm
+            double precision, intent(in) :: xp
+            double precision, intent(in) :: yp
+            double precision, intent(in) :: sp
+            double precision, intent(in) :: theta
+            double precision dimension(3,2), intent(out) :: pv
+        end subroutine iau_pvtob
+        subroutine iau_pvu(dt,pv,upv) ! in :sofa:pvu.for
+            double precision, intent(in) :: dt
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(out) :: upv
+        end subroutine iau_pvu
+        subroutine iau_pvup(dt,pv,p) ! in :sofa:pvup.for
+            double precision, intent(in) :: dt
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3), intent(out) :: p
+        end subroutine iau_pvup
+        subroutine iau_pvxpv(a,b,axb) ! in :sofa:pvxpv.for
+            double precision dimension(3,2), intent(in) :: a
+            double precision dimension(3,2), intent(in) :: b
+            double precision dimension(3,2), intent(out) :: axb
+        end subroutine iau_pvxpv
+        subroutine iau_pxp(a,b,axb) ! in :sofa:pxp.for
+            double precision dimension(3), intent(in) :: a
+            double precision dimension(3), intent(in) :: b
+            double precision dimension(3), intent(out) :: axb
+        end subroutine iau_pxp
+        subroutine iau_refco(phpa,tc,rh,wl,refa,refb) ! in :sofa:refco.for
+            double precision, intent(in) :: phpa
+            double precision, intent(in) :: tc
+            double precision, intent(in) :: rh
+            double precision, intent(in) :: wl
+            double precision, intent(out) :: refa
+            double precision, intent(out) :: refb
+        end subroutine iau_refco
+        subroutine iau_rm2v(r,w) ! in :sofa:rm2v.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3), intent(out) :: w
+        end subroutine iau_rm2v
+        subroutine iau_rv2m(w,r) ! in :sofa:rv2m.for
+            double precision dimension(3), intent(in) :: w
+            double precision dimension(3,3), intent(out) :: r
+        end subroutine iau_rv2m
+        subroutine iau_rx(phi,r) ! in :sofa:rx.for
+            double precision, intent(in) :: phi
+            double precision dimension(3,3), intent(inout) :: r
+        end subroutine iau_rx
+        subroutine iau_rxp(r,p,rp) ! in :sofa:rxp.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3), intent(out) :: rp
+        end subroutine iau_rxp
+        subroutine iau_rxpv(r,pv,rpv) ! in :sofa:rxpv.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(out) :: rpv
+        end subroutine iau_rxpv
+        subroutine iau_rxr(a,b,atb) ! in :sofa:rxr.for
+            double precision dimension(3,3), intent(in) :: a
+            double precision dimension(3,3), intent(in) :: b
+            double precision dimension(3,3), intent(out) :: atb
+        end subroutine iau_rxr
+        subroutine iau_ry(theta,r) ! in :sofa:ry.for
+            double precision, intent(in) :: theta
+            double precision dimension(3,3), intent(inout) :: r
+        end subroutine iau_ry
+        subroutine iau_rz(psi,r) ! in :sofa:rz.for
+            double precision, intent(in) :: psi
+            double precision dimension(3,3), intent(inout) :: r
+        end subroutine iau_rz
+        function iau_s00a(date1,date2) ! in :sofa:s00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_s00a
+        end function iau_s00a
+        function iau_s00b(date1,date2) ! in :sofa:s00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_s00b
+        end function iau_s00b
+        function iau_s00(date1,date2,x,y) ! in :sofa:s00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(out) :: iau_s00
+        end function iau_s00
+        function iau_s06a(date1,date2) ! in :sofa:s06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_s06a
+        end function iau_s06a
+        function iau_s06(date1,date2,x,y) ! in :sofa:s06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: x
+            double precision, intent(in) :: y
+            double precision, intent(out) :: iau_s06
+        end function iau_s06
+        subroutine iau_s2c(theta,phi,c) ! in :sofa:s2c.for
+            double precision, intent(in) :: theta
+            double precision, intent(in) :: phi
+            double precision dimension(3), intent(out) :: c
+        end subroutine iau_s2c
+        subroutine iau_s2p(theta,phi,r,p) ! in :sofa:s2p.for
+            double precision, intent(in) :: theta
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: r
+            double precision dimension(3), intent(out) :: p
+        end subroutine iau_s2p
+        subroutine iau_s2pv(theta,phi,r,td,pd,rd,pv) ! in :sofa:s2pv.for
+            double precision, intent(in) :: theta
+            double precision, intent(in) :: phi
+            double precision, intent(in) :: r
+            double precision, intent(in) :: td
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: rd
+            double precision dimension(3,2), intent(out) :: pv
+        end subroutine iau_s2pv
+        subroutine iau_s2xpv(s1,s2,pv,spv) ! in :sofa:s2xpv.for
+            double precision, intent(in) :: s1
+            double precision, intent(in) :: s2
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(out) :: spv
+        end subroutine iau_s2xpv
+        subroutine iau_sepp(a,b,s) ! in :sofa:sepp.for
+            double precision dimension(3), intent(in) :: a
+            double precision dimension(3), intent(in) :: b
+            double precision, intent(out) :: s
+        end subroutine iau_sepp
+        subroutine iau_seps(al,ap,bl,bp,s) ! in :sofa:seps.for
+            double precision, intent(in) :: al
+            double precision, intent(in) :: ap
+            double precision, intent(in) :: bl
+            double precision, intent(in) :: bp
+            double precision, intent(out) :: s
+        end subroutine iau_seps
+        function iau_sp00(date1,date2) ! in :sofa:sp00.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: iau_sp00
+        end function iau_sp00
+        subroutine iau_starpm(ra1,dec1,pmr1,pmd1,px1,rv1,ep1a,ep1b,ep2a,ep2b,ra2,dec2,pmr2,pmd2,px2,rv2,j) ! in :sofa:starpm.for
+            double precision, intent(in) :: ra1
+            double precision, intent(in) :: dec1
+            double precision, intent(in) :: pmr1
+            double precision, intent(in) :: pmd1
+            double precision, intent(in) :: px1
+            double precision, intent(in) :: rv1
+            double precision, intent(in) :: ep1a
+            double precision, intent(in) :: ep1b
+            double precision, intent(in) :: ep2a
+            double precision, intent(in) :: ep2b
+            double precision, intent(out) :: ra2
+            double precision, intent(out) :: dec2
+            double precision, intent(out) :: pmr2
+            double precision, intent(out) :: pmd2
+            double precision, intent(out) :: px2
+            double precision, intent(out) :: rv2
+            integer, intent(out) :: j
+        end subroutine iau_starpm
+        subroutine iau_starpv(ra,dec,pmr,pmd,px,rv,pv,j) ! in :sofa:starpv.for
+            double precision, intent(in) :: ra
+            double precision, intent(in) :: dec
+            double precision, intent(in) :: pmr
+            double precision, intent(in) :: pmd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision dimension(3,2), intent(out) :: pv
+            integer, intent(out) :: j
+        end subroutine iau_starpv
+        subroutine iau_sxp(s,p,sp) ! in :sofa:sxp.for
+            double precision, intent(in) :: s
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3), intent(out) :: sp
+        end subroutine iau_sxp
+        subroutine iau_sxpv(s,pv,spv) ! in :sofa:sxpv.for
+            double precision, intent(in) :: s
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(out) :: spv
+        end subroutine iau_sxpv
+        subroutine iau_taitt(tai1,tai2,tt1,tt2,j) ! in :sofa:taitt.for
+            double precision, intent(in) :: tai1
+            double precision, intent(in) :: tai2
+            double precision, intent(out) :: tt1
+            double precision, intent(out) :: tt2
+            integer, intent(out) :: j
+        end subroutine iau_taitt
+        subroutine iau_taiut1(tai1,tai2,dta,ut11,ut12,j) ! in :sofa:taiut1.for
+            double precision, intent(in) :: tai1
+            double precision, intent(in) :: tai2
+            double precision, intent(in) :: dta
+            double precision, intent(out) :: ut11
+            double precision, intent(out) :: ut12
+            integer, intent(out) :: j
+        end subroutine iau_taiut1
+        subroutine iau_taiutc(tai1,tai2,utc1,utc2,j) ! in :sofa:taiutc.for
+            double precision, intent(in) :: tai1
+            double precision, intent(in) :: tai2
+            double precision, intent(out) :: utc1
+            double precision, intent(out) :: utc2
+            integer, intent(out) :: j
+        end subroutine iau_taiutc
+        subroutine iau_tcbtdb(tcb1,tcb2,tdb1,tdb2,j) ! in :sofa:tcbtdb.for
+            double precision, intent(in) :: tcb1
+            double precision, intent(in) :: tcb2
+            double precision, intent(out) :: tdb1
+            double precision, intent(out) :: tdb2
+            integer, intent(out) :: j
+        end subroutine iau_tcbtdb
+        subroutine iau_tcgtt(tcg1,tcg2,tt1,tt2,j) ! in :sofa:tcgtt.for
+            double precision, intent(in) :: tcg1
+            double precision, intent(in) :: tcg2
+            double precision, intent(out) :: tt1
+            double precision, intent(out) :: tt2
+            integer, intent(out) :: j
+        end subroutine iau_tcgtt
+        subroutine iau_tdbtcb(tdb1,tdb2,tcb1,tcb2,j) ! in :sofa:tdbtcb.for
+            double precision, intent(in) :: tdb1
+            double precision, intent(in) :: tdb2
+            double precision, intent(out) :: tcb1
+            double precision, intent(out) :: tcb2
+            integer, intent(out) :: j
+        end subroutine iau_tdbtcb
+        subroutine iau_tdbtt(tdb1,tdb2,dtr,tt1,tt2,j) ! in :sofa:tdbtt.for
+            double precision, intent(in) :: tdb1
+            double precision, intent(in) :: tdb2
+            double precision, intent(in) :: dtr
+            double precision, intent(out) :: tt1
+            double precision, intent(out) :: tt2
+            integer, intent(out) :: j
+        end subroutine iau_tdbtt
+        subroutine iau_tf2a(s,ihour,imin,sec,rad,j) ! in :sofa:tf2a.for
+            character, intent(in) :: s
+            integer, intent(in) :: ihour
+            integer, intent(in) :: imin
+            double precision, intent(in) :: sec
+            double precision, intent(out) :: rad
+            integer, intent(out) :: j
+        end subroutine iau_tf2a
+        subroutine iau_tf2d(s,ihour,imin,sec,days,j) ! in :sofa:tf2d.for
+            character, intent(in) :: s
+            integer, intent(in) :: ihour
+            integer, intent(in) :: imin
+            double precision, intent(in) :: sec
+            double precision, intent(out) :: days
+            integer, intent(out) :: j
+        end subroutine iau_tf2d
+        subroutine iau_tpors(xi,eta,a,b,a01,b01,a02,b02,n) ! in :sofa:tpors.for
+            double precision, intent(in) :: xi
+            double precision, intent(in) :: eta
+            double precision, intent(in) :: a
+            double precision, intent(in) :: b
+            double precision, intent(out) :: a01
+            double precision, intent(out) :: b01
+            double precision, intent(out) :: a02
+            double precision, intent(out) :: b02
+            integer, intent(out) :: n
+        end subroutine iau_tpors
+        subroutine iau_tporv(xi,eta,v,v01,v02,n) ! in :sofa:tporv.for
+            double precision, intent(in) :: xi
+            double precision, intent(in) :: eta
+            double precision dimension(3), intent(in) :: v
+            double precision dimension(3), intent(out) :: v01
+            double precision dimension(3), intent(out) :: v02
+            integer, intent(out) :: n
+        end subroutine iau_tporv
+        subroutine iau_tpsts(xi,eta,a0,b0,a,b) ! in :sofa:tpsts.for
+            double precision, intent(in) :: xi
+            double precision, intent(in) :: eta
+            double precision, intent(in) :: a0
+            double precision, intent(in) :: b0
+            double precision, intent(out) :: a
+            double precision, intent(out) :: b
+        end subroutine iau_tpsts
+        subroutine iau_tpstv(xi,eta,v0,v) ! in :sofa:tpstv.for
+            double precision, intent(in) :: xi
+            double precision, intent(in) :: eta
+            double precision dimension(3), intent(in) :: v0
+            double precision dimension(3), intent(out) :: v
+        end subroutine iau_tpstv
+        subroutine iau_tpxes(a,b,a0,b0,xi,eta,j) ! in :sofa:tpxes.for
+            double precision, intent(in) :: a
+            double precision, intent(in) :: b
+            double precision, intent(in) :: a0
+            double precision, intent(in) :: b0
+            double precision, intent(out) :: xi
+            double precision, intent(out) :: eta
+            integer, intent(out) :: j
+        end subroutine iau_tpxes
+        subroutine iau_tpxev(v,v0,xi,eta,j) ! in :sofa:tpxev.for
+            double precision dimension(3), intent(in) :: v
+            double precision dimension(3), intent(in) :: v0
+            double precision, intent(out) :: xi
+            double precision, intent(out) :: eta
+            integer, intent(out) :: j
+        end subroutine iau_tpxev
+        subroutine iau_tr(r,rt) ! in :sofa:tr.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3,3), intent(out) :: rt
+        end subroutine iau_tr
+        subroutine iau_trxp(r,p,trp) ! in :sofa:trxp.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3), intent(in) :: p
+            double precision dimension(3), intent(out) :: trp
+        end subroutine iau_trxp
+        subroutine iau_trxpv(r,pv,trpv) ! in :sofa:trxpv.for
+            double precision dimension(3,3), intent(in) :: r
+            double precision dimension(3,2), intent(in) :: pv
+            double precision dimension(3,2), intent(out) :: trpv
+        end subroutine iau_trxpv
+        subroutine iau_tttai(tt1,tt2,tai1,tai2,j) ! in :sofa:tttai.for
+            double precision, intent(in) :: tt1
+            double precision, intent(in) :: tt2
+            double precision, intent(out) :: tai1
+            double precision, intent(out) :: tai2
+            integer, intent(out) :: j
+        end subroutine iau_tttai
+        subroutine iau_tttcg(tt1,tt2,tcg1,tcg2,j) ! in :sofa:tttcg.for
+            double precision, intent(in) :: tt1
+            double precision, intent(in) :: tt2
+            double precision, intent(out) :: tcg1
+            double precision, intent(out) :: tcg2
+            integer, intent(out) :: j
+        end subroutine iau_tttcg
+        subroutine iau_tttdb(tt1,tt2,dtr,tdb1,tdb2,j) ! in :sofa:tttdb.for
+            double precision, intent(in) :: tt1
+            double precision, intent(in) :: tt2
+            double precision, intent(in) :: dtr
+            double precision, intent(out) :: tdb1
+            double precision, intent(out) :: tdb2
+            integer, intent(out) :: j
+        end subroutine iau_tttdb
+        subroutine iau_ttut1(tt1,tt2,dt,ut11,ut12,j) ! in :sofa:ttut1.for
+            double precision, intent(in) :: tt1
+            double precision, intent(in) :: tt2
+            double precision, intent(in) :: dt
+            double precision, intent(out) :: ut11
+            double precision, intent(out) :: ut12
+            integer, intent(out) :: j
+        end subroutine iau_ttut1
+        subroutine iau_ut1tai(ut11,ut12,dta,tai1,tai2,j) ! in :sofa:ut1tai.for
+            double precision, intent(in) :: ut11
+            double precision, intent(in) :: ut12
+            double precision, intent(in) :: dta
+            double precision, intent(out) :: tai1
+            double precision, intent(out) :: tai2
+            integer, intent(out) :: j
+        end subroutine iau_ut1tai
+        subroutine iau_ut1tt(ut11,ut12,dt,tt1,tt2,j) ! in :sofa:ut1tt.for
+            double precision, intent(in) :: ut11
+            double precision, intent(in) :: ut12
+            double precision, intent(in) :: dt
+            double precision, intent(out) :: tt1
+            double precision, intent(out) :: tt2
+            integer, intent(out) :: j
+        end subroutine iau_ut1tt
+        subroutine iau_ut1utc(ut11,ut12,dut1,utc1,utc2,j) ! in :sofa:ut1utc.for
+            double precision, intent(in) :: ut11
+            double precision, intent(in) :: ut12
+            double precision, intent(in) :: dut1
+            double precision, intent(out) :: utc1
+            double precision, intent(out) :: utc2
+            integer, intent(out) :: j
+        end subroutine iau_ut1utc
+        subroutine iau_utctai(utc1,utc2,tai1,tai2,j) ! in :sofa:utctai.for
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(out) :: tai1
+            double precision, intent(out) :: tai2
+            integer, intent(out) :: j
+        end subroutine iau_utctai
+        subroutine iau_utcut1(utc1,utc2,dut1,ut11,ut12,j) ! in :sofa:utcut1.for
+            double precision, intent(in) :: utc1
+            double precision, intent(in) :: utc2
+            double precision, intent(in) :: dut1
+            double precision, intent(out) :: ut11
+            double precision, intent(out) :: ut12
+            integer, intent(out) :: j
+        end subroutine iau_utcut1
+        subroutine iau_xy06(date1,date2,x,y) ! in :sofa:xy06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+        end subroutine iau_xy06
+        subroutine iau_xys00a(date1,date2,x,y,s) ! in :sofa:xys00a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+            double precision, intent(out) :: s
+        end subroutine iau_xys00a
+        subroutine iau_xys00b(date1,date2,x,y,s) ! in :sofa:xys00b.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+            double precision, intent(out) :: s
+        end subroutine iau_xys00b
+        subroutine iau_xys06a(date1,date2,x,y,s) ! in :sofa:xys06a.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: x
+            double precision, intent(out) :: y
+            double precision, intent(out) :: s
+        end subroutine iau_xys06a
+        subroutine iau_zp(p) ! in :sofa:zp.for
+            double precision dimension(3), intent(out) :: p
+        end subroutine iau_zp
+        subroutine iau_zpv(pv) ! in :sofa:zpv.for
+            double precision dimension(3,2), intent(out) :: pv
+        end subroutine iau_zpv
+        subroutine iau_zr(r) ! in :sofa:zr.for
+            double precision dimension(3,3), intent(out) :: r
+        end subroutine iau_zr
+    end interface 
+end python module sofa
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/

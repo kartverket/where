@@ -15,8 +15,6 @@ description can be found in :cite:`ray2010`.
 This routine reads so far only GPS satellite clock bias values given for every 5 minutes. The satellite clock bias is
 given in seconds, but is converted to meters.
 
-
-
 """
 
 # Standard library imports
@@ -96,8 +94,7 @@ class RinexClkParser(parser.Parser):
         self.data.setdefault("satellite", list()).append(sat)
         self.data.setdefault("sat_clock_bias", list()).append(
             float(line["sat_clock_bias"]) * constant.c
-        )  # Convert [s]
-        # to [m]
+        )  # Convert [s] to [m]
 
     #
     # WRITE DATA
@@ -117,7 +114,6 @@ class RinexClkParser(parser.Parser):
         ====================  ===============  =======  ========================================================
 
         """
-
         dset.num_obs = len(self.data["time"])
 
         for k, v in self.data.items():

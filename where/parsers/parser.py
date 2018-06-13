@@ -150,6 +150,8 @@ class Parser(object):
         """
         self.dependencies.append(self.file_path)
         is_zipped = files.is_path_zipped(self.file_path)
+        if files.empty_file(self.file_path):
+            log.warn(f"File {self.file_path} is empty.")
         with files.open_path(self.file_path, mode="rt", is_zipped=is_zipped) as fid:
             self.parse_file(fid)
 

@@ -1,0 +1,53 @@
+! Authors:
+! Michael Daehnn <michael.daehnn@kartverket.no>.
+
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module gpt2w ! in
+    interface  ! in :gpt2w
+        subroutine asknewet(e,tm,lambda,zwd) ! in asknewet.f
+            double precision, intent(in) :: e
+            double precision, intent(in) :: tm
+            double precision, intent(in) :: lambda
+            double precision, intent(out) :: zwd
+        end subroutine asknewet
+        subroutine gpt2_1w(dmjd,dlat,dlon,hell,nstat,it,p,t,dt,tm,e,ah,aw,la,undu) ! in gpt2_1w.f
+            double precision, intent(in) :: dmjd
+            double precision, depend(nstat), intent(in) :: dlat
+            double precision, depend(nstat), intent(in) :: dlon
+            double precision, depend(nstat), intent(in) :: hell
+            integer, intent(in) :: nstat
+            integer, intent(in) :: it
+            double precision dimension(nstat), intent(out) :: p
+            double precision dimension(nstat), intent(out) :: t
+            double precision dimension(nstat), intent(out) :: dt
+            double precision dimension(nstat), intent(out) :: tm
+            double precision dimension(nstat), intent(out) :: e
+            double precision dimension(nstat), intent(out) :: ah
+            double precision dimension(nstat), intent(out) :: aw
+            double precision dimension(nstat), intent(out) :: la
+            double precision dimension(nstat), intent(out) :: undu
+        end subroutine gpt2_1w
+        subroutine saasthyd(p,dlat,hell,zhd) ! in saasthyd.f
+            double precision, intent(in) :: p
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: hell
+            double precision, intent(out) :: zhd
+        end subroutine saasthyd
+        subroutine vmf1_ht(ah,aw,dmjd,dlat,ht,zd,vmf1h,vmf1w) ! in vmf1_ht.f
+            double precision, intent(in) :: ah
+            double precision, intent(in) :: aw
+            double precision, intent(in) :: dmjd
+            double precision, intent(in) :: dlat
+            double precision, intent(in) :: ht
+            double precision, intent(in) :: zd
+            double precision, intent(out) :: vmf1h
+            double precision, intent(out) :: vmf1w
+        end subroutine vmf1_ht
+    end interface
+end python module gpt2w
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
+

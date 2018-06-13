@@ -50,13 +50,13 @@ class AprioriOrbit():
         self.satellite = satellite
         self.system = [s[0] for s in satellite] if system is None else system
         self._dset_raw = data.Dataset(
-            rundate=rundate, tech=tech, stage=self.name, dataset_name="raw", dataset_id=0, empty=True
+            rundate=rundate, tech=tech, stage=self.name, dataset_name="raw", dataset_id=0, empty=True, session=""
         )
         self._dset_edit = data.Dataset(
-            rundate=rundate, tech=tech, stage=self.name, dataset_name="edit", dataset_id=0, empty=True
+            rundate=rundate, tech=tech, stage=self.name, dataset_name="edit", dataset_id=0, empty=True, session=""
         )
         self._dset = data.Dataset(
-            rundate=rundate, tech=tech, stage=self.name, dataset_name="orbit", dataset_id=0, empty=True
+            rundate=rundate, tech=tech, stage=self.name, dataset_name="orbit", dataset_id=0, empty=True, session=""
         )
 
     @property
