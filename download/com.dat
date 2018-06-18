@@ -1,0 +1,5 @@
+# Based on http://geophy.uni.lu/applications/atm1/download/com_table.pdf
+xyz   A1           B1           A2           B2
+dX    2.1188E-04  -7.6861E-04   1.4472E-04  -1.7844E-04
+dY   -7.2766E-04  -2.3582E-04  -3.2691E-04  -1.5878E-04
+dZ   -1.2176E-05   3.2243E-05  -9.6271E-05   1.6976E-05
