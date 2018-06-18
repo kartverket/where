@@ -213,7 +213,6 @@ class There(tk.Tk):
         # Dataset controls
         dataset_line = ttk.Frame()
         self.add_dropdown(dataset_line, DD_Location)
-        self.add_dropdown(dataset_line, DD_User)
         self.add_dropdown(dataset_line, DD_Date)
         self.add_dropdown(dataset_line, DD_Pipeline)
         self.add_dropdown(dataset_line, DD_Dataset)

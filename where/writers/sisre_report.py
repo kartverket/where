@@ -32,6 +32,8 @@ from where.lib import files
 from where.lib import gnss
 from where.lib import plugins
 
+gnss_name = {"C": "BeiDou", "E": "Galileo", "G": "GPS", "I": "IRNSS", "J": "QZSS", "R": "GLONASS"}
+
 SubplotConfig = namedtuple("SubplotConfig", ["ylabel", "color", "ydata"])
 SubplotConfig.__doc__ = """A convenience class for defining a field for subplot configuration
 
@@ -72,9 +74,10 @@ def sisre_report(dset):
         figure_dir = files.path("output_sisre_report_figure", file_vars=dset.vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
         if write_level <= enums.get_value("write_level", "detail"):
-            _plot_satellite_bias(fid, figure_dir, dset)
-            _plot_orbit_and_clock_differences(fid, figure_dir, dset)
-        _plot_sisre(fid, figure_dir, dset)
+            _plot_scatter_satellite_bias(fid, figure_dir, dset)
+            _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
+        _plot_histogram_sisre(fid, figure_dir, dset)
+        _plot_scatter_sisre(fid, figure_dir, dset)
         _statistics(fid, figure_dir, dset)
 
 
@@ -121,58 +124,56 @@ date: {nowdate:%Y-%m-%d}
     )
 
     fid.write("\\newpage\n")
-    fid.write("#SISRE analysis\n")
+    fid.write(
+        """#SISRE analysis\n
 
-    fid.write("\\begin{equation}\n")
-    fid.write(
-        "     \\text{SISRE(orb)}^s = \sqrt{w_r^2 \cdot \Delta {r^s}^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}\n"
+For the SISRE analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
+
+\\begin{equation}   
+     \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
+  \\label{eq:sisre}  
+\\end{equation}
+
+\\begin{equation}   
+     \\text{SISRE(orb)}^s = \sqrt{w_r^2 \cdot \Delta {r^s}^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
+  \\label{eq:sisre_orb}  
+\\end{equation}
+
+\\begin{tabular}{lll}
+with\\\\
+ & $\\text{SISRE}^s$        & Global averaged SISRE for satellite $s$, \\\\
+ & $\\text{SISRE(orb)}^s$   & Orbit-only SISRE for satellite $s$, \\\\
+ &$\Delta a^s$, $\Delta c^s$, $\Delta r^s$   & Satellite coordinate differences between broadcast and precise\\\\
+ &                                           & ephemeris in along-track, cross-track and radial for satellite $s$,\\\\
+ &$\Delta t^s$              & Satellite clock correction difference related to CoM of \\\\
+ &                          & satellite $s$ and corrected for satellite biases and averaged \\\\
+ &                          & clock offset in each epoch,\\\\
+ &$w_r$                     & SISRE weight factor for radial errors (see Table 1),\\\\
+ &$w_{a,c}$                 & SISRE weight factor for along-track and cross-track errors\\\\
+ &                          & (see Table 1).\\\\
+\\end{tabular}
+
+It should be noted that we have neglected the uncertainty of precise ephemeris and clocks by the determination of SISRE.
+
+The SISRE analysis is carried out on daily basis. Each daily solution is cleaned for outliers. The outliers are detected and rejected for each day iteratively using a 3-sigma threshold determined for each satellite. After each iteration the SISRE results are again recomputed.
+
+\\begin{table}[!ht]
+\\begin{center}
+  \\begin{tabular}[c]{lll}
+    \\hline
+    System       & $w_r$  & $w_{a,c}$ \\\\
+    \\hline
+    GPS          & $0.980$ & $0.139$ \\\\
+    Galileo      & $0.984$ & $0.124$ \\\\
+    \\hline
+  \\end{tabular}
+  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in Montenbruck et al. 2018.}
+  \\label{tab:sisre_weight_factors}
+\\end{center}
+\\end{table}
+
+\\newpage\n """
     )
-    fid.write("  \\label{eq:sisre_orb}\n")
-    fid.write("\\end{equation}\n")
-    fid.write("\n")
-    fid.write("\\begin{equation}\n")
-    fid.write(
-        "     \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}\n"
-    )
-    fid.write("  \\label{eq:sisre}\n")
-    fid.write("\\end{equation}\n")
-    fid.write("\n")
-    fid.write("\\begin{tabular}{lll}\n")
-    fid.write("with\\\n")
-    fid.write(" & $\\text{SISRE(orb)}^s$  & Orbit-only SISRE for satellite $s$, \\\\\n")
-    fid.write(" & $\\text{SISRE}^s$       & SISRE for satellite $s$, \\\\\n")
-    fid.write(
-        " &$\Delta a^s$, $\Delta c^s$, $\Delta r^s$   & Satellite coordinate differences between broadcast and precise \\\\\n"
-    )
-    fid.write(" &                        & ephemeris in along-track, cross-track and radial for satellite $s$,\\\\\n")
-    fid.write(
-        " &$w_r$                   & SISRE weight factor for radial errors (see Table \\ref{tab:sisre_weight_factors}),\\\\\n"
-    )
-    fid.write(" &$w_{a,c}$               & SISRE weight factor for along-track and cross-track errors \\\\\n")
-    fid.write(" &                        & (see Table \\ref{tab:sisre_weight_factors}).\\\\\n")
-    fid.write("\end{tabular}\n")
-    fid.write("\n")
-    fid.write("\\begin{table}[!ht]\n")
-    fid.write("\\begin{center}\n")
-    fid.write("  \\begin{tabular}[c]{lll}\n")
-    fid.write("    \hline\n")
-    fid.write("    System       & $w_r$  & $w_{a,c}^2$ \\\\\n")
-    fid.write("    \hline\n")
-    fid.write("    GPS          & $0.98$ & $1/49$ \\\\\n")
-    fid.write("    GLONASS      & $0.98$ & $1/45$ \\\\\n")
-    fid.write("    Galileo      & $0.98$ & $1/61$ \\\\\n")
-    fid.write("    QZSS         & $0.99$ & $1/126$ \\\\\n")
-    fid.write("    BeiDou (MEO) & $0.98$ & $1/54$ \\\\\n")
-    fid.write("    \hline\n")
-    fid.write("  \end{tabular}\n")
-    fid.write(
-        "  \caption[SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$)]"
-        "{SISRE weight factors for radial ($w_r$) and along-track and cross-track ($w_{a,c}$) errors }\n"
-    )
-    fid.write("  \label{tab:sisre_weight_factors}\n")
-    fid.write("\end{center}\n")
-    fid.write("\end{table}\n")
-    fid.write("\\newpage\n")
 
 
 def _get_satellite_type(dset, satellite):
@@ -312,30 +313,74 @@ def _plot_bar_stacked_sisre_satellites(fid, field_dfs, extra_row_names, figure_d
 
 
 #
+# HISTOGRAM PLOTS
+#
+def _plot_histogram_subplot(data, axis, system):
+    axis.hist(data, normed=True, bins=30)
+    axis.set(xlabel="SISRE [m]", ylabel="Frequency")
+    axis.set_title(f"{gnss_name[system]}")
+    mean = np.mean(data)
+    std = np.std(data)
+    axis.text(
+        0.98,
+        0.98,
+        f"$mean={mean:5.3f}\ \pm {std:5.3f}$ m",
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=axis.transAxes,
+    )
+
+
+def _plot_histogram_sisre(fid, figure_dir, dset):
+    import math
+
+    # TODO: How to handle for example 3 subplots?
+    nrows = math.ceil(len(dset.unique("system")) / 2)
+    ncols = 2 if len(dset.unique("system")) > 1 else 1
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True, squeeze=False)
+    for sys, ax in zip(dset.unique("system"), axes.flatten()):
+        idx = dset.filter(system=sys)
+        _plot_histogram_subplot(dset.sisre[idx], ax, sys)
+    plt.savefig(figure_dir / f"plot_histogram_sisre.pdf")
+    plt.clf()  # clear the current figure
+
+    fid.write(f"![Histrogram of SISRE results]({figure_dir}/plot_histogram_sisre.pdf)\n")
+    fid.write("\\newpage\n")
+
+
+#
 # SCATTER PLOTS
 #
-def _plot_satellite_bias(fid, figure_dir, dset):
+def _plot_scatter_satellite_bias(fid, figure_dir, dset):
 
-    for field, orbit in {"bias_brdc": "Broadcast", "bias_precise": "Precise"}.items():
-        if np.sum(dset[field]) != 0:
-            plt.scatter(dset.time.gps.datetime, dset[field])
-            plt.ylabel(f"{orbit} satellite bias [m]")
-            plt.xlim([min(dset.time.gps.datetime), max(dset.time.gps.datetime)])
-            plt.xlabel("Time [GPS]")
-            plt.savefig(figure_dir / f"plot_scatter_{field}.pdf")
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
 
-            fid.write(f"![{orbit} satellite bias]({figure_dir}/plot_scatter_{field}.pdf)\n")
-            fid.write("\\newpage\n")
+        for field, orbit in {"bias_brdc": "Broadcast", "bias_precise": "Precise"}.items():
+            if np.sum(dset[field][idx]) != 0:
+                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx])
+                plt.ylabel(f"{orbit} satellite bias [m]")
+                plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
+                plt.xlabel("Time [GPS]")
+                plt.title(f"{gnss_name[sys]}")
+                plt.savefig(figure_dir / f"plot_scatter_{field}_{gnss_name[sys].lower()}.pdf")
+                plt.clf()  # clear the current figure
+
+                fid.write(
+                    f"![{orbit} satellite bias]({figure_dir}/plot_scatter_{field}_{gnss_name[sys].lower()}.pdf)\n"
+                )
+                fid.write("\\newpage\n")
 
 
 #
 # SCATTER SUPPLOTS
 #
-def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel=""):
+def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
     marker = "."  # point marker type
 
     fig, axes = plt.subplots(len(subplots), 1, sharex=True, sharey=True)
     fig.set_figheight(9)  # inches
+    fig.suptitle(f"{title}", y=1.0)
     for idx, ax in enumerate(axes):
         ax.set(ylabel=subplots[idx].ylabel)
         ax.set_xlim([min(xdata), max(xdata)])  # otherwise time scale of x-axis is not correct -> Why?
@@ -351,44 +396,57 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel=""):
     plt.clf()  # clear the current figure
 
 
-def _plot_orbit_and_clock_differences(fid, figure_dir, dset):
+def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
 
-    # Define configuration of subplots
-    subplots = (
-        SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.itrs[:, 0]),
-        SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.itrs[:, 1]),
-        SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.itrs[:, 2]),
-        SubplotConfig("Δclock [m]", "tomato", dset.clk_diff_sys),
-    )
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
 
-    _plot_scatter_subplots(
-        dset.time.gps.datetime,
-        subplots,
-        figure_path=figure_dir / f"plot_scatter_orbit_clock_differences.pdf",
-        xlabel="Time [GPS]",
-    )
+        # Define configuration of subplots
+        subplots = (
+            SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.itrs[:, 0][idx]),
+            SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.itrs[:, 1][idx]),
+            SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.itrs[:, 2][idx]),
+            SubplotConfig("Δclock [m]", "tomato", dset.clk_diff_sys[idx]),
+        )
 
-    fid.write(
-        f"![Broadcast ephemeris errors for along-track, cross-track and radial orbit errors and clock errors]({figure_dir}/plot_scatter_orbit_clock_differences.pdf)\n"
-    )
-    fid.write("\\newpage\n")
+        _plot_scatter_subplots(
+            dset.time.gps.datetime[idx],
+            subplots,
+            figure_path=figure_dir / f"plot_scatter_orbit_clock_differences_{gnss_name[sys].lower()}.pdf",
+            xlabel="Time [GPS]",
+            title=f"{gnss_name[sys]}",
+        )
+
+        fid.write(
+            f"![Broadcast ephemeris errors for along-track, cross-track and radial orbit errors and clock errors]({figure_dir}/plot_scatter_orbit_clock_differences_{gnss_name[sys].lower()}.pdf)\n"
+        )
+        fid.write("\\newpage\n")
 
 
-def _plot_sisre(fid, figure_dir, dset):
+def _plot_scatter_sisre(fid, figure_dir, dset):
 
-    # Define configuration of subplots
-    subplots = (
-        SubplotConfig("orbit-only SISRE [m]", "paleturquoise", dset.sisre_orb),
-        SubplotConfig("clock-only SISRE [m]", "deepskyblue", dset.sisre - dset.sisre_orb),
-        SubplotConfig("SISRE [m]", "royalblue", dset.sisre),
-    )
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
 
-    _plot_scatter_subplots(
-        dset.time.gps.datetime, subplots, figure_path=figure_dir / f"plot_scatter_sisre.pdf", xlabel="Time [GPS]"
-    )
+        # Define configuration of subplots
+        subplots = (
+            SubplotConfig("orbit-only SISRE [m]", "paleturquoise", dset.sisre_orb[idx]),
+            SubplotConfig("clock-only SISRE [m]", "deepskyblue", dset.sisre[idx] - dset.sisre_orb[idx]),
+            SubplotConfig("SISRE [m]", "royalblue", dset.sisre[idx]),
+        )
 
-    fid.write(f"![Orbit-only SISRE, clock-only SISRE and SISRE]({figure_dir}/plot_scatter_sisre.pdf)\n")
-    fid.write("\\newpage\n")
+        _plot_scatter_subplots(
+            dset.time.gps.datetime[idx],
+            subplots,
+            figure_path=figure_dir / f"plot_scatter_sisre_{gnss_name[sys].lower()}.pdf",
+            xlabel="Time [GPS]",
+            title=f"{gnss_name[sys]}",
+        )
+
+        fid.write(
+            f"![Orbit-only SISRE, clock-only SISRE and SISRE]({figure_dir}/plot_scatter_sisre_{gnss_name[sys].lower()}.pdf)\n"
+        )
+        fid.write("\\newpage\n")
 
 
 def _statistics_satellite(fid, figure_dir, dset):
@@ -516,6 +574,7 @@ def _write_config(fid):
     fid.write("```\n")
     fid.write(str(config.tech.as_str(key_width=25, width=70, only_used=True)))
     fid.write("\n```\n")
+    fid.write("\\newpage\n")
 
 
 def _write_dataframe_to_markdown(fid, df, float_format=""):

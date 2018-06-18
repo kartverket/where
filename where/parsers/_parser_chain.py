@@ -109,6 +109,8 @@ class ChainParser(Parser):
         if not parser.label:
             return
 
+        # log.debug('{:>3d}: {}', cache['line_num'], line)
+
         label = parser.label(line.rstrip(), cache["line_num"])
         if label not in parser.parser_def:
             return

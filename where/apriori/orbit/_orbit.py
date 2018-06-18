@@ -156,7 +156,5 @@ class AprioriOrbit():
             numpy.ndarray:    GNSS satellite clock corrections for each observation in [m] related to CoM 
                               (Note: without relativistic orbit eccentricity correction)
         """
-        # MURKS z_acr = self.dset.sat_posvel.convert_itrs_to_acr(antex.satellite_phase_center_offset(self.dset))[:,2]
-        # MURKS return self.satellite_clock_correction() + z_acr
-
-        return self.satellite_clock_correction() + antex.satellite_phase_center_offset(self.dset)[:, 2]
+        z_yaw = self.dset.sat_posvel.convert_itrs_to_yaw(antex.satellite_phase_center_offset(self.dset))[:, 2]
+        return self.satellite_clock_correction() + z_yaw

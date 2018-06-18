@@ -24,18 +24,22 @@ import pycurl
 class CasedConfigParser(ConfigParser):
     """ConfigParser with case-sensitive keys"""
 
-    def optionxform(self, optionstr):
+    def optionxform(self, optionstr: str) -> str:
+        """Do not turn optionstr (key) into lowercase"""
         return optionstr
 
-    def read(self, path):
+    def read(self, path: pathlib.Path) -> None:
         """Replace f-style variables with values from the __vars__ section after the config file is read"""
         super().read(path)
 
-        fmt_vars = {k: v for k, v in self["__vars__"].items()}
+        if "__vars__" in self.sections():
+            fmt_vars = {k: v for k, v in self["__vars__"].items()}
+        else:
+            fmt_vars = {}
+
         for name, section in self._sections.items():
             if name.startswith("__"):
                 continue
-
             new_section = OrderedDict()
             for key, value in section.items():
                 new_section[key.format(**fmt_vars)] = value.format(**fmt_vars)
@@ -57,7 +61,7 @@ def main() -> None:
     library = args[0]
     cfg_path = pathlib.Path.cwd() / "config" / f"download_{library}.conf"
     if not cfg_path.exists():
-        help()
+        help(f"Did not find information about {library!r} at {cfg_path}")
 
     # Download library
     download(cfg_path)
@@ -144,11 +148,16 @@ def process(cfg: ConfigParser, section: str) -> None:
             input(f"Please {hint} manually, and hit enter afterwards")
 
 
-def help() -> None:
-
+def help(error_msg: str = "") -> None:
     """Print the help message from the module doc-string.
+
+    Args:
+        error_msg:  Optional extra error message that will be printed below the help message.
     """
     print(__doc__)
+    if error_msg:
+        print(f"\nError: {error_msg}")
+
     raise SystemExit
 
 

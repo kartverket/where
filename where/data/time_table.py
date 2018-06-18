@@ -102,10 +102,16 @@ class TimeTable(Table):
         Returns:
             Dict: A representation of the table as a dictionary.
         """
-        if fields is None or self.name in fields:
+        if fields is None:
             return {self.name: self.plot_values(self.name) if use_plot_values else self._data.datetime}
         else:
-            return dict()
+            dct = dict()
+            fields_attrs = dict([f.partition(".")[::2] for f in fields])
+            for field, attr in fields_attrs.items():
+                if not field == self.name:
+                    continue
+                dct[f"{field}.{attr}"] = getattr(self._data, attr).datetime if attr else self._data.datetime
+            return dct
 
     def __getitem__(self, key):
         """Read field data from table

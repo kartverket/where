@@ -3,17 +3,13 @@
 Description:
 ------------
 
-Reads atmospheric tide center of mass coefficients. 
+Reads atmospheric tide center of mass coefficients.
 
 
 Reference:
 ----------
 
 http://geophy.uni.lu/ggfc-atmosphere/tide-loading-calculator.html
-
-
-
-
 
 """
 # Where imports
