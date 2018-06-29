@@ -21,7 +21,7 @@
         <meta property="og:title" content="Installing Where"/>
         <meta property="og:url" content="https://kartverket.github.io/where/installing-where.html"/>
         <meta property="og:description" content="Obtain and install Where on your system."/>
-        <meta property="article:published_time" content="2018-06-05" />
+        <meta property="article:published_time" content="2018-06-06" />
             <meta property="article:section" content="How-to" />
             <meta property="article:tag" content="installation" />
             <meta property="article:tag" content="python" />
@@ -106,7 +106,7 @@ Where            </a>
 <footer class="post-info">
     <span class="label label-default">Date</span>
     <span class="published">
-        <i class="fa fa-calendar"></i><time datetime="2018-06-05T00:00:00+02:00"> Tue 05 June 2018</time>
+        <i class="fa fa-calendar"></i><time datetime="2018-06-06T00:00:00+02:00"> Wed 06 June 2018</time>
     </span>
 
 
@@ -133,7 +133,7 @@ Where            </a>
 <a href="where-latest.html">Download the latest version of Where</a>, and unpack it at a
 convenient location on your computer.</p>
 <p>All commands shown in this guide should be performed in a terminal from inside
-the <code>where</code>-directory you just downloaded.</p>
+the <code>where</code>-directory you just downloaded and unpacked.</p>
 <h2 id="prerequisites">Prerequisites</h2>
 <p>The Where software is mainly written in Python. As such, it is dependent on
 having a modern Python (&gt;= 3.6) installed on your system, including several
@@ -142,22 +142,108 @@ packages from the scientific stack. Where also utilizes
 performance. Finally, Where depends on some Fortran libraries with community
 implementations of conventional models.</p>
 <h3 id="step-1-install-anaconda-python">Step 1: Install Anaconda Python</h3>
-<p>We recommend using <a href="https://www.anaconda.com/download"><strong>Anaconda Python</strong></a>. This is
-a Python distribution that comes with its own package manager (<a href="https://conda.io/">conda</a>) that
-makes it easier to install other Python packages, especially on Windows.</p>
-<p>Once Anaconda is installed, you should install the Python packages needed by
-Where by doing:</p>
+<p>We recommend using
+<a href="https://www.anaconda.com/download"><strong>Anaconda Python</strong></a>. This is a Python
+distribution that comes with its own package manager
+(<a href="https://conda.io/">conda</a>) that makes it easier to install other Python
+packages, especially on Windows.</p>
+<p>An alternative distribution of Anaconda is
+<a href="https://conda.io/miniconda.html"><strong>Miniconda</strong></a>. It comes with the same Conda
+package manager, but only installs a minimal Python system by default. As such
+Miniconda is a great choice for instance on servers.</p>
+<p>Install Anaconda or Miniconda following the instructions on their respective web
+pages.</p>
+<h3 id="step-2-install-necessary-python-dependencies">Step 2: Install Necessary Python Dependencies</h3>
+<p>Once Anaconda or Miniconda is installed, you should install the Python packages
+needed by Where by doing:</p>
 <pre><code>conda update -f environment.yml
 </code></pre>
-<h3 id="step-2-install-a-fortran-compiler-windows-only">Step 2: Install a Fortran compiler (Windows only)</h3>
+<h3 id="step-3-install-a-fortran-compiler-windows-only">Step 3: Install a Fortran Compiler (Windows Only)</h3>
 <p>Windows typically does not come with a Fortran compiler preinstalled.</p>
-<h3 id="step-3-install-a-c-compiler-windows-only">Step 3: Install a C compiler (Windows only)</h3>
+<p>(Instructions coming)</p>
+<h3 id="step-4-install-a-c-compiler-windows-only">Step 4: Install a C Compiler (Windows Only)</h3>
 <p>Windows typically does not come with a C compiler preinstalled.</p>
-<h2 id="downloading-external-libraries">Downloading external libraries</h2>
+<p>(Instructions coming)</p>
+<h2 id="installing-where">Installing Where</h2>
+<p>The actual installation of Where happens in three steps:</p>
+<ul>
+<li>Compile the external Fortran libraries and build them as a Python module using
+  <a href="https://docs.scipy.org/doc/numpy/f2py/"><code>f2py</code></a>.</li>
+<li>Compile and build the Cython code.</li>
+<li>Install Where on your computer.</li>
+</ul>
+<p>All these three steps are carried out automatically by running the Make-command:</p>
+<pre><code>make
+</code></pre>
+<p>You can confirm that the installation succeeded by asking for help about Where:</p>
+<pre><code>where -h
+</code></pre>
+<p>If you get an error saying that Where is an unknown command, you most likely
+need to add Where to your path.</p>
+<blockquote>
+<p><strong>Note:</strong> On Windows the command to start Where is <code>gd_where</code>. In the example
+above you should run <code>gd_where -h</code>.</p>
+</blockquote>
+<h2 id="set-up-paths-used-by-where">Set Up Paths Used by Where</h2>
+<p>Where uses a few different directories. The location of these are controlled by
+the Where configuration. You should create a new text file called
+<code>where_local.conf</code> inside the <code>where/config</code> directory.</p>
+<p>Add the following contents and save the file:</p>
+<pre><code>[path]
+data     = ~/where_data
+work     = ~/where_work
+log      = ~/where_log
+publish  = ~/where_publish
+</code></pre>
+<p>This specifies the location of four different directories:</p>
+<ul>
+<li><code>data</code>: The data directory will contain all data needed to analyze a session,
+  including observation files, reference frames, and a priori model information.</li>
+<li><code>work</code>: The work directory will contain all active analysis files, including
+  configuration, analysis <a href="https://kartverket.github.io/where/the-where-software.html#dataset">datasets</a> and
+  output products.</li>
+<li><code>log</code>: The log directory will contain log files with information from
+  <a href="https://kartverket.github.io/where/running-where.html#running-many-analyses">running many Where analyses</a>. Log
+  files for single sessions are stored in their respective directories inside
+  the <code>work</code> directory.</li>
+<li><code>publish</code>: It is possible to publish some of the result files. Publishing a
+  file simply means that it will be copied to some location within the publish
+  directory.</li>
+</ul>
+<p>Using the default above, these directories are created as four separate
+directories named <code>where_data</code>, <code>where_work</code>, <code>where_publish</code>, and <code>where_log</code>
+inside your home directory. Feel free to change these according to your taste.</p>
+<h2 id="obtaining-data-files">Obtaining data files</h2>
+<p>Where has functionality for automatically downloading the data files that it
+needs when it is running.</p>
+<p>You should however download the observation files you want to analyse
+separately. In the example below we assume that you specified the <code>data</code>
+directory to be <code>~/where_data/</code>. Change the path if you specified a different
+<code>data</code> directory above:</p>
+<h3 id="analyzing-ngs-format">Analyzing NGS Format</h3>
+<p>The following downloads the observation file for January 2nd 2018:</p>
+<pre><code>mkdir -p ~/where_data/vlbi/obs/ngs/2018 
+cd ~/where_data/vlbi/obs/ngs/2018 
+wget ftp://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/ngs/2018/18JAN02XA_N004.gz
+</code></pre>
+<p>You can then analyse this file by running:</p>
+<pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=ngs
+</code></pre>
+<h3 id="analyzing-vgosdb-format">Analyzing vgosDB Format</h3>
+<p>~~The following downloads the observation file for January 2nd 2018:~~</p>
+<p>Unfortunately, the download server for vgosDB data seems to be unavailable. The
+following shows how to set up a vgosDB analysis if data are available:</p>
+<pre><code>mkdir -p ~/where_data/vlbi/obs/vgosdb/2018 
+cd ~/where_data/vlbi/obs/vgosdb/2018 
+wget (missing url)
+</code></pre>
+<p>You can then analyse this file by running:</p>
+<pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=vgosdb
+</code></pre>
+<h2 id="external-libraries">External libraries</h2>
 <p>Where depends on three external libraries that are not included in the
-download. These are all available online and can be downloaded separately. The
-downloading of these libraries is part of the <code>make</code>-process, so you do not need
-to do it explicitly.</p>
+download. These are all available online and have already been downloaded
+automatically by the <code>make</code>-process.</p>
 <h3 id="sofa">SOFA</h3>
 <p>The
 <a href="https://www.iausofa.org/">SOFA (Standards of Fundamental Astronomy) software library</a>
@@ -192,58 +278,6 @@ implemented using the
 stored in the <code>external/gpt2w/</code> directory. This can be done automatically by
 running</p>
 <pre><code>python download.py gpt2w
-</code></pre>
-<h2 id="installing-where">Installing Where</h2>
-<p>The actual installation of Where happens in three steps:</p>
-<ul>
-<li>Compile the external Fortran libraries and build them as a Python module using
-  <a href="https://docs.scipy.org/doc/numpy/f2py/"><code>f2py</code></a>.</li>
-<li>Compile and build the Cython code.</li>
-<li>Install Where on your computer.</li>
-</ul>
-<p>All these three steps are carried out automatically by running the Make-command:</p>
-<pre><code>make
-</code></pre>
-<p>You can confirm that the installation succeeded by asking for help about Where:</p>
-<pre><code>where -h
-</code></pre>
-<p>If you get an error saying that Where is an unknown command, you most likely
-need to add Where to your path.</p>
-<blockquote>
-<p><strong>Note:</strong> On Windows the command to start Where is <code>gd_where</code>. In the example
-above you should run <code>gd_where -h</code>.</p>
-</blockquote>
-<h2 id="set-up-paths-used-by-where">Set up paths used by Where</h2>
-<p>Where uses a few different directories. The location of these are controlled by
-the Where configuration. You should create a new text file called
-<code>where_local.conf</code> inside the <code>where/config</code> directory.</p>
-<p>Add the following contents and save the file:</p>
-<pre><code>[path]
-data     = ~/where_data
-work     = ~/where_work
-archive  = ~/where_archive
-log      = ~/where_log
-</code></pre>
-<p>This specifies the location of four different directories:</p>
-<ul>
-<li><code>data</code>: The data directory will contain all data needed to analyze a session,
-  including observation files, reference frames, and a priori model information.</li>
-<li><code>work</code>: The work directory will contain all active analysis files, including
-  configuration, analysis <a href="https://kartverket.github.io/where/the-where-software.html#dataset">datasets</a> and
-  output products.</li>
-<li><code>archive</code>: When an analysis is
-  <a href="https://kartverket.github.io/where/running-where.html#archiving-deleting-and-resetting-the-configuration">archived</a>
-  it is moved to the archive directory.</li>
-<li><code>log</code>: The log directory will contain log files with information from
-  <a href="https://kartverket.github.io/where/running-where.html#running-many-analyses">running many Where analyses</a>. Log
-  files for single sessions are stored in their respective directories inside
-  the <code>work</code> directory.</li>
-</ul>
-<p>Using the default above, these directories are created as four separate
-directories named <code>where_data</code>, <code>where_work</code>, <code>where_archive</code>, and <code>where_log</code>
-inside your home directory. Feel free to change these according to your taste.</p>
-<h2 id="obtaining-data-files">Obtaining data files</h2>
-<pre><code>python download.py data
 </code></pre>
             </div>
             <!-- /.entry-content -->
