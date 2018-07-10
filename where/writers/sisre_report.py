@@ -13,8 +13,9 @@ asdf
 from collections import namedtuple
 import getpass
 from datetime import datetime
-import re
-import textwrap
+import os
+
+# import subprocess
 
 # External library imports
 import matplotlib.patches as mpatches
@@ -25,11 +26,11 @@ import pandas as pd
 # WHERE imports
 import where
 from where import apriori
-from where import cleaners
 from where.lib import config
 from where.lib import enums
 from where.lib import files
 from where.lib import gnss
+from where.lib import log
 from where.lib import plugins
 
 gnss_name = {"C": "BeiDou", "E": "Galileo", "G": "GPS", "I": "IRNSS", "J": "QZSS", "R": "GLONASS"}
@@ -59,36 +60,44 @@ def sisre_report(dset):
     """Write SISRE report
 
     Args:
-        dset:       Dataset, a dataset containing the data.
+        dset (Dataset):       A dataset containing the data.
     """
     write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
 
-    with files.open(file_key="output_gnss_session_report", file_vars=dset.vars, mode="wt") as fid:
-        _header(fid)
+    with files.open(file_key="output_sisre_report", file_vars=dset.vars, mode="wt") as fid:
+        _write_title(fid, dset.rundate)
+        _write_information(fid)
         _write_config(fid)
         fid.write("\n# Satellite status\n\n")
         _unhealthy_satellites(fid, dset)
         _eclipse_satellites(fid, dset)
 
         # Generate figure directory to save figures generated for SISRE report
+        fid.write("\n# SISRE analysis results\n\n")
         figure_dir = files.path("output_sisre_report_figure", file_vars=dset.vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
         if write_level <= enums.get_value("write_level", "detail"):
             _plot_scatter_satellite_bias(fid, figure_dir, dset)
             _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
-        _plot_histogram_sisre(fid, figure_dir, dset)
         _plot_scatter_sisre(fid, figure_dir, dset)
+        _plot_histogram_sisre(fid, figure_dir, dset)
         _statistics(fid, figure_dir, dset)
+
+    # Generate PDF from Markdown file
+    # TODO: define config call without defining sisre_report!!!
+    if config.tech.sisre_report.get("markdown_to_pdf", default=False).bool:
+        _markdown_to_pdf(dset)
 
 
 def _eclipse_satellites(fid, dset):
     """Write overview over satellites in eclipse
 
     Args:
-       fid:
-       dset:
+       fid (_io.TextIOWrapper):  File object.
+       dset (Dataset):           A dataset containing the data.
     """
     # TODO: time period of eclipting satellites needed
+    # Get broadcast orbit
     brdc = apriori.get(
         "orbit",
         rundate=dset.rundate,
@@ -105,87 +114,62 @@ def _eclipse_satellites(fid, dset):
     )
 
 
-def _header(fid):
-    title = "Where"
-
-    fid.write(
-        """---
-title: {title}
-author: Where v{version} [{user}]
-date: {nowdate:%Y-%m-%d}
----
-""".format(
-            # title=title["text"], version=where.__version__, user=config.analysis.user.str, nowdate=datetime.now()
-            title=title,
-            version=where.__version__,
-            user=getpass.getuser(),
-            nowdate=datetime.now(),  # TODO: Better solution?
-        )
-    )
-
-    fid.write("\\newpage\n")
-    fid.write(
-        """#SISRE analysis\n
-
-For the SISRE analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
-
-\\begin{equation}   
-     \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
-  \\label{eq:sisre}  
-\\end{equation}
-
-\\begin{equation}   
-     \\text{SISRE(orb)}^s = \sqrt{w_r^2 \cdot \Delta {r^s}^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
-  \\label{eq:sisre_orb}  
-\\end{equation}
-
-\\begin{tabular}{lll}
-with\\\\
- & $\\text{SISRE}^s$        & Global averaged SISRE for satellite $s$, \\\\
- & $\\text{SISRE(orb)}^s$   & Orbit-only SISRE for satellite $s$, \\\\
- &$\Delta a^s$, $\Delta c^s$, $\Delta r^s$   & Satellite coordinate differences between broadcast and precise\\\\
- &                                           & ephemeris in along-track, cross-track and radial for satellite $s$,\\\\
- &$\Delta t^s$              & Satellite clock correction difference related to CoM of \\\\
- &                          & satellite $s$ and corrected for satellite biases and averaged \\\\
- &                          & clock offset in each epoch,\\\\
- &$w_r$                     & SISRE weight factor for radial errors (see Table 1),\\\\
- &$w_{a,c}$                 & SISRE weight factor for along-track and cross-track errors\\\\
- &                          & (see Table 1).\\\\
-\\end{tabular}
-
-It should be noted that we have neglected the uncertainty of precise ephemeris and clocks by the determination of SISRE.
-
-The SISRE analysis is carried out on daily basis. Each daily solution is cleaned for outliers. The outliers are detected and rejected for each day iteratively using a 3-sigma threshold determined for each satellite. After each iteration the SISRE results are again recomputed.
-
-\\begin{table}[!ht]
-\\begin{center}
-  \\begin{tabular}[c]{lll}
-    \\hline
-    System       & $w_r$  & $w_{a,c}$ \\\\
-    \\hline
-    GPS          & $0.980$ & $0.139$ \\\\
-    Galileo      & $0.984$ & $0.124$ \\\\
-    \\hline
-  \\end{tabular}
-  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in Montenbruck et al. 2018.}
-  \\label{tab:sisre_weight_factors}
-\\end{center}
-\\end{table}
-
-\\newpage\n """
-    )
-
-
 def _get_satellite_type(dset, satellite):
+    """Get satellite type (e.g. GALILEO-1, GALILEO-2, BLOCK IIF)
+
+    Args:
+       dset (Dataset):      A dataset containing the data.
+       satellite (str):     Satellite number (e.g. E01, G02, ...) 
+    """
     idx = dset.filter(satellite=satellite)
     return set(dset.satellite_type[idx]).pop()
 
 
-def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column="rms"):
+def _markdown_to_pdf(dset):
+    """Convert markdown SISRE report file to pdf format
+
+    Args:
+       dset (Dataset):           A dataset containing the data.
+    """
+
+    md_path = str(files.path("output_sisre_report", file_vars=dset.vars))
+    pdf_path = md_path.replace(".md", ".pdf")
+    program = "pandoc"
+
+    # Convert markdown to pdf with pandoc
+    pandoc_args = ["-f markdown", "-V classoption:twoside", "-N", "-o " + pdf_path, md_path]
+
+    log.info("Start: {} {}".format(program, " ".join(pandoc_args)))
+    status = os.system(f"{program} {' '.join(pandoc_args)}")
+    if status != 0:
+        log.error("{} failed with error code {} ({})", program, status, " ".join([program] + pandoc_args))
+
+    # TODO: pandoc subprocess call does not work. Why?
+    # process = subprocess.run([program] + pandoc_args)
+    # if process.returncode:
+    #    log.error("{} failed with error code {} ({})", program, process.returncode, " ".join(process.args))
+
+
+#
+# BAR PLOT
+#
+def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None, column="rms"):
     """Generate bar plot of given dataframe columns (colored and ordered by satellite type)
+
+    Args:
+       fid (_io.TextIOWrapper): File object.
+       figure_dir (PosixPath):  Figure directory.
+       df (DataFrame):          Dataframe with data to plot.
+       field (str):             Dataset field to plot.
+       extra_row_names (list):  List of extra rows removed from the dataframe.
+       column (str):            Dataframe column to plot.
     """
     fontsize = 12
-    df_reduced = df.drop(extra_row_names)  # Remove extra rows
+
+    if extra_row_names:
+        df_reduced = df.drop(extra_row_names)  # Remove extra rows
+    else:
+        df_reduced = df
 
     # Assign to each satellite type a color
     colors = dict()
@@ -214,7 +198,7 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, col
     fid.write(
         f"![{field.upper()} {column.upper()} for all satellites sorted by satellite type]({figure_dir}/plot_bar_{field}_{column}.pdf)\n"
     )
-    fid.write("\\newpage\n")
+    fid.write("\n\\clearpage\n\n")
 
 
 #
@@ -222,6 +206,18 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, col
 #
 def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xticks_rotation=None, axhline=None):
     """Generate bar plot of given dataframe columns (colored and ordered by satellite type)
+
+    Args:
+       fid (_io.TextIOWrapper):     File object.
+       df_sisre (DataFrame):        Dataframe with SISRE results.
+       df_sisre_orb (DataFrame):    Dataframe with orbit-only SISRE results.
+       figure_path (PosixPath):     Figure path.
+       xlabel (str):                X-axis label.
+       xticks_rotation (int):       Rotation angle for x-axis ticks.
+       axhline (tuple):             Tuple like (type, y_value, color), whereby:
+                                         type - GNSS type identifier
+                                         y-value - Y-value for horizontal line
+                                         color - Color of horizontal line 
     """
     fontsize = 12
 
@@ -258,6 +254,14 @@ def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xtick
 
 
 def _plot_bar_stacked_sisre(fid, field_dfs, extra_row_names, figure_dir):
+    """Generate stacked bar plot with SISRE RMS over all satellites (constellation)
+
+    Args:
+       fid (_io.TextIOWrapper): File object.
+       field_dfs (dict):        Dictionary with SISRE and orbit-only SISRE dataframe.          
+       extra_row_names (list):  List of extra rows removed from the dataframe.
+       figure_dir (PosixPath):  Figure directory.
+    """
 
     figure_path_threshold = figure_dir / f"plot_bar_stacked_sisre_extra_rows_threshold.pdf"
     figure_path = figure_dir / f"plot_bar_stacked_sisre_extra_rows.pdf"
@@ -269,53 +273,77 @@ def _plot_bar_stacked_sisre(fid, field_dfs, extra_row_names, figure_dir):
     df_sisre_extra = field_dfs["sisre"].drop(set(field_dfs["sisre"].index) - set(extra_row_names))
     df_sisre_orb_extra = field_dfs["sisre_orb"].drop(set(field_dfs["sisre_orb"].index) - set(extra_row_names))
 
-    _plot_bar_stacked(
-        fid,
-        df_sisre_extra,
-        df_sisre_orb_extra,
-        figure_path=figure_path_threshold,
-        xticks_rotation=20,
-        axhline=sisre_threshold,
-    )
-    _plot_bar_stacked(
-        fid,
-        df_sisre_extra,
-        df_sisre_orb_extra,
-        figure_path=figure_path_threshold,
-        xticks_rotation=20,
-        axhline=sisre_threshold,
-    )
+    # Stacked bar plot WITHOUT threshold
     _plot_bar_stacked(fid, df_sisre_extra, df_sisre_orb_extra, figure_path=figure_path, xticks_rotation=20)
 
     fid.write(
-        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE]({figure_path_threshold})\n"
+        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE for the used time processing period and over all satellites.]({figure_path})\n\n"
     )
+
+    # Stacked bar plot WITH threshold
+    _plot_bar_stacked(
+        fid,
+        df_sisre_extra,
+        df_sisre_orb_extra,
+        figure_path=figure_path_threshold,
+        xticks_rotation=20,
+        axhline=sisre_threshold,
+    )
+
     fid.write(
-        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE]({figure_path})\n"
+        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE for the used time processing period and over all satellites. The threshold lines indicate the minimum performance level of the used GNSS.]({figure_path_threshold})\n"
     )
-    fid.write("\\newpage\n")
+    fid.write("\n\\clearpage\n\n")
 
 
 def _plot_bar_stacked_sisre_satellites(fid, field_dfs, extra_row_names, figure_dir):
+    """Generate stacked bar plot with SISRE RMS for each satellite
 
+    Args:
+       fid (_io.TextIOWrapper): File object.
+       field_dfs (dict):        Dictionary with SISRE and orbit-only SISRE dataframe.          
+       extra_row_names (list):  List of extra rows removed from the dataframe.
+       figure_dir (PosixPath):  Figure directory.
+    """
     figure_path = figure_dir / f"plot_bar_stacked_sisre.pdf"
+    figure_path_threshold = figure_dir / f"plot_bar_stacked_sisre_threshold.pdf"
+
+    # Define SISRE thresholds
+    sisre_threshold = (AxhlineConfig("E", 7, "red"),)  # TODO: Handling of several GNSS
 
     # Remove extra rows
     df_sisre = field_dfs["sisre"].drop(extra_row_names)
     df_sisre_orb = field_dfs["sisre_orb"].drop(extra_row_names)
 
+    # Stacked bar plot WITHOUT threshold
     _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path=figure_path, xlabel="Satellite")
 
     fid.write(
-        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE]({figure_path})\n"
+        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE for the used time processing period and each satellite.]({figure_path})\n\n"
     )
-    fid.write("\\newpage\n")
+
+    # Stacked bar plot WITH threshold
+    _plot_bar_stacked(
+        fid, df_sisre, df_sisre_orb, figure_path=figure_path_threshold, xlabel="Satellite", axhline=sisre_threshold
+    )
+
+    fid.write(
+        f"![Blue bars indicate orbit-only SISRE RMS, orange bars clock-only SISRE RMS and green bars 95th percentile SISRE for the used time processing period and each satellite. The threshold lines indicate the minimum performance level of the used GNSS.]({figure_path_threshold})\n"
+    )
+    fid.write("\n\\clearpage\n\n")
 
 
 #
 # HISTOGRAM PLOTS
 #
 def _plot_histogram_subplot(data, axis, system):
+    """Plot histogram subplots
+
+    Args:
+       data (numpy.ndarray):    Data to plot.
+       axis (AxesSubplot):      Subplot axes.
+       system (str):            GNSS system identifier (e.g. E, G, ...)
+    """
     axis.hist(data, normed=True, bins=30)
     axis.set(xlabel="SISRE [m]", ylabel="Frequency")
     axis.set_title(f"{gnss_name[system]}")
@@ -332,6 +360,13 @@ def _plot_histogram_subplot(data, axis, system):
 
 
 def _plot_histogram_sisre(fid, figure_dir, dset):
+    """Plot histogram based on SISRE dataset field
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory
+       dset (Dataset):           A dataset containing the data.
+    """
     import math
 
     # TODO: How to handle for example 3 subplots?
@@ -345,13 +380,20 @@ def _plot_histogram_sisre(fid, figure_dir, dset):
     plt.clf()  # clear the current figure
 
     fid.write(f"![Histrogram of SISRE results]({figure_dir}/plot_histogram_sisre.pdf)\n")
-    fid.write("\\newpage\n")
+    fid.write("\n\\clearpage\n\n")
 
 
 #
 # SCATTER PLOTS
 #
 def _plot_scatter_satellite_bias(fid, figure_dir, dset):
+    """Scatter plot of used broadcast and precise satellite bias by determination of SISRE
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory
+       dset (Dataset):           A dataset containing the data.
+    """
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
@@ -367,19 +409,30 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
                 plt.clf()  # clear the current figure
 
                 fid.write(
-                    f"![{orbit} satellite bias]({figure_dir}/plot_scatter_{field}_{gnss_name[sys].lower()}.pdf)\n"
+                    f"![Satellite bias applied for {orbit.lower()} satellite clock corrections]({figure_dir}/plot_scatter_{field}_{gnss_name[sys].lower()}.pdf)\n"
                 )
-                fid.write("\\newpage\n")
+                fid.write("\n\\clearpage\n\n")
 
 
 #
 # SCATTER SUPPLOTS
 #
 def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
+    """Generate scatter subplot
+    Args:
+       xdata (numpy.ndarray):       X-axis data to plot.
+       subplots (tuple):            Tuple like (ylabel, color, ydata), whereby:
+                                        ylabel (str):           Y-axis label
+                                        color (str):            Color of scatter plot
+                                        ydata (numpy.ndarray):  Y-axis data
+       figure_path (PosixPath):     Figure path.
+       xlabel (str):                X-axis label.
+       title (str):                 Title of subplot. 
+    """
     marker = "."  # point marker type
 
-    fig, axes = plt.subplots(len(subplots), 1, sharex=True, sharey=True)
-    fig.set_figheight(9)  # inches
+    fig, axes = plt.subplots(len(subplots), 1, sharex=True, sharey=True, figsize=(6, 8))
+    # fig.set_figheight(8)  # inches
     fig.suptitle(f"{title}", y=1.0)
     for idx, ax in enumerate(axes):
         ax.set(ylabel=subplots[idx].ylabel)
@@ -397,6 +450,13 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
 
 
 def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
+    """Scatter subplot of orbit and clock differences between broadcast and precise orbit and clock products
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory
+       dset (Dataset):           A dataset containing the data.
+    """
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
@@ -418,12 +478,19 @@ def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
         )
 
         fid.write(
-            f"![Broadcast ephemeris errors for along-track, cross-track and radial orbit errors and clock errors]({figure_dir}/plot_scatter_orbit_clock_differences_{gnss_name[sys].lower()}.pdf)\n"
+            f"![Difference between precise and broadcast orbits given in along-track, cross-track and radial direction and satellite clock corrections for all satellites.]({figure_dir}/plot_scatter_orbit_clock_differences_{gnss_name[sys].lower()}.pdf)\n"
         )
-        fid.write("\\newpage\n")
+        fid.write("\n\\clearpage\n\n")
 
 
 def _plot_scatter_sisre(fid, figure_dir, dset):
+    """Scatter subplot of orbit-only SISRE, clock-only SISRE and SISRE
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory
+       dset (Dataset):           A dataset containing the data.
+    """
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
@@ -444,18 +511,18 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
         )
 
         fid.write(
-            f"![Orbit-only SISRE, clock-only SISRE and SISRE]({figure_dir}/plot_scatter_sisre_{gnss_name[sys].lower()}.pdf)\n"
+            f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_dir}/plot_scatter_sisre_{gnss_name[sys].lower()}.pdf)\n"
         )
-        fid.write("\\newpage\n")
+        fid.write("\n\\clearpage\n\n")
 
 
 def _statistics_satellite(fid, figure_dir, dset):
     """Generate statistics for each field and satellite
 
     Args:
-        fid (_io.TextIOWrapper):         File object
-        figure_dir (pathlib.PosixPath):  Figure directory path
-        dset (Dataset):                  Dataset
+        fid (_io.TextIOWrapper):    File object
+        figure_dir (PosixPath):     Figure directory path
+        dset (Dataset):             Dataset
     """
     fields = ["sisre", "sisre_orb", "orb_diff_3d", "clk_diff_sys"]
     rms = lambda x: np.sqrt(np.mean(np.square(x)))
@@ -537,10 +604,18 @@ def _statistics_satellite(fid, figure_dir, dset):
         column = "rms"  # TODO: Loop over columns?
         fid.write("\n\n#{} RMS for all satellites in [m]\n".format(field.upper()))
         _write_dataframe_to_markdown(fid, df, float_format="6.3f")
-        _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column)
+        # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column)
+        _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column)
 
 
 def _statistics(fid, figure_dir, dset):
+    """Statistics
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory.
+       dset (Dataset):           A dataset containing the data.
+    """
     _statistics_satellite(fid, figure_dir, dset)
 
 
@@ -548,8 +623,9 @@ def _unhealthy_satellites(fid, dset):
     """Write overview over unhealthy satellites
 
     Args:
-       fid:
-       dset:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory.
+       dset (Dataset):           A dataset containing the data.
     """
     brdc = apriori.get(
         "orbit",
@@ -567,7 +643,7 @@ def _write_config(fid):
     """Print the configuration options for a given technique and model run date
 
     Args:
-       fid:
+       fid (_io.TextIOWrapper):  File object.
     """
     # Print the individual configuration options
     fid.write("#Configuration of SISRE analysis\n__Located at {}__\n".format(", ".join(config.tech.sources)))
@@ -610,3 +686,108 @@ def _write_dataframe_to_markdown(fid, df, float_format=""):
                 line = line + " {} |".format(v)
         fid.write(line + "\n")
     fid.write("\n")
+
+
+#
+# WRITE DOCUMENT DESCRIPTION
+#
+def _write_information(fid):
+    """Write information about SISRE analysis
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+    """
+
+    fid.write("\\newpage\n")
+    fid.write(
+        """#SISRE analysis\n
+
+For the SISRE analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
+
+\\begin{equation}   
+     \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
+  \\label{eq:sisre}  
+\\end{equation}
+
+\\begin{equation}   
+     \\text{SISRE(orb)}^s = \sqrt{w_r^2 \cdot \Delta {r^s}^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
+  \\label{eq:sisre_orb}  
+\\end{equation}
+
+\\begin{equation}   
+     \\text{SISRE(clk)}^s = \\text{SISRE}^s - \\text{SISRE(orb)}^s
+  \\label{eq:sisre_clk}  
+\\end{equation}
+
+\\begin{tabular}{lll}
+with\\\\
+ & $\\text{SISRE}^s$        & Global averaged SISRE for satellite $s$, \\\\
+ & $\\text{SISRE(orb)}^s$   & Orbit-only SISRE (SISRE\_ORB) for satellite $s$, \\\\
+ & $\\text{SISRE(clk)}^s$   & Clock-only SISRE for satellite $s$, \\\\
+ &$\Delta a^s$, $\Delta c^s$, $\Delta r^s$   & Satellite coordinate differences between broadcast\\\\
+ &                                           & and precise ephemeris in along-track, cross-track \\\\
+ &                                           & and radial for satellite $s$,\\\\
+ &$\Delta t^s$              & Satellite clock correction difference related to CoM \\\\
+ &                          & of satellite $s$ and corrected for satellite biases and \\\\
+ &                          & averaged clock offset in each epoch\\\\
+ &                          & (CLK\_DIFF\_SYS),\\\\
+ &$w_r$                     & SISRE weight factor for radial errors (see Table 1),\\\\
+ &$w_{a,c}$                 & SISRE weight factor for along-track and cross-track \\\\
+ &                          & errors (see Table 1).\\\\
+\\end{tabular}
+
+It should be noted that we have neglected the uncertainty of precise ephemeris and clocks by the determination of SISRE.
+
+The SISRE analysis is carried out on daily basis. Each daily solution is cleaned for outliers. The outliers are detected and rejected for each day iteratively using a 3-sigma threshold determined for each satellite. After each iteration the SISRE results are again recomputed.
+
+The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is caculated as follows:
+\\begin{equation}   
+     \\text{ORB\_DIFF\_3D}^s = \sqrt{(\Delta {r^s}^2 + \Delta {a^s}^2 + \Delta {c^s}^2)}
+  \\label{eq:orb_diff_3d}  
+\\end{equation}
+
+\\begin{table}[!ht]
+\\begin{center}
+  \\begin{tabular}[c]{lll}
+    \\hline
+    System       & $w_r$  & $w_{a,c}$ \\\\
+    \\hline
+    GPS          & $0.980$ & $0.139$ \\\\
+    Galileo      & $0.984$ & $0.124$ \\\\
+    \\hline
+  \\end{tabular}
+  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in Montenbruck et al. 2018.}
+  \\label{tab:sisre_weight_factors}
+\\end{center}
+\\end{table}
+
+
+
+
+\\newpage\n """
+    )
+
+
+def _write_title(fid, rundate):
+    """Write title page
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       rundate (date):           Run date.
+    """
+    title = f"SISRE analysis for day {rundate:%Y-%m-%d}"
+
+    fid.write(
+        """---
+title: {title}
+author: Where v{version} [{user}]
+date: {nowdate:%Y-%m-%d}
+---
+""".format(
+            # title=title["text"], version=where.__version__, user=config.analysis.user.str, nowdate=datetime.now()
+            title=title,
+            version=where.__version__,
+            user=getpass.getuser(),
+            nowdate=datetime.now(),  # TODO: Better solution?
+        )
+    )

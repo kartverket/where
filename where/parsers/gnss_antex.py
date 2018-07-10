@@ -164,7 +164,10 @@ class AntexParser(ChainParser):
         #                                                            END OF ANTENNA
         corr_parser = ParserDef(
             end_marker=lambda line, _ln, _: line[60:74] == "END OF ANTENNA",
-            label=lambda line, _ln: line[60:].strip() if (line[60].isalpha() or line[60] == "#") else "CORRECTION",
+            skip_line=lambda line: not line,
+            label=lambda line, _ln: line[60:].strip()
+            if (line[60:61].isalpha() or line[60:61] == "#")
+            else "CORRECTION",
             parser_def={
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # BLOCK IIA           G01                 G032      1992-079A TYPE / SERIAL NO

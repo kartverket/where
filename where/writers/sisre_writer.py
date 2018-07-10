@@ -11,6 +11,7 @@ from collections import namedtuple
 from datetime import datetime
 
 # External library imports
+import midgard
 import numpy as np
 
 # Where imports
@@ -21,6 +22,7 @@ from where.lib import files
 from where.lib import plugins
 from where.lib.unit import unit
 from where.lib import util
+from where.writers import sisre_output_buffer
 
 WriterField = namedtuple("WriterField", ["field", "attrs", "dtype", "format", "width", "header", "unit"])
 WriterField.__new__.__defaults__ = (None,) * len(WriterField._fields)
@@ -126,6 +128,10 @@ def sisre_writer(dset):
         encoding="utf8",
     )
 
+    # Append SISRE output path to SISRE output buffer file
+    if config.tech.sisre_writer.write_buffer_file.bool:
+        sisre_output_buffer.sisre_output_buffer(dset)
+
 
 def _get_field(dset, field, attrs):
     """Get field values of a Dataset specified by the field attributes
@@ -154,7 +160,7 @@ def _get_header(dset):
         str:                  Header lines
     """
 
-    pgm = "where " + where.__version__
+    pgm = "where " + where.__version__ + "/midgard " + midgard.__version__
     run_by = util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else ""
     file_created = datetime.utcnow().strftime("%Y%m%d %H%M%S") + " UTC"
     header = ("PGM: {:s}  RUN_BY: {:s}  DATE: {:s}\n\n".format(pgm, run_by, file_created))
@@ -180,12 +186,12 @@ def _get_header(dset):
             sat,
             dset.meta["bias_brdc"][sat],
             dset.meta["bias_precise"][sat],
-            dset.meta["pco_yaw_brdc"][sat][0],
-            dset.meta["pco_yaw_brdc"][sat][1],
-            dset.meta["pco_yaw_brdc"][sat][2],
-            dset.meta["pco_yaw_precise"][sat][0],
-            dset.meta["pco_yaw_precise"][sat][1],
-            dset.meta["pco_yaw_precise"][sat][2],
+            dset.meta["pco_sat_brdc"][sat][0],
+            dset.meta["pco_sat_brdc"][sat][1],
+            dset.meta["pco_sat_brdc"][sat][2],
+            dset.meta["pco_sat_precise"][sat][0],
+            dset.meta["pco_sat_precise"][sat][1],
+            dset.meta["pco_sat_precise"][sat][2],
         )
 
     return header + "\n\n"

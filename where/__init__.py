@@ -19,7 +19,7 @@ import platform as _platform
 # Version of Where.
 #
 # This is automatically set using the where_release tool
-__version__ = "0.7.4"
+__version__ = "0.8.0"
 
 
 # Authors of the software

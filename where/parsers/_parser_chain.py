@@ -17,18 +17,19 @@ from where.lib import util
 
 
 # A simple structure used to define the necessary fields of a parser
-ParserDef = namedtuple("ParserDef", ["end_marker", "label", "parser_def", "end_callback"])
-ParserDef.__new__.__defaults__ = (None,)  # end_callback is optional
+ParserDef = namedtuple("ParserDef", ["end_marker", "label", "parser_def", "skip_line", "end_callback"])
+ParserDef.__new__.__defaults__ = (None, None)  # skip_line and end_callback are optional
 ParserDef.__doc__ = """A convenience class for defining the necessary fields of a parser
 
     A single parser can read and parse one group of datalines, defined through the ParserDef by specifying how to parse
     each line (parser_def), how to identify each line (label), how to recognize the end of the group of lines
     (end_marker) and finally what (if anything) should be done after all lines in a group is read (end_callback).
 
-    The end_marker, label and end_callback parameters should all be functions with the following signatures:
+    The end_marker, label, skip_line and end_callback parameters should all be functions with the following signatures:
 
         end_marker   = func(line, line_num, next_line)
         label        = func(line, line_num)
+        skip_line    = func(line)
         end_callback = func(cache)
 
     The parser definition `parser_def` includes the `parser`, `field`, `strip` and `delimiter` entries. The `parser`
@@ -48,6 +49,7 @@ ParserDef.__doc__ = """A convenience class for defining the necessary fields of 
         end_marker:   A function returning True for the last line in a group.
         label:        A function returning a label used in the parser_def.
         parser_def:   A dict with 'parser' and 'fields' defining the parser.
+        skip_line:    A function returning True if the line should be skipped.
         end_callback: A function called after reading all lines in a group.
     """
 
@@ -109,7 +111,8 @@ class ChainParser(Parser):
         if not parser.label:
             return
 
-        # log.debug('{:>3d}: {}', cache['line_num'], line)
+        if parser.skip_line and parser.skip_line(line):
+            return
 
         label = parser.label(line.rstrip(), cache["line_num"])
         if label not in parser.parser_def:

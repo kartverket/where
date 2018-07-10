@@ -15,8 +15,9 @@ import numpy as np
 
 # Where imports
 from where import data
-from where.lib import log
 from where import parsers
+from where.lib import constant
+from where.lib import log
 from where.lib import plugins
 
 
@@ -93,15 +94,18 @@ class AntennaCorrection(UserDict):
         self.data = parser.as_dict()
         self.file_path = parser.file_path
 
-    def satellite_phase_center_offset(self, dset, freq=1):
+    def satellite_phase_center_offset(self, dset, sys_freq):
         """Determine satellite phase center offset correction vectors given in ITRS
 
-        TODO: Frequency dependency is not solved. Should observations be corrected? Or only choosed observations?
-          Ionospheric-free linear combination is described in subirana!!!
+        Satellite phase center offset (PCO) corrections are frequency dependent. The argument 'sys_freq' defines, which
+        frequencies for a given GNSS should be used. If two frequencies for a GNSS are given, then the PCO is
+        determined as ionospheric-free linear combination.
 
         Args:
             dset (Dataset):   Model data.
-            freq (int):       ANTEX frequency identifier
+            sys_freq (dict):  Dictionary with frequency or frequency combination given for GNSS
+                              identifier:
+                                sys_freq = { <sys_id>: <freq> }  (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
 
         Returns:
             numpy.ndarray: Satellite phase center offset correction vectors given in ITRS in meter
@@ -132,23 +136,106 @@ class AntennaCorrection(UserDict):
             if used_date is None:
                 continue
 
-            # Get GNSS specific ANTEX frequency identifier (e.g. G01, R02, E05, ...)
-            freq_id = ("{sys}{freq:02d}".format(sys=sat[0], freq=freq))
-
-            # Get satellite phase center offset (PCO)
-            pco_yaw = self.data[sat][used_date][freq_id]["neu"]
-
             # Add PCO to Dataset meta
-            dset.meta.setdefault("pco_yaw", dict()).update({sat: pco_yaw})
+            system = sat[0]
+            pco_sat = self._get_pco_sat(sat, sys_freq, used_date)
+            dset.meta.setdefault("pco_sat", dict()).update({sat: pco_sat.tolist()[0]})
 
-            # Transform PCO given in satellite body-fixed reference frame (assumed to be aligned to yaw-steering reference
-            # frame) to ITRS
-            pco_itrs = dset.sat_posvel.convert_yaw_to_itrs(np.array([pco_yaw]))
-            # pco_itrs = dset.sat_posvel._yaw2itrs[idx][0] @ np.array(pco_yaw)
+            # Transform PCO given in satellite body-fixed reference frame (for GPS and Galileo assumed to be aligned
+            # to yaw-steering reference frame) to ITRS
+            pco_itrs = dset.sat_posvel.convert_yaw_to_itrs(pco_sat)
+            # pco_itrs = dset.sat_posvel._yaw2itrs[idx][0] @ np.array(pco_sat)
 
             correction[idx] = pco_itrs[idx]
 
         return correction
+
+    def _get_pco_sat(self, sat, sys_freq, used_date):
+        """Get satellite PCO in satellite reference system
+
+        If two frequencies are given over the 'sys_freq' argument, then the PCOs are determined as an ionospheric linear
+        combination.
+
+        Args:
+            sat (str):                      Satellite identifier.
+            sys_freq (dict):                Dictionary with frequency or frequency combination given for GNSS
+                                            identifier:
+                                                sys_freq = { <sys_id>: <freq> }  
+                                                (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
+            used_date (datetime.datetime):  Correct date for use of satellite antenna corrections     
+
+        Returns:
+            numpy.ndarray: Satellite PCO in satellite reference system
+        """
+        # GNSS          GNSS freq        ANTEX freq
+        # ___________________________________________
+        # C (BeiDou):   B1               'C02'
+        #               B2               'C07'
+        #               B3               'C06'
+        # G (GPS):      L1               'G01'
+        #               L2               'G02'
+        #               L5               'G05'
+        # R (GLONASS):  G1               'R01'
+        #               G2               'R02'
+        # E (Galileo):  E1               'E01'
+        #               E5 (E5a+E5b)     'E08'
+        #               E5a              'E05'
+        #               E5b              'E07'
+        #               E6               'E06'
+        # I (IRNSS):    L5               'I05'
+        #               S                'I09'
+        # J (QZSS):     L1               'J01'
+        #               L2               'J02'
+        #               L5               'J05'
+        #               LEX              'J06'
+        # S (SBAS):     L1               'S01'
+        #               L5               'S05'
+        gnss_to_antex_freq = {
+            "C": {"B1": "C02", "B2": "C07", "B3": "C06"},
+            "E": {"E1": "E01", "E5": "E08", "E5a": "E05", "E5b": "E07", "E6": "E06"},
+            "G": {"L1": "G01", "L2": "G02", "L5": "G05"},
+            "I": {"L5": "I05", "S": "I09"},
+            "J": {"L1": "J01", "L2": "J02", "L5": "J05", "LEX": "J06"},
+            "R": {"G1": "R01", "G2": "R02"},
+            "S": {"L1": "S01", "L5": "S05"},
+        }
+
+        # Get GNSS and frequency/frequencies
+        sys = sat[0]  # GNSS identifier
+        freq = sys_freq[sys]
+        if "_" in freq:
+            freq = freq.split("_")
+        else:
+            freq = [freq]
+
+        # Get satellite PCO for one frequency
+        if len(freq) == 1:
+
+            # Get satellite phase center offset (PCO) given in satellite reference system
+            pco_sat = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"]])
+
+        # Get satellite PCO for ionospheric-free linear combination based on two-frequencies
+        elif len(freq) == 2:
+
+            # Coefficient of ionospheric-free linear combination
+            f1 = constant.get("gnss_freq_" + sys, source=freq[0])  # Frequency of 1st band
+            f2 = constant.get("gnss_freq_" + sys, source=freq[1])  # Frequency of 2nd band
+            n = f1 ** 2 / (f1 ** 2 - f2 ** 2)
+            m = -f2 ** 2 / (f1 ** 2 - f2 ** 2)
+
+            # Get satellite phase center offset (PCO) given in satellite reference system
+            pco_sat_f1 = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"]])
+            pco_sat_f2 = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[1]]]["neu"]])
+
+            # Generate ionospheric-free linear combination
+            pco_sat = n * pco_sat_f1 + m * pco_sat_f2
+
+        else:
+            log.fatal(
+                f"Wrong frequency type '{sys}:{'_'.join(freq)}'. Note: 'signals' configuration option should represent one- or two-frequencies (e.g. E:E1 or E:E1_E5a)."
+            )
+
+        return pco_sat
 
     def satellite_type(self, dset):
         """Get satellite type from ANTEX file (e.g. BLOCK IIF, GALILEO-1, GALILEO-2, GLONASS-M, BEIDOU-2G, ...)

@@ -57,7 +57,6 @@ Version: {version}
 # Standard library imports
 from datetime import datetime
 import itertools
-import os.path
 import subprocess
 import sys
 import tkinter as tk
@@ -124,17 +123,11 @@ tk.CallWrapper = CallWrapperReportingException
 def main():
     """Parse command line arguments and run the program
     """
-    # Use options to specify tech, include tech as profile
-    # tech = None
-    # for option, tech_name in pipelines.options().items():
-    #     if util.check_options(option):
-    #         tech = tech_name
-    #         break
+    # Use options to specify tech and session, include tech as profile
     try:
         tech = pipelines.get_from_options()
     except exceptions.UnknownPipelineError:
         tech = None
-
     session = util.read_option_value("--session", default="")
 
     # Add command line options to config
@@ -146,7 +139,7 @@ def main():
     # Show the model configuration info
     if util.check_options("-S", "--showconfig"):
         print(config.there)
-        return
+        raise SystemExit
 
     # Start logging
     log.init()
@@ -170,7 +163,7 @@ def main():
         if colormap == "help":
             print("Possible values for colormap are:")
             print(console.fill(", ".join(sorted(cm.cmap_d)), initial_indent=" " * 4, subsequent_indent=" " * 4))
-            sys.exit(0)
+            raise SystemExit
         else:
             cm.get_cmap(colormap)
 
@@ -202,19 +195,19 @@ class There(tk.Tk):
         super().wm_title(util.get_program_name().title())
 
         # Set up default values for variables
-        self.vars = dict(
-            config.program_vars(rundate, tech, session=session, location="work"), **config.date_vars(rundate)
-        )
+        self.vars = dict(config.program_vars(rundate, tech, session=session), **config.date_vars(rundate))
         if rundate is not None:
-            self.vars.update({"date": f"{rundate:%Y%m%d}{session}{self.vars['id'].replace('_', '/', 1)}"})
+            self.vars.update({"session": f"{rundate:%Y%m%d}/{session}"})
+        self.vars["pipeline"] = self.vars["tech"]  # TODO: Can be removed when tech is changed to pipeline
         self.vars.update(config.there.initial_settings.as_dict())
         self.widget_updates = list()
 
         # Dataset controls
         dataset_line = ttk.Frame()
-        self.add_dropdown(dataset_line, DD_Location)
-        self.add_dropdown(dataset_line, DD_Date)
         self.add_dropdown(dataset_line, DD_Pipeline)
+        self.add_dropdown(dataset_line, DD_Session)
+        self.add_dropdown(dataset_line, DD_Id)
+        self.add_dropdown(dataset_line, DD_Stage)
         self.add_dropdown(dataset_line, DD_Dataset)
         dataset_line.pack(side=tk.TOP, fill=tk.X, expand=False)
 
@@ -300,7 +293,7 @@ class There(tk.Tk):
             log.warn("Log file {} does not exist", log_path)
             return
 
-        log.print_file(log_path, config.there.print_log_level.str.upper())
+        log.print_file(log_path, config.there.print_log_level.str.upper())  # TODO: Use log_level enum
 
     def button_show_map(self):
         map_path = files.path("output_web_map", file_vars=self.vars)
@@ -379,6 +372,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         NavigationToolbar2TkAgg(self, master).update()
         self._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.picker_id = None
+        self.ignore_obs = None
         self.cmap = config.there.colormap.str
         self.event_colors = dict()
         self.draw()
@@ -388,7 +382,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
     def update_dataset(self):
         if self.vars["rundate"] is None:
-            location = config.files[f"directory_{self.vars['location']}"].directory.replaced.str.split("{")[0]
+            location = config.files.directory_work.directory.replaced.str.split("{")[0]
             log.error(f"No data found in {location}. Run '{where.__executable__}' to generate data.")
             return
 
@@ -405,6 +399,9 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             if "event_interval" not in self.dataset.fields:
                 self.dataset.add_float("event_interval")
             self.dataset.event_interval[:] = np.sum(event - obs < 0, axis=1) + 0.5
+
+        # Observations that will not be plotted
+        self.ignore_obs = np.zeros(self.dataset.num_obs, dtype=bool)
 
         # Update the next widget
         self.update_next()
@@ -461,6 +458,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         log.debug("Updating the {}-plot", self.vars["plot_type"])
         tooltip_fields = config.there.tooltip_fields.tuple
         idx, idx_other = self.do_filter()
+        self.figure.canvas.mpl_connect("pick_event", self.dbl_click_pick)  # TODO: Delete these?
 
         # Use the registered plotting functions to plot the correct plot
         self.figure.clear()
@@ -483,6 +481,8 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             self.figure.canvas.mpl_disconnect(self.picker_id)
 
         def on_pick(event):
+            if event.mouseevent.dblclick:
+                return
             try:
                 x_data = self.vars["x-axis_data"][idx]
                 idx_finite_x = np.all(np.isfinite(x_data), axis=tuple(range(1, x_data.ndim)))
@@ -527,14 +527,17 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
     def do_filter(self):
         filter_dict = {f: self.vars[f] for f in self.filters if self.vars[f] != "no filter"}
-        idx_data = self.dataset.filter(**filter_dict)
+        idx_data = self.dataset.filter(**filter_dict, idx=np.logical_not(self.ignore_obs))
         try:
-            idx_other = self.other_dataset.filter(**filter_dict)
+            idx_other = self.other_dataset.filter(**filter_dict, idx=np.logical_not(self.ignore_obs))
         except AttributeError:
             idx_other = idx_data
         return idx_data, idx_other
 
-    def dbl_click_pick(self, event, mouse_event):
+    def dbl_click_pick(self, event, mouse_event=None):
+        if mouse_event is None:
+            mouse_event = event.mouseevent
+
         if not mouse_event.dblclick:
             return False, dict(ind=list())
 
@@ -545,7 +548,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         log.debug("Doing nothing about double click")
         return False, dict()
 
-    def dbl_click_add_clock_break(self, _, mouse_event):
+    def dbl_click_add_clock_break(self, event, mouse_event):
+        if "ind" in dir(event):  # Workaround so that clock breaks are not added twice
+            return False, dict()
+
         if self.vars["station"] == "no filter":
             log.error("Choose a station to add a clock break")
         else:
@@ -570,15 +576,42 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
             # Add to config file
             with config.update_tech_config(use_options=False, **self.vars) as cfg:
-                print(cfg.sources)
                 current = cfg.vlbi_clock_correction.clock_breaks.as_list(", *")
                 updated = ", ".join(sorted(current + [clock_break]))
                 cfg.update("vlbi_clock_correction", "clock_breaks", updated, source=util.get_program_name())
 
         return False, dict()
 
+    def dbl_click_ignore_observation(self, event, _):
+        if "ind" not in dir(event):
+            return False, dict()
+
+        filter_idx, _ = self.do_filter()
+        station_field = "baseline" if "baseline" in self.dataset.fields else "station"
+
+        # Find which observations to ignore
+        ignore_list = list()
+        for idx in event.ind:
+            ignore_str = f"{self.dataset.time.utc.iso[filter_idx][idx]} {self.dataset[station_field][filter_idx][idx]}"
+            log.info(f"Adding '{ignore_str}' to ignore_observation")
+            ignore_list.append(ignore_str)
+
+            # Add to ignore filter for visualization
+            # TODO: Should ignore_obs be in dset.meta so it will be permanent?
+            self.ignore_obs[np.where(filter_idx)[0][idx]] = True
+
+        self.update_plot()
+
+        # Add to config file
+        with config.update_tech_config(use_options=False, **self.vars) as cfg:
+            current = cfg.ignore_observation.observations.as_list(", *")
+            updated = ", ".join(sorted(current + ignore_list))
+            cfg.update("ignore_observation", "observations", updated, source=util.get_program_name())
+
+        return False, dict()
+
     def ignore_baseline(self):
-        if self.vars["baseline"] == "no filter":
+        if "baseline" not in self.vars or self.vars["baseline"] == "no filter":
             log.error("Choose a baseline in the filter menu to ignore it")
         else:
             log.info(f"Adding {self.vars['baseline']} to ignore_baseline")
@@ -588,7 +621,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 cfg.update("vlbi_ignore_baseline", "baselines", updated, source=util.get_program_name())
 
     def ignore_station(self):
-        if self.vars["station"] == "no filter":
+        if "station" not in self.vars or self.vars["station"] == "no filter":
             log.error("Choose a station in the filter menu to ignore it")
         else:
             log.info(f"Adding {self.vars['station']} to ignore_station")
@@ -598,7 +631,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 cfg.update("ignore_station", "stations", updated, source=util.get_program_name())
 
     def ignore_source(self):
-        if self.vars["source"] == "no filter":
+        if "source" not in self.vars or self.vars["source"] == "no filter":
             log.error("Choose a source in the filter menu to ignore it")
         else:
             log.info(f"Adding {self.vars['source']} to ignore_source")
@@ -626,6 +659,8 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             e_time, e_type, e_description = event
 
             def on_pick(_, mouse_event):
+                if mouse_event.dblclick:
+                    return False, dict(ind=list())
                 mouse_time = getattr(mouse_event, axis + "data")
                 if mouse_time and abs(e_time.plot_date - mouse_time) < threshold:
                     log.info(
@@ -645,6 +680,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         for plot_num, (num_y, num_x) in enumerate(itertools.product(range(nrows), range(ncols))):
             ax = self.figure.add_subplot(sub_gs[plot_num])
             ax.clear()
+            # ax.scatter(0, 0, s=0, cmap=self.cmap)
             ax.scatter(0, 0, s=0, picker=self.dbl_click_pick, cmap=self.cmap)
             idx_x = slice(None) if x_data.ndim == 1 else (slice(None), num_x)
             idx_y = slice(None) if y_data.ndim == 1 else (slice(None), num_y)
@@ -911,16 +947,9 @@ class DropdownPicker(ttk.Combobox, UpdateMixin):
 
         self.vars = vars_
         self.figure = figure
-        self.file_vars = config.files.vars  # TODO: This should not depend on config.files.vars
         self.next_update_func = None
         self.choice.set(self.vars.get(self.name, ""))
         self.choice.trace("w", self.choose)
-
-    def _glob_dset_paths(self, file_vars):
-        # TODO: How to deal with archive vs work
-        # print(self.vars)
-        # print(file_vars)
-        ...
 
     def choose(self, *_):
         vars_ = self.parse_vars()
@@ -946,84 +975,86 @@ class DropdownPicker(ttk.Combobox, UpdateMixin):
         return list()
 
 
-class DD_Location(DropdownPicker):
-
-    name = "location"
-    width = 8
-
-    def read_options(self):
-        """Read possible locations from the file config
-        """
-        return sorted([d[10:] for d in config.files.sections if d.startswith("directory_")])
-
-
-class DD_User(DropdownPicker):
-
-    name = "user"
-    width = 8
-
-    def read_options(self):
-        """Read users from the file directories
-        """
-        users = files.glob_variable("dataset_hdf5", "user", r"[a-z]+")
-        return sorted(users)
-
-
-class DD_Date(DropdownPicker):
-
-    name = "date"
-    width = 30
-
-    def read_options(self):
-        """Read dates from filenames
-
-        TODO: The persistence of config.files.vars causes problems. We are not able to glob for paths since date is
-              already set in the vars.
-        """
-        file_vars = dict(user=self.vars["user"])
-        paths = files.glob_paths("dataset_hdf5", file_vars=file_vars)
-        dirs = [os.path.basename(os.path.dirname(p)) for p in paths]
-        dates = set()
-        for dirname in dirs:
-            dates.add(dirname.replace("_", "/", 1))
-        return sorted(dates)
-
-    def parse_vars(self):
-        """Construct date variables and split out timestamp
-        """
-        parts = (self.choice.get() + "/").split("/")
-        rundate = datetime.strptime(parts[0][:8], "%Y%m%d").date() if parts[0] else None
-        file_vars = config.date_vars(rundate) if rundate else dict()
-        file_vars["rundate"] = rundate
-        file_vars["date"] = parts[0][:8]
-        file_vars["session"] = parts[0][8:]
-        file_vars["timestamp"] = parts[1].split("_")[0]
-        try:
-            # Test if timestamp is valid
-            datetime.strptime(file_vars["timestamp"], config.FMT_dt_file)
-            parts[1] = "_".join(parts[1].split("_")[1:])
-        except ValueError:
-            file_vars["timestamp"] = ""
-        file_vars["id"] = "_" + parts[1] if parts[1] else ""
-        return file_vars
-
-
 class DD_Pipeline(DropdownPicker):
 
     name = "pipeline"
+    width = 8
+
+    def read_options(self):
+        """Read possible pipelines from disk, so we only show pipelines that have been analyzed
+        """
+        return sorted(files.glob_variable("directory_work", "tech", r"[a-z]+"))
+
+    def parse_vars(self):
+        """TODO: This can be removed when tech is renamed pipeline"""
+        return {"tech": self.choice.get()}
+
+
+class DD_Session(DropdownPicker):
+
+    name = "session"
+    width = 20
+
+    def read_options(self):
+        """Read sessions from filenames
+
+        A session in this case is given by a date and a session name.
+        """
+        file_vars = dict(user=self.vars["user"], tech=self.vars["tech"])
+        paths = files.glob_paths("dataset_hdf5", file_vars=file_vars)
+        dirs = [p.parent.name for p in paths]
+        sessions = set()
+        for dirname in dirs:
+            session = dirname.split("_")[0]
+            sessions.add(f"{session[:8]}/{session[8:]}")
+        return sorted(sessions)
+
+    def parse_vars(self):
+        """Construct date variables and split out session name
+        """
+        date, _, session = self.choice.get().partition("/")
+        rundate = datetime.strptime(date, "%Y%m%d").date() if date else None
+        session_vars = config.date_vars(rundate)
+        session_vars["rundate"] = rundate
+        session_vars["date"] = date
+        session_vars["session"] = session
+        return session_vars
+
+
+class DD_Id(DropdownPicker):
+
+    name = "id"
+    width = 12
+
+    def read_options(self):
+        """Read ids from filenames
+
+        """
+        file_vars = {k: v for k, v in self.vars.items() if k not in ("id", "stage", "dataset_name", "dataset_id")}
+        ids = files.glob_variable("dataset_hdf5", "id", r"|_[_\w]+", file_vars=file_vars)
+        return sorted(i.lstrip("_") for i in ids)
+
+    def parse_vars(self):
+        """Add leading underscore to id
+        """
+        id_ = self.choice.get()
+        return {self.name: f"_{id_}" if id_ else ""}
+
+
+class DD_Stage(DropdownPicker):
+
+    name = "stage"
     width = 14
 
     def read_options(self):
         """Read pipeline and stage from filenames
         """
-        file_vars = {k: v for k, v in self.vars.items() if k not in ("tech", "stage")}
-        paths = files.glob_paths("dataset_hdf5", file_vars=file_vars)
-        tech_stages = [(s[0], s[2]) for s in [os.path.basename(p).split("-") for p in sorted(paths)]]
-        return [f"{t}/{s}" for t, s in sorted(tech_stages, key=self._sorter)]
+        file_vars = {k: v for k, v in self.vars.items() if k not in ("stage",)}
+        stages = files.glob_variable("dataset_hdf5", "stage", r"[a-z]+", file_vars=file_vars)
+        return sorted(stages, key=self._sorter)
 
-    @staticmethod
-    def _sorter(tech_stage):
-        """Return a sort key for the given tech and stage
+    def _sorter(self, stage):
+        """Return a sort key for the given stage
 
         Sorts first on tech then on stage such that later stages are sorted first. Unknown stages are sorted
         alphabetically at the end. Stages can be prioritized by adding them to stages in there.conf.
@@ -1034,20 +1065,13 @@ class DD_Pipeline(DropdownPicker):
         Returns:
             Tuple that can be sorted on.
         """
-        tech, stage = tech_stage
+        tech = self.vars["tech"]
         stages = config.there.stages.list + pipelines.stages(tech)[::-1]  # Reversed to sort later stages first
         try:
             stage_id = stages.index(stage)
         except ValueError:
             stage_id = len(stages)  # Unknown stages are sorted last
-        return (tech, stage_id, stage)
-
-    def parse_vars(self):
-        if not self.choice.get():
-            return dict()
-
-        tech, _, stage = self.choice.get().partition("/")
-        return dict(tech=tech, stage=stage)
+        return (stage_id, stage)
 
 
 class DD_Dataset(DropdownPicker):

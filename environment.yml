@@ -9,11 +9,14 @@ dependencies:
   - cython
   - h5py
   - ipython
+  - line_profiler
+  - markdown
   - matplotlib
   - mypy
   - netCDF4
   - numpy
   - pandas
+  - pelican
   - pycurl
   - pytest
   - pytest-cov

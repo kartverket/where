@@ -46,9 +46,9 @@ def clock(dset):
     stations = np.asarray(stations)
 
     skip_stations = config.tech.get("skip_stations", section=PARAMETER, default="").list
-    skip_idx = [sta == skip_sta for skip_sta in skip_stations for sta in stations]
+    skip_idx = np.in1d(stations, skip_stations)
 
-    if skip_idx:
+    if skip_idx.any():
         stations = stations[np.logical_not(skip_idx)]
 
     partials = np.zeros((dset.num_obs, len(stations)))

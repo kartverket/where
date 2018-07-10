@@ -25,7 +25,6 @@ files are properly closed they should normally be used with a context manager as
 import builtins
 from contextlib import contextmanager
 from datetime import datetime
-import glob
 import gzip
 import pathlib
 import re
@@ -245,13 +244,13 @@ def url(file_key, file_vars=None, default=None, is_zipped=None, use_aliases=True
     file_vars = dict() if file_vars is None else file_vars
     base_url = config.files[file_key].url.replace(default=default, **file_vars).str.rstrip("/")
     file_name = config.files[file_key].filename.replace(default=default, **file_vars).str
-    file_url = _replace_gz(URL(f"{base_url}/{file_name}"))
+    file_url = _replace_gz(URL(f"{base_url}/{file_name}"), is_zipped=is_zipped)
 
     # Check for aliases
     if use_aliases and not file_url.exists():
         aliases = config.files.get("aliases", section=file_key, default="").replace(default=default, **file_vars).list
         for alias in aliases:
-            aliased_url = _replace_gz(file_url.with_name(alias))
+            aliased_url = _replace_gz(file_url.with_name(alias), is_zipped=is_zipped)
             if aliased_url.exists():
                 return aliased_url
 
@@ -407,9 +406,9 @@ def download_file(file_key, file_vars=None, create_dirs=True):
         create_dirs (Bool):  Create directories as necessary before downloading file.
     """
     if (
-        "url" not in config.files[file_key]
+        not config.where.files.download_missing.bool
+        or "url" not in config.files[file_key]
         or not config.files[file_key].url.str
-        or not config.where.files.download_missing.bool
     ):
         return None
 
@@ -446,9 +445,18 @@ def download_file(file_key, file_vars=None, create_dirs=True):
 
 def glob_paths(file_key, file_vars=None, is_zipped=None):
     """Find all filepaths matching a filename pattern
+
+    Using pathlib.Path.glob() here is not trivial because we need to split into a base directory to start searching
+    from and a pattern which may include directories. With glob.glob() this is trivial. The downside is that it only
+    returns strings and not pathlib.Paths.
+
     """
-    file_path = path(file_key, file_vars, default="*", is_zipped=is_zipped)
-    return glob.glob(str(file_path))
+    path_string = str(path(file_key, file_vars, default="*", is_zipped=is_zipped))
+    glob_path = pathlib.Path(re.sub(r"\*+", "*", path_string))
+    idx = min((i for i, p in enumerate(glob_path.parts) if "*" in p), default=len(glob_path.parts) - 1)
+    glob_base = pathlib.Path(*glob_path.parts[:idx])
+    glob_pattern = str(pathlib.Path(*glob_path.parts[idx:]))
+    return list(glob_base.glob(glob_pattern))
 
 
 def glob_variable(file_key, variable, pattern, file_vars=None):
@@ -467,7 +475,7 @@ def glob_variable(file_key, variable, pattern, file_vars=None):
     # Find each match
     values = set()
     for search_path in search_paths:
-        match = re_pattern.search(search_path)
+        match = re_pattern.search(str(search_path))
         if match and variable in match.groupdict():
             values.add(match.groupdict()[variable])
 

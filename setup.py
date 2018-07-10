@@ -70,7 +70,7 @@ setup(
     #   $ pip install -e .[optional,dev_tools]
     extras_require={
         "optional": ["colorama", "h5py", "netCDF4", "python-editor", "requests", "seaborn"],
-        "dev_tools": ["black", "bumpversion", "flake8", "mypy", "pytest"],
+        "dev_tools": ["black", "bumpversion", "flake8", "line_profiler", "mypy", "pytest"],
     },
     # If there are data files included in your packages that need to be installed, specify them here.  If using Python
     # 2.6 or less, then these have to be included in MANIFEST.in as well.
@@ -86,7 +86,7 @@ setup(
     entry_points={
         "console_scripts": [
             f"{exe}=where.__main__:main",
-            f"{exe:profiler}=where.__main__:profiler",
+            f"{exe:profiler}=where.tools.profiler:profiler",
             f"{exe:release}=where_release:main",
             f"{exe:runner}=where.runner:main",
             f"{exe:setup}=where.setup:main",

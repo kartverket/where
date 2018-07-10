@@ -32,13 +32,14 @@ from where.lib import config
 from where.lib import exceptions
 
 # Log-levels, a log message will be shown if the message log level is at or above the current log level.
-_LEVELS = ("ALL", "DEBUG", "TIME", "DEV", "INFO", "WARN", "CHECK", "ERROR", "FATAL", "NONE")
+_LEVELS = ("ALL", "DEBUG", "TIME", "DEV", "INFO", "OUT", "WARN", "CHECK", "ERROR", "FATAL", "NONE")
 LOGLEVELS = {level: num for num, level in enumerate(_LEVELS)}
 
 # Colors used when printing log, log-levels without an entry will not be colored.
 LOGCOLORS = {
     "DEV": console.color.Fore.BLUE,
     "TIME": console.color.Fore.WHITE,
+    "OUT": console.color.Style.BRIGHT,
     "CHECK": console.color.Style.BRIGHT + console.color.Fore.YELLOW,
     "WARN": console.color.Fore.YELLOW,
     "ERROR": console.color.Fore.RED,
@@ -236,6 +237,19 @@ def info(log_text, *fmtargs, **fmtkws):
         fmtkws:     Keyword arguments passed on to str.format.
     """
     log("INFO", log_text, *fmtargs, **fmtkws)
+
+
+def out(log_text, *fmtargs, **fmtkws):
+    """Write output message to log
+
+    The message is parsed with str.format and written to the log if the current log level is INFO or lower.
+
+    Args:
+        log_text:   String, will be parsed with str.format.
+        fmtargs:    Arguments passed on to str.format.
+        fmtkws:     Keyword arguments passed on to str.format.
+    """
+    log("OUT", log_text, *fmtargs, **fmtkws)
 
 
 def check(log_text, *fmtargs, **fmtkws):
@@ -469,16 +483,16 @@ def file_end():
 
 
 def print_file(file_path, log_level="INFO"):
-    if log_level.upper() not in LOGLEVELS:
+    if log_level not in LOGLEVELS:
         error("Log level '{}' is unknown. Use one of {}", log_level, ", ".join(LOGLEVELS))
         return
 
     info("Showing contents of log file {} at level {} and above", file_path, log_level)
-    level_limit = LOGLEVELS[log_level.upper()]
-    current_level = level_limit
+    level_limit = LOGLEVELS[log_level]
+    current_level = log_level
     with open(file_path, mode="r") as fid:  # lib.files is not available in lib.log
         for line in fid:
-            line_level = line.split()[0]
+            line_level = line.split()[0].rstrip(":")
             current_level = line_level if line_level in LOGLEVELS else current_level
             if LOGLEVELS[current_level] >= level_limit:
                 color = LOGCOLORS.get(current_level, "")

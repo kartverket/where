@@ -76,11 +76,11 @@ def write(default_stage):
         plugins.call_one(package_name=__name__, plugin_name=writer, prefix=prefix, dset=dsets[dset_str])
 
 
-def write_one(writer, dset):
+def write_one(writer, dset, **writer_args):
     """Call one writer
 
     Args:
         writer (String):   Name of writer.
         dset (Dataset):    Model run data.
     """
-    plugins.call_one(package_name=__name__, plugin_name=writer, dset=dset)
+    plugins.call_one(package_name=__name__, plugin_name=writer, dset=dset, **writer_args)

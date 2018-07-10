@@ -147,14 +147,23 @@ class AprioriOrbit():
         # return -2 / constant.c * (self.dset.sat_posvel.itrs_pos[:, None, :] @
         #                           self.dset.sat_posvel.itrs_vel[:, :, None])[:, 0, 0]
 
-    def satellite_clock_correction_com(self, antex):
+    def satellite_clock_correction_com(self, antex, sys_freq):
         """Determine satellite clock correction related to center of mass (CoM)
 
         The satellite clock correction is based on Section 20.3.3.3.3.1 in :cite:`is-gps-200h`.
+
+        Args:
+            antex (AntennaCorrection):  Antenna correction object based including ANTEX file data
+            sys_freq (dict):            Dictionary with frequency or frequency combination given for GNSS
+                                        identifier:
+                                            sys_freq = { <sys_id>: <freq> }
+                                            (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} ) 
 
         Returns:
             numpy.ndarray:    GNSS satellite clock corrections for each observation in [m] related to CoM 
                               (Note: without relativistic orbit eccentricity correction)
         """
-        z_yaw = self.dset.sat_posvel.convert_itrs_to_yaw(antex.satellite_phase_center_offset(self.dset))[:, 2]
+        z_yaw = self.dset.sat_posvel.convert_itrs_to_yaw(antex.satellite_phase_center_offset(self.dset, sys_freq))[
+            :, 2
+        ]
         return self.satellite_clock_correction() + z_yaw

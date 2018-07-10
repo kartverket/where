@@ -53,7 +53,7 @@ def detect_clockbreaks(dset):
 
         # Add fields to dset for debug
         idx_site = np.hstack((np.where(idx_1)[0], np.where(idx_2)[0]))[idx_sort]
-        dset.add_float(f"cb_{station}_residual", write_level="detail")
+        dset.add_float(f"cb_{station}_residual", write_level="operational")
         dset[f"cb_{station}_residual"][idx_site] = residual
         dset.add_float(f"cb_{station}_value", write_level="detail")
         dset.add_float(f"cb_{station}_limit", write_level="detail")

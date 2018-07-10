@@ -17,6 +17,7 @@ from collections import OrderedDict
 import numpy as np
 
 # Where imports
+from where.lib import log
 from where.lib import plugins
 
 
@@ -45,28 +46,28 @@ def parameter_corrections(dset):
                 np.mean(dset[field]), np.mean(dset[field_sigma]), np.sum(dset.filter(source=name[0]))
             )
 
-    print("Parameter corrections from Kalman filter after estimation:")
+    correction_str = ""
     for key, values in print_data.items():
         if isinstance(values, dict):
             suffix = sorted(values.keys())
-            print("{:30} {:4d} = ".format(key[0] + ":" + key[1] + "_" + "".join(suffix), values[suffix[0]][2]), end="")
+            param = f"{key[0]}:{key[1]}_{''.join(suffix)}"
+            correction_str += f"  {param:30} {values[suffix[0]][2]:4d} = "
             for k in suffix:
-                print("{: 14.12f} ".format(values[k][0]), end="")
-            print(key[2], "(std:", end="")
+                correction_str += f"{values[k][0]:15.12f} "
+            correction_str += f"{key[2]} (std:"
             for k in suffix:
-                print("{: 6.4f} ".format(values[k][1]), end="")
-            print(")")
+                correction_str += f" {values[k][1]:6.4f}"
+            correction_str += ")\n"
         else:
-            print(
-                "{:30} {:4d} = {: 14.12f} {} (std: {:6.4f})".format(
-                    key[0] + ":" + key[1], values[2], values[0], key[2], values[1]
-                )
+            correction_str += (
+                f"  {f'{key[0]}:{key[1]}':30} {values[2]:4d} = {values[0]:15.12f} {key[2]} (std: {values[1]:6.4f})\n"
             )
+    log.out(f"Parameter corrections from Kalman filter after estimation:\n{correction_str.rstrip()}")
 
-    print("Parameter corrections from normal equations")
     names = dset.meta["normal equation"]["names"]
     x = dset.meta["normal equation"]["solution"]
     Q = dset.meta["normal equation"]["covariance"]
-
+    correction_str = ""
     for i, name in enumerate(names):
-        print("{:30} = {: 14.12f} (std: {: 6.4f})".format(name, x[i], Q[i][i]))
+        correction_str += f"  {name:30} = {x[i]:15.12f} (std: {Q[i][i]:6.4f})\n"
+    log.out(f"Parameter corrections from normal equations:\n{correction_str.rstrip()}")

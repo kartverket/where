@@ -29,10 +29,8 @@ The following example shows output from a VLBI analysis of three stations::
     KATH12M   YARRA12M    888   2360367.26   -0.00579    0.10621 **
     YARRA12M  HOBART12    904   3211335.64    0.00063    0.07539 *
     YARRA12M  KATH12M     888   2360367.26   -0.00579    0.10621 **
-
-
-
 """
+
 # Standard library imports
 import itertools
 import math
@@ -42,6 +40,7 @@ import numpy as np
 
 # Where imports
 from where.lib import files
+from where.lib import log
 from where.lib import plugins
 
 MAX_NUM_STARS = 15
@@ -103,5 +102,5 @@ def _write_line(sta_1, sta_2, dset, idx, fid):
         rms=rms,
         stars="*" * num_stars,
     )
-    print(info_str.rstrip())
+    log.out(info_str.rstrip())
     fid.write(info_str)

@@ -29,7 +29,7 @@ from where.lib import files
 from where.lib import gnss
 from where.lib import plugins
 from where.reports import report
-from where.writers import sisre_writer
+from where.writers import sisre_report
 
 
 @plugins.register
@@ -52,7 +52,7 @@ def write_session_report(rundate, tech):
         return 0
 
     dset = dsets["orbit"][session]
-    sisre_writer.sisre_writer(dset)
+    sisre_report.sisre_report(dset)
 
     # with files.open("output_gnss_session_report", mode="wt") as fid:
     #     rejected_satellites_per_station(fid, dsets)

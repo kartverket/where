@@ -3,7 +3,8 @@
 Description:
 ------------
 
-Todo
+We store some indicators from a daily analysis to a common dataset with a dummy-date of January 1st 1970. This is
+called the timeseries dataset and can be used to look at results across different datasets.
 
 """
 
@@ -145,7 +146,16 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
 #
 # Methods, corresponds to keys in config.tech.timeseries
 #
+# TODO: Use config metadata instead of dummy functions below
 def method_index(dset, field, idx_values, func):
+    return None, None, None
+
+
+def method_dataset_name(dset, field, idx_values, func):
+    return None, None, None
+
+
+def method_dataset_id(dset, field, idx_values, func):
     return None, None, None
 
 

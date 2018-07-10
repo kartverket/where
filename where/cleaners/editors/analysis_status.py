@@ -22,8 +22,6 @@ def analysis_status(dset):
     Args:
         dset:     A Dataset containing model data.
 
-    Returns:
-        Array containing False for observations to throw away.
     """
     status = config.tech[_SECTION].status.str
     dset.meta["analysis_status"] = status

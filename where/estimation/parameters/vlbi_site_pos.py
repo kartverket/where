@@ -44,8 +44,8 @@ def site_pos(dset):
     # Remove stations that should be fixed
     stations = np.asarray(dset.unique("station"))
     fix_stations = config.tech[PARAMETER].fix_stations.list
-    fix_idx = [sta == fix_sta for fix_sta in fix_stations for sta in stations]
-    if fix_idx:
+    fix_idx = np.in1d(stations, fix_stations)
+    if fix_idx.any():
         stations = stations[np.logical_not(fix_idx)]
 
     # Calculate partials

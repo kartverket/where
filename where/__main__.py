@@ -18,13 +18,11 @@ Pipeline             Description
 {pipelines_doc:Run}
 ===================  ===========================================================
 
-
 Furthermore, the following options are recognized:
 
 ===================  ===========================================================
 Option               Description
 ===================  ===========================================================
--A, --archive        Move existing analysis results to archive.
 -D, --delete         Delete existing analysis results.
     --doy            Specify date as <year day-of-year>.
 -E, --edit           Edit the configuration of an analysis.
@@ -41,9 +39,9 @@ Option               Description
 --user=username      Run as username. Does not need to be an existing username
                      on the system.
 --debug, ...         Show additional debug information. Other flags such as
-                     --all, --debug, --time, --dev, --info, --warn, --check,
-                     --error, --fatal, --none are also allowed, and will show
-                     differing amounts of information as the program runs.
+                     --all, --debug, --time, --dev, --info, --out, --warn,
+                     --check, --error, --fatal, --none are also allowed, and
+                     shows differing amounts of information as the program runs.
 --version            Show version information and exit.
 -h, --help           Show this help message and exit.
 ===================  ===========================================================

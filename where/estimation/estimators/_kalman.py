@@ -152,12 +152,31 @@ class KalmanFilter(object):
         # Report and set analysis status if there are too few degrees of freedom
         if deg_freedom < 1:
             log.error(f"Degrees of freedom is {deg_freedom} < 1. Estimate fewer parameters")
-            if dset.meta["analysis_status"] != "bad":
+            if dset.meta["analysis_status"] == "unchecked":
                 dset.meta["analysis_status"] = "too few degrees of freedom"
 
                 # Update config
-                with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
-                    cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
+                # with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
+                # cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
+        else:
+            if dset.meta["analysis_status"] == "too few degrees of freedom":
+                dset.meta["analysis_status"] = "unchecked"
+
+                # Update config
+                # with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
+                # cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
+
+        # Report and set analysis status if there are too few stations
+        # TODO: if vlbi_site_pos in state_vector and num_stations < 3
+        if len(dset.unique("station")) < 3:
+            log.error(f"Two few stations {len(dset.unique('station'))} < 3. Do not estimate station positions.")
+            if dset.meta["analysis_status"] == "unchecked":
+                dset.meta["analysis_status"] = "needs custom state vector"
+
+        print(dset.meta["analysis_status"])
+        # Update config
+        with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
+            cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
 
         # Add information to dset.meta
         dset.add_to_meta("statistics", "number of observations", dset.num_obs)
@@ -283,7 +302,9 @@ class KalmanFilter(object):
                 display_unit = dset.meta["display_units"][param_name]
                 factor = unit("meter / ({})".format(partial_unit), display_unit)
                 dset.add_to_meta("display_factors", param_name, factor)
-                dset.add_float(fieldname, table="state", val=value * factor, unit=display_unit)
+                dset.add_float(
+                    fieldname, table="state", val=value * factor, unit=display_unit, write_level="operational"
+                )
 
             if fieldname_sigma in dset.fields:
                 dset[fieldname_sigma][:] = value * dset.meta["display_factors"][param_name]
@@ -293,7 +314,13 @@ class KalmanFilter(object):
                 display_unit = dset.meta["display_units"][param_name]
                 factor = unit("meter / ({})".format(partial_unit), display_unit)
                 dset.add_to_meta("display_factors", param_name, factor)
-                dset.add_float(fieldname_sigma, table="state", val=value_sigma * factor, unit=display_unit)
+                dset.add_float(
+                    fieldname_sigma,
+                    table="state",
+                    val=value_sigma * factor,
+                    unit=display_unit,
+                    write_level="operational",
+                )
 
             # Estimate vectors
             fieldname = "{}_{}".format("estimate", param_name)
@@ -301,13 +328,13 @@ class KalmanFilter(object):
             if fieldname in dset.fields:
                 dset[fieldname][:] = value
             else:
-                dset.add_float(fieldname, table="estimate", val=value, unit="meter")
+                dset.add_float(fieldname, table="estimate", val=value, unit="meter", write_level="analysis")
 
         value = (self.x_smooth.transpose(0, 2, 1) @ self.h)[:dset.num_obs, 0, 0]
         if "estimate" in dset.fields:
             dset.estimate[:] = value
         else:
-            dset.add_float("estimate", val=value, unit="meter")
+            dset.add_float("estimate", val=value, unit="meter", write_level="operational")
 
     def _normal_equations(self, normal_idx, last_obs):
         """Calculate normal equations corresponding to the filter results

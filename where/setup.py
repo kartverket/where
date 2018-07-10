@@ -11,28 +11,33 @@ specify the date as `<year day-of-year>` (for example 2015 216) by also adding
 the option `--doy`.
 In addition, one pipeline must be specified. See below for available pipelines.
 
+===================  ===========================================================
+Pipeline             Description
+===================  ===========================================================
+{pipelines_doc:Set up}
+===================  ===========================================================
+
 Furthermore, the following options are recognized:
 
 ===================  ===========================================================
 Option               Description
 ===================  ===========================================================
-{pipelines_doc:Set up}
-
--A, --archive        Archive model run results.
--C, --clean          Archive model run results and start a new analysis.
--D, --delete         Delete model run results and start a new analysis.
+-D, --delete         Delete existing analysis results.
     --doy            Specify date as <year day-of-year>.
--U, --updateconfig   Update configuration from where.conf
---id=sessionid       Add a special session id (to run several analyses for the
-                     same day simultaneously).
+-E, --edit           Edit the configuration of an analysis.
+-N, --new            Start a new analysis (combine with -A or -D).
+-T, --showtb         Show traceback if the program crashes.
+--id=analysisid      Add a special analysis id (to run several versions of the
+                     same analysis simultaneously).
 --profile=name       Use config settings specfied for a given profile, for
                      instance --profile=vascc for a VLBI analysis.
+--session=session    Set up analysis for the given session.
 --user=username      Run as username. Does not need to be an existing username
                      on the system.
 --debug, ...         Show additional debug information. Other flags such as
-                     --all, --debug, --time, --dev, --info, --warn, --check,
-                     --error, --fatal, --none are also allowed, and will show
-                     differing amounts of information as the program runs.
+                     --all, --debug, --time, --dev, --info, --out, --warn,
+                     --check, --error, --fatal, --none are also allowed, and
+                     shows differing amounts of information as the program runs.
 --version            Show version information and exit.
 -h, --help           Show this help message and exit.
 ===================  ===========================================================
@@ -84,7 +89,6 @@ from midgard.config import config as mg_config
 from midgard.dev import console
 
 # Where imports
-from where.tools import archive
 from where.tools import delete
 from where import pipelines
 from where.lib import config
@@ -131,23 +135,12 @@ def setup_config(rundate, pipeline, session):
     """Set up configuration for a Where analysis
 
     """
-    # Show current configuration
-    if util.check_options("-S", "--show-config"):
-        show_config(rundate, pipeline, session)
-        raise SystemExit
-
     # Set the correct profile
     profile = util.read_option_value("--profile", default="")
     config.where.profiles = profile.split() + [pipeline]
 
     # Should a new analysis be started?
     start_new = util.check_options("-N", "--new")
-
-    # Move an analysis to archive
-    if util.check_options("-A", "--archive"):
-        archive.archive_analysis(rundate, pipeline, session)
-        if not start_new:
-            raise SystemExit
 
     # Delete an analysis
     if util.check_options("-D", "--delete"):
@@ -165,12 +158,20 @@ def setup_config(rundate, pipeline, session):
     # Update configuration based on command line options
     update_config(rundate, pipeline, session)
 
+    # Add new dependent sections from command line options
+    add_sections(rundate, pipeline, session)
+
     # Edit configuration manually
     if util.check_options("-E", "--edit"):
         edit_config(rundate, pipeline, session)
 
-    # Add new dependent sections
+    # Add new dependent sections from manual edit
     add_sections(rundate, pipeline, session)
+
+    # Show current configuration
+    if util.check_options("-S", "--show-config"):
+        show_config(rundate, pipeline, session)
+        raise SystemExit
 
 
 def has_config(rundate, pipeline, session):
@@ -190,12 +191,13 @@ def create_config(rundate, pipeline, session):
     cfg.update_from_config_section(config.where.all, section=pipeline)
     cfg.update_from_config_section(config.where[pipeline], section=pipeline)
     log.info(f"Creating new configuration at '{cfg_path}' based on {', '.join(cfg.sources)}")
+    _write_config(cfg, rundate, pipeline, session)
 
     # Update configuration settings from library
     for section in read_from_library(rundate, pipeline, session):
         cfg.update_from_config_section(section, section.name)
 
-    # Write configuration to file
+    # Write updated configuration to file
     _write_config(cfg, rundate, pipeline, session)
 
     # Add timestamp and creation note
@@ -307,6 +309,11 @@ def add_timestamp(rundate, pipeline, session, timestamp_key):
 
 
 def read_from_library(rundate, pipeline, session):
+    cfg = _read_config(rundate, pipeline, session)
+    cfg.update_from_options(allow_new=True)
+    if not cfg.read_from_library.bool:
+        raise StopIteration
+
     file_vars = config.create_file_vars(rundate, pipeline, session)
     lib_path = files.path("config_library", file_vars=file_vars)
     lib_cfg = mg_config.Configuration.read_from_file("library", lib_path)
@@ -316,15 +323,19 @@ def read_from_library(rundate, pipeline, session):
 
 
 def store_config_to_library(rundate, pipeline, session):
+    cfg = _read_config(rundate, pipeline, session)
+    if not cfg.write_to_library.bool:
+        return
+
     file_vars = config.create_file_vars(rundate, pipeline, session)
     lib_path = files.path("config_library", file_vars=file_vars)
     lib_cfg = mg_config.Configuration("library")
 
-    cfg = _read_config(rundate, pipeline, session)
     for section in cfg.sections:
         for key, entry in cfg[section].items():  # Todo: Make ConfigurationSection iterable
             if "library" in entry.meta or "library" in config.where.get(key, section=section, default="").meta:
                 lib_cfg.update(section, key, entry.str, source=entry.source)
+                # Todo: Only store entries different from default (issue: profiles?)
 
     lib_cfg.write_to_file(lib_path)
 
@@ -416,7 +427,7 @@ def _dependent_sections(cfg_section, master_cfg=config.where):
 def _clean_sys_argv():
     """Values in sys.argv that are not valid option values in Where
     """
-    reserved_opts = {"id", "session", "profile", "user"}
+    reserved_opts = {"id", "session", "profile", "user", "line_profile"}
     return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]
 
 

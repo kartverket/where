@@ -69,12 +69,24 @@ def file_vars():
 
     # Add obs_version for ngs
     if config.tech.get("obs_format").str == "ngs":
-        versions = files.glob_variable(
-            "vlbi_obs_ngs", "obs_version", r"\d{3}", file_vars=dict(session=config.analysis.session.str)
-        )
+        versions = files.glob_variable("vlbi_obs_ngs", "obs_version", r"\d{3}")
         if versions:
-            file_vars["obs_version"] = sorted(versions)[-1]
+            file_vars["obs_version"] = max(versions)
+        elif config.where.files.download_missing.bool:
+            # Look online for a candidate
+            log.info("No NGS observation file found on disk: Looking for one online.")
+            obs_versions = [f"{v:03d}" for v in reversed(range(4, 10))]
+            for obs_version in obs_versions:
+                url = files.url(
+                    "vlbi_obs_ngs", file_vars=dict(obs_version=obs_version), is_zipped=True, use_aliases=False
+                )
+                log.info(f"Looking for {url} ...")
+                if url.exists():
+                    file_vars["obs_version"] = obs_version
+                    break
 
+        if not file_vars:
+            log.fatal("No NGS observation file found")
     return file_vars
 
 
@@ -146,9 +158,9 @@ def calculate(rundate, session, prev_stage, stage):
     # Run models for each term of the observation equation
     log.info("Calculating theoretical delays for {}", session)
     models.calculate_delay("calc_models", dset)
-    dset.add_float("obs", val=dset.observed_delay, unit="meter")
-    dset.add_float("calc", val=np.sum(dset.get_table("calc_models"), axis=1), unit="meter")
-    dset.add_float("residual", val=dset.obs - dset.calc, unit="meter")
+    dset.add_float("obs", val=dset.observed_delay, unit="meter", write_level="operational")
+    dset.add_float("calc", val=np.sum(dset.get_table("calc_models"), axis=1), unit="meter", write_level="operational")
+    dset.add_float("residual", val=dset.obs - dset.calc, unit="meter", write_level="operational")
     log.blank()
 
     # Estimate clock polynomial

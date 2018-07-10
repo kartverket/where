@@ -125,7 +125,9 @@ def parse_clock_breaks(dset, clock_breaks):
         OrderedDict with clock breaks and total number of clock breaks
      """
     # Parse clock breaks from file and store in the station_breaks dictionary
-    station_breaks = {s: [min(dset.time), max(dset.time) + TimeDelta(1, format="sec")] for s in dset.unique("station")}
+    station_breaks = {
+        s: [min(dset.time.utc), max(dset.time.utc) + TimeDelta(1, format="sec")] for s in dset.unique("station")
+    }
     if clock_breaks:
         log.info("Applying clock breaks: {}", ", ".join(clock_breaks))
 

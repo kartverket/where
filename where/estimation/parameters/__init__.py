@@ -59,7 +59,13 @@ def partial_vectors(dset, estimator_config_key):
             factor = unit(data_unit, partial_unit)
             for values, name in zip(data.T, names):
                 partial_name = "{}-{}".format(param, name)
-                dset.add_float("partial_" + partial_name, table="partial", val=values * factor, unit=partial_unit)
+                dset.add_float(
+                    "partial_" + partial_name,
+                    table="partial",
+                    val=values * factor,
+                    unit=partial_unit,
+                    write_level="operational",
+                )
                 dset.add_to_meta("display_units", partial_name, display_unit)
                 partial_vectors[config_key].append(partial_name)
 
