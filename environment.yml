@@ -7,6 +7,7 @@ dependencies:
   - bumpversion
   - colorama
   - cython
+  - folium
   - h5py
   - ipython
   - line_profiler

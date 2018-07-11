@@ -221,13 +221,13 @@ def get_user_info(user=None):
     Returns:
         Dict:  Information about user
     """
-    user = getpass.getuser() if user is None else user
+    user = config.program.get("user", value=user, default=getpass.getuser()).str
     user_info = config.where.get(section="user_info", key=user, default="").as_tuple(", *")
 
     info_dict = dict(user=user, **dict(zip(("name", "email", "inst_abbreviation"), user_info)))
     if "inst_abbreviation" in info_dict:
         inst_info = config.where.get(
-            section="institution_info", key=info_dict["inst_abbreviation"], default=""
+            section="institution_info", key=info_dict["inst_abbreviation"].lower(), default=""
         ).as_tuple(
             ", *"
         )

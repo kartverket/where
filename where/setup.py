@@ -191,14 +191,14 @@ def create_config(rundate, pipeline, session):
     cfg.update_from_config_section(config.where.all, section=pipeline)
     cfg.update_from_config_section(config.where[pipeline], section=pipeline)
     log.info(f"Creating new configuration at '{cfg_path}' based on {', '.join(cfg.sources)}")
-    _write_config(cfg, rundate, pipeline, session)
+    cfg.write_to_file(cfg_path, metadata=False)
 
     # Update configuration settings from library
     for section in read_from_library(rundate, pipeline, session):
         cfg.update_from_config_section(section, section.name)
 
     # Write updated configuration to file
-    _write_config(cfg, rundate, pipeline, session)
+    cfg.write_to_file(cfg_path, metadata=False)
 
     # Add timestamp and creation note
     add_timestamp(rundate, pipeline, session, "created")
@@ -246,7 +246,7 @@ def add_sections(rundate, pipeline, session):
     ts_before = files.get_timestamp(cfg_path)
 
     # Add dependent sections that are not already included
-    with mg_config.Configuration.update_on_file(cfg_path) as cfg:
+    with mg_config.Configuration.update_on_file(cfg_path, metadata=False) as cfg:
         for section in _dependent_sections(cfg[pipeline]):
             if section.name not in cfg.sections:
                 cfg.update_from_config_section(section)
@@ -362,23 +362,6 @@ def _read_config(rundate, pipeline, session):
     cfg.master_section = pipeline
 
     return cfg
-
-
-def _write_config(cfg, rundate, pipeline, session):
-    """Write the configuration of a Where analysis to file
-
-    Todo: Add this as a method on Configuration
-
-    Metadata like help text and type hints are not stored in the configuration.
-
-    Args:
-        cfg:       The configuration.
-        rundate:   Rundate of analysis.
-        pipeline:  Pipeline used for analysis.
-        session:   Session in analysis.
-    """
-    with files.open_path(_config_path(rundate, pipeline, session), mode="w", create_dirs=True) as fid:
-        fid.write(cfg.as_str(metadata=False))
 
 
 def _config_path(rundate, pipeline, session):

@@ -55,10 +55,11 @@ setup(
     install_requires=[
         "astropy",
         "cython",
+        "folium",
         "IPython",
         "jplephem",
         "matplotlib",
-        "midgard",
+        "midgard>=0.1.4",
         "numpy",
         "pandas",
         "pint",
@@ -69,7 +70,7 @@ setup(
     # following syntax, for example:
     #   $ pip install -e .[optional,dev_tools]
     extras_require={
-        "optional": ["colorama", "h5py", "netCDF4", "python-editor", "requests", "seaborn"],
+        "optional": ["colorama", "h5py", "netCDF4", "python-editor", "seaborn"],
         "dev_tools": ["black", "bumpversion", "flake8", "line_profiler", "mypy", "pytest"],
     },
     # If there are data files included in your packages that need to be installed, specify them here.  If using Python

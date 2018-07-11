@@ -26,11 +26,12 @@ import numpy as np
 # Where imports
 import where
 from where import apriori
+from where.lib import cache
+from where.lib import config
+from where.lib import log
 from where.lib import time
 from where.lib.unit import unit
 from where.lib import util
-from where.lib import config
-from where.lib import log
 
 _PARAMS = dict(
     site_pos={"x": "STAX", "y": "STAY", "z": "STAZ"},
@@ -65,19 +66,33 @@ class SinexBlocks():
         self.ids.update({src: "{:0>4}".format(i) for i, src in enumerate(self.dset.unique("source"), start=1)})
         self.ids.update({"----": "----"})
 
+    @cache.property
+    def _analyst_info(self):
+        """Information about analyst
+
+        Uses analyst field in config. If no value is given, current user is used as back-up.
+        """
+        analyst = config.tech.get("analyst", section="sinex", default="").str
+        if analyst:
+            return util.get_user_info(analyst)
+        else:
+            return util.get_user_info()
+
     def header_line(self):
         """Mandatory header line
         """
-        now = time.Time(datetime.now(), scale="utc")
-        timestamp = now.yydddsssss
+        now = time.Time(datetime.now(), scale="utc").yydddsssss
+        start = min(self.dset.time).yydddsssss
+        end = max(self.dset.time).yydddsssss
 
-        start = self.dset.time.yydddsssss[0]
-        end = self.dset.time.yydddsssss[-1]
+        institute = self._analyst_info.get("inst_abbreviation", "")
+        file_agency = config.tech.get("file_agency", section="sinex", default="").str or institute
+        data_agency = config.tech.get("data_agency", section="sinex", default="").str or institute
 
         num_params = self.dset.meta["statistics"]["number of unknowns"]
         constraint = "2"
         self.fid.write(
-            "%=SNX 2.02 NMA {} NMA {} {} R {:>5} {} S E C \n" "".format(timestamp, start, end, num_params, constraint)
+            f"%=SNX 2.02 {file_agency:<3} {now} {data_agency:<3} {start} {end} R {num_params:>5} {constraint} S E C \n"
         )
 
     def end_line(self):
@@ -85,34 +100,39 @@ class SinexBlocks():
         """
         self.fid.write("%ENDSNX\n")
 
+    def write_block(self, block_name, *args):
+        """Call the given block so it writes itself"""
+        try:
+            getattr(self, block_name)(*args)
+        except AttributeError:
+            log.fatal(f"Sinex block '{block_name}' is unknown")
+
     def file_reference(self):
         """Mandatory block
         """
         self.fid.write("+FILE/REFERENCE\n")
-        self.fid.write(" {:<18} {:<60}\n".format("DESCRIPTION", "Norwegian Mapping Authority"))
-        self.fid.write(" {:<18} {:<60}\n".format("OUTPUT", "Daily VLBI solution, Normal equations"))
-        analyst = util.get_user_info()
-        if "email" in analyst:
-            self.fid.write(" {:<18} {:<60}\n".format("ANALYST", analyst["email"]))
-        for contact in where.__contact__.split(","):
-            self.fid.write(" {:<18} {:<60}\n".format("CONTACT", contact.strip()))
-        self.fid.write(" {:<18} {:<60}\n".format("SOFTWARE", "Where v{}".format(where.__version__)))
-        # self.fid.write(' {:<18} {:<60}\n'.format('HARDWARE', '---'))
-        self.fid.write(
-            " {:<18} {:<60}\n".format(
-                "INPUT", "{} {}".format(self.dset.meta["input"]["type"], self.dset.meta["input"]["file"])
-            )
-        )
+        if "inst_name" not in self._analyst_info:
+            log.error("Add information about user and institute in configuration. Left blank in Sinex-file")
+        self.fid.write(f" {'DESCRIPTION':<18} {self._analyst_info.get('inst_name', ''):<60}\n")
+        self.fid.write(f" {'OUTPUT':<18} {'Daily VLBI solution, Normal equations':<60}\n")
+        self.fid.write(f" {'ANALYST':<18} {self._analyst_info.get('email', ''):<60}\n")
+        contacts = config.tech.get("contact", section="sinex", default=where.__contact__).list
+        for contact in contacts:
+            self.fid.write(f" {'CONTACT':<18} {contact:<60}\n")
+        self.fid.write(f" {'SOFTWARE':<18} {f'Where v{where.__version__}':<60}\n")
+        # self.fid.write(' {'HARDWARE':<18} {'---':<60}\n')
+        input_string = f"{self.dset.meta['input']['type']} {self.dset.meta['input']['file']}"
+        self.fid.write(f" {'INPUT':<18} {input_string:<60}\n")
         self.fid.write("-FILE/REFERENCE\n")
 
     def file_comment(self):
         """Optional block
         """
         self.fid.write("+FILE/COMMENT\n")
-        self.fid.write(" Analyst configuration: \n")
+        self.fid.write(" Analysis configuration: \n")
         cfg_str = config.tech.as_str(width=79, key_width=30).split("\n")
         for line in cfg_str[1:]:
-            self.fid.write(" {:<79}\n".format(line))
+            self.fid.write(f" {line:<79}\n")
         self.fid.write("-FILE/COMMENT\n")
 
     def input_history(self):
@@ -135,7 +155,15 @@ class SinexBlocks():
         """Optional block
         """
         self.fid.write("+INPUT/ACKNOWLEDGEMENTS\n")
-        self.fid.write(" {:<3} {:<75}\n".format("NMA", "Norwegian Mapping Authority"))
+        institute = self._analyst_info.get("inst_abbreviation", "")
+        file_agency = config.tech.get("file_agency", section="sinex", default="").str
+        data_agency = config.tech.get("file_agency", section="sinex", default="").str
+        agencies = sorted(a for a in {institute, file_agency, data_agency} if a)
+        for agency in agencies:
+            name = (config.where.get(agency.lower(), section="institution_info", default="").as_list(", *") + [""])[0]
+            if not name:
+                log.warn(f"Unknown institution {agency!r}. Add information about {agency!r} to configuration")
+            self.fid.write(f" {agency:<3} {name:<75}\n")
         self.fid.write("-INPUT/ACKNOWLEDGEMENTS\n")
 
     def nutation_data(self):
