@@ -369,6 +369,9 @@ def publish_files(publish=None):
     Args:
         publish (String):   List of file_keys that will be published.
     """
+    if not config.where.files.publish.bool:
+        return
+
     publish_list = config.tech.get("publish", value=publish).list
     for file_key in publish_list:
         try:
