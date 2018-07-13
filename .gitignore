@@ -1,0 +1,33 @@
+# Where-directories
+data/
+work/
+publish/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C/Cython extensions
+*.so
+*.c
+*.o
+*.html
+
+# Distribution / packaging
+*.egg-info/
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# mypy
+.mypy_cache/
