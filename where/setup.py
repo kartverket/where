@@ -119,7 +119,7 @@ def main():
     else:
         rundate = util.parse_args("date", doc_module=__name__)
     pipeline = pipelines.get_from_options()
-    session = util.read_option_value("--session", default="")
+    session = pipelines.get_session(rundate, pipeline)
 
     # Set up the configuration for the analysis
     setup_config(rundate, pipeline, session)
@@ -158,15 +158,9 @@ def setup_config(rundate, pipeline, session):
     # Update configuration based on command line options
     update_config(rundate, pipeline, session)
 
-    # Add new dependent sections from command line options
-    add_sections(rundate, pipeline, session)
-
     # Edit configuration manually
     if util.check_options("-E", "--edit"):
         edit_config(rundate, pipeline, session)
-
-    # Add new dependent sections from manual edit
-    add_sections(rundate, pipeline, session)
 
     # Show current configuration
     if util.check_options("-S", "--show-config"):
@@ -203,6 +197,9 @@ def create_config(rundate, pipeline, session):
     # Add timestamp and creation note
     add_timestamp(rundate, pipeline, session, "created")
 
+    # Add new dependent sections from newly created config
+    add_sections(rundate, pipeline, session)
+
 
 def update_config(rundate, pipeline, session):
     """Update the configuration of a Where analysis
@@ -220,6 +217,9 @@ def update_config(rundate, pipeline, session):
     if files.get_timestamp(cfg_path) != ts_before:
         add_timestamp(rundate, pipeline, session, "last update")
 
+    # Add new dependent sections from command line options
+    add_sections(rundate, pipeline, session)
+
 
 def edit_config(rundate, pipeline, session):
     """Update the configuration of a Where analysis
@@ -231,9 +231,12 @@ def edit_config(rundate, pipeline, session):
     # Open config file in an editor
     editor.edit(cfg_path)
 
-    # Add timestamp and edited note
     if files.get_timestamp(cfg_path) != ts_before:
+        # Add timestamp and edited note
         add_timestamp(rundate, pipeline, session, "last update")
+
+        # Add new dependent sections from manual edit
+        add_sections(rundate, pipeline, session)
 
 
 def add_sections(rundate, pipeline, session):
@@ -304,7 +307,7 @@ def add_timestamp(rundate, pipeline, session, timestamp_key):
 
     # Add timestamp with update note to timestamp file
     with mg_config.Configuration.update_on_file(ts_path) as ts_cfg:
-        timestamp = f"{datetime.now().strftime(config.FMT_dt_file)} by {util.get_program_info()}"
+        timestamp = f"{datetime.now().strftime(config.FMT_datetime)} by {util.get_program_info()}"
         ts_cfg.update("timestamps", timestamp_key, timestamp, source=__file__)
 
 

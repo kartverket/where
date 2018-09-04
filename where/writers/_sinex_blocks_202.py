@@ -116,7 +116,7 @@ class SinexBlocks():
         self.fid.write(f" {'DESCRIPTION':<18} {self._analyst_info.get('inst_name', ''):<60}\n")
         self.fid.write(f" {'OUTPUT':<18} {'Daily VLBI solution, Normal equations':<60}\n")
         self.fid.write(f" {'ANALYST':<18} {self._analyst_info.get('email', ''):<60}\n")
-        contacts = config.tech.get("contact", section="sinex", default=where.__contact__).list
+        contacts = config.tech.get("contacts", section="sinex", default=where.__contact__).list
         for contact in contacts:
             self.fid.write(f" {'CONTACT':<18} {contact:<60}\n")
         self.fid.write(f" {'SOFTWARE':<18} {f'Where v{where.__version__}':<60}\n")
@@ -195,9 +195,7 @@ class SinexBlocks():
         self.fid.write("*Code IERS nam ICRF designator \n")
         for iers_name in self.dset.unique("source"):
             icrf_name = icrf[iers_name].meta["icrf_name"] if "icrf_name" in icrf[iers_name].meta else ""
-            self.fid.write(
-                " {:0>4} {:<8} {:<16}\n".format(self.ids[iers_name], iers_name.replace("dot", "."), icrf_name)
-            )
+            self.fid.write(" {:0>4} {:<8} {:<16}\n".format(self.ids[iers_name], iers_name, icrf_name))
         self.fid.write("-SOURCE/ID\n")
 
     def site_id(self):

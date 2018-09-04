@@ -71,7 +71,7 @@ def src_dir(dset):
         src_idx = dset.filter(source=src)
         if np.sum(src_idx) < limit:
             fix_idx[idx] = True
-            log.warn("Radio source {} has less than {} observations. Keeping coordinates fixed.".format(src, limit))
+            log.info("Radio source {} has less than {} observations. Keeping coordinates fixed.".format(src, limit))
 
     sources = sources[np.logical_not(fix_idx)]
 

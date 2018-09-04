@@ -22,6 +22,10 @@ class InitializationError(WhereException):
     pass
 
 
+class InvalidSessionError(WhereException):
+    pass
+
+
 class FieldExistsError(WhereException):
     pass
 

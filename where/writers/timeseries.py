@@ -50,7 +50,7 @@ def add_to_full_timeseries(dset):
     rundate_str = dset.rundate.strftime(config.FMT_date)
     session = dset.dataset_name
     status = dset.meta.get("analysis_status", "unchecked")
-    session_type = dset.meta.get("session_type", "")
+    session_type = dset.meta.get("master_file", dict()).get("session_type", "")
 
     dset_session.num_obs = num_obs
     dset_session.add_time("time", val=[mean_epoch] * num_obs, scale="utc")
@@ -132,7 +132,8 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
         param_units = [u for f, u in zip(names, units) if f.startswith(field + "-")]
         name2 = [p.split("-")[-1].split("_")[-1] for p in params]
         dim = len(np.unique(name2)) if not any([n2 in n for n2 in name2 for n in idx_names]) else 1
-        val = np.full((num_obs, dim), np.nan, dtype=float)
+        shape = (num_obs, dim) if dim > 1 else num_obs
+        val = np.full(shape, np.nan, dtype=float)
         idx = np.array([any([n in p for p in params]) for n in idx_names], dtype=bool)
         mean = np.array([np.mean(state) for state, param in zip(x, names) if param in params]).reshape(-1, dim)
         if idx.any():
@@ -167,7 +168,7 @@ def method_func(dset, field, idx_values, func):
 def method_statistics(dset, field, idx_values, func):
     num_obs = len(idx_values[list(idx_values.keys()).pop()])
     val = np.full(num_obs, np.nan, dtype=float)
-    val[0] = dset.meta["statistics"][field]
+    val[:] = dset.meta["statistics"][field]
 
     return val, "add_float", None  # Todo: Can we add a unit here somehow?
 
@@ -178,6 +179,9 @@ def method_meta(dset, field, idx_values, func):
 
 
 def method_text(dset, field, idx_values, func):
+    if field not in dset.fields:  # Ignore fields not in dataset
+        return None, None, None
+
     text = np.array(["/".join(dset.unique(field, idx=i)) for i in _filter_each(dset, idx_values)])
     return text, "add_text", dset.unit(field)
 
@@ -250,11 +254,26 @@ def rms_sisre_orb(dset, field, idx_values):
 
 
 def rms(dset, field, idx_values):
+    if field not in dset.fields:  # Ignore fields not in dataset
+        return None, None, None
+
     rms = np.array([dset.rms(field, idx=i) for i in _filter_each(dset, idx_values)])
     return rms, "add_float", dset.unit(field)
 
 
+def nanrms(dset, field, idx_values):
+    if field not in dset.fields:  # Ignore fields not in dataset
+        return None, None, None
+
+    not_nan = ~np.isnan(dset[field])
+    rms = np.array([dset.rms(field, idx=i & not_nan) for i in _filter_each(dset, idx_values)])
+    return rms, "add_float", dset.unit(field)
+
+
 def num(dset, field, idx_values):
+    if field not in dset.fields:  # Ignore fields not in dataset
+        return None, None, None
+
     num_obs = np.array([sum(i) for i in _filter_each(dset, idx_values)])
     return num_obs, "add_float", "count"
 

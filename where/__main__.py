@@ -122,7 +122,7 @@ def main():
     else:
         rundate = util.parse_args("date", doc_module=__name__)
     pipeline = pipelines.get_from_options()
-    session = util.read_option_value("--session", default="")
+    session = pipelines.get_session(rundate, pipeline)
 
     # Pretend to empty mailbox
     pretend_to_empty_mailbox()

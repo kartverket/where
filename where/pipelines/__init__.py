@@ -60,23 +60,6 @@ def names():
 
 
 @cache.function
-def sessions(rundate, pipeline):
-    """Get a list of sessions for a given rundate for a pipeline
-
-    Args:
-        rundate (Date):     The model run date.
-        pipeline (String):  The pipeline.
-
-    Returns:
-        List: Strings with the names of the sessions.
-    """
-    try:
-        return plugins.call_one(package_name=__name__, plugin_name=pipeline, part="sessions", rundate=rundate)
-    except exceptions.UnknownPluginError:
-        return [""]  # If sessions is not defined in the pipeline, return a list with one unnamed session
-
-
-@cache.function
 def stages(pipeline):
     """Get a list of stages for a given pipeline
 
@@ -140,6 +123,43 @@ def get_from_options():
         )
 
     return available_pipelines[pipeline_option]
+
+
+def get_session(rundate, pipeline):
+    """Read session from command line options
+
+    The session is validated for the given pipeline. Uses the `validate_session`-plugin for validation.
+
+    Args:
+        pipeline (String):  Name of pipeline.
+
+    Returns:
+        String:  Name of session.
+    """
+    session = util.read_option_value("--session", default="")
+    try:
+        return plugins.call_one(
+            package_name=__name__, plugin_name=pipeline, part="validate_session", rundate=rundate, session=session
+        )
+    except exceptions.UnknownPluginError:
+        return session  # Simply return session if it can not be validated
+
+
+@cache.function
+def list_sessions(rundate, pipeline):
+    """Get a list of sessions for a given rundate for a pipeline
+
+    Args:
+        rundate (Date):     The model run date.
+        pipeline (String):  Name of pipeline.
+
+    Returns:
+        List: Strings with the names of the sessions.
+    """
+    try:
+        return plugins.call_one(package_name=__name__, plugin_name=pipeline, part="list_sessions", rundate=rundate)
+    except exceptions.UnknownPluginError:
+        return [""]  # If sessions is not defined in the pipeline, return a list with one unnamed session
 
 
 def file_vars():
@@ -214,11 +234,12 @@ def run(rundate, pipeline, session=""):
     session_timer.start()
 
     # Run stages, keep track of previous stage
+    dep_fast = config.where.files.dependencies_fast.bool
     for prev_stage, stage in zip([None] + stage_list, stage_list):
 
         # Skip stages where no dependencies have changed
         if not (
-            dependencies.changed(rundate=rundate, tech=pipeline, session=session, stage=stage)
+            dependencies.changed(fast_check=dep_fast, rundate=rundate, tech=pipeline, session=session, stage=stage)
             or util.check_options("-F", "--force")
         ):
             log.info(f"Not necessary to run {stage} for {pipeline.upper()} {rundate.strftime(config.FMT_date)}")
@@ -231,7 +252,7 @@ def run(rundate, pipeline, session=""):
             log.blank()  # Empty line for visual clarity
 
         # Set up dependencies. Add dependencies to previous stage and config file
-        dependencies.init(session=session, stage=stage)
+        dependencies.init(fast_check=dep_fast, session=session, stage=stage)
         dependencies.add(files.path("model_run_depends", file_vars=dict(session=session, stage=prev_stage)))
         dependencies.add(*config.tech.sources)
 

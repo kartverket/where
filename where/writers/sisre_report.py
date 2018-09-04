@@ -33,7 +33,9 @@ from where.lib import gnss
 from where.lib import log
 from where.lib import plugins
 
-gnss_name = {"C": "BeiDou", "E": "Galileo", "G": "GPS", "I": "IRNSS", "J": "QZSS", "R": "GLONASS"}
+FIGURE_DPI = 200
+FIGURE_FORMAT = "png"
+GNSS_NAME = {"C": "BeiDou", "E": "Galileo", "G": "GPS", "I": "IRNSS", "J": "QZSS", "R": "GLONASS"}
 
 SubplotConfig = namedtuple("SubplotConfig", ["ylabel", "color", "ydata"])
 SubplotConfig.__doc__ = """A convenience class for defining a field for subplot configuration
@@ -64,13 +66,17 @@ def sisre_report(dset):
     """
     write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
 
+    # TODO: Better solution?
+    if "sampling_rate" not in dset.vars:  # necessary if called for example by where_concatenate.py
+        dset.vars["sampling_rate"] = ""
+
     with files.open(file_key="output_sisre_report", file_vars=dset.vars, mode="wt") as fid:
         _write_title(fid, dset.rundate)
         _write_information(fid)
         _write_config(fid)
         fid.write("\n# Satellite status\n\n")
-        _unhealthy_satellites(fid, dset)
-        _eclipse_satellites(fid, dset)
+        # _unhealthy_satellites(fid, dset)
+        # _eclipse_satellites(fid, dset)
 
         # Generate figure directory to save figures generated for SISRE report
         fid.write("\n# SISRE analysis results\n\n")
@@ -78,15 +84,15 @@ def sisre_report(dset):
         figure_dir.mkdir(parents=True, exist_ok=True)
         if write_level <= enums.get_value("write_level", "detail"):
             _plot_scatter_satellite_bias(fid, figure_dir, dset)
-            _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
+        _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
         _plot_scatter_sisre(fid, figure_dir, dset)
+        #_plot_scatter_field(fid, figure_dir, dset, 'sisre')
+        _plot_scatter_field(fid, figure_dir, dset, 'sisre', label=False, legend=False)
         _plot_histogram_sisre(fid, figure_dir, dset)
         _statistics(fid, figure_dir, dset)
 
     # Generate PDF from Markdown file
-    # TODO: define config call without defining sisre_report!!!
-    if config.tech.sisre_report.get("markdown_to_pdf", default=False).bool:
-        _markdown_to_pdf(dset)
+    _markdown_to_pdf(dset)
 
 
 def _eclipse_satellites(fid, dset):
@@ -132,22 +138,23 @@ def _markdown_to_pdf(dset):
        dset (Dataset):           A dataset containing the data.
     """
 
-    md_path = str(files.path("output_sisre_report", file_vars=dset.vars))
-    pdf_path = md_path.replace(".md", ".pdf")
-    program = "pandoc"
+    if config.where.sisre_report.get("markdown_to_pdf", default=False).bool:
+        md_path = str(files.path("output_sisre_report", file_vars=dset.vars))
+        pdf_path = md_path.replace(".md", ".pdf")
+        program = "pandoc"
 
-    # Convert markdown to pdf with pandoc
-    pandoc_args = ["-f markdown", "-V classoption:twoside", "-N", "-o " + pdf_path, md_path]
+        # Convert markdown to pdf with pandoc
+        pandoc_args = ["-f markdown", "-V classoption:twoside", "-N", "-o " + pdf_path, md_path]
 
-    log.info("Start: {} {}".format(program, " ".join(pandoc_args)))
-    status = os.system(f"{program} {' '.join(pandoc_args)}")
-    if status != 0:
-        log.error("{} failed with error code {} ({})", program, status, " ".join([program] + pandoc_args))
+        log.info("Start: {} {}".format(program, " ".join(pandoc_args)))
+        status = os.system(f"{program} {' '.join(pandoc_args)}")
+        if status != 0:
+            log.error("{} failed with error code {} ({})", program, status, " ".join([program] + pandoc_args))
 
-    # TODO: pandoc subprocess call does not work. Why?
-    # process = subprocess.run([program] + pandoc_args)
-    # if process.returncode:
-    #    log.error("{} failed with error code {} ({})", program, process.returncode, " ".join(process.args))
+        # TODO: pandoc subprocess call does not work. Why?
+        # process = subprocess.run([program] + pandoc_args)
+        # if process.returncode:
+        #    log.error("{} failed with error code {} ({})", program, process.returncode, " ".join(process.args))
 
 
 #
@@ -192,11 +199,11 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None
     ax.legend(handles=satellite_type_patch, bbox_to_anchor=(1.04, 1), loc=2, borderaxespad=0., ncol=1)
 
     plt.tight_layout()
-    plt.savefig(figure_dir / f"plot_bar_{field}_{column}.pdf")
+    plt.savefig(figure_dir / f"plot_bar_{field}_{column}.{FIGURE_FORMAT}", dpi=FIGURE_DPI)
     plt.clf()  # clear the current figure
 
     fid.write(
-        f"![{field.upper()} {column.upper()} for all satellites sorted by satellite type]({figure_dir}/plot_bar_{field}_{column}.pdf)\n"
+        f"![{field.upper()} {column.upper()} for all satellites sorted by satellite type]({figure_dir}/plot_bar_{field}_{column}.{FIGURE_FORMAT})\n"
     )
     fid.write("\n\\clearpage\n\n")
 
@@ -249,7 +256,7 @@ def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xtick
     if xticks_rotation is not None:
         plt.xticks(rotation=xticks_rotation)
     plt.tight_layout()
-    plt.savefig(figure_path)
+    plt.savefig(figure_path, dpi=FIGURE_DPI)
     plt.clf()  # clear the current figure
 
 
@@ -263,8 +270,8 @@ def _plot_bar_stacked_sisre(fid, field_dfs, extra_row_names, figure_dir):
        figure_dir (PosixPath):  Figure directory.
     """
 
-    figure_path_threshold = figure_dir / f"plot_bar_stacked_sisre_extra_rows_threshold.pdf"
-    figure_path = figure_dir / f"plot_bar_stacked_sisre_extra_rows.pdf"
+    figure_path_threshold = figure_dir / f"plot_bar_stacked_sisre_extra_rows_threshold.{FIGURE_FORMAT}"
+    figure_path = figure_dir / f"plot_bar_stacked_sisre_extra_rows.{FIGURE_FORMAT}"
 
     # Define SISRE thresholds
     sisre_threshold = (AxhlineConfig("E", 2, "red"),)  # TODO: Handling of several GNSS
@@ -305,11 +312,11 @@ def _plot_bar_stacked_sisre_satellites(fid, field_dfs, extra_row_names, figure_d
        extra_row_names (list):  List of extra rows removed from the dataframe.
        figure_dir (PosixPath):  Figure directory.
     """
-    figure_path = figure_dir / f"plot_bar_stacked_sisre.pdf"
-    figure_path_threshold = figure_dir / f"plot_bar_stacked_sisre_threshold.pdf"
+    figure_path = figure_dir / f"plot_bar_stacked_sisre.{FIGURE_FORMAT}"
+    figure_path_threshold = figure_dir / f"plot_bar_stacked_sisre_threshold.{FIGURE_FORMAT}"
 
     # Define SISRE thresholds
-    sisre_threshold = (AxhlineConfig("E", 7, "red"),)  # TODO: Handling of several GNSS
+    sisre_threshold = (AxhlineConfig("E", 2, "red"),)  # TODO: Handling of several GNSS
 
     # Remove extra rows
     df_sisre = field_dfs["sisre"].drop(extra_row_names)
@@ -346,7 +353,7 @@ def _plot_histogram_subplot(data, axis, system):
     """
     axis.hist(data, normed=True, bins=30)
     axis.set(xlabel="SISRE [m]", ylabel="Frequency")
-    axis.set_title(f"{gnss_name[system]}")
+    axis.set_title(f"{GNSS_NAME[system]}")
     mean = np.mean(data)
     std = np.std(data)
     axis.text(
@@ -376,10 +383,10 @@ def _plot_histogram_sisre(fid, figure_dir, dset):
     for sys, ax in zip(dset.unique("system"), axes.flatten()):
         idx = dset.filter(system=sys)
         _plot_histogram_subplot(dset.sisre[idx], ax, sys)
-    plt.savefig(figure_dir / f"plot_histogram_sisre.pdf")
+    plt.savefig(figure_dir / f"plot_histogram_sisre.{FIGURE_FORMAT}", dpi=FIGURE_DPI)
     plt.clf()  # clear the current figure
 
-    fid.write(f"![Histrogram of SISRE results]({figure_dir}/plot_histogram_sisre.pdf)\n")
+    fid.write(f"![Histrogram of SISRE results]({figure_dir}/plot_histogram_sisre.{FIGURE_FORMAT})\n")
     fid.write("\n\\clearpage\n\n")
 
 
@@ -400,18 +407,65 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
 
         for field, orbit in {"bias_brdc": "Broadcast", "bias_precise": "Precise"}.items():
             if np.sum(dset[field][idx]) != 0:
+                figure_path = figure_dir / f"plot_scatter_{field}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
                 plt.scatter(dset.time.gps.datetime[idx], dset[field][idx])
                 plt.ylabel(f"{orbit} satellite bias [m]")
                 plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
                 plt.xlabel("Time [GPS]")
-                plt.title(f"{gnss_name[sys]}")
-                plt.savefig(figure_dir / f"plot_scatter_{field}_{gnss_name[sys].lower()}.pdf")
+                plt.title(f"{GNSS_NAME[sys]}")
+                plt.savefig(figure_path, dpi=FIGURE_DPI
+                )
                 plt.clf()  # clear the current figure
 
                 fid.write(
-                    f"![Satellite bias applied for {orbit.lower()} satellite clock corrections]({figure_dir}/plot_scatter_{field}_{gnss_name[sys].lower()}.pdf)\n"
+                    f"![Satellite bias applied for {orbit.lower()} satellite clock corrections]({figure_path})\n"
                 )
                 fid.write("\n\\clearpage\n\n")
+
+
+def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
+    """Scatter plot of given field
+
+    Args:
+       fid (_io.TextIOWrapper):  File object.
+       figure_dir (PosixPath):   Figure directory
+       dset (Dataset):           A dataset containing the data.
+       field (str):              Dataset field.
+    """   
+
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
+        figure_path = figure_dir / f"plot_scatter_{field.lower()}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
+          
+        fig = plt.figure(figsize=(6,5))
+        if label == True:
+            for sat in dset.unique('satellite', idx=idx):
+                idx_sat = dset.filter(system=sys, satellite=sat)
+                if np.sum(dset[field][idx_sat]) != 0:
+                        plt.scatter(dset.time.gps.datetime[idx_sat], dset[field][idx_sat], label=sat, marker='o', s=10)
+        else:
+            if np.sum(dset[field][idx]) != 0:
+                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], marker='o', s=10)
+
+        if legend == True:
+            plt.legend(bbox_to_anchor=(1.04, 1), ncol=1)
+        text = (f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ m"
+                f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ m")
+        fig.text(0.95, 0.9, text, horizontalalignment="right", verticalalignment="top", multialignment='left') 
+        plt.ylabel(f"{field.upper()} [m]")
+        plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
+        plt.xlabel("Time [GPS]")
+        plt.title(f"{GNSS_NAME[sys]}")
+        fig.autofmt_xdate()  # rotates and right aligns the x labels, and moves the bottom of the axes up to make room for them
+        plt.tight_layout()
+        plt.savefig(figure_path, dpi=FIGURE_DPI)
+        plt.clf()  # clear the current figure
+
+        fid.write(
+            f"![{field.upper()} for {GNSS_NAME[sys]}]({figure_path})\n"
+        )
+        fid.write("\n\\clearpage\n\n")
+
 
 
 #
@@ -437,7 +491,7 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
     for idx, ax in enumerate(axes):
         ax.set(ylabel=subplots[idx].ylabel)
         ax.set_xlim([min(xdata), max(xdata)])  # otherwise time scale of x-axis is not correct -> Why?
-        text = f"mean $ = {np.mean(subplots[idx].ydata):.2f} \pm {np.std(subplots[idx].ydata):.2f}$ m"
+        text = f"mean $= {np.mean(subplots[idx].ydata):.2f} \pm {np.std(subplots[idx].ydata):.2f}$ m"
         ax.text(0.98, 0.98, text, horizontalalignment="right", verticalalignment="top", transform=ax.transAxes)
         ax.scatter(xdata, subplots[idx].ydata, marker=marker, color=subplots[idx].color)
         ax.set(xlabel=xlabel)
@@ -445,7 +499,7 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
     fig.autofmt_xdate()  # rotates and right aligns the x labels, and moves the bottom of the
     # axes up to make room for them
     plt.tight_layout()
-    plt.savefig(figure_path)
+    plt.savefig(figure_path, dpi=FIGURE_DPI)
     plt.clf()  # clear the current figure
 
 
@@ -457,28 +511,28 @@ def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
        figure_dir (PosixPath):   Figure directory
        dset (Dataset):           A dataset containing the data.
     """
-
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
+        figure_path = figure_dir / f"plot_scatter_subplot_orbit_clock_differences_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
 
         # Define configuration of subplots
         subplots = (
             SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.itrs[:, 0][idx]),
             SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.itrs[:, 1][idx]),
             SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.itrs[:, 2][idx]),
-            SubplotConfig("Δclock [m]", "tomato", dset.clk_diff_sys[idx]),
+            SubplotConfig("Δclock [m]", "tomato", dset.clk_diff[idx]),
         )
 
         _plot_scatter_subplots(
             dset.time.gps.datetime[idx],
             subplots,
-            figure_path=figure_dir / f"plot_scatter_orbit_clock_differences_{gnss_name[sys].lower()}.pdf",
+            figure_path,
             xlabel="Time [GPS]",
-            title=f"{gnss_name[sys]}",
+            title=f"{GNSS_NAME[sys]}",
         )
 
         fid.write(
-            f"![Difference between precise and broadcast orbits given in along-track, cross-track and radial direction and satellite clock corrections for all satellites.]({figure_dir}/plot_scatter_orbit_clock_differences_{gnss_name[sys].lower()}.pdf)\n"
+            f"![Difference between precise and broadcast orbits given in along-track, cross-track and radial direction and satellite clock corrections for all satellites.]({figure_path})\n"
         )
         fid.write("\n\\clearpage\n\n")
 
@@ -494,6 +548,7 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
+        figure_path = figure_dir / f"plot_scatter_subplot_sisre_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
 
         # Define configuration of subplots
         subplots = (
@@ -505,13 +560,13 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
         _plot_scatter_subplots(
             dset.time.gps.datetime[idx],
             subplots,
-            figure_path=figure_dir / f"plot_scatter_sisre_{gnss_name[sys].lower()}.pdf",
+            figure_path,
             xlabel="Time [GPS]",
-            title=f"{gnss_name[sys]}",
+            title=f"{GNSS_NAME[sys]}",
         )
 
         fid.write(
-            f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_dir}/plot_scatter_sisre_{gnss_name[sys].lower()}.pdf)\n"
+            f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_path})\n"
         )
         fid.write("\n\\clearpage\n\n")
 
@@ -524,7 +579,7 @@ def _statistics_satellite(fid, figure_dir, dset):
         figure_dir (PosixPath):     Figure directory path
         dset (Dataset):             Dataset
     """
-    fields = ["sisre", "sisre_orb", "orb_diff_3d", "clk_diff_sys"]
+    fields = ["sisre", "sisre_orb", "orb_diff_3d", "clk_diff"]
     rms = lambda x: np.sqrt(np.mean(np.square(x)))
     percentile = lambda x: np.percentile(x, 95)
     functions = [rms, np.mean, np.std, np.min, np.max, percentile]

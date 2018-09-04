@@ -116,7 +116,7 @@ def main():
     # Loop over dates
     rundate = from_date
     while rundate <= to_date:
-        available_sessions = set(pipelines.sessions(rundate, tech))
+        available_sessions = set(pipelines.list_sessions(rundate, tech))
         sessions = available_sessions & session_list if session_list else available_sessions
 
         for session in sorted(sessions):
@@ -134,7 +134,8 @@ def main():
                 stderr = err.stderr.decode()
                 stderr, *tb_exc = stderr.partition("\nTraceback")  # Regular Python traceback
                 stderr, *tb_fatal = stderr.partition("\nFATAL:")  # Where log.fatal traceback
-                traceback = indent("".join(tb_exc + tb_fatal).strip(), 4)
+                stderr, *tb_error = stderr.partition("\nERROR:")  # Where log.error traceback
+                traceback = indent("".join(tb_exc + tb_fatal + tb_error).strip(), 4)
                 print(stderr, file=sys.stderr)
                 error_logger(f"Command '{' '.join(cmd)}' failed with\n{traceback}")
             else:

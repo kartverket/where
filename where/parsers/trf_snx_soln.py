@@ -29,7 +29,7 @@ class ItrfSnxSolnParser(SinexParser):
     """A parser for reading data from ITRF files in SNX format
     """
 
-    def __init__(self, file_path, header=None):
+    def __init__(self, file_path, encoding=None, header=None):
         """Set up the basic information needed by the parser
 
         Turn off parsing of header by default, as the soln-Sinex files in general are missing headers.
@@ -38,7 +38,7 @@ class ItrfSnxSolnParser(SinexParser):
             file_path (String/Path):    Path to file that will be read.
             header (Boolean):           Whether to parse the header.
         """
-        super().__init__(file_path)
+        super().__init__(file_path, encoding)
         self._header = False if header is None else header
 
     def setup_parser(self):

@@ -59,7 +59,7 @@ def write(default_stage):
     dsets = dict()
     prefix = config.analysis.get("analysis", default="").str
     output_list = config.tech.output.list
-    writer_and_dset = [f"{o}:{default_stage}".split(":")[:2] for o in output_list]
+    writer_and_dset = [o.partition(":")[::2] for o in output_list]
 
     rundate = config.analysis.rundate.date
     tech = config.analysis.tech.str
@@ -69,8 +69,13 @@ def write(default_stage):
         # Read the datasets
         if dset_str not in dsets:
             stage, _, dset_id = dset_str.partition("/")
+            stage, _, dset_name = stage.partition(":")
+            stage = stage if stage else default_stage
+            dset_name = dset_name if dset_name else session
             dset_id = int(dset_id) if dset_id else "last"
-            dsets[dset_str] = data.Dataset(rundate, tech=tech, stage=stage, dataset_name=session, dataset_id=dset_id)
+            dsets[dset_str] = data.Dataset(
+                rundate, tech=tech, stage=stage, dataset_name=dset_name, dataset_id=dset_id, session=session
+            )
 
         # Call the writers
         plugins.call_one(package_name=__name__, plugin_name=writer, prefix=prefix, dset=dsets[dset_str])

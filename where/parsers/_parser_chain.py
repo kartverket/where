@@ -77,7 +77,7 @@ class ChainParser(Parser):
         parser = next(parsers_chain)  # Pointing to first parser
         cache = dict(line_num=0)
 
-        with files.open_path(self.file_path, mode="rt") as fid:
+        with files.open_path(self.file_path, mode="rt", encoding=self.file_encoding) as fid:
             # Get iterators for current and next line
             line_iter, next_line_iter = itertools.tee(fid)
             next(next_line_iter, None)

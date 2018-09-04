@@ -26,6 +26,7 @@ import builtins
 from contextlib import contextmanager
 from datetime import datetime
 import gzip
+import hashlib
 import pathlib
 import re
 import shutil
@@ -113,6 +114,7 @@ def open(file_key, file_vars=None, create_dirs=False, is_zipped=None, download_m
     """
     download_missing = download_missing and "r" in kwargs.get("mode", "r")
     file_path = path(file_key, file_vars, is_zipped=is_zipped, download_missing=download_missing)
+    kwargs.setdefault("encoding", encoding(file_key))
     try:
         with open_path(
             file_path, description=file_key, create_dirs=create_dirs, is_zipped=is_path_zipped(file_path), **kwargs
@@ -178,6 +180,19 @@ def open_path(file_path, description="", mode="rt", create_dirs=False, is_zipped
                 yield fid
     except Exception:
         raise
+
+
+def encoding(file_key):
+    """Look up the encoding for a given file key
+
+    Args:
+        file_key (String):  Key that is looked up in the Where file list.
+
+    Returns:
+        String:  Name of encoding. If encoding is not specified None is returned.
+    """
+    file_encoding = config.files.get("encoding", section=file_key, default="").str
+    return file_encoding or None
 
 
 def path(file_key, file_vars=None, default=None, is_zipped=None, download_missing=False, use_aliases=True):
@@ -384,14 +399,13 @@ def publish_files(publish=None):
             continue
 
         try:
-            destinations = config.files[file_key].publish.replaced.list
+            destinations = config.files[file_key].publish.replaced.as_list(convert=pathlib.Path)
         except AttributeError:
             log.error(f"File key '{file_key}' does not specify 'publish' directory in file configuration. Ignored")
             continue
 
         # Copy file to destinations
-        for destination_str in destinations:
-            destination = pathlib.Path(destination_str)
+        for destination in destinations:
             log.info("Publishing {}-file {} to {}", file_key, source, destination)
             destination.mkdir(parents=True, exist_ok=True)
             shutil.copy(source, destination)
@@ -528,6 +542,27 @@ def get_timestamp(file_path):
         return "File does not exist"
 
     return datetime.fromtimestamp(mod_time).isoformat()
+
+
+def get_md5(file_path):
+    """Return a md5 checksum based on a file.
+
+    Args:
+        file_path (Path/String):  Path to file.
+
+    Returns:
+        Hex-string representing the contents of the file.
+    """
+    md5 = hashlib.md5()
+    block_size = 128 * md5.block_size  # Chunk file to avoid memory problems
+
+    try:
+        with builtins.open(file_path, mode="rb") as fid:
+            for chunk in iter(lambda: fid.read(block_size), b""):
+                md5.update(chunk)
+        return md5.hexdigest()
+    except FileNotFoundError:
+        return "File does not exist"
 
 
 def _log_file_open(file_path, description="", mode="r"):

@@ -23,10 +23,10 @@ class Satellite:
     This class should be inherited by all satellites, possibly with more specialized classes (e.g. Slr, Gps) as mixins.
     """
 
-    short_name = ""
-    cospar_id = 0
-    area = 0
-    mass = 0
+    short_name: str = ""
+    cospar_id: int = 0
+    area: float = 0
+    mass: float = 0
 
     def __init__(self):
         """Initialize satellite object

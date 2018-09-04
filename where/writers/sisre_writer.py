@@ -54,12 +54,13 @@ def sisre_writer(dset):
         WriterField("toe_gpsweek", (), object, "%15s", 15, "TOE"),
         WriterField("diff_trans_toe", (), float, "%8d", 8, "TM-TOE"),
         WriterField("diff_time_toe", (), float, "%8d", 8, "T-TOE"),
+        WriterField("clk_diff_no_mean", (), float, "%16.4f", 16, "ΔCLOCK_NO_MEAN"),
         WriterField("clk_diff", (), float, "%16.4f", 16, "ΔCLOCK"),
-        WriterField("clk_diff_sys", (), float, "%16.4f", 16, "ΔCLOCK_SYS"),
         WriterField("dalong_track", (), float, "%16.4f", 16, "ΔALONG_TRACK"),
         WriterField("dcross_track", (), float, "%16.4f", 16, "ΔCROSS_TRACK"),
         WriterField("dradial", (), float, "%16.4f", 16, "ΔRADIAL"),
         WriterField("orb_diff_3d", (), float, "%16.4f", 16, "ORB_DIFF_3D"),
+        WriterField("sisre_orb_no_mean", (), float, "%16.4f", 16, "SISRE_ORB_NOMEAN"),
         WriterField("sisre_orb", (), float, "%16.4f", 16, "SISRE_ORB"),
         WriterField("sisre", (), float, "%16.4f", 16, "SISRE"),
     )
@@ -101,7 +102,7 @@ def sisre_writer(dset):
             WriterField("clk_sys", (), float, "%10.4f", 10, "CLK_SYS"),
         )
 
-        dset.add_float("clk_sys", val=dset.clk_diff - dset.clk_diff_sys, unit="meter")
+        dset.add_float("clk_sys", val=dset.clk_diff_no_mean - dset.clk_diff, unit="meter")
 
     # List epochs ordered by satellites
     idx = np.concatenate([np.where(dset.filter(satellite=s))[0] for s in dset.unique("satellite")])

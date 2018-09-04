@@ -1,12 +1,13 @@
-# This is the the local WHERE configuration file. Any settings here will override the same settings in the main WHERE
-# configuration file (where.conf).
+# This is your personal Where configuration file. Any settings here will
+# override the same settings in the main Where configuration file
+# (where.conf). If you want to change any configuration settings in Where, you
+# should do it here. Changes in the main configuration file will be overwritten
+# when you update Where.
 #
-# To use this file, copy it to where_local.conf
+# This file should be named where_local.conf.  Where will first look for this
+# file in the current directory, then in the where/config directory.
 #
-# This file can be named either .wherelocalrc, wherelocalrc or where_local.conf.  WHERE will look for this file first
-# in the current directory, then in the home direcory of the user, and finally in the system-wide /etc-directory.
-# Thus, if you want to make changes in this file that should not be checked into the main version control repository,
-# you can copy this file to your home directory and make changes there.
+# You can have different where_local.conf files in different
+# directories. Starting where from such a directory will then use the
+# configuration settings provided in the corresponding where_local.conf file
 
-# The most common use will probably be to set paths different on a local machine from what is used on servers.
-[path]

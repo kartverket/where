@@ -153,8 +153,9 @@ def ignore_epochs_exceeding_brdc_fit_interval(dset, dset_idx):
             fit_interval = 4.0 if brdc.dset_edit.fit_interval[idx] == 0.0 else brdc.dset_edit.fit_interval[idx]
             toe_limit = fit_interval * 1800.0  # toe_limit = fit_interval/2 * 3600 = fit_interval * 1800
         elif sys == "E":
-            # TODO: Is that correct?
-            fit_interval = 3.0
+            # Galileo navigation data record is valid for 4 hours after time of ephemeris due to Appendix C.4.4.1 in 
+            # Galileo-OS-SDD (2016).
+            fit_interval = 4.0
             toe_limit = fit_interval * 3600.0
 
         # Remove observations, if they exceed fit interval limit 'toe_limit'

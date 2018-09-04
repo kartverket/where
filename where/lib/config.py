@@ -74,7 +74,7 @@ import pathlib
 import sys
 
 # Where imports
-from midgard.config import config as mg_config
+from midgard.config.config import Configuration
 from where.lib import enums  # noqa  # Register Where enums
 
 
@@ -89,7 +89,7 @@ _CONFIG_FILENAMES = dict(
 )
 
 # Possible locations for all Where config files
-_CONFIG_DIRECTORIES = (pathlib.Path.cwd(), WHERE_DIR / "config")
+_CONFIG_DIRECTORIES = (pathlib.Path.cwd(), pathlib.Path.home() / ".where", WHERE_DIR / "config")
 
 # Date format, defined here for consistency
 FMT_date = "%Y-%m-%d"
@@ -228,8 +228,8 @@ def date_vars(date):
     )
 
 
-def _config_paths(cfg_name):
-    for file_name in _CONFIG_FILENAMES[cfg_name][::-1]:
+def config_paths(cfg_name):
+    for file_name in _CONFIG_FILENAMES.get(cfg_name, (f"{cfg_name}.conf",))[::-1]:
         for file_dir in _CONFIG_DIRECTORIES:
             file_paths = sorted(pathlib.Path(file_dir).glob(file_name))
             if file_paths:
@@ -243,29 +243,41 @@ def update_tech_config(rundate, pipeline, session, **kwargs):
     file_vars = create_file_vars(rundate, pipeline, session, **kwargs)
     cfg_path = files.config.directory.replace(**file_vars).path / files.config.filename.replace(**file_vars).path
 
-    with mg_config.Configuration.update_on_file(cfg_path) as cfg:
+    with Configuration.update_on_file(cfg_path) as cfg:
         yield cfg
 
     # Todo: Update timestamp file
 
 
+def timestamps(rundate, pipeline, session, **kwargs):
+    file_vars = create_file_vars(rundate, pipeline, session, **kwargs)
+    ts_path = files.timestamp.directory.replace(**file_vars).path / files.timestamp.filename.replace(**file_vars).path
+
+    cfg = Configuration.read_from_file("timestamps", ts_path)
+
+    if "timestamps" in cfg.sections:
+        return cfg.timestamps.as_dict()
+    else:
+        return dict()
+
+
 def reset_config():
     # Where-configuration
     where.clear()
-    for file_path in _config_paths("where"):
+    for file_path in config_paths("where"):
         where.update_from_file(file_path, interpolate=True)
     where.master_section = "all"
 
     # Files-configuration
     files.clear()
-    for file_path in _config_paths("files"):
+    for file_path in config_paths("files"):
         files.update_from_file(file_path, interpolate=False)
     set_file_vars()
 
     # There-configuration
     there.clear()
-    for file_path in _config_paths("there"):
-        there.update_from_file(file_path, interpolate=True)
+    for file_path in config_paths("there"):
+        there.update_from_file(file_path, interpolate=True, case_sensitive=True)
     there.master_section = "general"
 
     # Analysis, Tech and Session-configurations are initialised by config.init later
@@ -276,11 +288,11 @@ def reset_config():
 
 
 # Add configurations as module variables
-where = mg_config.Configuration("where")
-files = mg_config.Configuration("files")
-program = mg_config.Configuration("program")
-analysis = mg_config.Configuration("analysis")
-tech = mg_config.Configuration("tech")
-session = mg_config.Configuration("session")
-there = mg_config.Configuration("there")
+where = Configuration("where")
+files = Configuration("files")
+program = Configuration("program")
+analysis = Configuration("analysis")
+tech = Configuration("tech")
+session = Configuration("session")
+there = Configuration("there")
 reset_config()

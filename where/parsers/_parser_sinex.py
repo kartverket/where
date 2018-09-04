@@ -162,7 +162,7 @@ class SinexParser(Parser):
     """
     _TECH = {"C": "comb", "D": "doris", "L": "slr", "M": "llr", "P": "gnss", "R": "vlbi"}
 
-    def __init__(self, file_path, header=True):
+    def __init__(self, file_path, encoding=None, header=True):
         """Set up the basic information needed by the parser
 
         Add a self._sinex dictionary for the raw Sinex data and read which blocks to read from self.setup_parser().
@@ -171,7 +171,7 @@ class SinexParser(Parser):
             file_path (String/Path):    Path to file that will be read.
             header (Boolean):           Whether to parse the header.
         """
-        super().__init__(file_path)
+        super().__init__(file_path, encoding)
         self._header = header
         self._sinex = dict()
         self.sinex_blocks = self.setup_parser()
@@ -225,7 +225,7 @@ class SinexParser(Parser):
             while sinex_blocks:
                 # Find next block (line that starts with +)
                 fid = itertools.dropwhile(lambda ln: not ln.startswith(b"+"), fid)
-                block_header = next(fid).decode()
+                block_header = next(fid).decode(self.file_encoding or "utf-8")
                 marker, *params = block_header[1:].strip().split()
                 if marker not in sinex_blocks:
                     continue
@@ -272,6 +272,7 @@ class SinexParser(Parser):
             usecols=usecols,
             converters=converters,
             autostrip=True,
+            encoding=self.file_encoding or "bytes",  # TODO: Use None instead
         )
 
     def as_dataframe(self, marker=None, index=None):
@@ -340,7 +341,9 @@ class SinexParser(Parser):
             datetime: Field converted to datetime object.
         """
         ce = "19" if int(field[:2]) > 50 else "20"
-        return datetime.strptime(ce + field[:6].decode(), "%Y:%j") + timedelta(seconds=int(field[7:]))
+        return datetime.strptime(ce + field[:6].decode(self.file_encoding or "utf-8"), "%Y:%j") + timedelta(
+            seconds=int(field[7:])
+        )
 
     def _convert_exponent(self, field):
         """Convert scientific notation number field to float
@@ -354,7 +357,7 @@ class SinexParser(Parser):
         Returns:
             float: Field converted to floating point number.
         """
-        return float(field.decode().replace("D", "E"))
+        return float(field.decode(self.file_encoding or "utf-8").replace("D", "E"))
 
     def _convert_list(self, field):
         """Convert field to list
@@ -365,7 +368,7 @@ class SinexParser(Parser):
         Returns:
             List: Field converted to list.
         """
-        return field.decode().split()
+        return field.decode(self.file_encoding or "utf-8").split()
 
     def _convert_tuple(self, field):
         """Convert field to tuple
@@ -376,7 +379,7 @@ class SinexParser(Parser):
         Returns:
             Tuple: Field converted to tuple.
         """
-        return tuple(field.decode().split())
+        return tuple(field.decode(self.file_encoding or "utf-8").split())
 
     def _convert_utf8(self, field):
         """Decode field using utf-8
@@ -387,7 +390,7 @@ class SinexParser(Parser):
         Returns:
             Tuple: Field decoded using utf-8.
         """
-        return field.decode()
+        return field.decode(self.file_encoding or "utf-8")
 
     #
     # HEADER

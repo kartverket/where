@@ -51,10 +51,14 @@ class VlbiObsCrf(crf.CrfFactory):
         """
         # TODO make parser
         sources_file = files.path(file_key="vlbi_obs_vgosdb") / "Apriori" / "Source.nc"
+        source_names = apriori.get("vlbi_source_names")
         d = netCDF4.Dataset(sources_file)
         sources = d["AprioriSourceList"][:]
         radec = d["AprioriSource2000RaDec"][:]
-        return {str(s, "utf-8").strip(): dict(ra=coord[0], dec=coord[1]) for s, coord in zip(sources, radec)}
+        return {
+            source_names[str(s, "utf-8").strip()]["iers_name"]: dict(ra=coord[0], dec=coord[1])
+            for s, coord in zip(sources, radec)
+        }
 
     def _read_data_ngs(self):
         """Read data from NGS observation files
@@ -62,7 +66,11 @@ class VlbiObsCrf(crf.CrfFactory):
         Returns:
             Dict:  Dictionary containing data about each source defined in this celestial reference frame.
         """
-        return parsers.parse_key("vlbi_obs_ngs", parser="vlbi_ngs_sources").as_dict()
+        data = parsers.parse_key("vlbi_obs_ngs", parser="vlbi_ngs_sources").as_dict()
+        src_names = apriori.get("vlbi_source_names")
+
+        # Replace IVS name of source with official IERS name
+        return {src_names[ivsname]["iers_name"]: coords for ivsname, coords in data.items() if ivsname in src_names}
 
     def _calculate_pos_crs(self, source):
         """Calculate positions for the given time epochs

@@ -4,8 +4,6 @@ Description:
 ------------
 
 
-
-
 """
 # Where imports
 from where.parsers._parser_line import LineParser

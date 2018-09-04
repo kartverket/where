@@ -74,7 +74,7 @@ class VlbiNgsSourcesParser(ChainParser):
         Args:
             line:  Input data from NGS file
         """
-        src_name = line["name"].replace(".", "dot")
+        src_name = line["name"]
         self.data[src_name] = dict()
         self.data[src_name]["ra"] = unit.hms_to_rad(
             float(line["ra_hrs"]), int(line["ra_mins"]), float(line["ra_secs"])

@@ -12,13 +12,16 @@ import itertools
 import numpy as np
 
 # Where imports
+from where import apriori
 from where import data
 from where import cleaners
 from where import estimation
 from where.lib import config
+from where.lib import exceptions
 from where.lib import files
 from where.lib import log
 from where.lib import plugins
+from where.lib import util
 from where import models
 from where import parsers
 from where import writers
@@ -37,8 +40,8 @@ def options():
     return "-v", "--vlbi"
 
 
-@plugins.register_named("sessions")
-def sessions(rundate):
+@plugins.register_named("list_sessions")
+def list_sessions(rundate):
     """Sessions available for the given rundate
 
     Args:
@@ -47,13 +50,60 @@ def sessions(rundate):
     Returns:
         List:   Strings with names of available sessions.
     """
-    obs_format = config.tech.get("obs_format", section=TECH).str  # TODO: This always falls back on config.where ...
-    file_vars = config.create_file_vars(rundate, TECH, session=None)
-    del file_vars["session"]  # TODO: Do not add None variables to file_vars?
-    found_sessions = files.glob_variable(
-        f"vlbi_obs_{obs_format}", variable="session", pattern=r"\w{2}", file_vars=file_vars
-    )
-    return found_sessions
+    if config.where.get(
+        "get_session_from_master",
+        section=TECH,
+        value=util.read_option_value("--get_session_from_master", default=None),  # TODO: add this to mg_config
+        default=False,
+    ).bool:
+        skip_sessions = config.where.get(
+            "skip_sessions", section=TECH, value=util.read_option_value("--skip_sessions", default=None), default=""
+        ).list
+        master_file = apriori.get("vlbi_master_file", rundate=rundate)
+        sessions = master_file.list_sessions(rundate)
+
+        for session in skip_sessions:
+            if session in sessions:
+                sessions.remove(session)
+
+        return sessions
+    else:
+        obs_format = config.tech.get("obs_format", section=TECH).str  # TODO: This always falls back on config.where ..
+        file_vars = config.create_file_vars(rundate, TECH, session=None)
+        del file_vars["session"]  # TODO: Do not add None variables to file_vars?
+        found_sessions = files.glob_variable(
+            f"vlbi_obs_{obs_format}", variable="session", pattern=r"\w{2}", file_vars=file_vars
+        )
+        return found_sessions
+
+
+@plugins.register_named("validate_session")
+def validate_session(rundate, session):
+    """Validate a session for the given rundate
+
+    If session is not a valid VLBI session for the given rundate, an InvalidSessionError is raised.
+
+    Args:
+        rundate (date):    The model run date.
+        session (String):  Name of session.
+
+    Return:
+        String:  Name of validated session.
+    """
+    if not session:
+        if util.check_options("--session"):
+            return session  # Explicitly specified blank session, typically to open timeseries interactively
+        raise exceptions.InvalidSessionError("You must specify '--session=<...>' to run a VLBI analysis")
+
+    # TODO: Can we use master files to validate sessions? What about intensives?
+    master_file = apriori.get("vlbi_master_file", rundate=rundate)
+    master_sessions = master_file.list_sessions(rundate)
+    if session not in master_sessions:
+        log.warn(
+            f"Session '{session}' is not listed in master file for {rundate:{config.FMT_date}}. "
+            f"Available sessions are {', '.join(master_sessions)}."
+        )
+    return session
 
 
 @plugins.register_named("file_vars")

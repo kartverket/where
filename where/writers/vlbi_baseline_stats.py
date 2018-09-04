@@ -54,21 +54,25 @@ def baseline_stats(dset):
     Args:
         dset:   Dataset, information about model run.
     """
+    stats_str = ["Statistics about stations and baselines"]
     baselines = itertools.permutations(dset.unique("station"), 2)
+    idx = np.ones(dset.num_obs, dtype=bool)
+    stats_str.append(_write_line("ALL", "", dset, idx))
+
+    for sta in dset.unique("station"):
+        idx = dset.filter(station=sta)
+        stats_str.append(_write_line(sta, "", dset, idx))
+
+    for sta_1, sta_2 in baselines:
+        idx = np.logical_and(dset.filter(station=sta_1), dset.filter(station=sta_2))
+        stats_str.append(_write_line(sta_1, sta_2, dset, idx))
+
     with files.open("output_baseline_stats", file_vars=dset.vars, mode="wt") as fid:
-        idx = np.ones(dset.num_obs, dtype=bool)
-        _write_line("ALL", "", dset, idx, fid)
-
-        for sta in dset.unique("station"):
-            idx = dset.filter(station=sta)
-            _write_line(sta, "", dset, idx, fid)
-
-        for sta_1, sta_2 in baselines:
-            idx = np.logical_and(dset.filter(station=sta_1), dset.filter(station=sta_2))
-            _write_line(sta_1, sta_2, dset, idx, fid)
+        fid.write("\n".join(stats_str))
+    log.out("\n  ".join(stats_str))
 
 
-def _write_line(sta_1, sta_2, dset, idx, fid):
+def _write_line(sta_1, sta_2, dset, idx):
     """Write one line of information about a station or baseline.
 
     At the moment, we also print the line to the screen for convenience, this might need to be
@@ -82,25 +86,9 @@ def _write_line(sta_1, sta_2, dset, idx, fid):
         fid:    File-pointer, file to write to.
 
     """
-    if not any(idx):
-        return
+    rms = dset.rms("residual", idx=idx) if any(idx) else 0
+    bias = dset.mean("residual", idx=idx) if any(idx) else 0
+    stars = "" if rms < STAR_THRESHOLD else "*" * min(MAX_NUM_STARS, math.ceil(math.log2(rms / STAR_THRESHOLD)))
+    bl_len = np.linalg.norm(dset.site_pos_2.itrs[idx][0] - dset.site_pos_1.itrs[idx][0]) if (sta_2 and any(idx)) else 0
 
-    rms = np.sqrt(np.mean(np.square(dset.residual[idx])))
-    num_stars = 0 if rms < STAR_THRESHOLD else min(MAX_NUM_STARS, math.ceil(math.log2(rms / STAR_THRESHOLD)))
-    if sta_2:
-        bl_len = np.linalg.norm(dset.site_pos_2.itrs[idx][0] - dset.site_pos_1.itrs[idx][0])
-    else:
-        bl_len = 0
-
-    fmt_str = ("{sta_1:<9s} {sta_2:<9s} {num_obs:>5d} {bl_len:>12.2f} {bias:>10.5f} " "{rms:>10.5f} {stars:<}\n")
-    info_str = fmt_str.format(
-        sta_1=sta_1,
-        sta_2=sta_2,
-        num_obs=np.sum(idx),
-        bl_len=bl_len,
-        bias=np.mean(dset.residual[idx]),
-        rms=rms,
-        stars="*" * num_stars,
-    )
-    log.out(info_str.rstrip())
-    fid.write(info_str)
+    return f"{sta_1:<9s} {sta_2:<9s} {np.sum(idx):>5d} {bl_len:>11.1f} {bias:>11.6f} {rms:>11.6f} {stars}"

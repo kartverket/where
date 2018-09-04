@@ -24,7 +24,7 @@ class LineParser(Parser):
     and at least specify the necessary parameters in `setup_parser`.
     """
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, encoding=None):
         """Set up the basic information needed by the parser
 
         Add a self._array property for the raw numpy array data.
@@ -32,7 +32,7 @@ class LineParser(Parser):
         Args:
             file_path (String/Path):    Path to file that will be read.
         """
-        super().__init__(file_path)
+        super().__init__(file_path, encoding)
         self._array = None
 
     def setup_parser(self):
@@ -53,6 +53,7 @@ class LineParser(Parser):
         way.
         """
         self.meta["__params__"] = self.setup_parser()
+        self.meta["__params__"].setdefault("encoding", self.file_encoding or "bytes")  # TODO: Default to None instead?
         self._array = np.genfromtxt(self.file_path, **self.meta["__params__"])
         self.structure_data()
 

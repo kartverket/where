@@ -78,13 +78,13 @@ class Dataset(object):
         self._num_obs = 0
         self._default_field_suffix = None
         self._kwargs = kwargs
+        self._kwargs.setdefault("session", dataset_name)  # TODO: Can this be removed?
         self.vars = dict(
             config.program_vars(
                 **dict(
                     kwargs,
                     rundate=rundate,
                     tech_name=tech,
-                    session=dataset_name,
                     stage=stage,
                     dataset_name=dataset_name,
                     dataset_id=str(dataset_id),

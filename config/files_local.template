@@ -1,11 +1,12 @@
-# This is the the local WHERE files file. Any settings here will override the same settings in the main WHERE
-# files file (files.conf).
+# This is your personal files configuration file used by Where. Any settings
+# here will override the same settings in the main files configuration file
+# (files.conf). If you want to change any information about files used by Where,
+# you should do it here. Changes in the main configuration file will be
+# overwritten when you update Where.
 #
-# To use this file, copy it to files_local.conf
-#
-# This file can be named either files_local.confc or where_local.files.  WHERE will look for this file first in the
-# current directory, then in the home direcory of the user, and finally in the system-wide /etc-directory.  Thus, if
-# you want to make changes in this file that should not be checked into the main version control repository, you can
-# copy this file to your home directory and make changes there.
+# This file should be named files_local.conf.  Where will first look for this
+# file in the current directory, then in the where/config directory.
+
+
 
 

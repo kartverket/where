@@ -64,9 +64,13 @@ class VlbiVgosdbParser(parser.Parser):
         log.info("Found stations: {}", ", ".join(self.data["sta_name"]))
 
         # Read source apriori
+
+        source_names = apriori.get("vlbi_source_names")
         nc = self._read_nc_file("Apriori", "Source.nc")
+
+        # import IPython; IPython.embed()
         self.data["source_names"] = np.array(
-            [str(src, "utf-8").strip().replace(".", "dot") for src in nc["AprioriSourceList"]]
+            [source_names[str(src, "utf-8").strip()]["iers_name"] for src in nc["AprioriSourceList"]]
         )
         self.data["source_ra"] = nc["AprioriSource2000RaDec"][:, 0]
         self.data["source_dec"] = nc["AprioriSource2000RaDec"][:, 1]
@@ -280,7 +284,7 @@ class VlbiVgosdbParser(parser.Parser):
         dset.add_to_meta("input", "file", files.path(self.file_key, file_vars=self.vars).stem)
 
         master = apriori.get("vlbi_master_file")
-        dset.meta.update(master.get((self.rundate.timetuple().tm_yday, self.vars["session"]), {}))
+        dset.meta["master_file"] = master.data.get((self.rundate.timetuple().tm_yday, self.vars["session"]), {})
 
     def _read_nc_file(self, directory, file_name):
         full_path = os.path.join(self.session_dir, directory, file_name)

@@ -18,7 +18,7 @@ GPT2WDIR = $(CURDIR)/external/gpt2w/src
 .PHONY: all develop install cython doc test typing format external sofa iers_2010 gpt2w
 
 # Everything needed for installation
-all:	external cython develop
+all:	external cython develop local_config
 
 # Install in developer mode (no need to reinstall after changing source)
 develop:
@@ -31,6 +31,13 @@ server:
 # Regular install, freezes the code so must reinstall after changing source code
 install:
 	pip install --user .[optional]
+
+# Set up local configuration files
+local_config:
+	python config_wizard.py config/where_local.conf --ignore-existing
+	python config_wizard.py config/there_local.conf --ignore-existing
+	python config_wizard.py config/files_local.conf --ignore-existing
+	python config_wizard.py config/trf_local.conf --ignore-existing
 
 # Compile Cython files
 cython:

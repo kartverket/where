@@ -53,14 +53,14 @@ def parameter_corrections(dset):
             param = f"{key[0]}:{key[1]}_{''.join(suffix)}"
             correction_str += f"  {param:30} {values[suffix[0]][2]:4d} = "
             for k in suffix:
-                correction_str += f"{values[k][0]:15.12f} "
+                correction_str += f"{values[k][0]:9.6f} "
             correction_str += f"{key[2]} (std:"
             for k in suffix:
                 correction_str += f" {values[k][1]:6.4f}"
             correction_str += ")\n"
         else:
             correction_str += (
-                f"  {f'{key[0]}:{key[1]}':30} {values[2]:4d} = {values[0]:15.12f} {key[2]} (std: {values[1]:6.4f})\n"
+                f"  {f'{key[0]}:{key[1]}':30} {values[2]:4d} = {values[0]:9.6f} {key[2]} (std: {values[1]:6.4f})\n"
             )
     log.out(f"Parameter corrections from Kalman filter after estimation:\n{correction_str.rstrip()}")
 

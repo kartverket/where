@@ -5,13 +5,9 @@ Description:
 
 Reads the VLBI master file which contains information about all the planned and executed sessions each year.
 
-
-
-
 """
 
 # Standard library imports
-from datetime import date, timedelta
 from collections import defaultdict
 import itertools
 import re
@@ -37,6 +33,7 @@ class VlbiMasterFile(ChainParser):
             parser_def={
                 True: {
                     "parser": self.parse_session,
+                    "delimiter": "|",
                     "fields": [
                         None,
                         "session_name",
@@ -56,7 +53,6 @@ class VlbiMasterFile(ChainParser):
                         None,
                         None,
                     ],
-                    "delimiter": "|",
                 }
             },
         )
@@ -95,3 +91,15 @@ class VlbiMasterFile(ChainParser):
         log.warn("Session '{}' not found in master file for {}", session, date.strftime(config.FMT_date))
 
         return defaultdict(default_factory="")
+
+    def list_sessions(self, date):
+        """List sessions available at a given date
+
+        Args:
+            date (date):  The given date.
+
+        Returns:
+            List of strings:  Names of sessions available at a given date.
+        """
+        doy = date.timetuple().tm_yday
+        return [s for d, s in self.data.keys() if d == doy]

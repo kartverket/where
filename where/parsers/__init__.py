@@ -13,17 +13,13 @@ to be decorated with the :func:`~where.lib.plugins.register` decorator as follow
     class MyNewParser(parser.Parser):
         ...
 
-To use a parser, you will typically use the :func:`parse`-function defined below
+To use a parser, you will typically use the :func:`parse_key`- or :func:`parse_file-functions defined below
 
     from where import parsers
-    my_new_parser = parsers.parse('my_new_parser', ...)
+    my_new_parser = parsers.parse_file('my_new_parser', 'file_name.txt', ...)
     my_data = my_new_parser.as_dict()
 
-The name used in `parse` to call the parser is the name of the module (file) containing the parser.
-
-
-
-
+The name used in `parse_file` to call the parser is the name of the module (file) containing the parser.
 
 """
 
@@ -88,7 +84,7 @@ def parse(parser_name=None, file_key=None, **kwargs):
     return setup_parser(parser_name=parser_name, file_key=file_key, **kwargs).parse()
 
 
-def parse_file(parser_name, file_path, use_cache=True, **parser_args):
+def parse_file(parser_name, file_path, use_cache=True, encoding=None, **parser_args):
     """Use the given parser on a file and return parsed data
 
     Specify `parser_name` and `file_path` to the file that should be parsed. The following parsers are available:
@@ -112,7 +108,12 @@ def parse_file(parser_name, file_path, use_cache=True, **parser_args):
     """
     # Create the parser and parse the data
     parser = plugins.call_one(
-        package_name=__name__, plugin_name=parser_name, use_timer=False, file_path=file_path, **parser_args
+        package_name=__name__,
+        plugin_name=parser_name,
+        use_timer=False,
+        file_path=file_path,
+        encoding=encoding,
+        **parser_args
     )
     return parser.parse()
 
@@ -149,6 +150,7 @@ def parse_key(file_key, file_vars=None, parser=None, use_cache=True, **parser_ar
     # Figure out the file path
     file_vars = dict() if file_vars is None else file_vars
     file_path = files.path(file_key, file_vars=file_vars, download_missing=True, use_aliases=True)
+    parser_args.setdefault("encoding", files.encoding(file_key))
 
     # Create the parser and parse the data
     return parse_file(parser_name, file_path, use_cache=use_cache, **parser_args)

@@ -173,7 +173,6 @@ class KalmanFilter(object):
             if dset.meta["analysis_status"] == "unchecked":
                 dset.meta["analysis_status"] = "needs custom state vector"
 
-        print(dset.meta["analysis_status"])
         # Update config
         with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
             cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
@@ -307,7 +306,7 @@ class KalmanFilter(object):
                 )
 
             if fieldname_sigma in dset.fields:
-                dset[fieldname_sigma][:] = value * dset.meta["display_factors"][param_name]
+                dset[fieldname_sigma][:] = value_sigma * dset.meta["display_factors"][param_name]
             else:
                 # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
                 partial_unit = dset.unit("partial_{}".format(param_name))

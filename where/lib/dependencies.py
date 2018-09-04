@@ -1,33 +1,24 @@
 """Where library module for handling dependencies
 
-Example:
---------
-
-from where.lib import files
-with files.open('eopc04_iau', mode='rt') as fid:
-    for line in fid:
-        print(line.strip())
-
 Description:
 ------------
 
-This module handles opening of files. All regular Where files should be registered in the Where file list, and then
-opened using files.open. Other files could be opened using files.open_path, although this should be the exception,
-rather than the rule.
+Stores a list of files with a hash/checksum or a timestamp that can be used to detect if a file changes.
 
-The files.open and files.open_path functions are both wrappers around the built-in open function, and behave mainly
-similar. In particular, they accept all the same keyword arguments (like for instance mode). Furthermore, to make sure
-files are properly closed they should normally be used with a context manager as in the example above.
+Two strategies are available:
 
-
-
+- Timestamps: Fast, but not always reliable as timestamps may update without the file actually changing.
+- md5 hash/checksum: Slower, since it needs to read through the whole file, but will reliably only trigger when a file
+  has changed.
 """
 
 # Standard library imports
 import atexit
 from datetime import datetime
 import json
-import pathlib
+
+# Midgard imports
+from midgard.config.config import Configuration
 
 # Where imports
 from where.lib import files
@@ -38,27 +29,29 @@ _DEPENDENCY_FILE_VARS = dict()
 _CURRENT_DEPENDENCIES = dict()
 
 
-def init(**dep_vars):
+def init(fast_check=True, **dep_vars):
     """Start a clean list of dependencies
 
     The dep_vars describe which model run stage the dependency is valid for. These are cached, so after a first
     invocation (as is done in pipelines.run) repeated calls do not need to specify the dep_vars.
 
     Args:
-        dep_vars:   Variables specifying the model_run_depends-file.
+        fast_check:  Fast check uses timestamps, slow check uses md5 checksums.
+        dep_vars:    Variables specifying the model_run_depends-file.
     """
     # Store current dependencies to disk
     write()
 
     # Update and cache variables
     _DEPENDENCY_FILE_VARS.clear()
+    _DEPENDENCY_FILE_VARS["fast_check"] = fast_check
     _DEPENDENCY_FILE_VARS.update(dep_vars)
 
     # Delete any existing dependency file
     dep_path = files.path("model_run_depends", file_vars=_DEPENDENCY_FILE_VARS)
     try:
         dep_path.unlink()
-        log.debug("Removing old dependency file {}", dep_path)
+        log.debug(f"Removing old dependency file {dep_path}")
     except FileNotFoundError:
         pass  # If dependency file does not exist, we do not do anything
 
@@ -83,10 +76,31 @@ def add(*file_paths):
         return
 
     # Add or update dependency information
+    fast_check = _DEPENDENCY_FILE_VARS["fast_check"]
     for file_path in file_paths:
-        timestamp = files.get_timestamp(file_path)
-        _CURRENT_DEPENDENCIES[str(file_path)] = timestamp
-        log.debug(f"Adding dependency: {file_path} modified at {timestamp}")
+        file_info = _file_info(file_path, fast_check)
+        _CURRENT_DEPENDENCIES[str(file_path)] = file_info
+        log.debug(f"Adding dependency: {file_path} ({file_info['checksum']})")
+
+
+def _file_info(file_path, fast_check):
+    """Get file info for a file path
+
+    The contents of the file info depends on whether we are doing a fast check or not.
+
+    Args:
+        file_path (String/Path):  File path.
+
+    Returns:
+        Dictionary: Info about file.
+    """
+    file_info = dict(timestamp=files.get_timestamp(file_path))
+    if fast_check:
+        file_info["checksum"] = file_info["timestamp"]
+    else:
+        file_info["checksum"] = files.get_md5(file_path)
+
+    return file_info
 
 
 def write():
@@ -119,28 +133,21 @@ def _write(write_as_crash=True):
     if not _CURRENT_DEPENDENCIES:
         return
 
-    # Open dependency file
-    try:
-        with files.open("model_run_depends", file_vars=_DEPENDENCY_FILE_VARS, mode="rt", write_log=False) as fid:
-            dependencies = json.load(fid)
-    except FileNotFoundError:
-        dependencies = dict()
+    # Open dependency file or start from a fresh dictionary
+    dependency_path = files.path("model_run_depends", file_vars=_DEPENDENCY_FILE_VARS)
+    dependencies = Configuration.read_from_file("dependecies", dependency_path)
 
     # Update dependency information
-    dependencies.update(_CURRENT_DEPENDENCIES)
+    for file_path, info in _CURRENT_DEPENDENCIES.items():
+        dependencies.update_from_dict(info, section=file_path)
+
     _CURRENT_DEPENDENCIES.clear()
 
     # Write to dependency file
-    try:
-        with files.open("model_run_depends", file_vars=_DEPENDENCY_FILE_VARS, mode="wt") as fid:
-            json.dump(dependencies, fid)
-    except FileNotFoundError:
-        log.warn(
-            "Not able to write dependencies to {}", files.path("model_run_depends", file_vars=_DEPENDENCY_FILE_VARS)
-        )
+    dependencies.write_to_file(dependency_path)
 
 
-def changed(**dep_vars):
+def changed(fast_check=True, **dep_vars):
     """Check if the dependencies of a model run have changed
 
     Returns True if any of the files in the dependency file have changed, or if the dependency file does not exist.
@@ -151,18 +158,19 @@ def changed(**dep_vars):
     Returns:
         Boolean: True if any file has changed or if the dependecy file does not exist.
     """
-    # Open dependency file
-    try:
-        with files.open("model_run_depends", file_vars=dep_vars, mode="rt") as fid:
-            dependencies = json.load(fid)
-    except FileNotFoundError:
-        log.debug("Dependency file {} does not exist", files.path("model_run_depends", file_vars=dep_vars))
+    # Make sure dependency file exists
+    dependency_path = files.path("model_run_depends", file_vars=dep_vars)
+    if not dependency_path.exists():
+        log.debug(f"Dependency file {dependency_path} does not exist")
         return True
 
     # Check if any dependencies have changed
-    for file_path, timestamp in dependencies.items():
-        if timestamp != files.get_timestamp(file_path):
-            log.debug("Dependency {} changed from {} to {}", file_path, timestamp, files.get_timestamp(file_path))
+    dependencies = Configuration.read_from_file("dependencies", dependency_path)
+    for file_path in dependencies.sections:
+        previous_checksum = dependencies[file_path].checksum.str
+        current_checksum = _file_info(file_path, fast_check=fast_check)["checksum"]
+        if current_checksum != previous_checksum:
+            log.debug(f"Dependency {file_path} changed from {previous_checksum} to {current_checksum}")
             return True
 
     return False

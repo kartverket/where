@@ -27,20 +27,23 @@ class Parser:
     instance ChainParser, LineParser, SinexParser etc
 
     Attributes:
-        file_path (Path/String):      Path to the datafile that will be read.
+        file_path (Path):             Path to the datafile that will be read.
+        file_encoding (String):       Encoding of the datafile.
         parser_name (String):         Name of the parser (as needed to call parsers.parse_...).
         data_available (Boolean):     Indicator of whether data are available.
         data (Dict):                  The (observation) data read from file.
         meta (Dict):                  Metainformation read from file.
     """
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, encoding=None):
         """Set up the basic information needed by the parser
 
         Args:
             file_path (String/Path):    Path to file that will be read.
+            encoding (String):          Encoding of file that will be read.
         """
         self.file_path = pathlib.Path(file_path)
+        self.file_encoding = encoding
         self.parser_name = self.__module__.split(".")[-1]
 
         # Initialize the data

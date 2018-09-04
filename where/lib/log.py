@@ -461,8 +461,8 @@ def file_init(log_path=None, log_level=None, append=False):
     LOGINFO["do_file"] = True
     if log_path is None:
         program = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-        log_directory = config.where.log.path.path
-        log_path = log_directory / "{}.log".format(program)
+        log_directory = config.where.path.log.path
+        log_path = log_directory / "log" / f"{program}.log"
     _setup_logfiles(log_path, do_log_rolling=not append)
     mode = "a" if append else "w"
     LOGINFO["file_id"] = open(log_path, mode=mode)

@@ -226,11 +226,8 @@ def get_user_info(user=None):
 
     info_dict = dict(user=user, **dict(zip(("name", "email", "inst_abbreviation"), user_info)))
     if "inst_abbreviation" in info_dict:
-        inst_info = config.where.get(
-            section="institution_info", key=info_dict["inst_abbreviation"].lower(), default=""
-        ).as_tuple(
-            ", *"
-        )
+        institute = info_dict["inst_abbreviation"].lower()
+        inst_info = config.where.get(section="institution_info", key=institute, default="").as_tuple(", *", maxsplit=1)
         info_dict.update(dict(zip(("inst_name", "inst_address"), inst_info)))
 
     return info_dict

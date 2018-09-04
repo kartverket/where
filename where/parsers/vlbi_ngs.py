@@ -270,11 +270,14 @@ class VlbiNgsParser(parser.Parser):
             else:
                 raise e
 
+        source_names = apriori.get("vlbi_source_names")
+        iers_name = source_names[line["source"]]["iers_name"] if line["source"] in source_names else line["source"]
+
         obs = {
             "time": "{year:0>4}-{month:0>2}-{day:0>2}T{hour:0>2}:{minute:0>2}:{seconds}".format(**line),
             "station_1": line["station_1"],
             "station_2": line["station_2"],
-            "source": line["source"].replace(".", "dot"),
+            "source": iers_name,
             "pass": "{station_1}/{station_2}/{source}".format(**line),
             "baseline": "{station_1}/{station_2}".format(**line),
         }
@@ -376,13 +379,6 @@ class VlbiNgsParser(parser.Parser):
         ra = np.array([icrf[s].pos.crs[0] if s in icrf else 0 for s in dset.source])
         dec = np.array([icrf[s].pos.crs[1] if s in icrf else 0 for s in dset.source])
 
-        # If there are more than 300 sources in a NGS-file the source names are gibberish
-        bad_source_idx = np.where(ra == 0)[0]
-        bad_sources = np.array(dset.source)[bad_source_idx]
-        for s in np.unique(bad_sources):
-            # TODO: discard automatically? obs_format dependent edit file is bad
-            log.check("Unknown source {}. Add to vlbi_ignore_source", s)
-
         dset.add_direction("src_dir", ra=ra, dec=dec, write_level="operational")
 
         # Look up positions in ITRF file
@@ -396,7 +392,11 @@ class VlbiNgsParser(parser.Parser):
             else:
                 trf_site = trf.closest(self.data["pos_" + site], max_distance=5)
                 cdp = trf_site.key
-                log.warn("Undefined station name {}. Assuming station is {}.".format(site, trf_site.name))
+                ignore_stations = config.tech.ignore_station.stations.list
+                if site in ignore_stations:
+                    log.info("Undefined station name {}. Assuming station is {}.", site, trf_site.name)
+                else:
+                    log.warn("Undefined station name {}. Assuming station is {}.", site, trf_site.name)
 
             self.data["pos_" + site] = trf_site.pos.itrs
             log.debug(
@@ -470,4 +470,12 @@ class VlbiNgsParser(parser.Parser):
         dset.meta["tech"] = "vlbi"
 
         master = apriori.get("vlbi_master_file")
-        dset.meta.update(master.get((self.rundate.timetuple().tm_yday, self.vars["session"]), {}))
+        dset.meta["master_file"] = master.data.get((self.rundate.timetuple().tm_yday, self.vars["session"]), {})
+
+        # Final cleanup
+        # If there are more than 300 sources in a NGS-file the source names are gibberish
+        bad_source_idx = ra == 0
+        bad_sources = np.array(dset.source)[bad_source_idx]
+        for s in np.unique(bad_sources):
+            log.warn("Unknown source {}. Observations with this source is discarded", s)
+        dset.subset(np.logical_not(bad_source_idx))

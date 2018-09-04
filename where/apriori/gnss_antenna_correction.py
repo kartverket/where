@@ -2,8 +2,9 @@
 
 Description:
 ------------
-The module includes a class for handling apriori GNSS antenna corrections. Read GNSS ANTEX file (see :cite:`hilla2010`).
 
+The module includes a class for handling apriori GNSS antenna corrections. Read GNSS ANTEX file (see
+:cite:`hilla2010`).
 
 """
 # Standard library imports
@@ -28,7 +29,7 @@ class AntennaCorrection(UserDict):
     The attribute "data" is a dictionary with GNSS satellite PRN or receiver antenna as key. The GNSS satellite antenna
     corrections are time dependent and saved with "valid from" datetime object entry. The dictionary looks like:
 
-        dout = { <prn> : { <valid from>: { cospar_id:   <value>, 
+        dout = { <prn> : { <valid from>: { cospar_id:   <value>,
                                            sat_code:    <value>,
                                            sat_type:    <value>,
                                            valid_until: <value>,
@@ -56,12 +57,12 @@ class AntennaCorrection(UserDict):
      cospar_id           str                 COSPAR ID <yyyy-xxxa>: yyyy -> year when the satellite was put in
                                              orbit, xxx -> sequential satellite number for that year, a -> alpha
                                              numeric sequence number within a launch
-     elevation           numpy.ndarray       List with elevation values in [rad] corresponding to antenna 
+     elevation           numpy.ndarray       List with elevation values in [rad] corresponding to antenna
                                              corrections given in `azi` or `noazi`.
      <frequency>         str                 Frequency identifier (e.g. G01 - GPS L1)
-     neu                 list                North, East and Up eccentricities in [m]. The eccentricities of the 
-                                             mean antenna phase center is given relative to the antenna reference 
-                                             point (ARP) for receiver antennas or to the center of mass of the 
+     neu                 list                North, East and Up eccentricities in [m]. The eccentricities of the
+                                             mean antenna phase center is given relative to the antenna reference
+                                             point (ARP) for receiver antennas or to the center of mass of the
                                              satellite in X-, Y- and Z-direction.
      noazi               numpy.ndarray       List with elevation dependent (non-azimuth-dependent) antenna
                                              correction in [mm].
@@ -69,7 +70,7 @@ class AntennaCorrection(UserDict):
      <receiver antenna>  str                 Receiver antenna name together with radome code
      sat_code            str                 Satellite code e.g. GPS SVN, GLONASS number or Galileo GSAT number
      sat_type            str                 Satellite type (e.g. BLOCK IIA)
-     valid_from          datetime.datetime   Start of validity period of satellite in GPS time 
+     valid_from          datetime.datetime   Start of validity period of satellite in GPS time
      valid_until         datetime.datetime   End of validity period of satellite in GPS time
     =================== =================== ========================================================================
 
@@ -80,7 +81,7 @@ class AntennaCorrection(UserDict):
 
     Methods:
         satellite_phase_center_offset(): Determine satellite phase center offset correction vectors given in ITRS
-        satellite_type(): Get satellite type from ANTEX file (e.g. BLOCK IIF, GALILEO-1, GALILEO-2, GLONASS-M, 
+        satellite_type(): Get satellite type from ANTEX file (e.g. BLOCK IIF, GALILEO-1, GALILEO-2, GLONASS-M,
                           BEIDOU-2G, ...)
         _used_date(): Choose correct date for use of satellite antenna corrections
     """
@@ -160,9 +161,9 @@ class AntennaCorrection(UserDict):
             sat (str):                      Satellite identifier.
             sys_freq (dict):                Dictionary with frequency or frequency combination given for GNSS
                                             identifier:
-                                                sys_freq = { <sys_id>: <freq> }  
+                                                sys_freq = { <sys_id>: <freq> }
                                                 (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
-            used_date (datetime.datetime):  Correct date for use of satellite antenna corrections     
+            used_date (datetime.datetime):  Correct date for use of satellite antenna corrections
 
         Returns:
             numpy.ndarray: Satellite PCO in satellite reference system
@@ -214,6 +215,8 @@ class AntennaCorrection(UserDict):
             # Get satellite phase center offset (PCO) given in satellite reference system
             pco_sat = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"]])
 
+            log.debug(f"PCO of satellite {sat} for frequency {sys}:{sys_freq[sys]}: {pco_sat.tolist()[0]}.")
+
         # Get satellite PCO for ionospheric-free linear combination based on two-frequencies
         elif len(freq) == 2:
 
@@ -230,9 +233,15 @@ class AntennaCorrection(UserDict):
             # Generate ionospheric-free linear combination
             pco_sat = n * pco_sat_f1 + m * pco_sat_f2
 
+            log.debug(
+                f"Ionospheric-free linear combination PCOs of satellite {sat} for"
+                f" frequency combination {sys}:{sys_freq[sys]}:  {pco_sat.tolist()[0]}."
+            )
+
         else:
             log.fatal(
-                f"Wrong frequency type '{sys}:{'_'.join(freq)}'. Note: 'signals' configuration option should represent one- or two-frequencies (e.g. E:E1 or E:E1_E5a)."
+                f"Wrong frequency type '{sys}:{'_'.join(freq)}'. Note: 'signals' configuration option"
+                f" should represent one- or two-frequencies (e.g. E:E1 or E:E1_E5a)."
             )
 
         return pco_sat
