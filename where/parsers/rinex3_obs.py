@@ -22,11 +22,13 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import unit
 
 
@@ -121,7 +123,8 @@ class Rinex3Parser(parser.ParserDict):
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # SATREF              Norwegian Mapping Authority             OBSERVER / AGENCY
                 "OBSERVER / AGENCY": {
-                    "parser": self.parse_string, "fields": {"observer": (0, 20), "agency": (20, 60)}
+                    "parser": self.parse_string,
+                    "fields": {"observer": (0, 20), "agency": (20, 60)},
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # 3008040             SEPT POLARX4        2.9.0               REC # / TYPE / VERS
@@ -132,7 +135,8 @@ class Rinex3Parser(parser.ParserDict):
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # CR620012101         ASH701945C_M    SCIS                    ANT # / TYPE
                 "ANT # / TYPE": {
-                    "parser": self.parse_string, "fields": {"antenna_number": (0, 20), "antenna_type": (20, 40)}
+                    "parser": self.parse_string,
+                    "fields": {"antenna_number": (0, 20), "antenna_type": (20, 40)},
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 #   3275756.7623   321111.1395  5445046.6477                  APPROX POSITION XYZ
@@ -323,7 +327,8 @@ class Rinex3Parser(parser.ParserDict):
                     "parser": self.parse_observation,
                     "strip": "\n",  # Remove only newline '\n' leading and trailing characters from line.
                     "fields": {
-                        "sat": (0, 3), "obs": (3, None)  # 'None' indicates, that line is sliced until the end of line.
+                        "sat": (0, 3),
+                        "obs": (3, None),  # 'None' indicates, that line is sliced until the end of line.
                     },
                 },
             },
@@ -558,16 +563,13 @@ class Rinex3Parser(parser.ParserDict):
         if line["comment"][0:1].isalpha():
             return
 
-        cache["obs_time"] = (
-            "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}"
-            "".format(
-                year=int(line["year"]),
-                month=int(line["month"]),
-                day=int(line["day"]),
-                hour=int(line["hour"]),
-                minute=int(line["minute"]),
-                second=float(line["second"]),
-            )
+        cache["obs_time"] = "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}" "".format(
+            year=int(line["year"]),
+            month=int(line["month"]),
+            day=int(line["day"]),
+            hour=int(line["hour"]),
+            minute=int(line["minute"]),
+            second=float(line["second"]),
         )
         cache["obs_sec"] = (
             int(line["hour"]) * unit.hour2second + int(line["minute"]) * unit.minute2second + float(line["second"])
@@ -611,7 +613,7 @@ class Rinex3Parser(parser.ParserDict):
 
         # Parse observation line in fields
         for idx, obs_type in zip(range(0, line_length, field_length), self.meta["obstypes"][sys]):
-            value = line["obs"][idx:idx + field_length]
+            value = line["obs"][idx : idx + field_length]
             self.data["obs"][obs_type].append(_float(value[0:14]))
             self.data["cycle_slip"][obs_type].append(_int(value[14:15]))
             self.data["signal_strength"][obs_type].append(_int(value[15:16]))
@@ -634,7 +636,7 @@ class Rinex3Parser(parser.ParserDict):
 
         obs = {
             "station": self.meta["marker_name"].lower(),  # vars['station'],
-            "site_id": self.meta["marker_name"].lower(),
+            "site_id": self.meta["marker_name"].upper(),
             "system": sys,
             "satellite": line["sat"],
             "satnum": line["sat"][1:3],
@@ -848,6 +850,7 @@ class Rinex3Parser(parser.ParserDict):
 
         # Positions
         dset.add_position("site_pos", time="time", itrs=np.repeat(self.data["pos"][None, :], dset.num_obs, axis=0))
+        dset.add_to_meta(dset.vars["station"], "site_id", dset.meta["marker_name"].upper())
 
 
 def _float(value):

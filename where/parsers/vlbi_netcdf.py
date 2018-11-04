@@ -11,47 +11,34 @@ References:
 
 ..[1] vgosDb format
     ftp://gemini.gsfc.nasa.gov/pub/misc/jmg/VLBI_Structure_2013Jun11.pdf
-
-
-Authors:
---------
-
-* Ann-Silje Kirkvik <ann-silje.kirkvik@kartverket.no>
-
+    new url needed
 """
-# Standard library imports
-import os
-
 # External library imports
 import numpy as np
-from scipy import interpolate
+import netCDF4
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
-from where import apriori
 from where.lib import config
-from where.lib import constant
-from where.lib import files
-from where.lib import log
-from where.lib.time import Time
-from where.parsers import parser
-from where.lib import plugins
-from where.ext import sofa
-
 from where.parsers._parser import Parser
-
-# Optional imports
-from where.lib import optional
-
-netCDF4 = optional.optional_import("netCDF4")
 
 
 @plugins.register
 class NetCDFParser(Parser):
-    """A parser for reading ocean tidal loading coefficients from BLQ-files
+    """A parser for reading netCDF files with VLBI data
     """
 
     SKIP_FIELDS_DEFAULT = [
-        "Stub", "CreateTime", "CreatedBy", "Program", "Subroutine", "DataOrigin", "Session", "vgosDB_Version"
+        "Stub",
+        "CreateTime",
+        "CreatedBy",
+        "Program",
+        "Subroutine",
+        "DataOrigin",
+        "Session",
+        "vgosDB_Version",
     ]
 
     def read_data(self):
@@ -68,8 +55,28 @@ class NetCDFParser(Parser):
             self.data[key] = self._get_data(variable)
 
     def _get_data(self, variable):
-
+        variable.set_auto_mask(False)
         if variable.dtype == "S1":
-            return netCDF4.chartostring(variable[:])
+            try:
+                values = np.core.defchararray.strip(netCDF4.chartostring(variable[:]))
+            except UnicodeDecodeError:
+                # TODO: only happened with fields we are ignoring anyway so far
+                values = np.core.defchararray.strip(netCDF4.chartostring(variable[:], encoding="bytes"))
         else:
-            return variable[:]
+            values = variable[:]
+
+        if hasattr(variable, "REPEAT"):
+            if values.ndim < 2:
+                values = np.tile(values, variable.REPEAT)
+            else:
+                values = np.tile(values, variable.REPEAT).reshape(variable.REPEAT, -1)
+
+        if "YMDHM" in variable.name:
+            # Make sure year has 4 digits
+            idx_add1900 = np.logical_and((values[:, 0] >= 50), (values[:, 0] < 100))
+            idx_add2000 = values[:, 0] < 50
+            if idx_add1900.any() or idx_add2000.any():
+                values[:, 0][idx_add1900] += 1900
+                values[:, 0][idx_add2000] += 2000
+
+        return values

@@ -36,6 +36,7 @@ from where.lib import constant
 from where.ext import sofa
 from where.lib.unit import unit
 from where.lib import rotation
+from where import apriori
 
 
 @cache.function
@@ -51,25 +52,78 @@ def Q(time):
     Returns:
         numpy.array: An array of 3x3 transformation matrices
     """
-    # Read EOP values
-    from where import apriori
+    return rotation.R3(-E(time)) @ rotation.R2(-d(time)) @ rotation.R3(E(time)) @ rotation.R3(s(time))
 
+@cache.function
+def s(time):
+    """CIO locator
+    """
+    return vectorized_s06(time)
+
+@cache.function
+def X_model(time):
+    """X coordinates of CIP in GCRS from series based on IAU 2006 precession and IAU 2000A nutation
+    """
+    return vectorized_xy06(time)[0]
+
+@cache.function
+def Y_model(time):
+    """Y coordinates of CIP in GCRS from series based on IAU 2006 precession and IAU 2000A nutation
+    """
+    return vectorized_xy06(time)[1]
+
+@cache.function
+def X(time):
+    """Total X coordinate of CIP
+
+    Returns:
+        model + celestial pole offset
+    """
     eop = apriori.get("eop", time=time)
+    return X_model(time) + eop.dx * unit.arcsec2rad
 
-    # CIP and CIO
-    x, y = vectorized_xy06(time)
-    s = vectorized_s06(time, x, y)
+@cache.function
+def Y(time):
+    """Total Y coordinate of CIP
 
-    # Add Celestial Intermediate Pole corrections
-    x += eop.dx * unit.arcsec2rad
-    y += eop.dy * unit.arcsec2rad
+    Returns:
+        model + celestial pole offset
+    """
+    eop = apriori.get("eop", time=time)
+    return Y_model(time) + eop.dy * unit.arcsec2rad
 
-    # Celestial pole motion
-    if time.isscalar:
-        return vectorized_c2ixys(x, y, s).T
-    else:
-        return vectorized_c2ixys(x, y, s).transpose(0, 2, 1)
+@cache.function
+def Z(time):
+    """Total Z coordinate of CIP
 
+    Derived from X and Y with assumption of unit sphere with
+
+    Returns:
+        model + celestial pole offset
+    """
+    return np.sqrt(1 - (X(time)**2 + (Y(time)**2)))
+
+@cache.function
+def d(time):
+    """Polar angle of CIP from positive z-axis
+
+    Spherical coordinate with radius = 1
+    """
+    return np.arccos(Z(time))
+
+@cache.function
+def E(time):
+    """Azimuth angle of CIP in xy-plane
+
+    Spherical coordinate with radius = 1
+    """
+    return np.arctan2(Y(time), X(time))
+
+@cache.function
+def ERA(time):
+    """Earth rotation angle
+    """
+    return vectorized_era00(time)
 
 @cache.function
 def R(time):
@@ -92,8 +146,8 @@ def R(time):
         numpy.array: An array of 3x3 transformation matrices
 
     """
-    era = vectorized_era00(time)
-    return rotation.R3(-era)
+
+    return rotation.R3(-ERA(time))
 
 
 @cache.function
@@ -112,8 +166,28 @@ def dR_dut1(time):
         numpy.array: An array of 3x3 transformation matrices
 
     """
-    era = vectorized_era00(time)
-    return -rotation.dR3(-era) * constant.omega
+
+    return -rotation.dR3(-ERA(time)) * constant.omega
+
+@cache.function
+def xp(time):
+    """X coordinate of the CIP in ITRS
+    """
+    eop = apriori.get("eop", time=time)
+    return eop.x * unit.arcsec2rad
+
+@cache.function
+def yp(time):
+    """Y coordinate of the CIP in ITRS
+    """
+    eop = apriori.get("eop", time=time)
+    return eop.y * unit.arcsec2rad
+
+@cache.function
+def s_prime(time):
+    """ TIO locator
+    """
+    return vectorized_sp00(time)
 
 
 @cache.function
@@ -129,21 +203,7 @@ def W(time):
     Returns:
         numpy.array: An array of 3x3 transformation matrices
     """
-    # Read EOP values
-    from where import apriori
-
-    eop = apriori.get("eop", time=time)
-
-    # Polar motion
-    xp = eop.x * unit.arcsec2rad
-    yp = eop.y * unit.arcsec2rad
-    sp = vectorized_sp00(time)
-
-    if time.isscalar:
-        return vectorized_pom00(xp, yp, sp).T
-    else:
-        return vectorized_pom00(xp, yp, sp).transpose(0, 2, 1)
-
+    return rotation.R3(-s_prime(time)) @ rotation.R2(xp(time)) @ rotation.R1(yp(time))
 
 @cache.function
 def dW_dxp(time):
@@ -153,45 +213,94 @@ def dW_dxp(time):
     This is done according to equations (2.31) in Teke :cite:`teke2011` which is the analytical partial derivative of
     equation (5.3) in :cite:'iers2010'.
     """
-    from where import apriori
-
-    eop = apriori.get("eop", time=time)
-
-    xp = eop.x * unit.arcsec2rad
-    yp = eop.y * unit.arcsec2rad
-
-    sp = vectorized_sp00(time)
-
-    R3_sp = rotation.R3(sp)
-    R1_yp = rotation.R1(yp)
-    dR2_xp = rotation.dR2(xp)
-
-    return R3_sp @ dR2_xp @ R1_yp
+    return rotation.R3(-s_prime(time)) @ rotation.dR2(xp(time)) @ rotation.R1(yp(time))
 
 
 @cache.function
 def dW_dyp(time):
-    """Derivative of transformation matrix for the polar motion with regards to the CIP (Celestial Intermediate Pole)
-    in TRF along 270degrees longitude y_p.
+    """Derivative of transformation matrix for the polar motion with regards to the CIP in ITRS.
 
-    This is done according to equations (2.33) in Teke :cite:`teke2011` which is the analytical partial derivative of
-    equation (5.3) in :cite:'iers2010'.
+    Analytical partial derivative of equation (5.3) in :cite:'iers2010'.
     """
-    from where import apriori
+    return rotation.R3(-s_prime(time)) @ rotation.R2(xp(time)) @ rotation.dR1(yp(time))
 
-    eop = apriori.get("eop", time=time)
+@cache.function
+def dE_dX(time):
+    """Derivative of azimuth angle of CIP in GCRS with regards to the X coordinate of CIP in GCRS
+    """
+    return (-Y(time) / (X(time) ** 2 + Y(time) ** 2))[:, None, None]
 
-    xp = eop.x * unit.arcsec2rad
-    yp = eop.y * unit.arcsec2rad
+@cache.function
+def ds_dX(time):
+    """Derivative of CIO locator with regards the X coordinate of CIP in GCRS
+    """
+    return (-Y(time) / 2)[:, None, None]
 
-    sp = vectorized_sp00(time)
+@cache.function
+def dd_dX(time):
+    """Derivative of polar angle of CIP in GCRS with regards to the X coordinate of CIP in GCRS
+    """
+    return (X(time) / (Z(time) * np.sqrt(X(time) ** 2 + Y(time) ** 2)))[:, None, None]
 
-    R3_sp = rotation.R3(sp)
-    R2_xp = rotation.R2(xp)
-    dR1_yp = rotation.dR1(yp)
+@cache.function
+def dE_dY(time):
+    """Derivative of azimuth angle of CIP in GCRS with regards to the Y coordinate of CIP in GCRS
+    """
+    return (X(time) / (X(time) ** 2 + Y(time) ** 2))[:, None, None]
 
-    return R3_sp @ R2_xp @ dR1_yp
+@cache.function
+def ds_dY(time):
+    """Derivative of CIO locator with regards the X coordinate of CIP in GCRS
+    """
+    return (-X(time) / 2)[:, None, None]
 
+@cache.function
+def dd_dY(time):
+    """Derivative of polar angle of CIP in GCRS with regards to the Y coordinate of CIP in GCRS
+    """
+    return (Y(time) / (Z(time) * np.sqrt(X(time) ** 2 + Y(time) ** 2)))[:, None, None]
+
+@cache.function
+def dQ_dX(time):
+    """Derivative of transformation matrix for nutation/presession with regards to the X coordinate of CIP in GCRS
+    """
+    # Rotation matrices
+    R3_E = rotation.R3(E(time))
+    R3_s = rotation.R3(s(time))
+    R2_md = rotation.R2(-d(time))
+    R3_mE = rotation.R3(-E(time))
+    dR3_s = rotation.dR3(s(time))
+    dR3_E = rotation.dR3(E(time))
+    dR3_mE = rotation.dR3(-E(time))
+    dR2_md = rotation.dR2(-d(time))
+
+    return (
+          dR3_mE @  R2_md @  R3_E @  R3_s * (-dE_dX(time))
+        +  R3_mE @ dR2_md @  R3_E @  R3_s * (-dd_dX(time))
+        +  R3_mE @  R2_md @ dR3_E @  R3_s * ( dE_dX(time))
+        +  R3_mE @  R2_md @  R3_E @ dR3_s * ( ds_dX(time))
+    )
+
+@cache.function
+def dQ_dY(time):
+    """Derivative of transformation matrix for nutation/presession with regards to the Y coordinate of CIP in GCRS
+    """
+    # Rotation matrices
+    R3_E = rotation.R3(E(time))
+    R3_s = rotation.R3(s(time))
+    R2_md = rotation.R2(-d(time))
+    R3_mE = rotation.R3(-E(time))
+    dR3_s = rotation.dR3(s(time))
+    dR3_E = rotation.dR3(E(time))
+    dR3_mE = rotation.dR3(-E(time))
+    dR2_md = rotation.dR2(-d(time))
+
+    return (
+          dR3_mE @  R2_md @  R3_E @  R3_s * (-dE_dY(time))
+        +  R3_mE @ dR2_md @  R3_E @  R3_s * (-dd_dY(time))
+        +  R3_mE @  R2_md @ dR3_E @  R3_s * ( dE_dY(time))
+        +  R3_mE @  R2_md @  R3_E @ dR3_s * ( ds_dY(time))
+    )
 
 @cache.function
 def vectorized_xy06(time):
@@ -211,8 +320,8 @@ def vectorized_xy06(time):
         x[idx], y[idx] = sofa.iau_xy06(t.jd1, t.jd2)
     return x, y
 
-
-def vectorized_s06(time, x, y):
+@cache.function
+def vectorized_s06(time):
     """Vectorized version of SOFA s06-function
 
     Args:
@@ -224,25 +333,9 @@ def vectorized_s06(time, x, y):
         CIO locator s
     """
     if time.isscalar:
-        return sofa.iau_s06(time.tt.jd1, time.tt.jd2, x, y)
+        return sofa.iau_s06(time.tt.jd1, time.tt.jd2, X_model(time), Y_model(time))
 
-    return np.array([sofa.iau_s06(t.jd1, t.jd2, x_i, y_i) for t, x_i, y_i in zip(time.tt, x, y)])
-
-
-def vectorized_c2ixys(x, y, s):
-    """Vectorized version of SOFA c2ixys-function
-
-    Args:
-        x:      CIP x coordinate.
-        y:      CIP y coordinate.
-        s:      CIO locator.
-
-    Returns:
-        np.array:  Celestial to intermediate matrices
-    """
-    if isinstance(s, (float, int)):
-        return sofa.iau_c2ixys(x, y, s)
-    return np.array([sofa.iau_c2ixys(x_i, y_i, s_i) for x_i, y_i, s_i in zip(x, y, s)])
+    return np.array([sofa.iau_s06(t.jd1, t.jd2, x_i, y_i) for t, x_i, y_i in zip(time.tt, X_model(time), Y_model(time))])
 
 
 @cache.function
@@ -275,23 +368,6 @@ def vectorized_sp00(time):
         return sofa.iau_sp00(time.tt.jd1, time.tt.jd2)
 
     return np.array([sofa.iau_sp00(t.jd1, t.jd2) for t in time.tt])
-
-
-def vectorized_pom00(xp, yp, sp):
-    """Vectorized version of SOFA pom00-function
-
-    Args:
-        xp:      CIP x polar coordinate.
-        yp:      CIP y polar coordinate.
-        sp:      TIO locator.
-
-    Returns:
-        np.array:  Polar motion matrix
-    """
-    if isinstance(sp, (float, int)):
-        return sofa.iau_pom00(xp, yp, sp)
-
-    return np.array([sofa.iau_pom00(x_i, y_i, s_i) for x_i, y_i, s_i in zip(xp, yp, sp)])
 
 
 def vectorized_llh(pos, ref_ellipsoid=2):

@@ -10,18 +10,16 @@ References:
 
 http://ilrs.dgfi.tum.de/fileadmin/data_handling/ILRS_Data_Handling_File.snx
 
-
-
 """
 # Standard library imports
 from datetime import datetime, timedelta
 import itertools
 
-# External library imports
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.parsers import parser
-from where.lib import plugins
 
 
 @plugins.register
@@ -60,15 +58,13 @@ class SlrHandlingFileParser(parser.ParserDict):
         if line["start_time"] == "00:000:00000":
             start_time = datetime.min
         else:
-            start_time = (
-                datetime.strptime(line["start_time"][:6], "%y:%j") + timedelta(seconds=int(line["start_time"][7:]))
+            start_time = datetime.strptime(line["start_time"][:6], "%y:%j") + timedelta(
+                seconds=int(line["start_time"][7:])
             )
         if line["end_time"] == "00:000:00000":
             end_time = datetime.max
         else:
-            end_time = (
-                datetime.strptime(line["end_time"][:6], "%y:%j") + timedelta(seconds=int(line["end_time"][7:]))
-            )
+            end_time = datetime.strptime(line["end_time"][:6], "%y:%j") + timedelta(seconds=int(line["end_time"][7:]))
 
         interval = (start_time, end_time)
         if (start_time <= self.start_time <= end_time) or (self.start_time <= start_time <= self.end_time):

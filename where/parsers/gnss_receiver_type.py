@@ -18,9 +18,11 @@ Reads data from GNSS receiver type file.
 import itertools
 import re
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
-from where.lib import plugins
 
 
 @plugins.register
@@ -46,7 +48,8 @@ class GnssReceiverTypeParser(parser.Parser):
                 # ALTUS APS-3          P  Y     # GPS L1/L2+L2C, GLO L1/L2, SBAS integrated rcvr/antenna
                 # ALTUS APS-3L         P  Y     # GPS L1/L2+L2C, GLO L1/L2, SBAS, L-Band rcvr/antenna
                 True: {
-                    "parser": self.parse_string, "fields": {"name": (0, 20), "type": (20, 22), "igs_format": (22, 25)}
+                    "parser": self.parse_string,
+                    "fields": {"name": (0, 20), "type": (20, 22), "igs_format": (22, 25)},
                 }
             },
         )

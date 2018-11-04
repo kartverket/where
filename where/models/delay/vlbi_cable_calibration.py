@@ -42,4 +42,4 @@ def cable_calibration(dset):
         dset.cable_delay_1[idx_1] = 0.0
         dset.cable_delay_2[idx_2] = 0.0
 
-    return -(dset.cable_delay_2 - dset.cable_delay_1)
+    return -(np.nan_to_num(dset.cable_delay_2) - np.nan_to_num(dset.cable_delay_1))

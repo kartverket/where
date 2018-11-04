@@ -28,6 +28,7 @@ from where.lib.unit import unit as lib_unit
 
 class PosVelTable(PositionTable):
     """Function-klasse doc?"""
+
     datatype = "posvel"
 
     def __init__(self, name, num_obs, dataset):
@@ -45,18 +46,14 @@ class PosVelTable(PositionTable):
             self._itrs[:, 0:3] = (self._time.gcrs2itrs @ self._gcrs[:, 0:3, None])[:, :, 0]
             self._itrs[:, 3:6] = (
                 self._time.gcrs2itrs_dot @ self._gcrs[:, 0:3, None] + self._time.gcrs2itrs @ self._gcrs[:, 3:6, None]
-            )[
-                :, :, 0
-            ]
+            )[:, :, 0]
 
     def _assert_gcrs(self):
         if np.any(np.isnan(self._gcrs)):
             self._gcrs[:, 0:3] = (self._time.itrs2gcrs @ self._itrs[:, 0:3, None])[:, :, 0]
             self._gcrs[:, 3:6] = (
                 self._time.itrs2gcrs_dot @ self._itrs[:, 0:3, None] + self._time.itrs2gcrs @ self._itrs[:, 3:6, None]
-            )[
-                :, :, 0
-            ]
+            )[:, :, 0]
 
     @property
     @lib_unit.register("meter per second")

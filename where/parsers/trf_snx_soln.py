@@ -8,9 +8,6 @@ Reads epoch of discontinuity for the position and velocity model in ITRF.
 The file is using the SINEX format, but the SOLUTION/DISCONTINUITY block is not defined in the official format
 description.
 
-
-
-
 """
 
 # Standard library imports
@@ -19,8 +16,10 @@ from datetime import datetime
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.parsers._parser_sinex import SinexParser, SinexBlock, SinexField
 
 
@@ -29,13 +28,15 @@ class ItrfSnxSolnParser(SinexParser):
     """A parser for reading data from ITRF files in SNX format
     """
 
-    def __init__(self, file_path, encoding=None, header=None):
+    def __init__(self, file_path, encoding=None, logger=None, header=None):
         """Set up the basic information needed by the parser
 
         Turn off parsing of header by default, as the soln-Sinex files in general are missing headers.
 
         Args:
             file_path (String/Path):    Path to file that will be read.
+            encoding (String):          Encoding of file that will be read.
+            logger (Function):          Ignored for where.parsers, used for consistency with Midgard.
             header (Boolean):           Whether to parse the header.
         """
         super().__init__(file_path, encoding)

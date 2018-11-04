@@ -23,20 +23,19 @@ The name used in `parse_file` to call the parser is the name of the module (file
 
 """
 
+# Midgard imports
+from midgard.parsers import names, parse_file  # noqa
+from midgard import parsers as mg_parsers
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
+from where.lib import dependencies
 from where.lib import files
 from where.lib import log
-from where.lib import plugins
 
-
-def names():
-    """List the names of the available parsers
-
-    Returns:
-        List: List of strings with the names of the available parsers
-    """
-    return plugins.list_all(package_name=__name__)
+# Add Where parsers to Midgard parsers
+plugins.add_alias(mg_parsers.__name__, __name__)
 
 
 def setup_parser(parser_name=None, file_key=None, **kwargs):
@@ -46,6 +45,8 @@ def setup_parser(parser_name=None, file_key=None, **kwargs):
 
     It is possible to give file key instead of parser name. In that case the name of the parser will be read from the
     file list.
+
+    TODO: This is the old style of running parsers, can be deleted when all parsers are new style.
 
     Args:
         parser_name (String):   Name of parser.
@@ -59,7 +60,7 @@ def setup_parser(parser_name=None, file_key=None, **kwargs):
     parser_name = config.files.get(section=file_key, key="parser", value=parser_name).str
     log.assert_not_none(parser_name, "No parser found for '{}' in {}", file_key, ", ".join(config.files.sources))
 
-    parser = plugins.call_one(package_name=__name__, plugin_name=parser_name, use_timer=False, **kwargs)
+    parser = plugins.call(package_name=mg_parsers.__name__, plugin_name=parser_name, **kwargs)
 
     if file_key is not None:
         parser.file_key = file_key
@@ -73,6 +74,8 @@ def parse(parser_name=None, file_key=None, **kwargs):
     It is possible to give file key instead of parser name. In that case the name of the parser will be read from the
     file list.
 
+    TODO: This is the old style of running parsers, can be deleted when all parsers are new style.
+
     Args:
         parser_name (String):   Name of parser
         file_key (String):      Used to look up parser in the Where file list.
@@ -84,41 +87,7 @@ def parse(parser_name=None, file_key=None, **kwargs):
     return setup_parser(parser_name=parser_name, file_key=file_key, **kwargs).parse()
 
 
-def parse_file(parser_name, file_path, use_cache=True, encoding=None, **parser_args):
-    """Use the given parser on a file and return parsed data
-
-    Specify `parser_name` and `file_path` to the file that should be parsed. The following parsers are available:
-
-    {doc_parser_names}
-
-    Data can be retrieved either as Dictionaries, Pandas DataFrames or Where Datasets by using one of the methods
-    `as_dict`, `as_dataframe` or `as_dataset`.
-
-    Example:
-        > df = parsers.parse_file('rinex_obs', 'ande3160.16o').as_dataframe()
-
-    Args:
-        parser_name (String):     Name of parser
-        file_path (String/Path):  Path to file that should be parsed.
-        use_cache (Boolean):      Whether to use a cache to avoid parsing the same file several times.
-        parser_args:              Input arguments to the parser
-
-    Returns:
-        Parser:  Parser with the parsed data
-    """
-    # Create the parser and parse the data
-    parser = plugins.call_one(
-        package_name=__name__,
-        plugin_name=parser_name,
-        use_timer=False,
-        file_path=file_path,
-        encoding=encoding,
-        **parser_args
-    )
-    return parser.parse()
-
-
-def parse_key(file_key, file_vars=None, parser=None, use_cache=True, **parser_args):
+def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, logger=log.info, **parser_args):
     """Parse a file given in the Where file-list and return parsed data
 
     By specifying a `file_key`. The file_key is looked up in the file list to figure out which file that should be
@@ -135,22 +104,27 @@ def parse_key(file_key, file_vars=None, parser=None, use_cache=True, **parser_ar
         > df = parsers.parse_key('center_of_mass', file_vars=dict(satellite='Lageos')).as_dataset()
 
     Args:
-        file_key (String):        Used to look up parser_name and file_path in the Where file configuration.
-        file_vars (Dict):         Additional file variables used when looking up file path in configuration.
-        use_cache (Boolean):      Whether to use a cache to avoid parsing the same file several times.
-        parser_args:              Input arguments to the parser
+        file_key (String):     Used to look up parser_name and file_path in the Where file configuration.
+        file_vars (Dict):      Additional file variables used when looking up file path in configuration.
+        parser_name (String):  Name of parser to use. Default is to use parser named in the file list.
+        use_cache (Boolean):   Whether to use a cache to avoid parsing the same file several times.
+        logger (Function):     Function used to perform logging in the parser.
+        parser_args:           Input arguments to the parser.
 
     Returns:
         Parser:  Parser with the parsed data
     """
     # Read parser_name from config.files if it is not given
-    parser_name = config.files.get(section=file_key, key="parser", value=parser).str
-    log.assert_not_none(parser_name, "No parser found for '{}' in {}", file_key, ", ".join(config.files.sources))
+    parser_name = config.files.get(section=file_key, key="parser", value=parser_name).str
+    log.assert_not_none(parser_name, f"No parser found for {file_key!r} in {', '.join(config.files.sources)}")
 
     # Figure out the file path
     file_vars = dict() if file_vars is None else file_vars
     file_path = files.path(file_key, file_vars=file_vars, download_missing=True, use_aliases=True)
+    dependencies.add(file_path)
     parser_args.setdefault("encoding", files.encoding(file_key))
 
-    # Create the parser and parse the data
-    return parse_file(parser_name, file_path, use_cache=use_cache, **parser_args)
+    # Use the Midgard parser function to create parser and parse data
+    return parse_file(
+        parser_name, file_path, use_cache=use_cache, parser_logger=logger, timer_logger=log.time, **parser_args
+    )

@@ -17,6 +17,7 @@ from where.data.table import Table
 
 class FloatTable(Table):
     """Float-klasse doc?"""
+
     datatype = "float"
 
     def __init__(self, name, num_obs, dataset):
@@ -96,9 +97,9 @@ class FloatTable(Table):
         hdf5_data.create_dataset(self.name, data.shape, data.dtype)
         hdf5_data[self.name][...] = data
 
-        idxes = ["{s.start}-{s.stop}".format(s=field_spec[f][0]) for f in fields]
-        shapes = ["-".join(str(s) for s in field_spec[f][1]) for f in fields]
-        hdf5_data[self.name].attrs["fields"] = ",".join(fields)
+        idxes = ["{s.start}-{s.stop}".format(s=field_spec[f][0]) for f in field_spec]
+        shapes = ["-".join(str(s) for s in field_spec[f][1]) for f in field_spec]
+        hdf5_data[self.name].attrs["fields"] = ",".join(field_spec)
         hdf5_data[self.name].attrs["idxes"] = ",".join(idxes)
         hdf5_data[self.name].attrs["shapes"] = ",".join(shapes)
 
@@ -133,7 +134,7 @@ class FloatTable(Table):
 
         # Copy data from the other table (one field at a time in case indices are different)
         for field in other_table.fields:
-            self[field][-other_table.num_obs:] = other_table[field]
+            self[field][-other_table.num_obs :] = other_table[field]
 
     def __getitem__(self, key):
         """Read field data from table

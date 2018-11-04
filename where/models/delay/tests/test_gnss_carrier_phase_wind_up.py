@@ -3,8 +3,8 @@
 The test set up compares results from Where against gLAB solution for satellite G07 and epoch 2016-03-01 00:00:00.0,
 whereby precise orbits are used.
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
+$Revision: 15940 $
+$Date: 2018-09-11 16:32:58 +0200 (Tue, 11 Sep 2018) $
 $LastChangedBy: hjegei $
 """
 
@@ -21,7 +21,6 @@ from where.models.delay import gnss_carrier_phase_wind_up
 
 
 class TestPositionTable(unittest.TestCase):
-
     def setUp(self):
 
         # Definition of date

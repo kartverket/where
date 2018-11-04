@@ -22,15 +22,15 @@ all:	external cython develop local_config
 
 # Install in developer mode (no need to reinstall after changing source)
 develop:
-	pip install -e .[optional,dev_tools]
+	python -m pip install -e .[optional,dev_tools]
 
 # Install on server: Developer mode for ease of switching tags
 server:
-	pip install -e .[optional]
+	python -m pip install -e .[optional]
 
 # Regular install, freezes the code so must reinstall after changing source code
 install:
-	pip install --user .[optional]
+	python -m pip install --user .[optional]
 
 # Set up local configuration files
 local_config:

@@ -160,15 +160,18 @@ class SinexParser(Parser):
     from this one, and at least specify which Sinex blocks you are interested in by implementing `setup_parser`, as
     well implement methods that parse each block if needed.
     """
+
     _TECH = {"C": "comb", "D": "doris", "L": "slr", "M": "llr", "P": "gnss", "R": "vlbi"}
 
-    def __init__(self, file_path, encoding=None, header=True):
+    def __init__(self, file_path, encoding=None, logger=None, header=True):
         """Set up the basic information needed by the parser
 
         Add a self._sinex dictionary for the raw Sinex data and read which blocks to read from self.setup_parser().
 
         Args:
             file_path (String/Path):    Path to file that will be read.
+            encoding (String):          Encoding of file that will be read.
+            logger (Function):          Ignored for where.parsers, used for consistency with Midgard.
             header (Boolean):           Whether to parse the header.
         """
         super().__init__(file_path, encoding)

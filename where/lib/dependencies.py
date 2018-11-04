@@ -15,7 +15,6 @@ Two strategies are available:
 # Standard library imports
 import atexit
 from datetime import datetime
-import json
 
 # Midgard imports
 from midgard.config.config import Configuration
@@ -83,13 +82,15 @@ def add(*file_paths):
         log.debug(f"Adding dependency: {file_path} ({file_info['checksum']})")
 
 
-def _file_info(file_path, fast_check):
+def _file_info(file_path, fast_check, **info_args):
     """Get file info for a file path
 
     The contents of the file info depends on whether we are doing a fast check or not.
 
     Args:
         file_path (String/Path):  File path.
+        fast_check (Boolean):     Whether to do a fast check.
+        info_args:                Optional arguments that will be added to file info.
 
     Returns:
         Dictionary: Info about file.
@@ -100,6 +101,7 @@ def _file_info(file_path, fast_check):
     else:
         file_info["checksum"] = files.get_md5(file_path)
 
+    file_info.update(info_args)
     return file_info
 
 
@@ -127,7 +129,7 @@ def _write(write_as_crash=True):
 
     # Store timestamp of crash, this will also force the current stage to be rerun next time
     if write_as_crash:
-        _CURRENT_DEPENDENCIES["__crashed__"] = datetime.now().isoformat()
+        _CURRENT_DEPENDENCIES["CRASHED"] = _file_info("CRASHED", True, checksum="CRASHED")
 
     # No need to open and close files if there are no dependencies to store
     if not _CURRENT_DEPENDENCIES:
@@ -166,7 +168,7 @@ def changed(fast_check=True, **dep_vars):
 
     # Check if any dependencies have changed
     dependencies = Configuration.read_from_file("dependencies", dependency_path)
-    for file_path in dependencies.sections:
+    for file_path in dependencies.section_names:
         previous_checksum = dependencies[file_path].checksum.str
         current_checksum = _file_info(file_path, fast_check=fast_check)["checksum"]
         if current_checksum != previous_checksum:

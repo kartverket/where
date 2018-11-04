@@ -58,9 +58,7 @@ def src_dir(dset):
         )
 
     for group in config.tech[PARAMETER].except_sources.list:
-        except_idx = (
-            np.array([icrf[src].meta[group] if group in icrf[src].meta else src == group for src in sources])
-        )
+        except_idx = np.array([icrf[src].meta[group] if group in icrf[src].meta else src == group for src in sources])
         fix_idx = np.logical_and(np.logical_not(except_idx), fix_idx)
 
     # Remove sources with few observations
@@ -87,11 +85,11 @@ def src_dir(dset):
     baseline = (dset.site_pos_2.gcrs_pos - dset.site_pos_1.gcrs_pos)[:, :, None]
     dK_dra = np.array([-cos_dec * sin_ra, cos_dec * cos_ra, zero]).T[:, None, :]
     dK_ddec = np.array([-sin_dec * cos_ra, -sin_dec * sin_ra, cos_dec]).T[:, None, :]
-    all_partials = np.hstack((dK_dra @ baseline, dK_ddec @ baseline))[:, :, 0]
+    all_partials = np.hstack((-dK_dra @ baseline, -dK_ddec @ baseline))[:, :, 0]
 
     for idx, src in enumerate(sources):
         src_idx = dset.filter(source=src)
-        partials[src_idx, idx * 2:idx * 2 + 2] = all_partials[src_idx]
+        partials[src_idx, idx * 2 : idx * 2 + 2] = all_partials[src_idx]
 
     column_names = [s + "_" + name for s in sources for name in column_names]
 

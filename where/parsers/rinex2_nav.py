@@ -26,7 +26,6 @@ converted to GPS time scale.
 The navigation message is not defined for GALILEO, BeiDou, QZSS and IRNSS in RINEX format 2.11. In this case the RINEX
 3.03 definition is used (see :cite:`rinex3`).
 
-
 """
 
 # Standard library imports
@@ -37,18 +36,20 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import config
 from where.lib import files
 from where.lib import gnss
 from where.lib import log
-from where.lib import plugins
 from where.lib.time import Time, TimeDelta
 
 # The constant shows the 'second' relation between the GNSS time systems to the GPS time scale. Galileo (E),
-# IRNSS (I) and QZSS (J) uses the same second as the GPS time scale, but BeiDou (C) BDT time system is 14 seconds behind
-# GPS time.
+# IRNSS (I) and QZSS (J) uses the same second as the GPS time scale, but BeiDou (C) BDT time system is 14 seconds
+# behind GPS time.
 SYSTEM_TIME_OFFSET_TO_GPS_SECOND = dict(C=14, E=0, I=0, J=0)
 
 # The constant shows the relation between the GNSS week to the GPS week. Galileo (E), IRNSS (I) and QZSS (J) week
@@ -183,7 +184,8 @@ class Rinex2NavParser(parser.Parser):
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 #      2              NAVIGATION DATA                         RINEX VERSION / TYPE
                 "RINEX VERSION / TYPE": {
-                    "parser": self._parse_string, "fields": {"version": (0, 20), "file_type": (20, 21)}
+                    "parser": self._parse_string,
+                    "fields": {"version": (0, 20), "file_type": (20, 21)},
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # CCRINEXN V1.6.0 UX  CDDIS               01-MAR-16 19:39     PGM / RUN BY / DATE
@@ -278,7 +280,10 @@ class Rinex2NavParser(parser.Parser):
                 6: {
                     "parser": self._parse_obs_float,
                     "fields": {
-                        "idot": (0, 22), "gnss_data_info": (22, 41), "gnss_week": (41, 60), "gnss_l2p_flag": (60, 79)
+                        "idot": (0, 22),
+                        "gnss_data_info": (22, 41),
+                        "gnss_week": (41, 60),
+                        "gnss_l2p_flag": (60, 79),
                     },
                 },
                 7: {
@@ -424,16 +429,13 @@ class Rinex2NavParser(parser.Parser):
             year = int("20" + line["year"].zfill(2))
 
         # Create Time object
-        time = (
-            "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}"
-            "".format(
-                year=year,
-                month=int(line["month"]),
-                day=int(line["day"]),
-                hour=int(line["hour"]),
-                minute=int(line["minute"]),
-                second=float(line["second"]),
-            )
+        time = "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}" "".format(
+            year=year,
+            month=int(line["month"]),
+            day=int(line["day"]),
+            hour=int(line["hour"]),
+            minute=int(line["minute"]),
+            second=float(line["second"]),
         )
 
         # Fill temporary Dataset
@@ -476,7 +478,9 @@ class Rinex2NavParser(parser.Parser):
         """List steps necessary for postprocessing
         """
         return [  # TODO self._check_nav_message,
-            self._rename_fields_based_on_system, self._time_system_correction, self._determine_message_type
+            self._rename_fields_based_on_system,
+            self._time_system_correction,
+            self._determine_message_type,
         ]
 
     def _rename_fields_based_on_system(self):

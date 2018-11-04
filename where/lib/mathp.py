@@ -174,7 +174,7 @@ def moving_window_interpolation(x, y, x_new, model="lagrange", window_size=10, p
             e_idx = num_x  # Index setting at the end of the data series
 
         y_new[num_obs], y_new_derivate[num_obs] = interpolation(
-            x[s_idx:e_idx], y[s_idx:e_idx], x_new[num_obs:num_obs + 1], model=model, plot=False
+            x[s_idx:e_idx], y[s_idx:e_idx], x_new[num_obs : num_obs + 1], model=model, plot=False
         )
 
     return y_new, y_new_derivate

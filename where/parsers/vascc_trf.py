@@ -5,18 +5,13 @@ Description:
 
 Reads radio source coordinates from VASCC (VLBI Software Analysis Comparison Campaign) apriori file.
 
-
-
-
 """
 
-# External library imports
-import numpy as np
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
-from where.lib import files
 
 
 @plugins.register

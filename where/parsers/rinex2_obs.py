@@ -20,11 +20,13 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import unit
 
 
@@ -116,7 +118,8 @@ class Rinex2Parser(parser.ParserDict):
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # BILL SMITH          ABC INSTITUTE                           OBSERVER / AGENCY
                 "OBSERVER / AGENCY": {
-                    "parser": self.parse_string, "fields": {"observer": (0, 20), "agency": (20, 60)}
+                    "parser": self.parse_string,
+                    "fields": {"observer": (0, 20), "agency": (20, 60)},
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # X1234A123           XX                  ZZZ                 REC # / TYPE / VERS
@@ -127,7 +130,8 @@ class Rinex2Parser(parser.ParserDict):
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 # 234                 YY                                      ANT # / TYPE
                 "ANT # / TYPE": {
-                    "parser": self.parse_string, "fields": {"antenna_number": (0, 20), "antenna_type": (20, 40)}
+                    "parser": self.parse_string,
+                    "fields": {"antenna_number": (0, 20), "antenna_type": (20, 40)},
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
                 #   4375274.       587466.      4589095.                      APPROX POSITION XYZ
@@ -261,7 +265,11 @@ class Rinex2Parser(parser.ParserDict):
                     "parser": self.parse_observation,
                     "strip": "\n",  # Remove only newline '\n' leading and trailing characters from line.
                     "fields": {
-                        "obs_1": (0, 16), "obs_2": (16, 32), "obs_3": (32, 48), "obs_4": (48, 64), "obs_5": (64, 80)
+                        "obs_1": (0, 16),
+                        "obs_2": (16, 32),
+                        "obs_3": (32, 48),
+                        "obs_4": (48, 64),
+                        "obs_5": (64, 80),
                     },
                 },
             },
@@ -480,16 +488,13 @@ class Rinex2Parser(parser.ParserDict):
                     )
 
             cache["sat_list"] = list()
-            cache["obs_time"] = (
-                "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}"
-                "".format(
-                    year=year,
-                    month=int(line["month"]),
-                    day=int(line["day"]),
-                    hour=int(line["hour"]),
-                    minute=int(line["minute"]),
-                    second=float(line["second"]),
-                )
+            cache["obs_time"] = "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}" "".format(
+                year=year,
+                month=int(line["month"]),
+                day=int(line["day"]),
+                hour=int(line["hour"]),
+                minute=int(line["minute"]),
+                second=float(line["second"]),
             )
             cache["obs_sec"] = (
                 int(line["hour"]) * unit.hour2second + int(line["minute"]) * unit.minute2second + float(line["second"])
@@ -512,7 +517,7 @@ class Rinex2Parser(parser.ParserDict):
 
         # Generate satellite list for given epoch
         for i in range(0, len(line["sat_list"]), 3):
-            sat = line["sat_list"][i:i + 3].rstrip()
+            sat = line["sat_list"][i : i + 3].rstrip()
             if sat:
                 sat = sat[0].replace(" ", "G") + sat[1].replace(" ", "0") + sat[2]  # Blank satellite system
                 cache["sat_list"].append(sat)  # identifier indicates GPS ('G')
@@ -522,7 +527,6 @@ class Rinex2Parser(parser.ParserDict):
     def parse_observation(self, line, cache):
         """Parse observation record of RINEX file
         """
-
         # Ignore epochs based on sampling rate
         # TODO: Sampling of data should be done in 'edit' step!!!
         sec = cache["obs_sec"]
@@ -580,7 +584,7 @@ class Rinex2Parser(parser.ParserDict):
 
             obs = {
                 "station": self.meta["marker_name"].lower(),  # vars['station'],
-                "site_id": self.meta["marker_name"].lower(),
+                "site_id": self.meta["marker_name"].upper(),
                 "system": sys,
                 "satellite": sat,
                 "satnum": sat_num,
@@ -629,7 +633,7 @@ class Rinex2Parser(parser.ParserDict):
 
         # Loop over GNSS
         for sys in set(self.data["text"]["system"]):
-            idx = (np.array(self.data["text"]["system"]) == sys)
+            idx = np.array(self.data["text"]["system"]) == sys
 
             # Loop over all observation types
             for obs_type in self.meta["obstypes"]:
@@ -789,6 +793,7 @@ class Rinex2Parser(parser.ParserDict):
 
         # Positions
         dset.add_position("site_pos", time="time", itrs=np.repeat(self.data["pos"][None, :], dset.num_obs, axis=0))
+        dset.add_to_meta(dset.vars["station"], "site_id", dset.meta["marker_name"].upper())
 
 
 def _float(value):

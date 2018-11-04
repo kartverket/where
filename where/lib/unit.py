@@ -76,6 +76,7 @@ class _convert_units(type):
     The meta-class is used for convenience. It allows us to use the `unit`-class without instantiating it. That is, we
     can write `unit.km2m` instead of `unit().km2m`.
     """
+
     ureg = pint.UnitRegistry()
 
     with files.open("units") as fid:
@@ -357,9 +358,9 @@ class _convert_units(type):
             -0.005817642339636369
         """
         sign = np.copysign(1, degrees)
-        return sign * (
-            np.abs(degrees) + minutes * cls.minutes2hours + seconds * cls.seconds2hours
-        ) * cls.degrees2radians
+        return (
+            sign * (np.abs(degrees) + minutes * cls.minutes2hours + seconds * cls.seconds2hours) * cls.degrees2radians
+        )
 
     def hms_to_rad(cls, hours, minutes, seconds):
         """Convert hours, minutes and seconds to radians
@@ -389,5 +390,6 @@ class unit(metaclass=_convert_units):
 
     The implementation of the unit conversion is done in the `_convert_units`-metaclass.
     """
+
     # Make pint exceptions available
     from pint.errors import DimensionalityError

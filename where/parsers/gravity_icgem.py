@@ -18,8 +18,6 @@ http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/
 Petit, G. and Luzum, B. (eds.), IERS Conventions (2010),
                 IERS Technical Note No. 36, BKG (2010)
 
-
-
 """
 
 # Standard library imports
@@ -28,10 +26,12 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import log
 from where.parsers import parser
-from where.lib import plugins
 
 
 @plugins.register

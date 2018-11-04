@@ -107,8 +107,7 @@ class Crf(collections.UserDict):
             yield self[source]
 
 
-class CrfFactory():
-
+class CrfFactory:
     def __init__(self):
         self.name = self.__class__.__module__.split(".")[-1]
         self._data = None
@@ -183,8 +182,7 @@ class CrfFactory():
         return "{}()".format(self.__class__.__name__)
 
 
-class CrfSource():
-
+class CrfSource:
     def __init__(self, key, crs, source, **meta_args):
         self.key = key
         self.pos = Position(crs=crs)
@@ -199,7 +197,6 @@ class CrfSource():
     #
     def __repr__(self):
         pos = self.pos.crs
-        return (
-            "{}('{}', ({:.2f}, {:.2f}), '{}')"
-            "".format(self.__class__.__name__, self.name, *self.pos.crs, self.source)
+        return "{}('{}', ({:.2f}, {:.2f}), '{}')" "".format(
+            self.__class__.__name__, self.name, *self.pos.crs, self.source
         )

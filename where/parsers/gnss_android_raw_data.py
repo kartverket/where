@@ -11,7 +11,6 @@ Description:
 
 Reads raw data file from `GnssLogger` Android App.
 
-
 """
 
 # Standard library imports
@@ -20,11 +19,13 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import constant
 from where.lib import gnss
-from where.lib import plugins
 from where.lib.unit import unit
 
 
@@ -60,7 +61,14 @@ class GnssAndroidRawDataParser(parser.Parser):
                 "Fix": {
                     "parser": self.parse_fix,
                     "fields": [
-                        "dummy", "provider", "latitude", "longitude", "altitude", "speed", "accuracy", "time_utc"
+                        "dummy",
+                        "provider",
+                        "latitude",
+                        "longitude",
+                        "altitude",
+                        "speed",
+                        "accuracy",
+                        "time_utc",
                     ],
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8----+----9----+----0
@@ -155,11 +163,9 @@ class GnssAndroidRawDataParser(parser.Parser):
 
         # GNSS signal arriving time at measurement time (GPS time) referenced to GPS week
         tRxNanos = (
-            np.array(self.data["TimeNanos"], dtype=float) + np.array(self.data["TimeOffsetNanos"], dtype=float)
-        ) - (
-            np.array(self.data["FullBiasNanos"], dtype=float) + np.array(self.data["BiasNanos"], dtype=float)
-        ) - (
-            week * 604800e+9
+            (np.array(self.data["TimeNanos"], dtype=float) + np.array(self.data["TimeOffsetNanos"], dtype=float))
+            - (np.array(self.data["FullBiasNanos"], dtype=float) + np.array(self.data["BiasNanos"], dtype=float))
+            - (week * 604800e+9)
         )
 
         if np.all(tRxNanos >= 604800e+9):

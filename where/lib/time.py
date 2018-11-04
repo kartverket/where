@@ -434,8 +434,8 @@ class Time(astropy.time.Time):
         """Represent the time object with scale and format, and an indication of values
         """
         value = self.value if self.isscalar else "<{} epochs>".format(len(self))
-        return (
-            "{}(scale='{}', format='{}', value={})" "".format(self.__class__.__name__, self.scale, self.format, value)
+        return "{}(scale='{}', format='{}', value={})" "".format(
+            self.__class__.__name__, self.scale, self.format, value
         )
 
 

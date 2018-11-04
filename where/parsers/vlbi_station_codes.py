@@ -1,24 +1,27 @@
 """A parser for reading data from the VLBI station codes file
 
 Example:
+--------
+
     from where.parsers import VlbiStationCodesParser
     parser = VlbiStationCodesParser(file_key)
     parser.process_data()
 
 Description:
+------------
 
 Reads data from the VLBI station codes file.
-
-
 
 """
 
 # Standard library imports
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib import plugins
 from where.lib import cache
 from where.lib import log
 
@@ -39,7 +42,7 @@ class VlbiStationCodesParser(ChainParser):
                     "parser": self.parse_station,
                     "fields": {
                         "ivscode": (0, 3),
-                        "ivsname": (4, 12),
+                        "name": (4, 12),
                         "domes": (13, 18),
                         "marker": (18, 22),
                         "cdp": (23, 27),
@@ -58,13 +61,13 @@ class VlbiStationCodesParser(ChainParser):
             line:  Dict containing the fields of a line.
         """
         line_copy = line.copy()
-        ivsname = line_copy.pop("ivsname")
+        name = line_copy.pop("name")
         cdp = line.pop("cdp")
         # If there are multiple entries with the same cdp number use the first
         if cdp not in self.data:
             # Store data twice with different keys
             self.data[cdp] = line
-            self.data[ivsname] = line_copy
+            self.data[name] = line_copy
 
     @cache.function
     def __missing__(self, cdp):

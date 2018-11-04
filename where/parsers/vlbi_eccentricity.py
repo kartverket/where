@@ -5,9 +5,6 @@ Description:
 
 Reads the VLBI eccentricity vector from file.
 
-
-
-
 """
 
 # Standard library imports
@@ -18,17 +15,20 @@ import re
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import cache
 from where.lib import log
 from where.parsers import parser
-from where.lib import plugins
 
 
 @plugins.register
 class VlbiEccentricityParser(parser.ParserDict):
     """A parser for reading VLBI eccentricity vectors from file
     """
+
     #
     # PARSER for reading each line of the EOP file.
     #

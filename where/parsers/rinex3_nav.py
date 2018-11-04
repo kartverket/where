@@ -34,13 +34,15 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import config
 from where.lib import files
 from where.lib import gnss
 from where.lib import log
-from where.lib import plugins
 from where.lib.time import Time, TimeDelta
 
 # TODO: SYSTEM_TIME_OFFSET_TO_GPS_SECOND & SYSTEM_TIME_OFFSET_TO_GPS_WEEK should be placed in constans.conf
@@ -133,7 +135,7 @@ class Rinex3NavParser(parser.Parser):
 
         while date_to_read <= (self.rundate + timedelta(days=1)):
             self.vars.update(config.date_vars(date_to_read))
-            self.vars["date"] = ("{yyyy}-{mm}-{dd}".format(**self.vars))
+            self.vars["date"] = "{yyyy}-{mm}-{dd}".format(**self.vars)
             file_path = files.path(self.file_key, file_vars=self.vars)
             self.dependencies.append(file_path)
 
@@ -259,7 +261,10 @@ class Rinex3NavParser(parser.Parser):
                 6: {
                     "parser": self._parse_obs_float,
                     "fields": {
-                        "idot": (0, 23), "gnss_data_info": (23, 42), "gnss_week": (42, 61), "gnss_l2p_flag": (61, 80)
+                        "idot": (0, 23),
+                        "gnss_data_info": (23, 42),
+                        "gnss_week": (42, 61),
+                        "gnss_l2p_flag": (61, 80),
                     },
                 },
                 7: {
@@ -396,16 +401,13 @@ class Rinex3NavParser(parser.Parser):
             return
 
         # Create Time object
-        time = (
-            "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}"
-            "".format(
-                year=int(line["year"]),
-                month=int(line["month"]),
-                day=int(line["day"]),
-                hour=int(line["hour"]),
-                minute=int(line["minute"]),
-                second=float(line["second"]),
-            )
+        time = "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}" "".format(
+            year=int(line["year"]),
+            month=int(line["month"]),
+            day=int(line["day"]),
+            hour=int(line["hour"]),
+            minute=int(line["minute"]),
+            second=float(line["second"]),
         )
 
         # Fill temporary Dataset
@@ -448,7 +450,10 @@ class Rinex3NavParser(parser.Parser):
         self.meta[date].setdefault("time_sys_corr", dict()).update(
             {
                 line["corr_type"]: {
-                    "a0": _float(line["a0"]), "a1": _float(line["a1"]), "t": int(line["t"]), "w": int(line["w"])
+                    "a0": _float(line["a0"]),
+                    "a1": _float(line["a1"]),
+                    "t": int(line["t"]),
+                    "w": int(line["w"]),
                 }
             }
         )
@@ -466,7 +471,9 @@ class Rinex3NavParser(parser.Parser):
         """List steps necessary for postprocessing
         """
         return [  # TODO self.check_nav_message,
-            self._rename_fields_based_on_system, self._time_system_correction, self._determine_message_type
+            self._rename_fields_based_on_system,
+            self._time_system_correction,
+            self._determine_message_type,
         ]
 
     def _rename_fields_based_on_system(self):

@@ -241,7 +241,7 @@ class There(tk.Tk):
         for tab in tabs:
             # Tab variables
             self.vars[tab] = self.vars["common"].copy()
-            if f"{tab}_initial" in config.there.sections:
+            if f"{tab}_initial" in config.there.section_names:
                 self.vars[tab].update(config.there[f"{tab}_initial"].as_dict())
 
             # Add tab widget
@@ -266,19 +266,21 @@ class There(tk.Tk):
 
     def set_up_key_events(self):
         # Method events are first tried on the current tab, then on There in general
-        if "key_method" in config.there.sections:
+        if "key_method" in config.there.section_names:
             for key, entry in config.there.key_method.items():
                 KEY_EVENTS[key] = (entry.str.capitalize().replace("_", " "), [["current_tab", entry.str], [entry.str]])
 
         # Config events add to the current tech config using update_config()
-        if "key_config" in config.there.sections:
+        if "key_config" in config.there.section_names:
             for key, entry in config.there.key_config.items():
                 KEY_EVENTS[key] = (
-                    f"Update config: {entry.str}", [["current_tab", "update_config"]], entry.as_list(", *")
+                    f"Update config: {entry.str}",
+                    [["current_tab", "update_config"]],
+                    entry.as_list(", *"),
                 )
 
         # Select events select from dropdowns using select_dropdown()
-        if "key_select" in config.there.sections:
+        if "key_select" in config.there.section_names:
             for key, entry in config.there.key_select.items():
                 KEY_EVENTS[key] = (f"Select {entry.str}", [["current_tab", "select_dropdown"]], entry.as_list(", *"))
 
@@ -320,7 +322,6 @@ class There(tk.Tk):
 
 
 class Status(ttk.Frame):
-
     def __init__(self, master):
         super().__init__(master)
 
@@ -458,6 +459,7 @@ class Tab(ttk.Frame):
 
     def show_vars(self):
         from pprint import pprint
+
         pprint(self.vars)
 
     update_figure = update_all
@@ -608,6 +610,11 @@ class TabRunAnalysis(Tab):
         cmd_line.pack(side=tk.TOP, fill=tk.X, expand=False)
 
         # Add options
+        config_line = ttk.Frame(self)
+        cfg_tree = ConfigTree(config_line)
+        cfg_tree.update(config.where)
+        cfg_tree.pack()
+        config_line.pack(side=tk.TOP, fill=tk.X, expand=True)
 
         # Buttons for running Where
         button_line = ttk.Frame(self)
@@ -675,8 +682,7 @@ class TabSession(TabFigure):
     button_config = edit_config
 
 
-class UpdateMixin():
-
+class UpdateMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.next_update_func = None
@@ -696,8 +702,25 @@ class UpdateMixin():
         self.vars["do_update"] = True
 
 
-class Plot(FigureCanvasTkAgg, UpdateMixin):
+class ConfigTree(ttk.Treeview, UpdateMixin):
 
+    def __init__(self, master):
+        super().__init__(master, columns=("value", "help"))
+        self.heading("value", text="Value")
+        self.column("value", width=300)
+
+        self.heading("help", text="Description")
+        self.column("help", width=700)
+
+    def update(self, cfg):
+        print("Updating ConfigTree")
+        for idx, section in enumerate(cfg.sections):
+            tree_section = self.insert("", idx, text=section.name)
+            for idx_section, (key, entry) in enumerate(section.items()):
+                self.insert(tree_section, idx_section, text=key, values=(entry.str, entry.help))
+
+
+class Plot(FigureCanvasTkAgg, UpdateMixin):
     def __init__(self, master, vars_):
         figsize = (8, config.there.minimum_figure_height.float)
         self.figure = matplotlib.figure.Figure(figsize=figsize, dpi=100)
@@ -1298,7 +1321,6 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
 
 class CheckBox(ttk.Checkbutton):
-
     def __init__(self, master, name, vars_, figure, **kwargs):
         self.choice = tk.IntVar()
         label = name.replace("_", " ").title()
@@ -1390,7 +1412,7 @@ class DD_Date(tk.Frame, UpdateMixin):
         prefix = f"{self.var}_"
         value = int(getattr(self.choices, name).get())
         value_date = None
-        date_vars = {k[len(prefix):]: v for k, v in self.vars.items() if k.startswith(prefix)}
+        date_vars = {k[len(prefix) :]: v for k, v in self.vars.items() if k.startswith(prefix)}
         date_vars[name] = value
         if "year" in date_vars and "month" in date_vars and "day" in date_vars:
             try:
@@ -1512,7 +1534,7 @@ class DD_PipelineDisk(DropdownPicker):
     def read_options(self):
         """Read possible pipelines from disk, so we only show pipelines that have been analyzed
         """
-        return sorted(files.glob_variable("directory_work", "tech", r"[a-z]+"))
+        return sorted(files.glob_variable("directory_work", "tech", r"[_a-z]+"))
 
     def parse_vars(self):
         """TODO: This can be removed when tech is renamed pipeline"""
@@ -1750,7 +1772,6 @@ class DD_Size(DD_Field):
 
 
 def filter_factory(filter_name):
-
     class DD_Filter(DropdownPicker):
 
         width = 20

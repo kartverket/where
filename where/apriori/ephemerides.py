@@ -171,7 +171,7 @@ def get_ephemerides(time=None, ephemerides=None):
     return Ephemerides(time, ephemerides)
 
 
-class Ephemerides():
+class Ephemerides:
     """A class for doing ephemerides calculations
 
     The jplephem package and SPK-files are used for doing the actual calculations. This class offers a more readable
@@ -429,7 +429,7 @@ class Ephemerides():
         """
         path = self._generate_path(self._names[from_name.lower()], self._names[to_name.lower()])
         for segment in path:
-            yield segment[::self._segments[segment]], self._segments[segment]
+            yield segment[:: self._segments[segment]], self._segments[segment]
 
     def _generate_path(self, from_id, to_id, previous=None):
         """Recursively generate a path between two objects

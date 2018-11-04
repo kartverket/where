@@ -13,8 +13,8 @@ Satellite phase center correction returned by routine satellitePhaseCenterCorrec
     pc = -0.802373 m
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
+$Revision: 15940 $
+$Date: 2018-09-11 16:32:58 +0200 (Tue, 11 Sep 2018) $
 $LastChangedBy: hjegei $
 """
 
@@ -32,7 +32,6 @@ from where.lib import log
 
 
 class TestPositionTable(unittest.TestCase):
-
     def setUp(self):
 
         # Print debugging messages

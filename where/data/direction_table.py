@@ -24,6 +24,7 @@ from where.lib.unit import unit as lib_unit
 
 class DirectionTable(Table):
     """Direction-klasse doc?"""
+
     datatype = "direction"
 
     def __init__(self, name, num_obs, dataset):

@@ -68,6 +68,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
         _read():                Read precise orbit file data and save it in a Dataset
 
     """
+
     name = "precise"
 
     def __init__(self, rundate, time, satellite, system=None, file_key=None, file_path=None, day_offset=1, **kwargs):

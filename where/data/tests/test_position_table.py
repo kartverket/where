@@ -17,7 +17,6 @@ from where import data
 
 
 class TestPositionTable(unittest.TestCase):
-
     def setUp(self):
 
         # Definition of dummy date

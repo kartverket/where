@@ -5,13 +5,12 @@ Description:
 
 Reads atmospheric tide coefficients. Gridded coefficients for the S1 and S2 atmospheric tides.
 
-
-
-
 """
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
 
 
 @plugins.register

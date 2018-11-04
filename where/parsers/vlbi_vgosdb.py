@@ -12,311 +12,160 @@ References:
 ..[1] vgosDb format
     ftp://gemini.gsfc.nasa.gov/pub/misc/jmg/VLBI_Structure_2013Jun11.pdf
 
+    new url needed
+
 """
 # Standard library imports
-import os
+from datetime import datetime
 
 # External library imports
-import netCDF4
 import numpy as np
 from scipy import interpolate
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where import apriori
-from where.lib import config
 from where.lib import constant
-from where.lib import files
 from where.lib import log
-from where.lib.time import Time
-from where.parsers import parser
-from where.lib import plugins
-from where.ext import sofa
+from where.lib import files
+from where.parsers._parser import Parser
+from where import parsers
 
 
 @plugins.register
-class VlbiVgosdbParser(parser.Parser):
+class VgosDbParser(Parser):
+    """A parser for reading VLBI data from a VGOS database
+    """
 
-    def __init__(self, rundate, session=None):
-        super().__init__(rundate)
-        self.file_key = "vlbi_obs_vgosdb"
+    _STATION_FIELDS = {
+        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1},
+        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1},
+        "cable_delay": {"filestub": "Cal-Cable", "variable": "Cal-Cable", "factor": constant.c},
+    }
 
-        # Read arc-length from config file
-        self.arc_length = config.tech.arc_length.int
-
-        # Set session variables
-        self.vars["session"] = session
-        self.session_dir = files.path(self.file_key, file_vars=self.vars)
-        self.data_available = self.session_dir.exists()
+    def __init__(self, file_path, encoding=None, logger=None):
+        super().__init__(file_path, encoding=None)
+        self.raw = {}
 
     def read_data(self):
-        self.read_apriori()
-        self.read_observables()
-        self.read_obs_derived()
-        self.read_obs_edit()
-        self.read_crossreference()
-        self.read_stations()
+        """Parse the vgosdb wrapper file
 
-    def read_apriori(self):
-        # Read station apriori
-        nc = self._read_nc_file("Apriori", "Station.nc")
-        self.data["sta_name"] = np.array([str(sta, "utf-8").strip() for sta in nc["AprioriStationList"]])
-        self.data["sta_xyz"] = nc["AprioriStationXYZ"][:]
-        log.info("Found stations: {}", ", ".join(self.data["sta_name"]))
-
-        # Read source apriori
-
-        source_names = apriori.get("vlbi_source_names")
-        nc = self._read_nc_file("Apriori", "Source.nc")
-
-        # import IPython; IPython.embed()
-        self.data["source_names"] = np.array(
-            [source_names[str(src, "utf-8").strip()]["iers_name"] for src in nc["AprioriSourceList"]]
-        )
-        self.data["source_ra"] = nc["AprioriSource2000RaDec"][:, 0]
-        self.data["source_dec"] = nc["AprioriSource2000RaDec"][:, 1]
-
-    def read_crossreference(self):
-        nc = self._read_nc_file("CrossReference", "ObsCrossRef.nc")
-        self.data["obs2baseline"] = self._get_nc_value(nc, "Obs2Baseline")
-        self.data["obs2scan"] = self._get_nc_value(nc, "Obs2Scan")
-
-        nc = self._read_nc_file("CrossReference", "SourceCrossRef.nc")
-        self.data["scan2src"] = self._get_nc_value(nc, "Scan2Source")
-
-    def read_observables(self):
-        nc = self._read_nc_file("Observables", "TimeUTC.nc")
-        self.data["time"] = [
-            "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{}".format(*ymdhm, s)
-            for ymdhm, s in zip(nc["YMDHM"][:], nc["Second"][:])
-        ]
-        self.data["num_obs"] = len(self.data["time"])
-
-        nc = self._read_nc_file("Observables", "GroupDelay_bX.nc")
-        self.data.setdefault("obs", {}).update(observed_delay_ferr=nc["GroupDelaySig"][:] * constant.c)
-
-    def read_obs_derived(self):
-        nc = self._read_nc_file("ObsDerived", "Cal-SlantPathIonoGroup_bX.nc")
-        self.data.setdefault("obs", {}).update(iono_delay=nc["Cal-SlantPathIonoGroup"][:, 0] * constant.c)
-        self.data.setdefault("obs", {}).update(iono_delay_ferr=nc["Cal-SlantPathIonoGroupSigma"][:, 0] * constant.c)
-        try:
-            self.data.setdefault("obs", {}).update(iono_quality=nc["Cal-SlantPathIonoGroupDataFlag"][:])
-        except IndexError:
-            # The iono flag is sometimes missing from the data
-            self.data.setdefault("obs", {}).update(iono_quality=np.zeros(self.data["num_obs"]))
-            log.warn("Missing quality flag for ionosphere")
-
-    def read_obs_edit(self):
-        nc = self._read_nc_file("ObsEdit", "GroupDelayFull_iIVS_bX.nc")
-        #        nc = self._read_nc_file('ObsEdit', 'GroupDelayFull_bX.nc')
-        self.data.setdefault("obs", {}).update(observed_delay=nc["GroupDelayFull"][:] * constant.c)
-
-        try:
-            nc = self._read_nc_file("ObsEdit", "Edit_iIVS_V004.nc")
-            self.data.setdefault("obs", {}).update(data_quality=self._get_nc_value(nc, "DelayFlag"))
-        except OSError:
-            # The file is sometimes missing
-            self.data.setdefault("obs", {}).update(data_quality=np.zeros(self.data["num_obs"]))
-            log.warn("Missing data quality information")
-
-    def read_stations(self):
-        for sta in self.data["sta_name"]:
-            nc = self._read_nc_file(sta, "TimeUTC.nc")
-            sta_time = [
-                "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{}".format(*ymdhm, s)
-                for ymdhm, s in zip(nc["YMDHM"][:], nc["Second"][:])
-            ]
-            self.data.setdefault(sta, {}).update(time=sta_time)
-            self.data.setdefault(sta, {}).update(num_obs=len(sta_time))
-
-            if len(sta_time) < 5:
-                log.warn("Only {} observations for {}", len(sta_time), sta)
-
-            try:
-                nc = self._read_nc_file(sta, "Cal-Cable.nc")
-                self.data.setdefault(sta, {}).update(cable=nc["Cal-Cable"][:])
-            except OSError:
-                # Cable calibration is missing
-                self.data.setdefault(sta, {}).update(cable=np.zeros(len(sta_time)))
-                log.warn("Missing cable calibration information for {}", sta)
-
-            try:
-                nc = self._read_nc_file(sta, "Met.nc")
-                self.data.setdefault(sta, {}).update(temperature=nc["TempC"][:])
-                self.data.setdefault(sta, {}).update(pressure=nc["AtmPres"][:])
-            except OSError:
-                # Met data is missing
-                self.data.setdefault(sta, {}).update(temperature=np.full(len(sta_time), np.nan))
-                self.data.setdefault(sta, {}).update(pressure=np.full(len(sta_time), np.nan))
-                log.warn("Missing meterological data for {}", sta)
-
-    def write_to_dataset(self, dset):
-        """Store VLBI data in a dataset
-
-        Args:
-            dset: The Dataset where data are stored.
+        self.data will be populated with information from the netcdf files
         """
-        dset.num_obs = len(self.data["time"])
+        with files.open_path(self.file_path, mode="rt") as fid:
+            self._parse_file(fid)
 
-        # Vgosdb indicies
-        scan2src = self.data["scan2src"] - 1
-        obs2scan = self.data["obs2scan"] - 1
-        obs2baseline = self.data["obs2baseline"] - 1
+        self._organize_data()
 
-        # Time
-        dset.add_time("time", val=self.data["time"], scale="utc", format="isot")
+    def _parse_file(self, fid):
+        for line in fid:
+            if not line or line.startswith("!"):
+                continue
+            line = line.split()
+            if "begin" in line[0].lower():
+                self._parse_block(fid, line[1], name=" ".join(line[2:]))
 
-        # Observations
-        for obs_type, values in self.data["obs"].items():
-            dset.add_float(obs_type, val=values)
+    def _parse_block(self, fid, block, name="", directory=""):
+        # print("Parsing {} {}".format(block, name))
+        for line in fid:
+            if not line or line.startswith("!"):
+                continue
+            line = line.split()
+            if line[0].lower().startswith("end") and line[1] == block:
+                # print("Finished {} {}".format(block, name))
+                return
+            elif line[0].lower().startswith("begin"):
+                # recursive call
+                self._parse_block(fid, line[1], name=" ".join(line[2:]), directory=directory)
+            elif line[0].lower().startswith("default_dir"):
+                directory = line[1]
+            elif line[0].endswith(".nc"):
+                file_path = self.file_path.parents[0] / directory / line[0]
+                if directory:
+                    data = self.raw.setdefault(directory, {})
+                else:
+                    data = self.raw
+                nc_name = file_path.stem.split("_")
+                nc_stub = nc_name.pop(0)
+                data = data.setdefault(nc_stub, {})
+                for part in nc_name:
+                    if part.startswith("b"):
+                        data = data.setdefault(part[1:], {})
 
-        # Sources
-        icrf = apriori.get("crf", session=dset.dataset_name)
-        for i, src in enumerate(self.data["source_names"]):
-            # Read source coordinates from ICRF file.
-            if src in icrf:
-                self.data["source_ra"][i] = icrf[src].pos.crs[0]
-                self.data["source_dec"][i] = icrf[src].pos.crs[1]
-                log.debug(
-                    "Using coordinates ({:0.3f}, {:0.3f}) for {}", icrf[src].pos.crs[0], icrf[src].pos.crs[1], src
+                # print("Parse {}".format(file_path))
+                netcdf_data = parsers.parse_file("vlbi_netcdf", file_path=file_path).as_dict()
+                if "TimeUTC" in file_path.stem:
+                    self._parse_time(netcdf_data)
+                data.update(netcdf_data)
+            else:
+                data = self.raw.setdefault(block, {})
+                if name:
+                    data = data.setdefault(name, {})
+                data[line[0]] = " ".join(line[1:])
+
+    def _organize_data(self):
+        """ Copy content from self.raw to self.data and convert all data to arrays with num_obs length
+        """
+        meta = self.data.setdefault("meta", {})
+        meta["session_code"] = self.raw["Session"].get("Session")
+
+        # Epoch info
+        self.data["time"] = self.raw["Observables"]["TimeUTC"]["time"]
+        self.data["station_1"] = self.raw["Observables"]["Baseline"]["Baseline"][:, 0]
+        self.data["station_2"] = self.raw["Observables"]["Baseline"]["Baseline"][:, 1]
+        self.data["source"] = self.raw["Observables"]["Source"]["Source"]
+
+        # Obs info
+        self.data["observed_delay_ferr"] = self.raw["Observables"]["GroupDelay"]["X"]["GroupDelaySig"] * constant.c
+        self.data["observed_delay"] = self.raw["ObsEdit"]["GroupDelayFull"]["X"]["GroupDelayFull"] * constant.c
+        try:
+            self.data["data_quality"] = self.raw["ObsEdit"]["Edit"]["DelayFlag"]
+        except KeyError:
+            self.data["data_quality"] = np.full(len(self.data["time"]), np.nan)
+            log.warn("Missing data quality information")
+        self.data["iono_delay"] = (
+            self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"]["Cal-SlantPathIonoGroup"][:, 0] * constant.c
+        )
+        self.data["iono_delay_ferr"] = (
+            self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"]["Cal-SlantPathIonoGroupSigma"][:, 0] * constant.c
+        )
+        try:
+            self.data["iono_quality"] = self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"][
+                "Cal-SlantPathIonoGroupDataFlag"
+            ]
+        except KeyError:
+            self.data["iono_quality"] = np.full(len(self.data["time"]), np.nan)
+            log.warn("Missing ionosphere quality information")
+
+        # Station dependent info
+        for field, params in self._STATION_FIELDS.items():
+            self.data[field + "_1"] = np.zeros(len(self.data["time"]))
+            self.data[field + "_2"] = np.zeros(len(self.data["time"]))
+            for station in self.raw["Head"]["StationList"]:
+                sta_idx_1 = self.data["station_1"] == station
+                sta_idx_2 = self.data["station_2"] == station
+                sta_key = station.replace(" ", "_")
+                sta_time = self.raw[sta_key]["TimeUTC"]["sec_since_ref"]
+                try:
+                    sta_data = self.raw[sta_key][params["filestub"]][params["variable"]]
+                except KeyError:
+                    sta_data = np.full(len(sta_time), np.nan)
+                    log.warn("Missing {} data for {}", field, station)
+                func = interpolate.interp1d(
+                    sta_time, sta_data, bounds_error=False, fill_value=(sta_data[0], sta_data[-1]), assume_sorted=True
                 )
-            else:
-                log.info(
-                    "{} not found in apriori crf. Using coordinates ({:0.3f}, {:0.3f}) from vgosdb",
-                    src,
-                    self.data["source_ra"][i],
-                    self.data["source_dec"][i],
-                )
+                epochs_1 = self.raw["Observables"]["TimeUTC"]["sec_since_ref"][sta_idx_1]
+                epochs_2 = self.raw["Observables"]["TimeUTC"]["sec_since_ref"][sta_idx_2]
+                self.data[field + "_1"][sta_idx_1] = func(epochs_1) * params["factor"]
+                self.data[field + "_2"][sta_idx_2] = func(epochs_2) * params["factor"]
 
-        dset.add_text("source", val=self.data["source_names"][scan2src[obs2scan]])
-        dset.add_direction(
-            "src_dir", ra=self.data["source_ra"][scan2src[obs2scan]], dec=self.data["source_dec"][scan2src[obs2scan]]
+    def _parse_time(self, time_dict):
+        part1 = time_dict.pop("YMDHM")
+        part2 = time_dict.pop("Second")
+        time_dict["time"] = ["{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{}".format(*t1, t2) for t1, t2 in zip(part1, part2)]
+
+        self.raw["dt_0"] = datetime(*part1[0], int(part2[0]))
+        time_dict["sec_since_ref"] = np.array(
+            [(datetime(*t1, int(t2)) - self.raw["dt_0"]).total_seconds() for t1, t2 in zip(part1, part2)]
         )
-
-        # Stations
-        dset.add_text("station_1", val=self.data["sta_name"][obs2baseline][:, 0])
-        dset.add_text("station_2", val=self.data["sta_name"][obs2baseline][:, 1])
-        baseline = np.core.defchararray.add(np.core.defchararray.add(dset.station_1, "/"), dset.station_2)
-        dset.add_text("baseline", val=baseline)
-        dset.add_text("pass", val=np.core.defchararray.add(np.core.defchararray.add(baseline, "/"), dset.source))
-
-        trf = apriori.get("trf", time=dset.time)
-        station_codes = apriori.get("vlbi_station_codes")
-
-        for site, xyz in zip(self.data["sta_name"], self.data["sta_xyz"]):
-            if site in station_codes:
-                cdp = station_codes[site]["cdp"]
-                trf_site = trf[cdp]
-            else:
-                trf_site = trf.closest(xyz, max_distance=5)
-                cdp = trf_site.key
-
-            self.data["pos_" + site] = trf_site.pos.itrs
-            log.debug("Using position {} for {}", np.mean(self.data["pos_" + site], axis=0), site)
-
-            ivsname = station_codes[cdp]["ivsname"]
-            domes = station_codes[cdp]["domes"]
-            marker = station_codes[cdp]["marker"]
-            self.data["station_" + site] = dict(cdp=cdp, domes=domes, ivsname=ivsname, marker=marker, site_id=cdp)
-
-        # Positions
-        itrs_pos_1 = np.array([self.data["pos_" + s][i, :] for i, s in enumerate(dset.station_1)])
-        itrs_vel_1 = np.zeros((dset.num_obs, 3))
-
-        dset.add_posvel(
-            "site_pos_1",
-            time="time",
-            other="src_dir",
-            itrs=np.concatenate((itrs_pos_1, itrs_vel_1), axis=1),
-            write_level="operational",
-        )
-        itrs_pos_2 = np.array([self.data["pos_" + s][i, :] for i, s in enumerate(dset.station_2)])
-        itrs_vel_2 = np.zeros((dset.num_obs, 3))
-        dset.add_posvel(
-            "site_pos_2",
-            time="time",
-            other="src_dir",
-            itrs=np.concatenate((itrs_pos_2, itrs_vel_2), axis=1),
-            write_level="operational",
-        )
-
-        # Station data
-        sta_fields = set().union(*[v.keys() for k, v in self.data.items() if k.startswith("station_")])
-        for field in sta_fields:
-            dset.add_text(field + "_1", val=[self.data["station_" + s][field] for s in dset.station_1])
-            dset.add_text(field + "_2", val=[self.data["station_" + s][field] for s in dset.station_2])
-
-        dset.add_float("cable_delay_1", val=self._create_station_array(dset, "cable", 1) * constant.c)
-        dset.add_float("cable_delay_2", val=self._create_station_array(dset, "cable", 2) * constant.c)
-        dset.add_float("pressure_1", val=self._create_station_array(dset, "pressure", 1))
-        dset.add_float("pressure_2", val=self._create_station_array(dset, "pressure", 2))
-        dset.add_float("temperature_1", val=self._create_station_array(dset, "temperature", 1))
-        dset.add_float("temperature_2", val=self._create_station_array(dset, "temperature", 2))
-
-        # Station meta
-        station_keys = sorted([k for k, v in self.data.items() if k.startswith("station_")])
-        pos_keys = sorted([k for k, v in self.data.items() if k.startswith("pos_")])
-
-        for sta_key, pos_key in zip(station_keys, pos_keys):
-            sta_name = sta_key.split("_")[-1]
-            cdp = self.data[sta_key]["cdp"]
-            ivsname = station_codes[cdp]["ivsname"]
-            longitude, latitude, height, _ = sofa.iau_gc2gd(2, self.data[pos_key][0, :])
-            dset.add_to_meta(ivsname, "cdp", cdp)
-            dset.add_to_meta(ivsname, "site_id", cdp)
-            dset.add_to_meta(ivsname, "domes", station_codes[cdp]["domes"])
-            dset.add_to_meta(ivsname, "marker", station_codes[cdp]["marker"])
-            dset.add_to_meta(ivsname, "description", station_codes[cdp]["description"])
-            dset.add_to_meta(ivsname, "longitude", longitude)
-            dset.add_to_meta(ivsname, "latitude", latitude)
-            dset.add_to_meta(ivsname, "height", height)
-            if sta_name != ivsname:
-                dset.add_to_meta(sta_name, "cdp", cdp)
-                dset.add_to_meta(sta_name, "site_id", cdp)
-                dset.add_to_meta(sta_name, "domes", station_codes[cdp]["domes"])
-                dset.add_to_meta(sta_name, "marker", station_codes[cdp]["marker"])
-                dset.add_to_meta(sta_name, "description", station_codes[cdp]["description"])
-                dset.add_to_meta(sta_name, "longitude", longitude)
-                dset.add_to_meta(sta_name, "latitude", latitude)
-                dset.add_to_meta(sta_name, "height", height)
-
-        dset.meta["tech"] = "vlbi"
-        dset.add_to_meta("input", "type", "VGOSDB")
-        dset.add_to_meta("input", "file", files.path(self.file_key, file_vars=self.vars).stem)
-
-        master = apriori.get("vlbi_master_file")
-        dset.meta["master_file"] = master.data.get((self.rundate.timetuple().tm_yday, self.vars["session"]), {})
-
-    def _read_nc_file(self, directory, file_name):
-        full_path = os.path.join(self.session_dir, directory, file_name)
-        self.dependencies.append(full_path)
-        log.debug("Read netCDF-data from {}", full_path)
-
-        return netCDF4.Dataset(full_path)
-
-    def _get_nc_value(self, nc, name):
-        var = nc[name]
-        if hasattr(var, "REPEAT"):
-            if len(var[:]) > 1:
-                return np.tile(var[:], var.REPEAT).reshape(var.REPEAT, -1)
-            else:
-                return np.tile(var[:], var.REPEAT)
-        else:
-            return nc[name][:]
-
-    def _create_station_array(self, dset, field, suffix):
-        dset.default_field_suffix = suffix
-        array = np.zeros(dset.num_obs)
-
-        for sta in self.data["sta_name"]:
-            sta_idx = dset.filter(station=sta)
-            sta_time = Time(self.data[sta]["time"]).utc.mjd
-            func = interpolate.interp1d(
-                sta_time,
-                self.data[sta][field],
-                bounds_error=False,
-                fill_value=(self.data[sta][field][0], self.data[sta][field][-1]),
-                assume_sorted=True,
-            )
-            array[sta_idx] = func(dset.time.utc.mjd[sta_idx])
-
-        return array

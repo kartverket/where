@@ -182,6 +182,7 @@ class Dataset(object):
 
         # Update names
         self.name = "{name}/{id:04d}".format(name=dataset_name, id=dataset_id)
+        kwargs.setdefault("session", dataset_name)
         self.vars.update(dict(tech=tech, stage=stage, dataset_name=dataset_name, dataset_id=dataset_id, **kwargs))
 
     def write(self, write_level=None):
@@ -459,7 +460,7 @@ class Dataset(object):
 
     def for_each(self, key):
         previous_field_suffix = self.default_field_suffix
-        suffixes = [f[len(key):] for f in self.fields if f.startswith(key) and "." not in f]
+        suffixes = [f[len(key) :] for f in self.fields if f.startswith(key) and "." not in f]
         multipliers = [-1, 1] if len(suffixes) == 2 else [1] * len(suffixes)
         for multiplier, suffix in zip(multipliers, suffixes):
             self.default_field_suffix = suffix
@@ -964,16 +965,13 @@ class Dataset(object):
         Returns:
             A string representing the dataset.
         """
-        return (
-            "{cls}({rundate}, tech='{tech}', stage='{stage}', dataset_name='{name}', dataset_id={id})"
-            "".format(
-                cls=self.__class__.__name__,
-                rundate=repr(self.rundate).split(".")[-1],
-                tech=self.vars["tech"],
-                stage=self.vars["stage"],
-                name=self.dataset_name,
-                id=int(self.dataset_id),
-            )
+        return "{cls}({rundate}, tech='{tech}', stage='{stage}', dataset_name='{name}', dataset_id={id})" "".format(
+            cls=self.__class__.__name__,
+            rundate=repr(self.rundate).split(".")[-1],
+            tech=self.vars["tech"],
+            stage=self.vars["stage"],
+            name=self.dataset_name,
+            id=int(self.dataset_id),
         )
 
     def __repr__(self):
@@ -989,7 +987,7 @@ class Dataset(object):
         Returns:
             A string describing the dataset.
         """
-        description = ("{description}: {num_obs} obs\n".format(description=self.description, num_obs=self.num_obs))
+        description = "{description}: {num_obs} obs\n".format(description=self.description, num_obs=self.num_obs)
         return description + console.fill("Fields: " + ", ".join(self.fields), hanging=8)
 
     def __str__(self):

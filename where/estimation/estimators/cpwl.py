@@ -3,16 +3,11 @@
 Description:
 ------------
 
-Asdf.
-
-
-
-
-
 """
 
 # External library imports
 import numpy as np
+import scipy.sparse
 
 # Where imports
 from where import apriori
@@ -97,8 +92,10 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
         apriori_stdev[rate_idx] = config.tech[param].apriori_rate_stdev.float  # Rate parameters
 
     # Initialize variables
-    z = dset.calc - dset.obs
-    phi = np.repeat(np.eye(n)[None, :, :], num_obs, axis=0)
+    z = dset.obs - dset.calc
+    # phi = np.repeat(np.eye(n)[None, :, :], num_obs, axis=0)
+    phi = list()
+
     delta_phi = np.eye(n, k=1)
     delta_phi[:, :n_constant] = 0
     delta_phi[:, n_constant::2] = 0
@@ -108,7 +105,8 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
     for epoch in range(num_obs - 1):
         # TODO: Check that 24 is correct here (and use unit instead)
         delta_t = (dset.time.utc[epoch + 1].mjd - dset.time.utc[epoch].mjd) * 24
-        phi[epoch] += delta_phi * delta_t
+        # phi[epoch] += delta_phi * delta_t
+        phi.append(scipy.sparse.csr_matrix(np.eye(n) + delta_phi * delta_t))
 
         idx = np.logical_and(process_noise, dset.time.utc[epoch + 1].mjd > ref_time + knot_interval)
         indicies = np.where(idx)[0]
@@ -116,6 +114,8 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
         ref_time[idx] += knot_interval[idx] * ((dset.time.utc[epoch + 1].mjd - ref_time[idx]) // knot_interval[idx])
         num_unknowns += int(sum(idx))
+
+    phi.append(scipy.sparse.csr_matrix(np.eye(n)))
 
     # Add pseudo-observations
     constraints = config.tech.get(key="estimate_constraint", default="").as_list(split_re=", *")
@@ -129,7 +129,7 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
         for idx, column in enumerate(param_names):
             if "_site_pos-" not in column:
                 continue
-            station = column.split("-", maxsplit=1)[-1].split("_")[0]
+            station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
             key = dset.meta[station]["site_id"]
             if key in trf:
                 x0, y0, z0 = trf[key].pos.itrs  # TODO: Take units into account
@@ -192,7 +192,8 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
             h = np.vstack((h, H2[:, :, None]))
 
         z = np.hstack((z, np.zeros(num_constraints))).T
-        phi = np.vstack((phi, np.repeat(np.eye(n)[None, :, :], num_constraints, axis=0)))
+        # phi = np.vstack((phi, np.repeat(np.eye(n)[None, :, :], num_constraints, axis=0)))
+        phi = phi + [scipy.sparse.csr_matrix(np.eye(n))] * num_constraints
 
     # Initialize and run the Kalman filter
     kalman = KalmanFilter(h, z=z, apriori_stdev=apriori_stdev, phi=phi, r=obs_noise, Q=Q, param_names=param_names)

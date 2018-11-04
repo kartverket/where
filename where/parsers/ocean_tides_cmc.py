@@ -11,17 +11,15 @@ Reference:
 
 http://holt.oso.chalmers.se/loading/cmc.html
 
-
-
-
-
 """
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
 
 
 @plugins.register

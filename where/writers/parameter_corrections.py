@@ -43,7 +43,9 @@ def parameter_corrections(dset):
         else:
             print_data.setdefault(key, dict())
             print_data[key][name[1]] = (
-                np.mean(dset[field]), np.mean(dset[field_sigma]), np.sum(dset.filter(source=name[0]))
+                np.mean(dset[field]),
+                np.mean(dset[field_sigma]),
+                np.sum(dset.filter(source=name[0])),
             )
 
     correction_str = ""

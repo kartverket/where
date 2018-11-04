@@ -66,7 +66,6 @@ from where.lib import mathp
 
 
 class TestPosVelTable(unittest.TestCase):
-
     def setUp(self):
 
         # Definition of dummy date
@@ -214,7 +213,9 @@ class TestPosVelTable(unittest.TestCase):
             [
                 [
                     [
-                        -0.971554, 0.017062, -0.236205
+                        -0.971554,
+                        0.017062,
+                        -0.236205,
                     ],  # orientation variable in getSatelliteOrientation() routine in model.c
                     [-0.115836, 0.835705, 0.536822],
                     [0.206557, 0.548913, -0.809956],
@@ -236,7 +237,9 @@ class TestPosVelTable(unittest.TestCase):
             [
                 [
                     [
-                        -0.971554, -0.115836, 0.206557
+                        -0.971554,
+                        -0.115836,
+                        0.206557,
                     ],  # orientation variable in getSatelliteOrientation() routine in model.c
                     [0.017062, 0.835705, 0.548913],
                     [-0.236205, 0.536822, -0.809956],

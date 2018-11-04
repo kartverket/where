@@ -46,8 +46,7 @@ _PARAMS = dict(
 _TECH = {"comb": "C", "doris": "D", "slr": "L", "llr": "M", "gnss": "P", "vlbi": "R"}
 
 
-class SinexBlocks():
-
+class SinexBlocks:
     def __init__(self, dset, fid):
         self.dset = dset
         self.fid = fid
@@ -85,9 +84,8 @@ class SinexBlocks():
         start = min(self.dset.time).yydddsssss
         end = max(self.dset.time).yydddsssss
 
-        institute = self._analyst_info.get("inst_abbreviation", "")
-        file_agency = config.tech.get("file_agency", section="sinex", default="").str or institute
-        data_agency = config.tech.get("data_agency", section="sinex", default="").str or institute
+        file_agency = config.tech.sinex.file_agency.str.upper()
+        data_agency = config.tech.sinex.data_agency.str.upper()
 
         num_params = self.dset.meta["statistics"]["number of unknowns"]
         constraint = "2"
@@ -382,7 +380,7 @@ class SinexBlocks():
                 continue
 
             param_unit = self.dset.meta["normal equation"]["unit"][i - 1]
-            value = (self.dset.meta["normal equation"]["solution"][i - 1] + self._get_apriori_value(param, param_unit))
+            value = self.dset.meta["normal equation"]["solution"][i - 1] + self._get_apriori_value(param, param_unit)
             if self.dset.meta["normal equation"]["covariance"][i - 1][i - 1] < 0:
                 log.error(
                     "Negative covariance ({})for {} {}".format(
@@ -564,5 +562,6 @@ class SinexBlocks():
             return eop.convert_to("ut1_utc", param_unit)
         if param["type"] == "eop_lod":
             eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
-            return eop.convert_to("lod", param_unit)
+            # return eop.convert_to("lod", param_unit)
+            return -1 * eop.convert_to("ut1_utc_rate", param_unit + "/day")
         return 0

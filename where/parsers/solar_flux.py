@@ -15,18 +15,18 @@ References:
 @todo All these files from the link above are merged to F10.7CM
            (leftovers from old GEOSAT). Do something about this?
 
-
-
 """
 
 # Standard library imports
 from datetime import datetime
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import constant
-from where.lib import plugins
 
 
 @plugins.register

@@ -6,17 +6,16 @@ Description:
 Reads data information about VLBI antenna dimensions, type and thermal expansion properties for the different antenna
 construction elements.
 
-
-
-
 """
 
 # Standard library imports
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib import plugins
 
 
 @plugins.register

@@ -50,7 +50,7 @@ def add_to_full_timeseries(dset):
     rundate_str = dset.rundate.strftime(config.FMT_date)
     session = dset.dataset_name
     status = dset.meta.get("analysis_status", "unchecked")
-    session_type = dset.meta.get("master_file", dict()).get("session_type", "")
+    session_type = dset.meta.get("input", dict()).get("session_type", "")
 
     dset_session.num_obs = num_obs
     dset_session.add_time("time", val=[mean_epoch] * num_obs, scale="utc")

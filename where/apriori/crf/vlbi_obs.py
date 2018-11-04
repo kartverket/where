@@ -11,7 +11,6 @@ Reads source positions from the VLBI observation files in either NGS or vgosdb f
 
 # External library imports
 import numpy as np
-import netCDF4
 
 # Where imports
 from where import apriori
@@ -20,8 +19,6 @@ from where.lib import config
 from where.lib import log
 from where.lib import plugins
 from where import parsers
-from where.lib import files
-from where.lib import util
 
 
 @plugins.register
@@ -49,15 +46,13 @@ class VlbiObsCrf(crf.CrfFactory):
         Returns:
             Dict:  Dictionary containing data about each source defined in this celestial reference frame.
         """
-        # TODO make parser
-        sources_file = files.path(file_key="vlbi_obs_vgosdb") / "Apriori" / "Source.nc"
         source_names = apriori.get("vlbi_source_names")
-        d = netCDF4.Dataset(sources_file)
-        sources = d["AprioriSourceList"][:]
-        radec = d["AprioriSource2000RaDec"][:]
+        data = parsers.parse_key("vlbi_obs_sources_vgosdb").as_dict()
+
+        # Replace IVS name of source with official IERS name
         return {
-            source_names[str(s, "utf-8").strip()]["iers_name"]: dict(ra=coord[0], dec=coord[1])
-            for s, coord in zip(sources, radec)
+            source_names[ivsname]["iers_name"] if ivsname in source_names else ivsname: dict(ra=coord[0], dec=coord[1])
+            for ivsname, coord in zip(data["AprioriSourceList"], data["AprioriSource2000RaDec"])
         }
 
     def _read_data_ngs(self):
@@ -66,11 +61,14 @@ class VlbiObsCrf(crf.CrfFactory):
         Returns:
             Dict:  Dictionary containing data about each source defined in this celestial reference frame.
         """
-        data = parsers.parse_key("vlbi_obs_ngs", parser="vlbi_ngs_sources").as_dict()
+        data = parsers.parse_key("vlbi_obs_ngs", parser_name="vlbi_ngs_sources").as_dict()
         src_names = apriori.get("vlbi_source_names")
 
         # Replace IVS name of source with official IERS name
-        return {src_names[ivsname]["iers_name"]: coords for ivsname, coords in data.items() if ivsname in src_names}
+        return {
+            src_names[ivsname]["iers_name"] if ivsname in src_names else ivsname: coords
+            for ivsname, coords in data.items()
+        }
 
     def _calculate_pos_crs(self, source):
         """Calculate positions for the given time epochs

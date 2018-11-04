@@ -36,9 +36,9 @@ def eop_pm(dset):
     baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
 
     # x-pole
-    partials[:, 0] = (src_dir @ sofa.Q(dset.time) @ sofa.R(dset.time) @ sofa.dW_dxp(dset.time) @ baseline)[:, 0, 0]
+    partials[:, 0] = -(src_dir @ sofa.Q(dset.time) @ sofa.R(dset.time) @ sofa.dW_dxp(dset.time) @ baseline)[:, 0, 0]
 
     # y-pole
-    partials[:, 1] = (src_dir @ sofa.Q(dset.time) @ sofa.R(dset.time) @ sofa.dW_dyp(dset.time) @ baseline)[:, 0, 0]
+    partials[:, 1] = -(src_dir @ sofa.Q(dset.time) @ sofa.R(dset.time) @ sofa.dW_dyp(dset.time) @ baseline)[:, 0, 0]
 
     return partials, column_names, "meter per radian"

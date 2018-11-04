@@ -18,11 +18,14 @@ Reads data from files in SINEX GNSS bias file format 1.0 (see :cite:`sinex_bias`
 from datetime import datetime, timedelta
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_chain import ChainParser, ParserDef
 from where.lib import time
-from where.lib import plugins
 from where.lib.unit import unit
+
 
 # TODO: Should we use SINEX class instead?
 @plugins.register
@@ -98,10 +101,12 @@ class GnssBiasParser(ChainParser):
                         "obs1": (25, 29),
                         "obs2": (29, 34),
                         "start_time": (
-                            34, 49
+                            34,
+                            49,
                         ),  # TODO: Old format is not consistent with SINEX BIAS format 1.0. -> yy instead of yyyy
                         "end_time": (
-                            49, 64
+                            49,
+                            64,
                         ),  # TODO: Old format is not consistent with SINEX BIAS format 1.0. -> yy instead of yyyy
                         "unit": (64, 69),
                         "estimate": (69, 91),
@@ -119,8 +124,8 @@ class GnssBiasParser(ChainParser):
         """Parse BIAS/SOLUTION block entries to instance variable 'data'
         """
         # Prepare data dictionary entries
-        start_time = (
-            datetime.strptime(line["start_time"][0:8], "%Y:%j") + timedelta(seconds=int(line["start_time"][9:14]))
+        start_time = datetime.strptime(line["start_time"][0:8], "%Y:%j") + timedelta(
+            seconds=int(line["start_time"][9:14])
         )
         end_time = datetime.strptime(line["end_time"][0:8], "%Y:%j") + timedelta(seconds=int(line["end_time"][9:14]))
 

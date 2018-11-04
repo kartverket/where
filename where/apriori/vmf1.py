@@ -52,8 +52,8 @@ def get_vmf1(time):
         A dictionary of functions that can interpolate in the VMF1 dataset.
     """
     data = dict()
-    min_time = min(time).datetime
-    max_time = max(time).datetime
+    min_time = min(time.utc).datetime
+    max_time = max(time.utc).datetime
     start_hour = 6 * (min_time.hour // 6)
     start = min_time.replace(hour=start_hour, minute=0, second=0, microsecond=0)
     end_hour = 6 * (max_time.hour // 6)
@@ -131,10 +131,8 @@ def vmf1_interpolator(vmf1_data):
                 fraction = (obstime - starttime).total_seconds() / 21600  # 21600 seconds per 6 hours
 
                 # Linear time interpolation between hourly VMF1 files
-                value = (
-                    interpolator[starttime](lon, lat, grid=False)
-                    + fraction
-                    * (interpolator[endtime](lon, lat, grid=False) - interpolator[starttime](lon, lat, grid=False))
+                value = interpolator[starttime](lon, lat, grid=False) + fraction * (
+                    interpolator[endtime](lon, lat, grid=False) - interpolator[starttime](lon, lat, grid=False)
                 )
                 values.append(value)
             return np.array(values)
@@ -145,13 +143,9 @@ def vmf1_interpolator(vmf1_data):
             fraction = (dt_utc - starttime).total_seconds() / 21600  # 21600 seconds per 6 hours
 
             # Linear time interpolation between hourly VMF1 files
-            value = (
-                interpolator[starttime](longitude, latitude, grid=False)
-                + fraction
-                * (
-                    interpolator[endtime](longitude, latitude, grid=False)
-                    - interpolator[starttime](longitude, latitude, grid=False)
-                )
+            value = interpolator[starttime](longitude, latitude, grid=False) + fraction * (
+                interpolator[endtime](longitude, latitude, grid=False)
+                - interpolator[starttime](longitude, latitude, grid=False)
             )
 
             return value

@@ -76,9 +76,9 @@ def detect_clockbreaks(dset):
 
             # Test next observations
             model = np.polyval(
-                p, time[obs + 1:obs + 26]
+                p, time[obs + 1 : obs + 26]
             )  # Use many (=25) observations to avoid problems with outliers
-            obs_res = residual[obs + 1:obs + 26]
+            obs_res = residual[obs + 1 : obs + 26]
             dset[f"cb_{station}_value"][idx_site[obs]] = np.min(np.abs(obs_res - model))
             dset[f"cb_{station}_limit"][idx_site[obs]] = std_lim
             dset[f"cb_{station}_pred"][idx_site[obs]] = model[0]

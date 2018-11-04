@@ -3,9 +3,9 @@
 -------
 
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: hjegei $
+$Revision: 16296 $
+$Date: 2018-10-24 13:07:24 +0200 (Wed, 24 Oct 2018) $
+$LastChangedBy: dahmic $
 
 """
 # Standard library imports
@@ -14,6 +14,7 @@ import unittest
 
 # External library imports
 import numpy as np
+import pytest
 
 # Where imports
 from where import apriori
@@ -22,8 +23,8 @@ from where.lib.time import Time
 TEST = "test_2"
 
 
+@pytest.mark.quick
 class TestBroadcast(unittest.TestCase):
-
     def setUp(self):
         """
 
@@ -241,6 +242,9 @@ class TestBroadcast(unittest.TestCase):
         # print("OUTPUT:\n sat_pos = {:20.8f} {:20.8f} {:20.8f} [m]\n sat_vel = {:15.8f} {:15.8f} {:15.8f} [m/s]\n"
         #      ''.format(sat_pos[0], sat_pos[1], sat_pos[2], sat_vel[0], sat_vel[1], sat_vel[2]))
 
+    @pytest.mark.sisre
+    @pytest.mark.gnss
+    # @pytest.mark.xfail(reason="Tada")
     def test_get_satellite_clock_correction(self):
 
         sat_clk_corr = self.brdc.satellite_clock_correction()

@@ -5,9 +5,6 @@ Description:
 
 Reads data from files in the CPF file format as defined in http://ilrs.gsfc.nasa.gov/docs/2006/cpf_1.01.pdf
 
-
-
-
 """
 
 # Standard library imports
@@ -17,9 +14,11 @@ import itertools
 import numpy as np
 from scipy import misc, interpolate
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
-from where.lib import plugins
 from where.lib.unit import unit
 
 

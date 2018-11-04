@@ -6,16 +6,12 @@ Description:
 Reads ocean pole tide coefficients. The file contains the real and imaginary coefficients for the enu components in
 a lat-lon grid. The data is ordered in columns.
 
-
-
-
 """
-
-import numpy as np
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
 
 
 @plugins.register

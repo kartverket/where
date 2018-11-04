@@ -6,7 +6,7 @@ Description:
 Calculate the partial derivatives of the rate of the :math:`UT1 - UTC` Earth orientation parameter.
 
 
-
+\tau = -\hat{K}QRW\vec{b}
 
 
 """
@@ -32,6 +32,6 @@ def eop_dut1_rate(dset):
     baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
     dR_dut1 = sofa.dR_dut1(dset.time)
     dt = (dset.time.jd - dset.time.mean.jd)[:, None, None]
-    partials = (src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline @ dt)[:, :, 0]
+    partials = -(src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline @ dt)[:, :, 0]
 
     return partials, column_name, "meter * radians * days / seconds"

@@ -43,12 +43,14 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import config
 from where.lib import constant
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import unit
 
 
@@ -168,7 +170,8 @@ class OrbitSp3dParser(parser.Parser):
             label=lambda line, _ln: line[0],
             parser_def={
                 "*": {
-                    "parser": self._parse_date, "fields": [None, "year", "month", "day", "hour", "minute", "second"]
+                    "parser": self._parse_date,
+                    "fields": [None, "year", "month", "day", "hour", "minute", "second"],
                 },
                 "P": {
                     "parser": self._parse_position,
@@ -215,16 +218,13 @@ class OrbitSp3dParser(parser.Parser):
             cache (dict): Temporary dictionary with the fields 'key' and 'values'.
         """
         # Create Time object
-        cache["time"] = (
-            "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}"
-            "".format(
-                year=int(line["year"]),
-                month=int(line["month"]),
-                day=int(line["day"]),
-                hour=int(line["hour"]),
-                minute=int(line["minute"]),
-                second=float(line["second"]),
-            )
+        cache["time"] = "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}" "".format(
+            year=int(line["year"]),
+            month=int(line["month"]),
+            day=int(line["day"]),
+            hour=int(line["hour"]),
+            minute=int(line["minute"]),
+            second=float(line["second"]),
         )
 
     def _parse_float(self, line, _):
@@ -233,10 +233,8 @@ class OrbitSp3dParser(parser.Parser):
         Args:
             line (dict):  Dict containing the fields of a line.
         """
-        date = (
-            "{year}-{month:02d}-{day:02d}".format(
-                year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-            )
+        date = "{year}-{month:02d}-{day:02d}".format(
+            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
         )  # TODO: What would be a better solution for getting current date?
 
         for k, v in line.items():
@@ -268,10 +266,8 @@ class OrbitSp3dParser(parser.Parser):
                     log.warn("Identical epoch {} given in the SP3 files.", cache["time"])
                     return
 
-        date = (
-            "{year}-{month:02d}-{day:02d}".format(
-                year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-            )
+        date = "{year}-{month:02d}-{day:02d}".format(
+            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
         )  # TODO: What would be a better solution for getting current date?
 
         # SP3-a (GPS-only) format files missing satellite system identicator 'G' before satellite number
@@ -319,10 +315,8 @@ class OrbitSp3dParser(parser.Parser):
         Args:
             line (dict):  Dict containing the fields of a line.
         """
-        date = (
-            "{year}-{month:02d}-{day:02d}".format(
-                year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-            )
+        date = "{year}-{month:02d}-{day:02d}".format(
+            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
         )  # TODO: What would be a better solution for getting current date?
 
         for k, v in line.items():
@@ -348,8 +342,7 @@ class OrbitSp3dParser(parser.Parser):
         if line["sig_vel_x"] != "":
             self.data.setdefault("sat_vel_sigma", list()).append(
                 np.array([float(line["sig_vel_x"]), float(line["sig_vel_y"]), float(line["sig_vel_z"])])
-                * 10
-                ** -4
+                * 10 ** -4
                 * self.meta[date]["base_posvel"]
                 * unit.millimeter2meter
             )
@@ -419,10 +412,8 @@ class OrbitSp3dParser(parser.Parser):
         """
         dset.num_obs = len(self.data["time"])
         dset.meta.update(self.meta)
-        date = (
-            "{year}-{month:02d}-{day:02d}".format(
-                year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-            )
+        date = "{year}-{month:02d}-{day:02d}".format(
+            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
         )  # TODO: What would be a better solution for getting current date?
         if dset.meta[date]["time_sys"] == "GPS":
             dset.add_time("time", val=self.data["time"], scale="gps")

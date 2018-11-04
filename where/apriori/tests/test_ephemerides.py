@@ -16,7 +16,6 @@ from where.lib.unit import unit  # MURKS
 
 
 class TestEphemerides(unittest.TestCase):
-
     def setUp(self):
 
         # TODO: Configuration has to be defined? How? where.set_config(2016, 3, 1, 'gps')?

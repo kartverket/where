@@ -22,6 +22,9 @@ from where.lib import config
 from where.lib import log
 from where.lib import plugins
 
+# Name of section in configuration
+_SECTION = "_".join(__name__.split(".")[-1:])
+
 
 # TODO MURKS: The editor with highest number is processed at the end.
 @plugins.register_ordered(-100)
@@ -39,13 +42,9 @@ def gnss_select_obs(dset):
     obstypes_all = dset.table_fields("obs")
 
     session = dset.dataset_name
-    cfg_code_phase_obs = config.tech.code_phase_obs.list[0]
-    cfg_obstypes = config.tech.obs_types.list
+    cfg_code_phase_obs = config.tech[_SECTION].code_phase_obs.list[0]
+    cfg_obstypes = config.tech[_SECTION].obs_types.list
     cfg_systems = config.tech.systems.list
-    flag = config.session[session].gnss_select_obs.bool
-
-    if flag is False:  # TODO: Should it be done like that, if editor is not in use?
-        return edit_dset
 
     # Remove GNSS, which are not defined in configuration file
     for sys in list(dset.meta["obstypes"]):
@@ -168,22 +167,36 @@ def _select_observations(obstypes_all, obstypes):
     use_obstypes = dict()
     remove_obstypes = set(obstypes_all)
     freq_type = config.tech.freq_type.list[0]
+    code_phase_obs = config.tech[_SECTION].code_phase_obs.list[0]           
 
     # Loop over GNSSs
     for sys in obstypes:
         use_obstypes.update({sys: list()})
 
         if freq_type == "single":
-            for type_ in ["C1", "L1"]:
-                use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            if code_phase_obs == "code":
+                for type_ in ["C1"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            else:
+                for type_ in ["C1", "L1"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
 
         elif freq_type == "dual":
-            for type_ in ["C1", "L1", "C2", "L2"]:
-                use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            if code_phase_obs == "code":
+                for type_ in ["C1", "C2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            else:
+                for type_ in ["C1", "L1", "C2", "L2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
 
         elif freq_type == "triple":
-            for type_ in ["C1", "L1", "C2", "L2", "C3", "L3"]:
-                use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            if code_phase_obs == "code":
+                for type_ in ["C1", "C2", "C3"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            else:
+                for type_ in ["C1", "L1", "C2", "L2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+
         else:
             log.fatal("Configuration option 'freq_type = {}' is not valid.", freq_type)
 

@@ -33,10 +33,12 @@ The actual file will then be located in the archive using the files.conf configu
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import gnss
 from where.lib import log
-from where.lib import plugins
 from where.parsers import rinex2_nav, rinex3_nav
 
 

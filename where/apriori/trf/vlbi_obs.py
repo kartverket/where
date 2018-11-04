@@ -10,8 +10,6 @@ are available in the observation files, so the same position is used for all tim
 
 """
 
-import netCDF4
-
 # Where imports
 from where import apriori
 from where.apriori import trf
@@ -19,8 +17,6 @@ from where.lib import config
 from where.lib import log
 from where.lib import plugins
 from where import parsers
-from where.lib import files
-from where.lib import util
 
 
 @plugins.register
@@ -48,17 +44,13 @@ class VlbiObsTrf(trf.TrfFactory):
         Returns:
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
-        # TODO create parser
-        stations_file = files.path(file_key="vlbi_obs_vgosdb") / "Apriori" / "Station.nc"
-        d = netCDF4.Dataset(stations_file)
-        stations = d["AprioriStationList"][:]
-        xyz = d["AprioriStationXYZ"][:]
         station_codes = apriori.get("vlbi_station_codes")
-        stations = [str(n, "utf-8").strip() for n in stations]
+        data = parsers.parse_key("vlbi_obs_stations_vgosdb").as_dict()
         return {
-            station_codes[n]["cdp"]: dict(name=n, pos=p, **station_codes[n])
-            for n, p in zip(stations, xyz)
-            if n in station_codes
+            (station_codes[n]["cdp"] if n in station_codes else "key{}".format(i)): (
+                dict(name=n, pos=p, **station_codes[n]) if n in station_codes else dict(name=n, pos=p, real=False)
+            )
+            for i, (n, p) in enumerate(zip(data["AprioriStationList"], data["AprioriStationXYZ"]))
         }
 
     def _read_data_ngs(self):
@@ -68,7 +60,7 @@ class VlbiObsTrf(trf.TrfFactory):
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
         station_codes = apriori.get("vlbi_station_codes")
-        pos_ngs = parsers.parse_key("vlbi_obs_ngs", parser="vlbi_ngs_sites").as_dict()
+        pos_ngs = parsers.parse_key("vlbi_obs_ngs", parser_name="vlbi_ngs_sites").as_dict()
 
         # Match NGS names with station codes to get CDP codes as keys
         keys = {n: station_codes[n]["cdp"] for n in pos_ngs.keys() if n in station_codes}
@@ -87,4 +79,7 @@ class VlbiObsTrf(trf.TrfFactory):
         Returns:
             Array:  Positions, one 3-vector for each time epoch.
         """
-        return self.data[site]["pos"][None, :].repeat(len(self.time), axis=0)
+        if self.time.size > 1:
+            return self.data[site]["pos"][None, :].repeat(self.time.size, axis=0)
+        else:
+            return self.data[site]["pos"]

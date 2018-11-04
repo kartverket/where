@@ -18,6 +18,7 @@ from where.lib import time
 
 class TimeTable(Table):
     """Time-klasse doc?"""
+
     datatype = "time"
 
     def add(self, fieldname, val, scale, write_level=None, **kwargs):

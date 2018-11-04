@@ -97,7 +97,6 @@ def doc(pipeline=None):
 
     # Add a custom formatter to customize the action
     class DocString(str):
-
         def __format__(self, format_spec):
             if not format_spec:
                 format_spec = "Run a"

@@ -17,7 +17,6 @@ from where import data
 
 
 class TestGnss(unittest.TestCase):
-
     def setUp(self):
         """
 

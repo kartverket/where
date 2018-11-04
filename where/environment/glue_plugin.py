@@ -124,8 +124,7 @@ def simple_update_combobox(combo, labels):
     return update_combobox(combo, labels_with_data)
 
 
-class UpdateMixin():
-
+class UpdateMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.next_update_func = None
@@ -139,7 +138,6 @@ class UpdateMixin():
 
 
 class DataSelectorWidget(QtWidgets.QWidget):
-
     def __init__(self, data_collection=None, parent=None):
         print("-> DataSelectorWidget.__init__(", data_collection, parent, ")")
         super().__init__(parent=parent)
@@ -240,7 +238,9 @@ class DD_Location(DropdownPicker):
     width = 8
 
     def update(self):
-        simple_update_combobox(self, sorted([d[10:] for d in config.files.sections if d.startswith("directory_")]))
+        simple_update_combobox(
+            self, sorted([d[10:] for d in config.files.section_namess if d.startswith("directory_")])
+        )
 
 
 class DD_User(DropdownPicker):

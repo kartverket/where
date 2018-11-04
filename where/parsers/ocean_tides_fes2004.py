@@ -10,17 +10,16 @@ References:
 
     ftp://tai.bipm.org/iers/conv2010/chapter6/tidemodels/fes2004_Cnm-Snm.dat
 
-
-
-
 """
 
 # Standard library imports
 import re
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
-from where.lib import plugins
 
 
 @plugins.register

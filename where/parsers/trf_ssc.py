@@ -6,9 +6,6 @@ Description:
 Reads station positions and velocities from TRF files in SSC format. The velocity model is a simple linear offset
 based on the reference epoch.
 
-
-
-
 """
 
 # Standard library imports
@@ -16,8 +13,10 @@ from datetime import datetime, timedelta
 import itertools
 import re
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.parsers._parser_chain import ParserDef, ChainParser
 
 

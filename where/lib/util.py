@@ -173,7 +173,7 @@ def get_callers():
         line_no = caller.f_lineno
         file_name = caller.f_code.co_filename
         if file_name.endswith(".py"):
-            module_name = file_name[-file_name[::-1].find("/erehw/"):-3].replace("/", ".")
+            module_name = file_name[-file_name[::-1].find("/erehw/") : -3].replace("/", ".")
             callers.insert(0, "{}.{} ({})".format(module_name, func_name, line_no))
 
         caller = caller.f_back
@@ -266,7 +266,7 @@ def trace_full(frame, event, arg):
         line_no = frame.f_lineno
         file_name = frame.f_code.co_filename
         if file_name.endswith(".py"):
-            module_name = file_name[-file_name[::-1].find("/erehw/"):-3].replace("/", ".")
+            module_name = file_name[-file_name[::-1].find("/erehw/") : -3].replace("/", ".")
             callers.insert(0, "{}.{} ({})".format(module_name, func_name, line_no))
 
         frame = frame.f_back
@@ -299,7 +299,7 @@ def trace_source(frame, event, arg):
             _CACHE_SRC[file_name] = {no: ln.strip() for no, ln in enumerate(fid.readlines(), start=1)}
 
     line_no = caller.f_lineno
-    module_name = file_name[-file_name[::-1].find("/erehw/"):-3].replace("/", ".")
+    module_name = file_name[-file_name[::-1].find("/erehw/") : -3].replace("/", ".")
     func_name = "{}.{} ({}):".format(module_name, caller.f_code.co_name, line_no)
 
     print("-> {:<40s} {}".format(func_name, _CACHE_SRC[file_name][line_no]))

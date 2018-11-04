@@ -33,7 +33,7 @@ def rinex3_obs(dset):
     run_by = "NMA"
     date = datetime.utcnow()
     time_sys = "GPS"  # TODO: So far only GPS time system can be handled by Where.
-    file_created = ("{:15s} {:3s}".format(date.strftime("%Y%m%d %H%M%S"), "UTC"))
+    file_created = "{:15s} {:3s}".format(date.strftime("%Y%m%d %H%M%S"), "UTC")
     pos_x = dset.site_pos.itrs[0][0]
     pos_y = dset.site_pos.itrs[0][1]
     pos_z = dset.site_pos.itrs[0][2]
@@ -224,9 +224,8 @@ def rinex3_obs(dset):
                             num_sats = len(sats)
                             if line == 0:
                                 num_sats_str = str(num_sats) if num_sats > 0 else ""
-                                phase_shift_str = (
-                                    "{:1s} {:>3s} {:>8.5f}{:>4s}"
-                                    "".format(sys, type_, float(meta["phase_shift"][sys][type_]["corr"]), num_sats_str)
+                                phase_shift_str = "{:1s} {:>3s} {:>8.5f}{:>4s}" "".format(
+                                    sys, type_, float(meta["phase_shift"][sys][type_]["corr"]), num_sats_str
                                 )
                             else:
                                 phase_shift_str = ""

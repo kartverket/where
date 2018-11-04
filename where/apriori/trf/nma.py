@@ -23,6 +23,7 @@ from where.apriori import trf
 from where.lib import config
 from where.lib import log
 from where.lib import plugins
+from where.lib.time import Time
 
 
 @plugins.register
@@ -76,9 +77,7 @@ class NmaTrf(trf.TrfFactory):
             )
             site_data["time_end"] = np.array(
                 [datetime.strptime("{:02.0f} {:.0f}".format(y, d), "%y %j") for y, d in epoch_data[:, [0, 2]]]
-            ) + timedelta(
-                days=1
-            )
+            ) + timedelta(days=1)
             site_data["pos"] = epoch_data[:, [3, 4, 5]]
             self._data[key] = site_data
 
@@ -107,14 +106,28 @@ class NmaTrf(trf.TrfFactory):
             Array:  Positions, one 3-vector for each time epoch.
         """
         site_data = self.data[site]
-        pos = np.full((len(self.time), 3), np.nan)
-        if "pos" not in site_data:
-            return pos
+        if self.time.isscalar:
+            pos = np.full(3, np.nan)
+            if "pos" not in site_data:
+                return pos
 
-        for idx, epoch in enumerate(self.time.datetime):
+            epoch = self.time.datetime
             try:
                 ep_idx = np.where((site_data["time_start"] <= epoch) & (epoch < site_data["time_end"]))[0][0]
+                pos[:] = site_data["pos"][ep_idx]
             except IndexError:
-                continue
-            pos[idx] = site_data["pos"][ep_idx]
+                pass
+
+        else:
+            pos = np.full((len(self.time), 3), np.nan)
+            if "pos" not in site_data:
+                return pos
+
+            for idx, epoch in enumerate(self.time.datetime):
+                try:
+                    ep_idx = np.where((site_data["time_start"] <= epoch) & (epoch < site_data["time_end"]))[0][0]
+                except IndexError:
+                    continue
+                pos[idx] = site_data["pos"][ep_idx]
+
         return pos

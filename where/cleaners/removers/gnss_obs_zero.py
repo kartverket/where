@@ -30,11 +30,7 @@ def gnss_obs_zero(dset):
         Numpy array:  False for observations to throw away.
     """
     session = dset.dataset_name
-    flag = config.session[session].gnss_obs_zero.bool
     edit_dset = np.full(dset.num_obs, True, dtype=bool)
-
-    if flag is False:  # TODO: Should it be done like that, if editor is not in use?
-        return edit_dset
 
     # Loop over GNSSs and observation types
     for sys in dset.meta["obstypes"]:

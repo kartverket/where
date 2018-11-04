@@ -30,9 +30,6 @@ Todo:
 Rewrite as a class instead of a module, to have somewhat cleaner code (and be more consistent with things like
 lib.unit).
 
-
-
-
 """
 # Standard library imports
 from configparser import ConfigParser
@@ -41,7 +38,8 @@ from configparser import ConfigParser
 from where.lib import files
 from where.lib import log
 
-#: Where constants as a ConfigParser, loaded from file.
+# Where constants as a ConfigParser, loaded from file.
+# TODO: Use midgard.config.Configuration
 _CONSTANTS = ConfigParser()
 
 

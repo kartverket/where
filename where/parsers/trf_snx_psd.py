@@ -5,17 +5,16 @@ Description:
 
 Reads post-seismic deformation model paramters from ITRF files in SNX format.
 
-
-
-
 """
 
 # Standard library imports
 from datetime import datetime, timedelta
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.parsers._parser_sinex import SinexParser
 
 

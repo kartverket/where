@@ -36,6 +36,7 @@ from where.lib import plugins
 
 FIGURE_FORMAT = "png"
 
+
 @plugins.register
 def sisre_comparison_report(dset):
     """Compare SISRE datasets
@@ -210,7 +211,6 @@ def _plot_bar_sisre_satellite_percentile(df, fid, figure_dir, threshold=False):
         ax.set_ylabel("SISRE [m] (95th percentile)")
         if threshold:
             plt.axhline(2, color="r")
-            
 
     plt.legend(bbox_to_anchor=(0.8, -0.3), loc=1, borderaxespad=0., ncol=3)
     plt.tight_layout()

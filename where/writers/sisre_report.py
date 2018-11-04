@@ -56,7 +56,26 @@ AxhlineConfig.__doc__ = """A convenience class for defining matplotlib axhline c
         color (str):            Color of horizontal line
     """
 
+# Define dictionary with fields to be printed in SISRE report
+FIELDS = {"sisre":        "SISRE",
+          "sisre_orb":    "orbit-only SISRE",
+          "orb_diff_3d":  "3D orbit error",
+          "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
+          "bias_brdc":    "satellite bias of broadcast clocks",
+          "bias_precise": "satellite bias of precise clocks",
+}
 
+
+
+FIELDS_OLD = {"sisre":        "Global averaged signal-in-space range error (SISRE)",
+          "sisre_orb":    "Orbit related error of global average SISRE",
+          "orb_diff_3d":  "3D orbit error based on difference between broadcast and precise orbit",
+          "clk_diff_with_dt_mean": "Satellite clock correction difference between broadcast and precise orbit, whereby averaged clock offset in each epoch is applied.",
+          "bias_brdc":    "Satellite bias of broadcast clocks",
+          "bias_precise": "Satellite bias of precise clocks",
+}
+
+# TODO: Maybe better to write a SisreReport class.
 @plugins.register
 def sisre_report(dset):
     """Write SISRE report
@@ -82,14 +101,19 @@ def sisre_report(dset):
         fid.write("\n# SISRE analysis results\n\n")
         figure_dir = files.path("output_sisre_report_figure", file_vars=dset.vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
-        if write_level <= enums.get_value("write_level", "detail"):
-            _plot_scatter_satellite_bias(fid, figure_dir, dset)
+
         _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
         _plot_scatter_sisre(fid, figure_dir, dset)
-        #_plot_scatter_field(fid, figure_dir, dset, 'sisre')
-        _plot_scatter_field(fid, figure_dir, dset, 'sisre', label=False, legend=False)
+        _plot_scatter_field(fid, figure_dir, dset, "sisre")
+        # _plot_scatter_field(fid, figure_dir, dset, 'sisre', label=False, legend=False)
         _plot_histogram_sisre(fid, figure_dir, dset)
-        _statistics(fid, figure_dir, dset)
+        _satellite_statistics_and_plot(fid, figure_dir, dset)
+
+        fid.write("\n# Analysis of input files\n\n")
+        if write_level <= enums.get_value("write_level", "detail"):
+            #_plot_scatter_satellite_bias(fid, figure_dir, dset)
+            _plot_scatter_field(fid, figure_dir, dset, "bias_brdc")
+            _plot_scatter_field(fid, figure_dir, dset, "bias_precise")
 
     # Generate PDF from Markdown file
     _markdown_to_pdf(dset)
@@ -109,6 +133,7 @@ def _eclipse_satellites(fid, dset):
         rundate=dset.rundate,
         time=dset.time,
         satellite=tuple(dset.satellite),
+
         system=tuple(dset.system),
         station=dset.dataset_name.upper(),
         apriori_orbit="broadcast",
@@ -133,7 +158,6 @@ def _get_satellite_type(dset, satellite):
 
 def _markdown_to_pdf(dset):
     """Convert markdown SISRE report file to pdf format
-
     Args:
        dset (Dataset):           A dataset containing the data.
     """
@@ -182,8 +206,20 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None
     colors = dict()
     # TODO: Better handling of color definition?
     # color_def = ['cornflowerblue', 'firebrick', 'violet', 'gold', 'limegreen', 'deepskyblue', 'orangered']
-    color_def = ["red", "tomato", "lightsalmon", "blue", "royalblue", "deepskyblue", "paleturquoise"]
+    color_def = [
+        "red",
+        "tomato",
+        "lightsalmon",
+        "navy",
+        "mediumblue",
+        "blue",
+        "royalblue",
+        "deepskyblue",
+        "paleturquoise",
+    ]
     # color_def = ['C'+str(idx) for idx in range(0,10)]
+    if len(color_def) < len(set(df_reduced.type)):
+        log.fatal(f"Not enough colours defined for number of satellite types (#num: {len(set(df_reduced.type))}).")
     for type_ in sorted(set(df_reduced.type)):
         colors.update({type_: color_def.pop()})
 
@@ -211,7 +247,7 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None
 #
 # BAR STACKED PLOTS
 #
-def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xticks_rotation=None, axhline=None):
+def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xticks_rotation=None, axhline=None, with_95th_percentile=True):
     """Generate bar plot of given dataframe columns (colored and ordered by satellite type)
 
     Args:
@@ -225,22 +261,29 @@ def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xtick
                                          type - GNSS type identifier
                                          y-value - Y-value for horizontal line
                                          color - Color of horizontal line 
+       with_95th_percentile (bool): Plot SISRE 95th percentile in addition
     """
     fontsize = 12
 
     # Generate new dataframe with columns 'orbit-only SISRE' and 'clock-only SISRE'
+    columns=["orbit-only SISRE RMS", "clock-only SISRE RMS"]
     data = np.hstack(
         (
             np.array([df_sisre_orb.rms]).T,
             (np.array([df_sisre.rms]) - np.array([df_sisre_orb.rms])).T,
-            (np.array([df_sisre.percentile]) - np.array([df_sisre.rms])).T,
         )
     )
+
+    if with_95th_percentile:
+        columns = columns + ["95th percentile SISRE"]
+        data = np.hstack((data, (np.array([df_sisre.percentile]) - np.array([df_sisre.rms])).T))
+
     df_merged = pd.DataFrame(
         data=data,
         index=df_sisre.index,
-        columns=["orbit-only SISRE RMS", "clock-only SISRE RMS", "95th percentile SISRE"],
+        columns=columns,
     )
+    
 
     # Generate bar plot
     fig_width = len(df_merged.index) / 4 if len(df_merged.index) > 30 else 6.4
@@ -413,8 +456,7 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
                 plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
                 plt.xlabel("Time [GPS]")
                 plt.title(f"{GNSS_NAME[sys]}")
-                plt.savefig(figure_path, dpi=FIGURE_DPI
-                )
+                plt.savefig(figure_path, dpi=FIGURE_DPI)
                 plt.clf()  # clear the current figure
 
                 fid.write(
@@ -431,27 +473,28 @@ def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
        figure_dir (PosixPath):   Figure directory
        dset (Dataset):           A dataset containing the data.
        field (str):              Dataset field.
-    """   
-
+    """
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
         figure_path = figure_dir / f"plot_scatter_{field.lower()}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
-          
-        fig = plt.figure(figsize=(6,5))
+
+        fig = plt.figure(figsize=(7, 5))
         if label == True:
-            for sat in dset.unique('satellite', idx=idx):
+            for sat in dset.unique("satellite", idx=idx):
                 idx_sat = dset.filter(system=sys, satellite=sat)
                 if np.sum(dset[field][idx_sat]) != 0:
-                        plt.scatter(dset.time.gps.datetime[idx_sat], dset[field][idx_sat], label=sat, marker='o', s=10)
+                    plt.scatter(dset.time.gps.datetime[idx_sat], dset[field][idx_sat], label=sat, marker="o", s=10)
         else:
             if np.sum(dset[field][idx]) != 0:
-                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], marker='o', s=10)
+                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], marker="o", s=10)
 
         if legend == True:
-            plt.legend(bbox_to_anchor=(1.04, 1), ncol=1)
-        text = (f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ m"
-                f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ m")
-        fig.text(0.95, 0.9, text, horizontalalignment="right", verticalalignment="top", multialignment='left') 
+            plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
+        text = (
+            f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ m"
+            f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ m"
+        )
+        fig.text(0.83, 0.9, text, horizontalalignment="right", verticalalignment="top", multialignment="left")
         plt.ylabel(f"{field.upper()} [m]")
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
         plt.xlabel("Time [GPS]")
@@ -461,11 +504,8 @@ def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
         plt.savefig(figure_path, dpi=FIGURE_DPI)
         plt.clf()  # clear the current figure
 
-        fid.write(
-            f"![{field.upper()} for {GNSS_NAME[sys]}]({figure_path})\n"
-        )
+        fid.write(f"![{field.upper()} for {GNSS_NAME[sys]}]({figure_path})\n")
         fid.write("\n\\clearpage\n\n")
-
 
 
 #
@@ -513,22 +553,20 @@ def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
     """
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
-        figure_path = figure_dir / f"plot_scatter_subplot_orbit_clock_differences_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
+        figure_path = (
+            figure_dir / f"plot_scatter_subplot_orbit_clock_differences_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
+        )
 
         # Define configuration of subplots
         subplots = (
             SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.itrs[:, 0][idx]),
             SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.itrs[:, 1][idx]),
             SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.itrs[:, 2][idx]),
-            SubplotConfig("Δclock [m]", "tomato", dset.clk_diff[idx]),
+            SubplotConfig("Δclock [m]", "tomato", dset.clk_diff_with_dt_mean[idx]),
         )
 
         _plot_scatter_subplots(
-            dset.time.gps.datetime[idx],
-            subplots,
-            figure_path,
-            xlabel="Time [GPS]",
-            title=f"{GNSS_NAME[sys]}",
+            dset.time.gps.datetime[idx], subplots, figure_path, xlabel="Time [GPS]", title=f"{GNSS_NAME[sys]}"
         )
 
         fid.write(
@@ -558,28 +596,39 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
         )
 
         _plot_scatter_subplots(
-            dset.time.gps.datetime[idx],
-            subplots,
-            figure_path,
-            xlabel="Time [GPS]",
-            title=f"{GNSS_NAME[sys]}",
+            dset.time.gps.datetime[idx], subplots, figure_path, xlabel="Time [GPS]", title=f"{GNSS_NAME[sys]}"
         )
 
-        fid.write(
-            f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_path})\n"
-        )
+        fid.write(f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_path})\n")
         fid.write("\n\\clearpage\n\n")
 
 
-def _statistics_satellite(fid, figure_dir, dset):
-    """Generate statistics for each field and satellite
+
+
+
+#
+# SATELLITE-WISE PLOTS AND STATISTICS
+#
+
+def _generate_satellite_index_dataframe(dset):
+    """Generate field DataFrames with the satellites as indices and functional values (rms, mean, ...) as columns
 
     Args:
-        fid (_io.TextIOWrapper):    File object
-        figure_dir (PosixPath):     Figure directory path
         dset (Dataset):             Dataset
+
+    Returns:
+
+        tuple:  with following elements
+
+    ==================  ============================================================================================
+     Elements            Description
+    ==================  ============================================================================================
+     field_dfs           Dictionary with field names as keys and dataframe as value. The dataframes have satellite
+                         as indices and statistical information as columns (rms, mean, std, min, max, 95th percentile) 
+     extra_rows_names    List with extra row names like GNSS and satellite type
+    ==================  ============================================================================================
+    
     """
-    fields = ["sisre", "sisre_orb", "orb_diff_3d", "clk_diff"]
     rms = lambda x: np.sqrt(np.mean(np.square(x)))
     percentile = lambda x: np.percentile(x, 95)
     functions = [rms, np.mean, np.std, np.min, np.max, percentile]
@@ -593,7 +642,7 @@ def _statistics_satellite(fid, figure_dir, dset):
     # E11  GALILEO-1  0.175557  0.138370  0.108046  0.014441  0.701326    0.259400
     # E12  GALILEO-1  0.366780  0.310270  0.195602  0.039986  0.945892    0.765318
     # E19  GALILEO-1  0.154111  0.141690  0.060615  0.013444  0.284842    0.244182
-    for field in fields:
+    for field in FIELDS.keys():
         extra_row_names = list()
         extra_rows = list()
         df_field = pd.DataFrame(columns=columns)
@@ -651,27 +700,37 @@ def _statistics_satellite(fid, figure_dir, dset):
         # Add field Dataframe to field Dataframe dictionary
         field_dfs.update({field: df_field})
 
+    return field_dfs, extra_row_names
+
+
+
+def _satellite_statistics_and_plot(fid, figure_dir, dset):
+    """Generate statistics and plots for each field and satellite
+
+    Args:
+        fid (_io.TextIOWrapper):    File object
+        figure_dir (PosixPath):     Figure directory path
+        dset (Dataset):             Dataset
+    """
+
+    field_dfs, extra_row_names = _generate_satellite_index_dataframe(dset)
+
     _plot_bar_stacked_sisre(fid, field_dfs, extra_row_names, figure_dir)
     _plot_bar_stacked_sisre_satellites(fid, field_dfs, extra_row_names, figure_dir)
 
     # Write field Dataframes
+    column = "rms"  # Column to plot
+
+    fid.write(f"\n\n#Statistics\n") 
+    fid.write("In this Section statistics are represented for: \n\n{}".format(''.join(['* '+v+'\n' for v in FIELDS.values()]))) 
     for field, df in field_dfs.items():
-        column = "rms"  # TODO: Loop over columns?
-        fid.write("\n\n#{} RMS for all satellites in [m]\n".format(field.upper()))
+        fid.write(f"\n\n##Statistic for {FIELDS[field]}\n")
+        fid.write("Unit: meter\n") 
         _write_dataframe_to_markdown(fid, df, float_format="6.3f")
+        fid.write("  ") 
+        
         # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column)
         _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column)
-
-
-def _statistics(fid, figure_dir, dset):
-    """Statistics
-
-    Args:
-       fid (_io.TextIOWrapper):  File object.
-       figure_dir (PosixPath):   Figure directory.
-       dset (Dataset):           A dataset containing the data.
-    """
-    _statistics_satellite(fid, figure_dir, dset)
 
 
 def _unhealthy_satellites(fid, dset):
@@ -709,7 +768,7 @@ def _write_config(fid):
 
 
 def _write_dataframe_to_markdown(fid, df, float_format=""):
-    """Write Pandas DataFrame to Markdown
+    """Write Pandas DataFrame to Markdown table
 
     Args:
         fid (_io.TextIOWrapper):    File object

@@ -5,19 +5,18 @@ Description:
 
 Asdf
 
-
-
-
 """
 
 # Standard library imports
 from datetime import datetime
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import log
 from where.parsers import parser
-from where.lib import plugins
 from where.lib.unit import unit
 
 
@@ -106,7 +105,7 @@ class SlrComParser(parser.ParserDict):
             if info_line["start_time"] <= time.utc.datetime <= info_line["end_time"]:
                 return float(info_line["lcm"]) * unit.mm2m
 
-        if not station in self.already_warned:
+        if station not in self.already_warned:
             log.warn(
                 "Missing center of mass data for CDP '{}'. Using default for {} ({} meters).",
                 station,

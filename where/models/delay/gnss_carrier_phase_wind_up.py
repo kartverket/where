@@ -54,14 +54,12 @@ def gnss_carrier_phase_wind_up(dset):
         # (nobs,3) = (nobs,3) - (nobs,3) * ((nobs,1,3) * (nobs,3,1)) + (nobs,3) x (nobs,3)
         dipole_rec = (
             unit_e
-            - unit_sat_rec
-            * (unit_sat_rec[:, None, :] @ unit_e[:, :, None])[:, :, 0]
+            - unit_sat_rec * (unit_sat_rec[:, None, :] @ unit_e[:, :, None])[:, :, 0]
             + np.cross(unit_sat_rec, unit_n)
         )
         dipole_sat = (
             unit_x
-            + unit_sat_rec
-            * (unit_sat_rec[:, None, :] @ unit_x[:, :, None])[:, :, 0]
+            + unit_sat_rec * (unit_sat_rec[:, None, :] @ unit_x[:, :, None])[:, :, 0]
             - np.cross(unit_sat_rec, unit_y)
         )
         dipole_rec_norm = np.linalg.norm(dipole_rec, axis=1)

@@ -118,9 +118,7 @@ class KalmanFilter(object):
             p_hat = self._get_p_hat(epoch)
             x_smooth[epoch] = x_hat[epoch] + p_hat.T @ lam
             lam = (
-                phi[epoch - 1].T @ h[epoch]
-                * innovation[epoch]
-                / sigma[epoch]
+                phi[epoch - 1].T @ h[epoch] * innovation[epoch] / sigma[epoch]
                 + phi[epoch - 1].T @ (I - k[epoch] @ h[epoch].T).T @ lam
             )
 
@@ -135,31 +133,31 @@ class KalmanFilter(object):
         """
         # Update dataset with state and estimation fields and calculate new residuals
         self._add_fields(dset, param_names)
-        dset.residual[:] = dset.obs + dset.estimate - dset.calc
-        num_unknowns += dset.meta["num_clock_coeff"] if "num_clock_coeff" in dset.meta else 0
+        dset.residual[:] = dset.estimate - (dset.obs - dset.calc)
+        num_unknowns += dset.meta.get("num_clock_coeff", 0)
 
         # Calculate normal equations, and add statistics about estimation to dataset
         N, b = self._normal_equations(normal_idx, dset.num_obs - 1)
         g = self.x_hat[dset.num_obs - 1, normal_idx, :]
         deg_freedom = dset.num_obs - num_unknowns
         v = dset.residual[:, None]
-        P = np.diag(1 / self.r[:dset.num_obs])
+        P = np.diag(1 / self.r[: dset.num_obs])
         sq_sum_residuals = np.asscalar(v.T @ P @ v)
         sq_sum_omc_terms = np.asscalar(2 * b.T @ g - g.T @ N @ g)
-        variance_factor = sq_sum_residuals / deg_freedom
-        log.info("Variance factor = {:.4f}", variance_factor)
+        variance_factor = sq_sum_residuals / deg_freedom if deg_freedom != 0 else np.inf
+        log.info("Variance factor = {:.4f}, degrees of freedom = {:d}", variance_factor, deg_freedom)
 
         # Report and set analysis status if there are too few degrees of freedom
         if deg_freedom < 1:
             log.error(f"Degrees of freedom is {deg_freedom} < 1. Estimate fewer parameters")
-            if dset.meta["analysis_status"] == "unchecked":
+            if dset.meta.get("analysis_status") == "unchecked":
                 dset.meta["analysis_status"] = "too few degrees of freedom"
 
                 # Update config
                 # with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
                 # cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
         else:
-            if dset.meta["analysis_status"] == "too few degrees of freedom":
+            if dset.meta.get("analysis_status") == "too few degrees of freedom":
                 dset.meta["analysis_status"] = "unchecked"
 
                 # Update config
@@ -168,14 +166,17 @@ class KalmanFilter(object):
 
         # Report and set analysis status if there are too few stations
         # TODO: if vlbi_site_pos in state_vector and num_stations < 3
-        if len(dset.unique("station")) < 3:
-            log.error(f"Two few stations {len(dset.unique('station'))} < 3. Do not estimate station positions.")
-            if dset.meta["analysis_status"] == "unchecked":
+        estimate_site_pos = np.char.startswith(np.array(param_names), 'vlbi_site_pos').any()
+        if len(dset.unique("station")) < 3 and estimate_site_pos:
+            log.error(f"Too few stations {len(dset.unique('station'))} < 3. Do not estimate station positions.")
+            if dset.meta.get("analysis_status") == "unchecked":
                 dset.meta["analysis_status"] = "needs custom state vector"
-
+        elif len(dset.unique("station")) < 3 and estimate_site_pos:
+            if dset.meta.get("analysis_status") == "needs custom state vector":
+                dset.meta["analysis_status"] = "unchecked"
         # Update config
         with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
-            cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
+            cfg.update("analysis_status", "status", dset.meta.get("analysis_status", ""), source=__file__)
 
         # Add information to dset.meta
         dset.add_to_meta("statistics", "number of observations", dset.num_obs)
@@ -202,14 +203,12 @@ class KalmanFilter(object):
         from where import apriori
 
         trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
-        celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-        crf = apriori.get("crf", celestial_reference_frames=celestial_reference_frame, session=dset.dataset_name)
 
         # thaller2008: eq 2.51 (skipping scale factor)
         for idx, column in enumerate(names):
             if "_site_pos-" not in column:
                 continue
-            station = column.split("-", maxsplit=1)[-1].split("_")[0]
+            station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
             site_id = dset.meta[station]["site_id"]
             if site_id in trf:
                 x0, y0, z0 = trf[site_id].pos.itrs  # TODO: Take units into account
@@ -231,27 +230,31 @@ class KalmanFilter(object):
         sigmas = [0.0001] * 3 + [1.5e-11] * 3
 
         # NNR to CRF
-        H2 = np.zeros((3, n))
-        for idx, column in enumerate(names):
-            if "_src_dir-" not in column:
-                continue
-            source = column.split("-", maxsplit=1)[-1].split("_")[0]
-            if source in crf:
-                ra = crf[source].pos.crs[0]
-                dec = crf[source].pos.crs[1]
-                if column.endswith("_ra"):
-                    H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
-                    H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
-                    H2[2, idx] = np.cos(dec) ** 2
-                if column.endswith("_dec"):
-                    H2[0, idx] = np.sin(ra)
-                    H2[1, idx] = -np.cos(ra)
+        if "celestial_reference_frames" in config.tech.master_section:
+            celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
+            crf = apriori.get("crf", celestial_reference_frames=celestial_reference_frame, session=dset.dataset_name)
+            H2 = np.zeros((3, n))
+            for idx, column in enumerate(names):
+                if "_src_dir-" not in column:
+                    continue
+                source = column.split("-", maxsplit=1)[-1].split("_")[0]
+                if source in crf:
+                    ra = crf[source].pos.crs[0]
+                    dec = crf[source].pos.crs[1]
+                    if column.endswith("_ra"):
+                        H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
+                        H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
+                        H2[2, idx] = np.cos(dec) ** 2
+                    if column.endswith("_dec"):
+                        H2[0, idx] = np.sin(ra)
+                        H2[1, idx] = -np.cos(ra)
 
-        if H2.any():
-            log.info("Applying NNR constraint to {}", celestial_reference_frame.upper())
-            # add NNR to CRF constraints
-            H = np.concatenate((H, H2))
-            sigmas = sigmas + [1e-6] * 3
+            if H2.any():
+                log.info("Applying NNR constraint to {}", celestial_reference_frame.upper())
+                # add NNR to CRF constraints
+                H = np.concatenate((H, H2))
+                sigmas = sigmas + [1e-6] * 3
+
         # thaller2008: eq 2.45
         P_h = np.diag(1 / np.array(sigmas) ** 2)
 
@@ -290,8 +293,8 @@ class KalmanFilter(object):
             # State vectors
             fieldname = "{}_{}".format("state", param_name)
             fieldname_sigma = fieldname + "_sigma"
-            value = self.x_smooth[:dset.num_obs, idx, 0]
-            value_sigma = np.sqrt(self.x_hat_ferr[:dset.num_obs, idx])
+            value = self.x_smooth[: dset.num_obs, idx, 0]
+            value_sigma = np.sqrt(self.x_hat_ferr[: dset.num_obs, idx])
 
             if fieldname in dset.fields:
                 dset[fieldname][:] = value * dset.meta["display_factors"][param_name]
@@ -323,13 +326,13 @@ class KalmanFilter(object):
 
             # Estimate vectors
             fieldname = "{}_{}".format("estimate", param_name)
-            value = self.h[:dset.num_obs, idx, 0] * self.x_smooth[:dset.num_obs, idx, 0]
+            value = self.h[: dset.num_obs, idx, 0] * self.x_smooth[: dset.num_obs, idx, 0]
             if fieldname in dset.fields:
                 dset[fieldname][:] = value
             else:
                 dset.add_float(fieldname, table="estimate", val=value, unit="meter", write_level="analysis")
 
-        value = (self.x_smooth.transpose(0, 2, 1) @ self.h)[:dset.num_obs, 0, 0]
+        value = (self.x_smooth.transpose(0, 2, 1) @ self.h)[: dset.num_obs, 0, 0]
         if "estimate" in dset.fields:
             dset.estimate[:] = value
         else:
@@ -360,16 +363,16 @@ class KalmanFilter(object):
         # test
         if False:
             stat_idx = slice(normal_idx.stop, self.n, None)
-            R = np.diag(self.r[:last_obs + 1])
-            H_L = self.h[:last_obs + 1, stat_idx, 0]
+            R = np.diag(self.r[: last_obs + 1])
+            H_L = self.h[: last_obs + 1, stat_idx, 0]
             c_L = p_tilde_0[stat_idx, stat_idx]
             R_tilde = H_L @ c_L @ H_L.T + R
             R_tilde_inv = np.linalg.inv(R_tilde)
 
-            H_g = self.h[:last_obs + 1, normal_idx, 0]
+            H_g = self.h[: last_obs + 1, normal_idx, 0]
 
             NN = H_g.T @ R_tilde_inv @ H_g
-            bb = H_g.T @ R_tilde_inv @ self.z[:last_obs + 1]
+            bb = H_g.T @ R_tilde_inv @ self.z[: last_obs + 1]
             print("Normal matrix all close:", np.allclose(NN, N, atol=0.01), "Max diff:", np.max(np.abs(NN - N)))
             print(
                 "Normal vector all close:",

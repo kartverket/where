@@ -101,11 +101,10 @@ def vlbi_grav_delay(dset):
         norm_body_site1 = np.linalg.norm(vector_body_site1, axis=1)
         src_dot_vector_body_site1 = (dset.src_dir.unit_vector[:, None, :] @ vector_body_site1[:, :, None])[:, 0, 0]
         nomJ = norm_body_site1 + src_dot_vector_body_site1
-        denomJ = np.linalg.norm(vector_body_site2, axis=1) + (
-            dset.src_dir.unit_vector[:, None, :] @ vector_body_site2[:, :, None]
-        )[
-            :, 0, 0
-        ]
+        denomJ = (
+            np.linalg.norm(vector_body_site2, axis=1)
+            + (dset.src_dir.unit_vector[:, None, :] @ vector_body_site2[:, :, None])[:, 0, 0]
+        )
 
         # Main correction (equation 11.1)
         grav_delay += 2 * GM_body / constant.c ** 2 * np.log(nomJ / denomJ)
@@ -114,20 +113,18 @@ def vlbi_grav_delay(dset):
         baseline_dot_vector_body_site1 = (baseline_gcrs[:, None, :] @ vector_body_site1[:, :, None])[:, 0, 0]
         grav_delay += (
             4
-            * GM_body
-            ** 2
-            / constant.c
-            ** 4
+            * GM_body ** 2
+            / constant.c ** 4
             * (baseline_dot_vector_body_site1 / norm_body_site1 + src_dot_baseline)
-            / (norm_body_site1 + src_dot_vector_body_site1)
-            ** 2
+            / (norm_body_site1 + src_dot_vector_body_site1) ** 2
         )
 
     # Denominator (equation 11.9)
-    denominator = 1 + (
-        (bcrs_vel_earth + dset.site_pos_2.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c
-    )[
-        :, 0, 0
-    ]
+    denominator = (
+        1
+        + (
+            (bcrs_vel_earth + dset.site_pos_2.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c
+        )[:, 0, 0]
+    )
 
     return grav_delay / denominator

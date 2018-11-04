@@ -302,7 +302,10 @@ def get_rinex_file_version(file_key, file_vars):
     """
     file_path = files.path(file_key, file_vars=file_vars)
     with files.open(file_key, file_vars=file_vars, mode="rt") as infile:
-        version = infile.readline().split()[0]
+        try:
+            version = infile.readline().split()[0]
+        except IndexError:
+            log.fatal(f"Could not find Rinex version in file {file_path}")
 
     return version, file_path
 

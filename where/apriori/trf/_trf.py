@@ -91,7 +91,7 @@ class Trf(collections.UserDict):
         Returns:
             TrfSite: Site closest to the given position. Raises `ValueError` if no site is found within `max_distance`.
         """
-        distances = {k: self[k].distance_to(pos) for k in self.sites}
+        distances = {k: self[k].distance_to(pos) for k in self.sites if self[k].real}
         closest = min(distances, key=distances.get)
 
         # Check that distance is within threshold
@@ -102,6 +102,14 @@ class Trf(collections.UserDict):
                 "No site found within {} meters of ({:.2f}, {:.2f}, {:.2f}) in '{!r}'"
                 "".format(max_distance, *pos, self)
             )
+
+    def named_site(self, name):
+        """Find site with given name
+        """
+        for k in self.sites:
+            if name == self[k].name:
+                return self[k]
+        raise ValueError("No site found with name {} in '{!r}'".format(name, self))
 
     #
     # Dunder-methods
@@ -124,8 +132,7 @@ class Trf(collections.UserDict):
             yield self[site]
 
 
-class TrfFactory():
-
+class TrfFactory:
     def __init__(self, time, version=None):
         self.name = self.__class__.__module__.split(".")[-1]
         self.time = time
@@ -161,7 +168,6 @@ class TrfFactory():
 
         pos_itrs = self._calculate_pos_itrs(key)
         site_info = self.data[key]
-
         trf_site = TrfSite(key, time=self.time, itrs=pos_itrs, source=str(self), **site_info)
         log.debug("Found site {}".format(trf_site))
         return trf_site
@@ -203,17 +209,28 @@ class TrfFactory():
         return "{}({!r}, '{}')".format(self.__class__.__name__, self.time, self.version)
 
 
-class TrfSite():
+class TrfSite:
+    def __init__(self, key, time, itrs, source, real=True, name=None, **meta_args):
+        """Constructor
 
-    def __init__(self, key, time, itrs, source, **meta_args):
+        Args:
+            key:     Unique identifier for the site
+            time:    Epochs the site has observations for
+            pos:     The position (in a TRF) of the site at each epoch
+            source:  The source of the position information
+            real:    Flag indicating whether the site is a real site or a dummy site
+            meta:    Additional meta information
+        """
         self.key = key
         self.time = time
         self.pos = Position(itrs=itrs)
         self.source = source
+        self.real = real
+        self.name = name
         self.meta = meta_args
 
-        # Try to set name from meta, with fallback to key
-        self.name = self.meta.get("name", self.key)
+        if self.name is None:
+            self.name = meta_args.get(name, self.key)
 
     def distance_to(self, other_pos):
         """Calculate distance to some other position
@@ -232,10 +249,8 @@ class TrfSite():
     # Dunder methods
     #
     def __repr__(self):
-        if self.time.size == 1:
+        if self.pos.itrs.ndim == 1:
             pos = self.pos.itrs
         else:
             pos = self.pos.itrs.mean(axis=0)
-        return (
-            "{}('{}', ({:.2f}, {:.2f}, {:.2f}), '{}')" "".format(self.__class__.__name__, self.name, *pos, self.source)
-        )
+        return "{}('{}', ({:.2f}, {:.2f}, {:.2f}), '{}')".format(self.__class__.__name__, self.name, *pos, self.source)

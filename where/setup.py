@@ -251,7 +251,7 @@ def add_sections(rundate, pipeline, session):
     # Add dependent sections that are not already included
     with mg_config.Configuration.update_on_file(cfg_path, metadata=False) as cfg:
         for section in _dependent_sections(cfg[pipeline]):
-            if section.name not in cfg.sections:
+            if section.name not in cfg.section_names:
                 cfg.update_from_config_section(section)
             else:
                 for key, entry in section.items():
@@ -322,7 +322,7 @@ def read_from_library(rundate, pipeline, session):
     lib_cfg = mg_config.Configuration.read_from_file("library", lib_path)
 
     for section in lib_cfg.sections:
-        yield lib_cfg[section]
+        yield section
 
 
 def store_config_to_library(rundate, pipeline, session):
@@ -335,9 +335,9 @@ def store_config_to_library(rundate, pipeline, session):
     lib_cfg = mg_config.Configuration("library")
 
     for section in cfg.sections:
-        for key, entry in cfg[section].items():  # Todo: Make ConfigurationSection iterable
-            if "library" in entry.meta or "library" in config.where.get(key, section=section, default="").meta:
-                lib_cfg.update(section, key, entry.str, source=entry.source)
+        for key, entry in section.items():  # Todo: Make ConfigurationSection iterable
+            if "library" in entry.meta or "library" in config.where.get(key, section=section.name, default="").meta:
+                lib_cfg.update(section.name, key, entry.str, source=entry.source)
                 # Todo: Only store entries different from default (issue: profiles?)
 
     lib_cfg.write_to_file(lib_path)
@@ -405,7 +405,7 @@ def _dependent_sections(cfg_section, master_cfg=config.where):
             continue
 
         # Return sections matching entry values  # Todo: Add .set property to ConfigurationEntry
-        sections = set(master_cfg.sections) & set([s.split(":")[0] for s in entry.list])
+        sections = set(master_cfg.section_names) & set([s.split(":")[0] for s in entry.list])
         for section in sections:
             yield master_cfg[section]
 

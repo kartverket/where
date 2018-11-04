@@ -35,12 +35,13 @@ class Parser:
         meta (Dict):                  Metainformation read from file.
     """
 
-    def __init__(self, file_path, encoding=None):
+    def __init__(self, file_path, encoding=None, logger=None):
         """Set up the basic information needed by the parser
 
         Args:
             file_path (String/Path):    Path to file that will be read.
             encoding (String):          Encoding of file that will be read.
+            logger (Function):          Ignored for where.parsers, used for consistency with Midgard.
         """
         self.file_path = pathlib.Path(file_path)
         self.file_encoding = encoding
@@ -67,16 +68,14 @@ class Parser:
         """
         self.setup_parser()
 
-        parser_package = self.__module__.rsplit(".", maxsplit=1)[0]
-        with timer("Finish {} ({}) - {} in".format(self.parser_name, parser_package, self.file_path)):
-            if self.data_available:
-                self.read_data()
+        if self.data_available:
+            self.read_data()
 
-            if not self.data_available:  # May have been set to False by self.read_data()
-                log.warn("No data found by {} in {}", self.__class__.__name__, self.file_path)
-                return self
+        if not self.data_available:  # May have been set to False by self.read_data()
+            log.warn("No data found by {} in {}", self.__class__.__name__, self.file_path)
+            return self
 
-            self.calculate_data()
+        self.calculate_data()
 
         dependencies.add(self.file_path)
         return self

@@ -5,17 +5,16 @@ Description:
 
 Reads data from EOP files.
 
-
-
-
 """
 
 # Standard library imports
 import itertools
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib import plugins
 
 
 @plugins.register
@@ -32,7 +31,16 @@ class EopParser(ChainParser):
                 True: {
                     "parser": self.parse_eop_line,
                     "fields": [
-                        None, None, None, "mjd", "x", "y", "ut1_utc", "lod", "dx", "dy"  # ignore date, use MJD
+                        None,
+                        None,
+                        None,
+                        "mjd",
+                        "x",
+                        "y",
+                        "ut1_utc",
+                        "lod",
+                        "dx",
+                        "dy",  # ignore date, use MJD
                     ],
                 }
             },

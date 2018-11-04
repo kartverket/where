@@ -118,7 +118,7 @@ def init(rundate, tech_name, session, **cfg_vars):
     tech.clear()
     cfg_path = files.config.directory.replaced.path / files.config.filename.replaced.path
     tech.update_from_file(cfg_path)
-    if tech_name in tech.sections:
+    if tech_name in tech.section_names:
         tech.master_section = tech_name
 
 
@@ -149,14 +149,6 @@ def set_file_vars(file_vars=None):
     files.update_vars({"path_{}".format(k): str(v.path) for k, v in where.path.data.items()})
     if file_vars is not None:
         files.update_vars(file_vars)
-
-
-def reread():
-    # TODO: Can this function be deleted?
-    rundate = program.rundate.date
-    tech_name = program.tech.str
-    session = program.session.str
-    init(rundate=rundate, tech_name=tech_name, session=session)
 
 
 def program_vars(rundate, tech_name, session, use_options=True, **other_vars):
@@ -210,6 +202,8 @@ def date_vars(date):
     # Import Time locally to avoid circular imports
     from where.lib.time import Time
 
+    month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
     # Create the dict of date variables
     return dict(
         yyyy=date.strftime("%Y"),
@@ -217,8 +211,8 @@ def date_vars(date):
         yy=date.strftime("%y"),
         m=str(date.month),
         mm=date.strftime("%m"),
-        mmm=date.strftime("%b").lower(),
-        MMM=date.strftime("%b").upper(),
+        mmm=month[date.month - 1].lower(),
+        MMM=month[date.month - 1].upper(),
         d=str(date.day),
         dd=date.strftime("%d"),
         hh=date.strftime("%H"),

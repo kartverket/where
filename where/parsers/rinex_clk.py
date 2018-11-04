@@ -24,10 +24,12 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers import parser
 from where.lib import constant
-from where.lib import plugins
 
 
 @plugins.register

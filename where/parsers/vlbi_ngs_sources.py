@@ -12,9 +12,6 @@ References:
 [1] NGS file format.
     http://lacerta.gsfc.nasa.gov/mk5/help/dbngs_format.txt
 
-
-
-
 """
 
 # Standard library imports
@@ -23,9 +20,11 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib import plugins
 from where.lib.unit import unit
 
 

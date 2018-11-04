@@ -16,15 +16,15 @@ References:
 -----------
 http://ggosatm.hg.tuwien.ac.at/DELAY/readme.txt
 
-
-
 """
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser import Parser
-from where.lib import plugins
 
 
 @plugins.register

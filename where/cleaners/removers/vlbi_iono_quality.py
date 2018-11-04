@@ -4,6 +4,8 @@ Description:
 ------------
 
 """
+import numpy as np
+
 # Where imports
 from where.lib import config
 from where.lib import plugins
@@ -23,4 +25,4 @@ def iono_quality(dset):
         Array containing False for observations to throw away
     """
     iono_threshold = config.tech[_SECTION].threshold.int
-    return dset.iono_quality >= iono_threshold
+    return np.nan_to_num(dset.iono_quality) >= iono_threshold

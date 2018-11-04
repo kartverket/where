@@ -49,13 +49,13 @@ def site_pos(dset):
         stations = stations[np.logical_not(fix_idx)]
 
     # Calculate partials
-    all_partials = dset.src_dir.unit_vector[:, None, :] @ dset.time.itrs2gcrs
+    all_partials = -dset.src_dir.unit_vector[:, None, :] @ dset.time.itrs2gcrs
     partials = np.zeros((dset.num_obs, len(stations) * 3))
     for idx, station in enumerate(stations):
         filter_1 = dset.filter(station_1=station)
-        partials[filter_1, idx * 3:idx * 3 + 3] = all_partials[filter_1][:, 0] * -1
+        partials[filter_1, idx * 3 : idx * 3 + 3] = all_partials[filter_1][:, 0] * -1
         filter_2 = dset.filter(station_2=station)
-        partials[filter_2, idx * 3:idx * 3 + 3] = all_partials[filter_2][:, 0]
+        partials[filter_2, idx * 3 : idx * 3 + 3] = all_partials[filter_2][:, 0]
 
     column_names = [s + "_" + xyz for s in stations for xyz in "xyz"]
 

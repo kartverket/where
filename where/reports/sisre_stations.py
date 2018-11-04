@@ -127,7 +127,12 @@ def write_config(fid):
        fid:
     """
     skip_config_keys = [
-        "reference_ellipsoid", "reference_frame", "ocean_tides", "atmospheric_tides", "mean_pole_version", "eop_models"
+        "reference_ellipsoid",
+        "reference_frame",
+        "ocean_tides",
+        "atmospheric_tides",
+        "mean_pole_version",
+        "eop_models",
     ]  # TODO
 
     # Print the individual configuration options

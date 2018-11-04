@@ -38,9 +38,11 @@ def geometric_delay(dset):
         log.warn("Missing troposphere data. Correction set to zero")
         datm1 = 0
 
-    return datm1 * (
-        (dset.site_pos_2.gcrs_vel - dset.site_pos_1.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None]
-        / constant.c
-    )[
-        :, 0, 0
-    ]
+    return (
+        datm1
+        * (
+            (dset.site_pos_2.gcrs_vel - dset.site_pos_1.gcrs_vel)[:, None, :]
+            @ dset.src_dir.unit_vector[:, :, None]
+            / constant.c
+        )[:, 0, 0]
+    )

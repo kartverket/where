@@ -33,6 +33,6 @@ def eop_dut1(dset):
     src_dir = dset.src_dir.unit_vector[:, None, :]
     baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
     dR_dut1 = sofa.dR_dut1(dset.time)
-    partials = (src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline)[:, :, 0]
+    partials = -(src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline)[:, :, 0]
 
     return partials, column_name, "meter * (radians per second)"

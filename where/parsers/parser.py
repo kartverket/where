@@ -288,4 +288,5 @@ class Parser(object):
 class ParserDict(Parser, UserDict):
     """A Parser that can be treated as a dict containing all the parsed data
     """
+
     pass

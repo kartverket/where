@@ -16,18 +16,17 @@ example http://holt.oso.chalmers.se/loading/example_blq.html.
 The following assumption is made by this parser:
 *) A data block is identified with a 5 digit domes number
 
-
-
 """
 
 # Standard library imports
-import re
 import numpy as np
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser import Parser
 from where.lib import files
-from where.lib import plugins
 
 
 @plugins.register

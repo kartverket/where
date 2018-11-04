@@ -19,8 +19,7 @@ import functools
 _DEPENDENT_PROPERTIES = dict()
 
 
-class property():
-
+class property:
     def __init__(self, fget):
         self.fget = fget
         functools.update_wrapper(self, fget)

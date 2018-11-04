@@ -46,7 +46,7 @@ from where.lib import log
 class URL(str):
     """Simple wrapper around String to have URLs work similar to pathlib.Path
 
-    TODO: Move this to Midgard, add concatenation with "/"
+    TODO: Move this to Midgard, add concatenation with "/", download to path etc
     """
 
     @property
@@ -387,7 +387,7 @@ def publish_files(publish=None):
     if not config.where.files.publish.bool:
         return
 
-    publish_list = config.tech.get("publish", value=publish).list
+    publish_list = config.tech.get("files_to_publish", value=publish).list
     for file_key in publish_list:
         try:
             source = path(file_key)
@@ -519,8 +519,8 @@ def get_parser(file_key):
     Returns:
         String:  Name of parser to be used to parse file, None if parser is not specified.
     """
-    if file_key not in config.files.sections:
-        raise FileNotFoundError("File {} not found in file list".format(file_key))
+    if file_key not in config.files.section_names:
+        raise FileNotFoundError(f"File {file_key} not found in file list")
 
     return config.files[file_key].parser.str
 

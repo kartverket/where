@@ -12,14 +12,12 @@ Description:
 
 Reads data from files in Terrapos residual format.
 
-
 """
-# External library imports
-import numpy as np
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
 
 
 @plugins.register

@@ -12,9 +12,11 @@ Reference:
 http://geophy.uni.lu/ggfc-atmosphere/tide-loading-calculator.html
 
 """
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
 
 
 @plugins.register

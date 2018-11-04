@@ -26,6 +26,7 @@ from where.lib.unit import unit as lib_unit
 
 class PositionTable(Table):
     """Position-klasse doc?"""
+
     datatype = "position"
 
     def __init__(self, name, num_obs, dataset):
@@ -471,8 +472,7 @@ class PositionTable(Table):
         try:
             return (
                 self._other_tbl.unit_vector
-                + vel
-                / constant.c
+                + vel / constant.c
                 - self._other_tbl.unit_vector
                 * np.sum(self._other_tbl.unit_vector * vel, axis=1, keepdims=True)
                 / constant.c

@@ -4,6 +4,8 @@ Description:
 ------------
 
 """
+import numpy as np
+
 # Where imports
 from where.lib import config
 from where.lib import plugins
@@ -23,4 +25,4 @@ def data_quality(dset):
         Array containing False for observations to throw away
     """
     dq_threshold = config.tech[_SECTION].threshold.int
-    return dset.data_quality <= dq_threshold
+    return np.nan_to_num(dset.data_quality) <= dq_threshold

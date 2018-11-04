@@ -94,7 +94,7 @@ def config_wizard(cfg: config.Configuration) -> config.Configuration:
     cfg_local = config.Configuration("local")
 
     # Loop through sections and entries of main configuration
-    for section in cfg.sections:
+    for section in cfg.section_names:
         for key, entry in cfg[section].items():
             if "wizard" not in entry.meta:
                 continue

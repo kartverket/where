@@ -7,9 +7,6 @@ Reads data from files in the CRD file format as defined in http://ilrs.gsfc.nasa
 date October 27, 2009). General information about the format at
 http://ilrs.gsfc.nasa.gov/data_and_products/formats/crd.html with links to current specification and data.
 
-
-
-
 """
 
 # Standard library imports
@@ -20,13 +17,15 @@ import itertools
 import numpy as np
 from scipy import interpolate
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from where.lib import config
 from where.lib import files
 from where.lib import log
 from where.parsers import parser
-from where.lib import plugins
 from where.lib.time import Time
 from where.lib.unit import unit
 
@@ -204,7 +203,7 @@ class SlrCrdParser(parser.Parser):
     def parse_meteorology(self, line, cache):
         """Parse the meteorological record
         """
-        met_secs = ((cache["obs_date"] - self.rundate).total_seconds() + float(line["seconds"]))
+        met_secs = (cache["obs_date"] - self.rundate).total_seconds() + float(line["seconds"])
         if float(line["seconds"]) < 43000 and cache["starting_hour"] > 12:  # Suspect day-shift in session:
             met_secs += 86400
 

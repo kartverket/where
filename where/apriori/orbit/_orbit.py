@@ -22,7 +22,7 @@ from where import data
 from where.lib import util
 
 
-class AprioriOrbit():
+class AprioriOrbit:
     """An abstract baseclass for initial orbits
     """
 
@@ -72,9 +72,9 @@ class AprioriOrbit():
 
     @property
     def dset_edit(self):
-        """Dataset representing raw data from apriori orbit files
+        """Dataset representing edit data from apriori orbit files
 
-        Reads data if the raw data are not already present.
+        Edits data if the edit data are not already present.
         """
         if not self._dset_edit.num_obs:
             self._dset_edit = self._edit(self._dset_edit)

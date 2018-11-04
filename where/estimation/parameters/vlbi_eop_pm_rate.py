@@ -37,9 +37,9 @@ def eop_pm_rate(dset):
     dt = (time.jd - time.mean.jd)[:, None, None]
 
     # x-pole
-    partials[:, 0] = (src_dir @ sofa.Q(time) @ sofa.R(time) @ sofa.dW_dxp(time) @ baseline @ dt)[:, 0, 0]
+    partials[:, 0] = -(src_dir @ sofa.Q(time) @ sofa.R(time) @ sofa.dW_dxp(time) @ baseline @ dt)[:, 0, 0]
 
     # y-pole
-    partials[:, 1] = (src_dir @ sofa.Q(time) @ sofa.R(time) @ sofa.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
+    partials[:, 1] = -(src_dir @ sofa.Q(time) @ sofa.R(time) @ sofa.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
 
     return partials, column_names, "meter * days / radian"

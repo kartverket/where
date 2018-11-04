@@ -57,7 +57,7 @@ def axis_offset_station(dset):
 
     sin_a = np.sin(dset.site_pos.azimuth)
     cos_a = np.cos(dset.site_pos.azimuth)
-    sin_z = np.sin(dset.site_pos.zenith_distance)
+    cos_e = np.cos(dset.site_pos.elevation)
     cos_d = np.cos(dset.src_dir.declination)
 
     for ivsname in dset.unique("ivsname"):
@@ -70,13 +70,13 @@ def axis_offset_station(dset):
         axis_type = antenna_info[ivsname]["mount"]
 
         if axis_type == "MO_AZEL":
-            delays[idx] = -ao * sin_z[idx]
+            delays[idx] = -ao * cos_e[idx]
         elif axis_type == "MO_EQUA":
             delays[idx] = -ao * cos_d[idx]
         elif axis_type == "MO_XYNO":
-            delays[idx] = -ao * np.sqrt(1 - (sin_z[idx] * cos_a[idx]) ** 2)
+            delays[idx] = -ao * np.sqrt(1 - (cos_e[idx] * cos_a[idx]) ** 2)
         elif axis_type == "MO_XYEA":
-            delays[idx] = -ao * np.sqrt(1 - (sin_z[idx] * sin_a[idx]) ** 2)
+            delays[idx] = -ao * np.sqrt(1 - (cos_e[idx] * sin_a[idx]) ** 2)
         else:
             log.warn("Unknown antenna axis type '{}' for {}. Correction set to zero", axis_type, ivsname)
             continue

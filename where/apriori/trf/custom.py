@@ -46,10 +46,10 @@ class CustomTrf(trf.TrfFactory):
             dependencies.add(trf_local_path)
 
         data = dict()
-        for key in trf.sections:
-            info = {k: v for k, v in trf[key].as_dict().items() if not k == "pos_itrs"}
-            info["pos"] = np.array(trf[key].pos_itrs.list, dtype=float)
-            data[key] = info
+        for section in trf.sections:
+            info = {k: v for k, v in section.as_dict().items() if not k == "pos_itrs"}
+            info["pos"] = np.array(section.pos_itrs.list, dtype=float)
+            data[section.name] = info
 
         return data
 

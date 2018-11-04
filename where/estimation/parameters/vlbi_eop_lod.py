@@ -33,6 +33,6 @@ def eop_lod(dset):
     dR_dut1 = sofa.dR_dut1(dset.time)
     dt = (dset.time.jd - dset.time.mean.jd)[:, None, None]
     # lod = - ut1_rate * 1 day -> lod_partial = - ut1_rate_partial / 1 day
-    partials = -(src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline @ dt)[:, :, 0]
+    partials = (src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline @ dt)[:, :, 0]
 
     return partials, column_name, "meter * radians / seconds"

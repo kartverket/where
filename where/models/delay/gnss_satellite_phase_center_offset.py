@@ -9,14 +9,8 @@ phase center (APC).
 The precise orbits has to be related to the satellite antenna phase center by comparing broadcast with precise orbits.
 That means the precise orbits has to be corrected by offset between satellite center of mass and antenna phase center.
 In this case the satellite antenna phase offset of the first frequency is used as default.
-
-TODO: Frequency dependency is not solved. Should observations be corrected? Or only choosed observations?
-      Ionospheric-free linear combination is described in subirana!!!
-
-
-
-
 """
+
 # External library imports
 import numpy as np
 

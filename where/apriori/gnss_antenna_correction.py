@@ -95,12 +95,13 @@ class AntennaCorrection(UserDict):
         self.data = parser.as_dict()
         self.file_path = parser.file_path
 
-    def satellite_phase_center_offset(self, dset, sys_freq):
+    def satellite_phase_center_offset(self, dset, sys_freq=None):
         """Determine satellite phase center offset correction vectors given in ITRS
 
         Satellite phase center offset (PCO) corrections are frequency dependent. The argument 'sys_freq' defines, which
         frequencies for a given GNSS should be used. If two frequencies for a GNSS are given, then the PCO is
-        determined as ionospheric-free linear combination.
+        determined as ionospheric-free linear combination. If 'sys_freq' is not defined as input argument, then 
+        'sys_freq' is generated based on the given observation types in dataset 'dset'.
 
         Args:
             dset (Dataset):   Model data.
@@ -112,8 +113,51 @@ class AntennaCorrection(UserDict):
             numpy.ndarray: Satellite phase center offset correction vectors given in ITRS in meter
 
         """
+        # GNSS          Freq number      GNSS freq
+        #               L<num>/C<num>
+        # ___________________________________________
+        # C (BeiDou):   2                'B1'
+        #               7                'B2'
+        #               6                'B3'
+        # G (GPS):      1                'L1'
+        #               2                'L2'
+        #               5                'L5'
+        # R (GLONASS):  1                'G1'
+        #               2                'G2'
+        #               3                'G3'
+        # E (Galileo):  1                'E1'
+        #               8                'E5 (E5a+E5b)'
+        #               5                'E5a'
+        #               7                'E5b'
+        #               6                'E6'
+        # I (IRNSS):    5                'L5'
+        #               9                'S'
+        # J (QZSS):     1                'L1'
+        #               2                'L2'
+        #               5                'L5'
+        #               6                'LEX'
+        # S (SBAS):     1                'L1'
+        #               5                'L5'
+        obstype_to_gnss_freq = {
+            "C": {"2": "B1", "7": "B2", "6": "B3"},
+            "E": {"1": "E1", "8": "E5", "5": "E5a", "7": "E5b", "6": "E6"},
+            "G": {"1": "L1", "2": "L2", "5": "L5"},
+            "I": {"5": "L5", "9": "S"},
+            "J": {"1": "L1", "2": "L2", "5": "L5", "6": "LEX"},
+            "R": {"1": "G1", "2": "G2", "3": "G3"},
+            "S": {"1": "L1", "5": "L5"},
+        }
+
         correction = np.zeros((dset.num_obs, 3))
         used_date = None
+
+        # Get GNSS frequency based on observation type
+        if sys_freq is None:
+            sys_freq = dict()
+            obstypes = dset.meta["obstypes"]
+            for sys in obstypes:
+                freqs = {o[1] for o in obstypes[sys]}
+                sys_freq[sys] = "_".join(f"{obstype_to_gnss_freq[sys][f]}" for f in sorted(freqs))
 
         # Loop over all satellites given in RINEX observation file and configuration file
         for sat in dset.unique("satellite"):
@@ -197,7 +241,7 @@ class AntennaCorrection(UserDict):
             "G": {"L1": "G01", "L2": "G02", "L5": "G05"},
             "I": {"L5": "I05", "S": "I09"},
             "J": {"L1": "J01", "L2": "J02", "L5": "J05", "LEX": "J06"},
-            "R": {"G1": "R01", "G2": "R02"},
+            "R": {"G1": "R01", "G2": "R02", "G3": "R03"},
             "S": {"L1": "S01", "L5": "S05"},
         }
 

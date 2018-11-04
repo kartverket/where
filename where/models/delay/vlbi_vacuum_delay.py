@@ -72,11 +72,12 @@ def vlbi_vacuum_delay(dset):
     # Calculate each term of the geometric vacuum delay
     vel_earth = eph.vel_bcrs("earth")
     baseline_gcrs = dset.site_pos_2.gcrs_pos - dset.site_pos_1.gcrs_pos
-    denominator = 1 + (
-        (vel_earth + dset.site_pos_2.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c
-    )[
-        :, 0, 0
-    ]
+    denominator = (
+        1
+        + ((vel_earth + dset.site_pos_2.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c)[
+            :, 0, 0
+        ]
+    )
     proj_Kb = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs[:, :, None])[:, 0, 0] / denominator
     proj_Vb = (vel_earth[:, None, :] @ baseline_gcrs[:, :, None] / constant.c)[:, 0, 0] / denominator
 

@@ -91,6 +91,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         _edit():                Edit RINEX navigation file data and save it in a Dataset
         _read():                Read RINEX navigation file data and save it in a Dataset
     """
+
     name = "broadcast"
 
     def __init__(self, rundate, time=None, satellite=None, system=None, station=None, file_key=None):
@@ -387,6 +388,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         The satellite clock correction is based on Section 20.3.3.3.3.1 in :cite:`is-gps-200h`.
 
+        TODO_Mohammed: If single frequencies are used, than TGD (self.dset.tgd) or BGD (self.dset.bgd_e1_e5a,
+                       self.dset.bgd_e1_e5b) has to be applied by satellite clock correction. Frequency type ('single'
+                       or 'dual') can be checked with 'config.tech.freq_type.str' and GNSS with 'config.tech.systems'.
+                       
         Returns:
             numpy.ndarray:    GNSS satellite clock corrections for each observation in [m] (Note: without relativistic
                               orbit eccentricity correction)
@@ -403,11 +408,8 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         return (
             self.dset_edit.sat_clock_bias[dset_brdc_idx]
-            + self.dset_edit.sat_clock_drift[dset_brdc_idx]
-            * tk
-            + self.dset_edit.sat_clock_drift_rate[dset_brdc_idx]
-            * tk
-            ** 2
+            + self.dset_edit.sat_clock_drift[dset_brdc_idx] * tk
+            + self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk ** 2
         ) * constant.c
 
     def unhealthy_satellites(self):
@@ -458,7 +460,12 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         """
 
         brdc_block_nearest_to_options = [
-            "toc", "toc:positive", "toe", "toe:positive", "transmission_time", "transmission_time:positive"
+            "toc",
+            "toc:positive",
+            "toe",
+            "toe:positive",
+            "transmission_time",
+            "transmission_time:positive",
         ]
         brdc_idx = list()
 
@@ -756,31 +763,17 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         # Satellite velocity vector in Earth centered Earth-fixed coordinate system
         x_dot = (
-            v_orb[0]
-            * np.cos(bdict["lambda_"])
-            - v_orb[1]
-            * np.cos(bdict["i"])
-            * np.sin(bdict["lambda_"])
-            + bdict["r_orb"][1]
-            * i_dot
-            * np.sin(bdict["i"])
-            * np.sin(bdict["lambda_"])
-            - bdict["r_ecef"][1]
-            * lambda_dot
+            v_orb[0] * np.cos(bdict["lambda_"])
+            - v_orb[1] * np.cos(bdict["i"]) * np.sin(bdict["lambda_"])
+            + bdict["r_orb"][1] * i_dot * np.sin(bdict["i"]) * np.sin(bdict["lambda_"])
+            - bdict["r_ecef"][1] * lambda_dot
         )
 
         y_dot = (
-            v_orb[0]
-            * np.sin(bdict["lambda_"])
-            + v_orb[1]
-            * np.cos(bdict["i"])
-            * np.cos(bdict["lambda_"])
-            - bdict["r_orb"][1]
-            * i_dot
-            * np.sin(bdict["i"])
-            * np.cos(bdict["lambda_"])
-            + bdict["r_ecef"][0]
-            * lambda_dot
+            v_orb[0] * np.sin(bdict["lambda_"])
+            + v_orb[1] * np.cos(bdict["i"]) * np.cos(bdict["lambda_"])
+            - bdict["r_orb"][1] * i_dot * np.sin(bdict["i"]) * np.cos(bdict["lambda_"])
+            + bdict["r_ecef"][0] * lambda_dot
         )
 
         z_dot = v_orb[1] * np.sin(bdict["i"]) + bdict["r_orb"][1] * i_dot * np.cos(bdict["i"])

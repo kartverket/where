@@ -49,9 +49,7 @@ def pavlis_mendes(dset):
         # Compute total zenith delay:
         output[obs] = iers.fculzd_hpa(
             np.degrees(lat), height, pressure, wvp[obs], wavelength * unit.nanometer2micrometer
-        )[
-            0
-        ]
+        )[0]
         # Mapping function:
         output[obs] *= iers.fcul_a(np.degrees(lat), height, temperature, np.degrees(elevation))
 

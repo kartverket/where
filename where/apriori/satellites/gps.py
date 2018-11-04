@@ -23,6 +23,7 @@ class Gps:
     This class should be used as a mixin together with satellite.Satellite. That is, any GPS-satellite object should
     inherit from both Gps and satellite.Satellite (in that order).
     """
+
     area = math.pi * 0.30 ** 2
     mass = 40.965
 

@@ -28,10 +28,12 @@ The file to be parsed should be specified like:
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import files
 from where.lib import log
-from where.lib import plugins
 from where.parsers import orbit_sp3c, orbit_sp3d
 
 

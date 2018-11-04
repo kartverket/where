@@ -54,13 +54,12 @@ def sisre_writer(dset):
         WriterField("toe_gpsweek", (), object, "%15s", 15, "TOE"),
         WriterField("diff_trans_toe", (), float, "%8d", 8, "TM-TOE"),
         WriterField("diff_time_toe", (), float, "%8d", 8, "T-TOE"),
-        WriterField("clk_diff_no_mean", (), float, "%16.4f", 16, "ΔCLOCK_NO_MEAN"),
         WriterField("clk_diff", (), float, "%16.4f", 16, "ΔCLOCK"),
+        WriterField("clk_diff_with_dt_mean", (), float, "%16.4f", 16, "ΔCLOCK_MEAN"),
         WriterField("dalong_track", (), float, "%16.4f", 16, "ΔALONG_TRACK"),
         WriterField("dcross_track", (), float, "%16.4f", 16, "ΔCROSS_TRACK"),
         WriterField("dradial", (), float, "%16.4f", 16, "ΔRADIAL"),
         WriterField("orb_diff_3d", (), float, "%16.4f", 16, "ORB_DIFF_3D"),
-        WriterField("sisre_orb_no_mean", (), float, "%16.4f", 16, "SISRE_ORB_NOMEAN"),
         WriterField("sisre_orb", (), float, "%16.4f", 16, "SISRE_ORB"),
         WriterField("sisre", (), float, "%16.4f", 16, "SISRE"),
     )
@@ -102,7 +101,7 @@ def sisre_writer(dset):
             WriterField("clk_sys", (), float, "%10.4f", 10, "CLK_SYS"),
         )
 
-        dset.add_float("clk_sys", val=dset.clk_diff_no_mean - dset.clk_diff, unit="meter")
+        dset.add_float("clk_sys", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter")
 
     # List epochs ordered by satellites
     idx = np.concatenate([np.where(dset.filter(satellite=s))[0] for s in dset.unique("satellite")])
@@ -164,7 +163,7 @@ def _get_header(dset):
     pgm = "where " + where.__version__ + "/midgard " + midgard.__version__
     run_by = util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else ""
     file_created = datetime.utcnow().strftime("%Y%m%d %H%M%S") + " UTC"
-    header = ("PGM: {:s}  RUN_BY: {:s}  DATE: {:s}\n\n".format(pgm, run_by, file_created))
+    header = "PGM: {:s}  RUN_BY: {:s}  DATE: {:s}\n\n".format(pgm, run_by, file_created)
     header += "SISRE ANALYSIS RESULTS\n\n"
 
     # Used input files

@@ -23,10 +23,12 @@ import re
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.parsers._parser_chain import ChainParser, ParserDef
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import unit
 
 
@@ -67,6 +69,7 @@ class BcecmpParser(ChainParser):
         meta (dict):            Dict containing the metainformation read from file.
         parser_name (str):      Name of the parser
     """
+
     #
     # PARSERS
     #

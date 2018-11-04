@@ -73,9 +73,9 @@ def clock_correction(dset):
     for idx, (station, (t_start, t_end)) in enumerate(zip(stations, time_intervals)):
         filter_time = np.logical_and(t_start.utc.mjd <= dset.time.utc.mjd, dset.time.utc.mjd < t_end.utc.mjd)
         filter_1 = np.logical_and(dset.filter(station_1=station), filter_time)
-        A[filter_1, idx * terms:(idx + 1) * terms, 0] = poly[filter_1]
+        A[filter_1, idx * terms : (idx + 1) * terms, 0] = poly[filter_1]
         filter_2 = np.logical_and(dset.filter(station_2=station), filter_time)
-        A[filter_2, idx * terms:(idx + 1) * terms, 0] = -poly[filter_2]
+        A[filter_2, idx * terms : (idx + 1) * terms, 0] = -poly[filter_2]
 
     # Calculate normal matrix N and the moment vector U
     U = np.sum(A @ dset.residual[:, None, None], axis=0)

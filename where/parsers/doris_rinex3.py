@@ -17,8 +17,6 @@ References:
    Exchange Format. Version 3.00". Dated November 28, 2007.
    Available at ftp://igs.org/pub/data/format/rinex300.pdf
 
-
-
 """
 
 # Standard library imports
@@ -27,12 +25,14 @@ import itertools
 # External library imports
 import numpy as np
 
-# Where routines and data
+# Midgard imports
+from midgard.dev import plugins
+
+# Where imports
 from where import apriori
 from where.lib import config
 from where.lib import log
 from where.parsers import parser
-from where.lib import plugins
 
 
 @plugins.register
@@ -67,11 +67,14 @@ class DorisRinex3Parser(parser.Parser):
                 "CENTER OF MASS: XYZ": {
                     "parser": self._parse_xyz,
                     "fields": {
-                        "center_of_mass_x": (0, 14), "center_of_mass_y": (14, 28), "center_of_mass_z": (28, 42)
+                        "center_of_mass_x": (0, 14),
+                        "center_of_mass_y": (14, 28),
+                        "center_of_mass_z": (28, 42),
                     },
                 },
                 "SYS / SCALE FACTOR": {
-                    "parser": self._parse_default, "fields": {"scale_factor": (2, 6), "fields": (10, 58)}
+                    "parser": self._parse_default,
+                    "fields": {"scale_factor": (2, 6), "fields": (10, 58)},
                 },
                 "L2 / L1 DATE OFFSET": {"parser": self._parse_float, "fields": {"date_offset": (3, 17)}},
                 "STATION REFERENCE": {

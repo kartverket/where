@@ -45,7 +45,7 @@ def rinex3_nav(dset):
     # Overwrite Dataset. This is necessary if the writer is called from a analysis (e.g. SISRE) with does not include
     # broadcast ephemeris information.
     # TODO: Is that the best solution?
-    if "rinex_nav/edit" not in dset.description or "rinex_nav/raw" not in dset.description:
+    if "rinex_nav/edit" not in dset.description and "rinex_nav/raw" not in dset.description:
         brdc = apriori.get(
             "orbit",
             rundate=dset.rundate,

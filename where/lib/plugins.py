@@ -61,10 +61,6 @@ parameter to :func:`call_one`::
     > for part in plugins.list_parts('where.techniques', plugin_name='vlbi'):
     ...   plugins.call_one('where.techniques', plugin_name='vlbi', part=part, ...)
 
-
-
-
-
 """
 # Standard library imports
 from collections import namedtuple

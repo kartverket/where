@@ -79,11 +79,11 @@ from where.lib.unit import unit
 _EOP_DATA = dict()
 
 # List of files to read for EOP data, last file is prioritized for overlapping data
-_EOP_FILE_KEYS = ("eopc04_extended", "eopc04_iau")
+_EOP_FILE_KEYS = {"c04": ("eop_c04_extended", "eop_c04"), "bulletin_a": ("eop_bulletin_a",)}
 
 
 @plugins.register
-def get_eop(time, models=None, window=4):
+def get_eop(time, models=None, window=4, source=None):
     """Get EOP data for the given time epochs
 
     Read EOP data from the eopc04-files. Both files are read, with data from the regular IAU file
@@ -99,7 +99,8 @@ def get_eop(time, models=None, window=4):
     """
     # Read the extended and the regular EOP data file (overlapping dates are overwritten by the latter)
     if not _EOP_DATA:
-        for file_key in _EOP_FILE_KEYS:
+        source = config.tech.get("eop_source", value=source).str
+        for file_key in _EOP_FILE_KEYS[source]:
             _EOP_DATA.update(parsers.parse_key(file_key=file_key).as_dict())
 
     return Eop(_EOP_DATA, time, models=models, window=window)
@@ -111,6 +112,7 @@ class Eop:
     One instance of the `Eop`-class calculates corrections for a given set of time epochs (specified when the instance
     is created). However, all instances share a cache of results from the various functions calculating corrections.
     """
+
     _correction_cache = dict()
 
     def __init__(self, eop_data, time, models=None, window=4):
@@ -312,6 +314,48 @@ class Eop:
                     dut1_corr.append(correction_cache[t.mjd])
 
             values += dut1_corr
+        return values
+
+    @cache.property
+    @unit.register("seconds per day")
+    def ut1_utc_rate(self):
+        """Delta between UT1 and UTC
+
+        See section 5.5.3 in IERS Conventions, :cite:`iers2010`. Does correction for leap second jumps before
+        interpolation.
+
+        Reapplies low frequency tides if these were removed before interpolation.
+
+        TODO: apply models based on eop.models
+        Only works if eop.models = ()
+
+        Returns:
+            Array: UT1 - UTC, one value for each time epoch [seconds].
+        """
+        values = self._interpolate_table("ut1_utc", leap_second_correction=True, derivative_order=1)
+        # values += self._corrections(("ortho_eop", iers.ortho_eop, 2, 1e-6), ("utlibr", iers.utlibr, 0, 1e-6))
+
+        # Low frequency tides
+        #         if "rg_zont2" in self.models:
+        #             correction_cache = self._correction_cache.setdefault("rg_zont2", dict())
+        #             # Julian centuries since J2000
+        #             t_julian_centuries = (self.time.tt.jd - 2451545.0) / 36525
+        #
+        #             if self.time.isscalar:
+        #                 mjd = self.time.tt.mjd
+        #                 if mjd not in correction_cache:
+        #                     correction_cache[mjd] = iers.rg_zont2(t_julian_centuries)[0]
+        #                 dut1_corr = correction_cache[mjd]
+        #             else:
+        #                 dut1_corr = list()
+        #                 for t in self.time.tt:
+        #                     if t.mjd not in correction_cache:
+        #                         t_julian_centuries = (t.tt.jd - 2451545.0) / 36525
+        #                         correction_cache[t.mjd] = iers.rg_zont2(t_julian_centuries)[0]
+        #                     dut1_corr.append(correction_cache[t.mjd])
+        #
+        #             values += dut1_corr
+        #         return values
         return values
 
     @cache.property

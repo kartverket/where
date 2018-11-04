@@ -19,7 +19,6 @@ from where.data.table import Table
 
 
 class TextList(UserList):
-
     def __getitem__(self, key):
         """Add fancy boolean indexing to the list
         """
@@ -40,6 +39,7 @@ class TextList(UserList):
 
 class TextTable(Table):
     """Text-klasse doc?"""
+
     datatype = "text"
 
     def __init__(self, name, num_obs, dataset):

@@ -15,9 +15,12 @@ Reads data from files in Terrapos position output format.
 
 
 """
-# Where imports
-from where.parsers._parser_line import LineParser
-from where.lib import plugins
+# Standard library imports
+from typing import Dict
+
+# Midgard imports
+from midgard.parsers import LineParser
+from midgard.dev import plugins
 
 
 @plugins.register
@@ -25,7 +28,7 @@ class TerraposPositionParser(LineParser):
     """A parser for reading Terrapos position output file
     """
 
-    def setup_parser(self):
+    def setup_parser(self) -> Dict=[str, str]:
         """Set up information needed for the parser
 
         This should return a dictionary with all parameters needed by np.genfromtxt to do the actual parsing.

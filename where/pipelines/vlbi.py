@@ -13,6 +13,7 @@ import numpy as np
 
 # Where imports
 from where import apriori
+from where import obs
 from where import data
 from where import cleaners
 from where import estimation
@@ -23,7 +24,6 @@ from where.lib import log
 from where.lib import plugins
 from where.lib import util
 from where import models
-from where import parsers
 from where import writers
 
 # The name of this technique
@@ -59,7 +59,7 @@ def list_sessions(rundate):
         skip_sessions = config.where.get(
             "skip_sessions", section=TECH, value=util.read_option_value("--skip_sessions", default=None), default=""
         ).list
-        master_file = apriori.get("vlbi_master_file", rundate=rundate)
+        master_file = apriori.get("vlbi_master_schedule", rundate=rundate)
         sessions = master_file.list_sessions(rundate)
 
         for session in skip_sessions:
@@ -96,8 +96,8 @@ def validate_session(rundate, session):
         raise exceptions.InvalidSessionError("You must specify '--session=<...>' to run a VLBI analysis")
 
     # TODO: Can we use master files to validate sessions? What about intensives?
-    master_file = apriori.get("vlbi_master_file", rundate=rundate)
-    master_sessions = master_file.list_sessions(rundate)
+    master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
+    master_sessions = master_schedule.list_sessions(rundate)
     if session not in master_sessions:
         log.warn(
             f"Session '{session}' is not listed in master file for {rundate:{config.FMT_date}}. "
@@ -137,6 +137,33 @@ def file_vars():
 
         if not file_vars:
             log.fatal("No NGS observation file found")
+
+    # Add obs_version for vgosdb
+    if config.tech.get("obs_format").str == "vgosdb":
+        versions = files.glob_variable("vlbi_obs_vgosdb", "obs_version", r"\d{3}")
+        if versions:
+            file_vars["obs_version"] = max(versions)
+        elif config.where.files.download_missing.bool:
+            # Look online for a candidate
+            log.warn("No VGOSDB wrapper file found. Not attempting to download. TODO")
+            # log.info("No NGS wrapper file found on disk: Looking for one online.")
+            # obs_versions = [f"{v:03d}" for v in reversed(range(4, 10))]
+            # for obs_version in obs_versions:
+            #    url = files.url(
+            #        "vlbi_obs_ngs", file_vars=dict(obs_version=obs_version), is_zipped=True, use_aliases=False
+            #    )
+            #    log.info(f"Looking for {url} ...")
+            #    if url.exists():
+            #        file_vars["obs_version"] = obs_version
+            #        break
+
+        if not file_vars:
+            log.fatal("No VGOSDB observation file found")
+
+    # Sinex file vars
+    file_vars["solution"] = config.tech.sinex.solution.str
+    file_vars["file_agency"] = config.tech.sinex.file_agency.str.lower()
+
     return file_vars
 
 
@@ -153,15 +180,14 @@ def read(rundate, session, prev_stage, stage):
     Returns:
         Bool: True if data are available for the session, False otherwise
     """
-    obs_format = config.tech.obs_format.str
-    parser = parsers.parse("vlbi_{}".format(obs_format), rundate=rundate, session=session)
-    if parser.data_available:
-        dset = data.Dataset(rundate, tech=TECH, stage=stage, dataset_name=session, dataset_id=0, empty=True)
-        parser.write_to_dataset(dset)
-        dset.write()
-        log.info("Parsed {} observations for session {}", dset.num_obs, session)
+    try:
+        dset = obs.get(rundate, TECH, session)
+    except exceptions.MissingDataError:
+        return False
 
-    return parser.data_available
+    dset.write_as(rundate=rundate, tech=TECH, stage=stage, dataset_name=session, dataset_id=0)
+    log.info(f"Parsed {dset.num_obs} observations")
+    return True
 
 
 @plugins.register
@@ -217,6 +243,7 @@ def calculate(rundate, session, prev_stage, stage):
     log.info("Calculating clock polynomials for {}", session)
     max_iterations = config.tech.calculate_max_iterations.int
     outlier_limit = config.tech.calculate_outlier_limit.float
+    store_outliers = config.tech.store_outliers.bool
 
     for iter_num in itertools.count(start=1):
         models.calculate_delay("correction_models", dset, dset)
@@ -232,6 +259,16 @@ def calculate(rundate, session, prev_stage, stage):
         idx = np.abs(dset.residual) < outlier_limit * rms
         if iter_num > max_iterations or idx.all():
             break
+
+        if store_outliers:
+            bad_idx = np.logical_not(idx)
+            log.info(f"Adding {np.sum(bad_idx)} observations to ignore_observation")
+            bad_obs = np.char.add(np.char.add(dset.time.utc.iso[bad_idx], " "), dset.baseline[bad_idx]).tolist()
+            with config.update_tech_config(rundate, TECH, session) as cfg:
+                current = cfg.ignore_observation.observations.as_list(", *")
+                updated = ", ".join(sorted(current + bad_obs))
+                cfg.update("ignore_observation", "observations", updated, source=util.get_program_name())
+
         dset.subset(idx)
         log.info(
             "Removing {} observations with residuals bigger than {:.4f}", sum(np.logical_not(idx)), outlier_limit * rms

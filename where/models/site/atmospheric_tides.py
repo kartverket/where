@@ -75,34 +75,22 @@ def atmospheric_tides_station(dset):
 
     # Equation 7.19a and 7.19b from IERS Conventions 2010
     de = (
-        coeff["A_d1_e"](lon, lat, grid=False)
-        * np.cos(omega_1 * t)
-        + coeff["B_d1_e"](lon, lat, grid=False)
-        * np.sin(omega_1 * t)
-        + coeff["A_d2_e"](lon, lat, grid=False)
-        * np.cos(omega_2 * t)
-        + coeff["B_d2_e"](lon, lat, grid=False)
-        * np.sin(omega_2 * t)
+        coeff["A_d1_e"](lon, lat, grid=False) * np.cos(omega_1 * t)
+        + coeff["B_d1_e"](lon, lat, grid=False) * np.sin(omega_1 * t)
+        + coeff["A_d2_e"](lon, lat, grid=False) * np.cos(omega_2 * t)
+        + coeff["B_d2_e"](lon, lat, grid=False) * np.sin(omega_2 * t)
     )
     dn = (
-        coeff["A_d1_n"](lon, lat, grid=False)
-        * np.cos(omega_1 * t)
-        + coeff["B_d1_n"](lon, lat, grid=False)
-        * np.sin(omega_1 * t)
-        + coeff["A_d2_n"](lon, lat, grid=False)
-        * np.cos(omega_2 * t)
-        + coeff["B_d2_n"](lon, lat, grid=False)
-        * np.sin(omega_2 * t)
+        coeff["A_d1_n"](lon, lat, grid=False) * np.cos(omega_1 * t)
+        + coeff["B_d1_n"](lon, lat, grid=False) * np.sin(omega_1 * t)
+        + coeff["A_d2_n"](lon, lat, grid=False) * np.cos(omega_2 * t)
+        + coeff["B_d2_n"](lon, lat, grid=False) * np.sin(omega_2 * t)
     )
     du = (
-        coeff["A_d1_u"](lon, lat, grid=False)
-        * np.cos(omega_1 * t)
-        + coeff["B_d1_u"](lon, lat, grid=False)
-        * np.sin(omega_1 * t)
-        + coeff["A_d2_u"](lon, lat, grid=False)
-        * np.cos(omega_2 * t)
-        + coeff["B_d2_u"](lon, lat, grid=False)
-        * np.sin(omega_2 * t)
+        coeff["A_d1_u"](lon, lat, grid=False) * np.cos(omega_1 * t)
+        + coeff["B_d1_u"](lon, lat, grid=False) * np.sin(omega_1 * t)
+        + coeff["A_d2_u"](lon, lat, grid=False) * np.cos(omega_2 * t)
+        + coeff["B_d2_u"](lon, lat, grid=False) * np.sin(omega_2 * t)
     )
     denu = np.vstack([de, dn, du]).T * 1e-3
 
@@ -114,14 +102,10 @@ def atmospheric_tides_station(dset):
         # Equation (7.20) in [1]
         coeff_cmc = apriori.get("atmospheric_tides_cmc")
         dxyz += (
-            coeff_cmc["A1"][None, :]
-            * np.cos(omega_1 * t)[:, None]
-            + coeff_cmc["B1"][None, :]
-            * np.sin(omega_1 * t)[:, None]
-            + coeff_cmc["A2"][None, :]
-            * np.cos(omega_2 * t)[:, None]
-            + coeff_cmc["B2"][None, :]
-            * np.sin(omega_2 * t)[:, None]
+            coeff_cmc["A1"][None, :] * np.cos(omega_1 * t)[:, None]
+            + coeff_cmc["B1"][None, :] * np.sin(omega_1 * t)[:, None]
+            + coeff_cmc["A2"][None, :] * np.cos(omega_2 * t)[:, None]
+            + coeff_cmc["B2"][None, :] * np.sin(omega_2 * t)[:, None]
         )
 
     return dset.site_pos.convert_itrs_to_gcrs(dxyz)

@@ -106,41 +106,21 @@ def thermal_deformation_station(dset, temp_funcs):
             continue
 
         if axis_type == "MO_AZEL":
-            delays[idx] = (
-                gamma_f
-                * (T(t - dt_f)[idx] - T_0)
-                * (h_f * sin_e[idx])
-                + gamma_a
-                * (T(t - dt_a)[idx] - T_0)
-                * (h_p * sin_e[idx] + AO * cos_e[idx] + h_v - F_a * h_s)
-            )
+            delays[idx] = gamma_f * (T(t - dt_f)[idx] - T_0) * (h_f * sin_e[idx]) + gamma_a * (
+                T(t - dt_a)[idx] - T_0
+            ) * (h_p * sin_e[idx] + AO * cos_e[idx] + h_v - F_a * h_s)
         elif axis_type == "MO_EQUA":
-            delays[idx] = (
-                gamma_f
-                * (T(t - dt_f)[idx] - T_0)
-                * (h_f * sin_e[idx])
-                + gamma_a
-                * (T(t - dt_a)[idx] - T_0)
-                * (h_p * sin_e[idx] + AO * cos_d[idx] + h_v - F_a * h_s)
-            )
+            delays[idx] = gamma_f * (T(t - dt_f)[idx] - T_0) * (h_f * sin_e[idx]) + gamma_a * (
+                T(t - dt_a)[idx] - T_0
+            ) * (h_p * sin_e[idx] + AO * cos_d[idx] + h_v - F_a * h_s)
         elif axis_type == "MO_XYNO":
-            delays[idx] = (
-                gamma_f
-                * (T(t - dt_f)[idx] - T_0)
-                * (h_f * sin_e[idx])
-                + gamma_a
-                * (T(t - dt_a)[idx] - T_0)
-                * (h_p * sin_e[idx] + AO * np.sqrt(1 - (cos_e[idx] * cos_a[idx]) ** 2) + h_v - F_a * h_s)
-            )
+            delays[idx] = gamma_f * (T(t - dt_f)[idx] - T_0) * (h_f * sin_e[idx]) + gamma_a * (
+                T(t - dt_a)[idx] - T_0
+            ) * (h_p * sin_e[idx] + AO * np.sqrt(1 - (cos_e[idx] * cos_a[idx]) ** 2) + h_v - F_a * h_s)
         elif axis_type == "MO_XYEA":
-            delays[idx] = (
-                gamma_f
-                * (T(t - dt_f)[idx] - T_0)
-                * (h_f * sin_e[idx])
-                + gamma_a
-                * (T(t - dt_a)[idx] - T_0)
-                * (h_p * sin_e[idx] + AO * np.sqrt(1 - (cos_e[idx] * sin_a[idx]) ** 2) + h_v - F_a * h_s)
-            )
+            delays[idx] = gamma_f * (T(t - dt_f)[idx] - T_0) * (h_f * sin_e[idx]) + gamma_a * (
+                T(t - dt_a)[idx] - T_0
+            ) * (h_p * sin_e[idx] + AO * np.sqrt(1 - (cos_e[idx] * sin_a[idx]) ** 2) + h_v - F_a * h_s)
         else:
             log.warn("Unknown antenna axis type '{}' for {}. Correction set to zero", axis_type, ivsname)
             continue
@@ -193,7 +173,6 @@ def calculate_temperature_functions(dset):
 
 
 def _get_temperature_func(amplitude, phase, offset, trend):
-
     def temperature_func(time):
         return amplitude * np.sin(2 * np.pi * time + phase) + offset + trend * time
 

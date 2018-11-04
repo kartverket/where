@@ -8,17 +8,13 @@ Calibrator Survey Sources (VCS sources) and non VCS sources. These two sets are 
 defining sources are all non-VCS sources. In addition, some non-VCS sources are classified as special handling sources
 because they exhibit temporal variations in celestial coordinates.
 
-
-
-
 """
 
-# External library imports
-import numpy as np
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib import plugins
 from where.lib.unit import unit
 
 
