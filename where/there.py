@@ -474,7 +474,7 @@ class Tab(ttk.Frame):
         Use subprocess to run the analysis, in order to have a separate process for config, log  etc
         """
         exe = where.__executable__
-        cmd = "{exe} {rundate:%Y %-m %-d} --{pipeline} --session={dataset_name}".format(exe=exe, **self.vars).split()
+        cmd = "{exe} {rundate:%Y %m %d} --{pipeline} --session={dataset_name}".format(exe=exe, **self.vars).split()
         if self.vars["id"]:
             cmd.append(f"--id={self.vars['id'][1:]}")
         if self.vars.get("force_rerun"):
@@ -490,7 +490,7 @@ class Tab(ttk.Frame):
         Use subprocess to run the analysis, in order to have a separate process for config, log  etc
         """
         exe = where.__executable__
-        cmd = "{exe} {rundate:%Y %-m %-d} --{pipeline} --session={dataset_name}".format(exe=exe, **self.vars).split()
+        cmd = "{exe} {rundate:%Y %m %d} --{pipeline} --session={dataset_name}".format(exe=exe, **self.vars).split()
         if self.vars["id"]:
             cmd.append(f"--id={self.vars['id'][1:]}")
         if self.vars.get("force_rerun", False):
@@ -613,7 +613,7 @@ class TabRunAnalysis(Tab):
         config_line = ttk.Frame(self)
         cfg_tree = ConfigTree(config_line)
         cfg_tree.update(config.where)
-        cfg_tree.pack()
+        # cfg_tree.pack()
         config_line.pack(side=tk.TOP, fill=tk.X, expand=True)
 
         # Buttons for running Where
@@ -703,7 +703,6 @@ class UpdateMixin:
 
 
 class ConfigTree(ttk.Treeview, UpdateMixin):
-
     def __init__(self, master):
         super().__init__(master, columns=("value", "help"))
         self.heading("value", text="Value")
@@ -713,7 +712,7 @@ class ConfigTree(ttk.Treeview, UpdateMixin):
         self.column("help", width=700)
 
     def update(self, cfg):
-        print("Updating ConfigTree")
+        # print("Updating ConfigTree")
         for idx, section in enumerate(cfg.sections):
             tree_section = self.insert("", idx, text=section.name)
             for idx_section, (key, entry) in enumerate(section.items()):
@@ -1382,7 +1381,7 @@ class DD_Date(tk.Frame, UpdateMixin):
         if not init_val:
             init_strs = ["", "", ""]
         else:
-            init_strs = init_val.strftime("%Y-%-m-%-d").split("-")
+            init_strs = [d.lstrip("0") for d in init_val.strftime("%Y-%m-%d").split("-")]
 
         for dropdown, var, init in zip(self.dropdowns, self.choices, init_strs):
             dropdown.pack(side=tk.LEFT, padx=3)

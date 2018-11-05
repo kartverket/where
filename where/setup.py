@@ -286,7 +286,7 @@ def show_config(rundate, pipeline, session):
     # Add instructions about how to update configuration
     print(line)
     pipeline_opt = [o for o, p in pipelines.options().items() if p == pipeline and o.startswith("--")][0]
-    cmd = f"{util.get_program_name()} {rundate:%Y %-m %-d} {pipeline_opt} --session={session}"
+    cmd = f"{util.get_program_name()} {rundate.year} {rundate.month} {rundate.day} {pipeline_opt} --session={session}"
     print(f"Use '{cmd} --edit' to edit configuration manually")
     print(f"    '{cmd} --<key>=<value>' to update an entry in the [{pipeline}] section")
     print(f"    '{cmd} --<section>:<key>=<value>' to update an entry in a specific section")

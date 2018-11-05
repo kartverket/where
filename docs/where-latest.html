@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns# fb: https://www.facebook.com/2008/fbml">
 <head>
-    <title>Where v0.16.0 - Where</title>
+    <title>Where v0.16.1 - Where</title>
     <!-- Using the latest rendering mode for IE -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta charset="utf-8">
@@ -14,14 +14,14 @@
 
         <meta name="author" content="Norwegian Mapping Authority" />
         <meta name="keywords" content="download,github,vlbi,where,there,beta" />
-        <meta name="description" content="Download Where v0.16.0." />
+        <meta name="description" content="Download Where v0.16.1." />
 
         <meta property="og:site_name" content="Where" />
         <meta property="og:type" content="article"/>
-        <meta property="og:title" content="Where v0.16.0"/>
+        <meta property="og:title" content="Where v0.16.1"/>
         <meta property="og:url" content="https://kartverket.github.io/where/where-latest.html"/>
-        <meta property="og:description" content="Download Where v0.16.0."/>
-        <meta property="article:published_time" content="2018-11-05" />
+        <meta property="og:description" content="Download Where v0.16.1."/>
+        <meta property="article:published_time" content="2018-11-06" />
             <meta property="article:section" content="Download" />
             <meta property="article:tag" content="download" />
             <meta property="article:tag" content="github" />
@@ -95,8 +95,8 @@ Where            </a>
                 <h1>
                     <a href="https://kartverket.github.io/where/where-latest.html"
                        rel="bookmark"
-                       title="Permalink to Where v0.16.0">
-                        Where v0.16.0
+                       title="Permalink to Where v0.16.1">
+                        Where v0.16.1
                     </a>
                 </h1>
             </header>
@@ -106,7 +106,7 @@ Where            </a>
 <footer class="post-info">
     <span class="label label-default">Date</span>
     <span class="published">
-        <i class="fa fa-calendar"></i><time datetime="2018-11-05T00:00:00+01:00"> Mon 05 November 2018</time>
+        <i class="fa fa-calendar"></i><time datetime="2018-11-06T00:00:00+01:00"> Tue 06 November 2018</time>
     </span>
 
 
@@ -130,39 +130,32 @@ Where            </a>
                 </div>
                 <p>The source code of <strong>Where</strong> is available at
 <a href="https://github.com/kartverket/where">GitHub</a>.</p>
-<h2 id="clone-and-update-where-v0160">Clone and update Where v0.16.0</h2>
+<h2 id="clone-and-update-where-v0161">Clone and update Where v0.16.1</h2>
 <p>The simplest way to download Where and do later updates is by cloning the Where
 repository:</p>
 <pre><code>git clone https://github.com/kartverket/where.git
 </code></pre>
-<p>With a cloned repository you can update to version 0.16.0 by doing:</p>
+<p>With a cloned repository you can update to version 0.16.1 by doing:</p>
 <pre><code>cd where
 git fetch origin
-git checkout tags/v0.16.0
+git checkout tags/v0.16.1
 </code></pre>
 <p>See <a href="https://kartverket.github.io/where/installing.html">Installing Where</a> for details on how to install
 the software.</p>
-<h2 id="download-where-v0160">Download Where v0.16.0</h2>
+<h2 id="download-where-v0161">Download Where v0.16.1</h2>
 <p>If you prefer to download the source code as a zip- or tar-file, you can use the
 following links:</p>
 <ul>
-<li><a href="https://github.com/kartverket/where/archive/v0.16.0.zip">Source code (zip)</a></li>
-<li><a href="https://github.com/kartverket/where/archive/v0.16.0.tar.gz">Source code (tar.gz)</a></li>
+<li><a href="https://github.com/kartverket/where/archive/v0.16.1.zip">Source code (zip)</a></li>
+<li><a href="https://github.com/kartverket/where/archive/v0.16.1.tar.gz">Source code (tar.gz)</a></li>
 </ul>
 <p>See <a href="https://kartverket.github.io/where/installing.html">Installing Where</a> for details on how to install
 the software.</p>
 <h2 id="changelog">Changelog</h2>
-<p>Version 0.16.0 is a big update to <a href="https://kartverket.github.io/where/where-v0121.html">version 0.12.1</a>. Versions between 0.12.1 and 0.16.0 have been internal versions.</p>
-<p>The following are the biggest changes since <a href="https://kartverket.github.io/where/where-v0121.html">version 0.12.1</a>:</p>
+<p>Version 0.16.1 is a bug fix release fixing the following bugs in <a href="https://kartverket.github.io/where/where-v0160.html">version 0.16.0</a>:</p>
 <ul>
-<li>Improved handling of vgosDb files</li>
-<li>New <code>obs</code> module for parsing observations and creating datasets</li>
-<li>Fix bugs in dependency testing</li>
-<li>Use a sparse matrix for phi in the Kalman filter to save memory</li>
-<li>Save automatically detected outliers to config file</li>
-<li>Fix bug in LOD estimation</li>
-<li>More options for EOPs</li>
-<li>Improved readability of estimation models</li>
+<li>Removed pipeline that should not be included yet.</li>
+<li>Fix date formatting to work with Windows as well.</li>
 </ul>
 <blockquote>
 <p><strong>Note:</strong> The Where software is currently in Beta. There are still a few bugs

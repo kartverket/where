@@ -57,22 +57,23 @@ AxhlineConfig.__doc__ = """A convenience class for defining matplotlib axhline c
     """
 
 # Define dictionary with fields to be printed in SISRE report
-FIELDS = {"sisre":        "SISRE",
-          "sisre_orb":    "orbit-only SISRE",
-          "orb_diff_3d":  "3D orbit error",
-          "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
-          "bias_brdc":    "satellite bias of broadcast clocks",
-          "bias_precise": "satellite bias of precise clocks",
+FIELDS = {
+    "sisre": "SISRE",
+    "sisre_orb": "orbit-only SISRE",
+    "orb_diff_3d": "3D orbit error",
+    "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
+    "bias_brdc": "satellite bias of broadcast clocks",
+    "bias_precise": "satellite bias of precise clocks",
 }
 
 
-
-FIELDS_OLD = {"sisre":        "Global averaged signal-in-space range error (SISRE)",
-          "sisre_orb":    "Orbit related error of global average SISRE",
-          "orb_diff_3d":  "3D orbit error based on difference between broadcast and precise orbit",
-          "clk_diff_with_dt_mean": "Satellite clock correction difference between broadcast and precise orbit, whereby averaged clock offset in each epoch is applied.",
-          "bias_brdc":    "Satellite bias of broadcast clocks",
-          "bias_precise": "Satellite bias of precise clocks",
+FIELDS_OLD = {
+    "sisre": "Global averaged signal-in-space range error (SISRE)",
+    "sisre_orb": "Orbit related error of global average SISRE",
+    "orb_diff_3d": "3D orbit error based on difference between broadcast and precise orbit",
+    "clk_diff_with_dt_mean": "Satellite clock correction difference between broadcast and precise orbit, whereby averaged clock offset in each epoch is applied.",
+    "bias_brdc": "Satellite bias of broadcast clocks",
+    "bias_precise": "Satellite bias of precise clocks",
 }
 
 # TODO: Maybe better to write a SisreReport class.
@@ -111,7 +112,7 @@ def sisre_report(dset):
 
         fid.write("\n# Analysis of input files\n\n")
         if write_level <= enums.get_value("write_level", "detail"):
-            #_plot_scatter_satellite_bias(fid, figure_dir, dset)
+            # _plot_scatter_satellite_bias(fid, figure_dir, dset)
             _plot_scatter_field(fid, figure_dir, dset, "bias_brdc")
             _plot_scatter_field(fid, figure_dir, dset, "bias_precise")
 
@@ -133,7 +134,6 @@ def _eclipse_satellites(fid, dset):
         rundate=dset.rundate,
         time=dset.time,
         satellite=tuple(dset.satellite),
-
         system=tuple(dset.system),
         station=dset.dataset_name.upper(),
         apriori_orbit="broadcast",
@@ -247,7 +247,9 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None
 #
 # BAR STACKED PLOTS
 #
-def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xticks_rotation=None, axhline=None, with_95th_percentile=True):
+def _plot_bar_stacked(
+    fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xticks_rotation=None, axhline=None, with_95th_percentile=True
+):
     """Generate bar plot of given dataframe columns (colored and ordered by satellite type)
 
     Args:
@@ -266,24 +268,14 @@ def _plot_bar_stacked(fid, df_sisre, df_sisre_orb, figure_path, xlabel="", xtick
     fontsize = 12
 
     # Generate new dataframe with columns 'orbit-only SISRE' and 'clock-only SISRE'
-    columns=["orbit-only SISRE RMS", "clock-only SISRE RMS"]
-    data = np.hstack(
-        (
-            np.array([df_sisre_orb.rms]).T,
-            (np.array([df_sisre.rms]) - np.array([df_sisre_orb.rms])).T,
-        )
-    )
+    columns = ["orbit-only SISRE RMS", "clock-only SISRE RMS"]
+    data = np.hstack((np.array([df_sisre_orb.rms]).T, (np.array([df_sisre.rms]) - np.array([df_sisre_orb.rms])).T))
 
     if with_95th_percentile:
         columns = columns + ["95th percentile SISRE"]
         data = np.hstack((data, (np.array([df_sisre.percentile]) - np.array([df_sisre.rms])).T))
 
-    df_merged = pd.DataFrame(
-        data=data,
-        index=df_sisre.index,
-        columns=columns,
-    )
-    
+    df_merged = pd.DataFrame(data=data, index=df_sisre.index, columns=columns)
 
     # Generate bar plot
     fig_width = len(df_merged.index) / 4 if len(df_merged.index) > 30 else 6.4
@@ -603,12 +595,10 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
         fid.write("\n\\clearpage\n\n")
 
 
-
-
-
 #
 # SATELLITE-WISE PLOTS AND STATISTICS
 #
+
 
 def _generate_satellite_index_dataframe(dset):
     """Generate field DataFrames with the satellites as indices and functional values (rms, mean, ...) as columns
@@ -703,7 +693,6 @@ def _generate_satellite_index_dataframe(dset):
     return field_dfs, extra_row_names
 
 
-
 def _satellite_statistics_and_plot(fid, figure_dir, dset):
     """Generate statistics and plots for each field and satellite
 
@@ -721,14 +710,18 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset):
     # Write field Dataframes
     column = "rms"  # Column to plot
 
-    fid.write(f"\n\n#Statistics\n") 
-    fid.write("In this Section statistics are represented for: \n\n{}".format(''.join(['* '+v+'\n' for v in FIELDS.values()]))) 
+    fid.write(f"\n\n#Statistics\n")
+    fid.write(
+        "In this Section statistics are represented for: \n\n{}".format(
+            "".join(["* " + v + "\n" for v in FIELDS.values()])
+        )
+    )
     for field, df in field_dfs.items():
         fid.write(f"\n\n##Statistic for {FIELDS[field]}\n")
-        fid.write("Unit: meter\n") 
+        fid.write("Unit: meter\n")
         _write_dataframe_to_markdown(fid, df, float_format="6.3f")
-        fid.write("  ") 
-        
+        fid.write("  ")
+
         # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column)
         _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column)
 

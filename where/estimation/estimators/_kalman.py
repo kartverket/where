@@ -166,7 +166,7 @@ class KalmanFilter(object):
 
         # Report and set analysis status if there are too few stations
         # TODO: if vlbi_site_pos in state_vector and num_stations < 3
-        estimate_site_pos = np.char.startswith(np.array(param_names), 'vlbi_site_pos').any()
+        estimate_site_pos = np.char.startswith(np.array(param_names), "vlbi_site_pos").any()
         if len(dset.unique("station")) < 3 and estimate_site_pos:
             log.error(f"Too few stations {len(dset.unique('station'))} < 3. Do not estimate station positions.")
             if dset.meta.get("analysis_status") == "unchecked":

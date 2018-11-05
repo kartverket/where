@@ -410,7 +410,7 @@ def _parse_date():
     try:
         return date(_parse_int(), _parse_int(), _parse_int())
     except (ValueError, TypeError) as err:
-        err.args = (f"{err.args[0]}\n  Date should be written year month day, for instance {date.today():%Y %-m %-d}",)
+        err.args = (f"{err.args[0]}\n  Date should be written year month day, for instance {date.today():%Y %m %d}",)
         raise
 
 

@@ -6,7 +6,7 @@ import sys
 # Hack sys.argv before sending to setup
 sys.argv[1:] = ["build_ext", "--inplace"]
 
-sourcefiles = ["where/models/orbit/*.pyx","where/integrators/*.pyx"]
+sourcefiles = ["where/models/orbit/*.pyx", "where/integrators/*.pyx"]
 # Setup each version
 setup(
     name="cython_orbit_models",

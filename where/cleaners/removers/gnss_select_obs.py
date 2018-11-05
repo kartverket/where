@@ -167,7 +167,7 @@ def _select_observations(obstypes_all, obstypes):
     use_obstypes = dict()
     remove_obstypes = set(obstypes_all)
     freq_type = config.tech.freq_type.list[0]
-    code_phase_obs = config.tech[_SECTION].code_phase_obs.list[0]           
+    code_phase_obs = config.tech[_SECTION].code_phase_obs.list[0]
 
     # Loop over GNSSs
     for sys in obstypes:
