@@ -277,7 +277,7 @@ def reset_config():
     # Analysis, Tech and Session-configurations are initialised by config.init later
     analysis.clear()
     tech.clear()
-    tech.parent_config = where
+    tech.fallback_config = where
     session.clear()
 
 

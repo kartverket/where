@@ -31,7 +31,7 @@ from where.models import delay
 from where.models import site
 
 # Make orbit functions available
-from where.models.orbit._orbit import calculate as calculate_orbit, update_orbit  # noqa
+# from where.models.orbit._orbit import calculate as calculate_orbit, update_orbit  # noqa
 
 # Make documentation functions available
 from where.models.delay import doc as doc_delay  # noqa
