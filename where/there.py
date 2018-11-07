@@ -674,7 +674,7 @@ class TabSession(TabFigure):
             log.warn(f"Config file '{cfg_path}' does not exist")
             return
 
-        editor.edit(cfg_path)
+        editor.edit(str(cfg_path))
         setup.add_timestamp(self.vars["rundate"], self.vars["pipeline"], self.vars["session"], "last update")
 
     button_log = show_log

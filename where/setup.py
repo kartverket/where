@@ -229,7 +229,7 @@ def edit_config(rundate, pipeline, session):
     ts_before = files.get_timestamp(cfg_path)
 
     # Open config file in an editor
-    editor.edit(cfg_path)
+    editor.edit(str(cfg_path))
 
     if files.get_timestamp(cfg_path) != ts_before:
         # Add timestamp and edited note
