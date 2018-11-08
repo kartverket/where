@@ -221,7 +221,7 @@ def get_user_info(user=None):
     Returns:
         Dict:  Information about user
     """
-    user = config.program.get("user", value=user, default=getpass.getuser()).str
+    user = config.program.get("user", value=user, default=getpass.getuser().lower()).str
     user_info = config.where.get(section="user_info", key=user, default="").as_tuple(", *")
 
     info_dict = dict(user=user, **dict(zip(("name", "email", "inst_abbreviation"), user_info)))

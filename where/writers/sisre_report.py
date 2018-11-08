@@ -11,7 +11,6 @@ asdf
 """
 # Standard library imports
 from collections import namedtuple
-import getpass
 from datetime import datetime
 import os
 
@@ -32,6 +31,7 @@ from where.lib import files
 from where.lib import gnss
 from where.lib import log
 from where.lib import plugins
+from where.lib import util
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
@@ -150,7 +150,7 @@ def _get_satellite_type(dset, satellite):
 
     Args:
        dset (Dataset):      A dataset containing the data.
-       satellite (str):     Satellite number (e.g. E01, G02, ...) 
+       satellite (str):     Satellite number (e.g. E01, G02, ...)
     """
     idx = dset.filter(satellite=satellite)
     return set(dset.satellite_type[idx]).pop()
@@ -262,7 +262,7 @@ def _plot_bar_stacked(
        axhline (tuple):             Tuple like (type, y_value, color), whereby:
                                          type - GNSS type identifier
                                          y-value - Y-value for horizontal line
-                                         color - Color of horizontal line 
+                                         color - Color of horizontal line
        with_95th_percentile (bool): Plot SISRE 95th percentile in addition
     """
     fontsize = 12
@@ -300,7 +300,7 @@ def _plot_bar_stacked_sisre(fid, field_dfs, extra_row_names, figure_dir):
 
     Args:
        fid (_io.TextIOWrapper): File object.
-       field_dfs (dict):        Dictionary with SISRE and orbit-only SISRE dataframe.          
+       field_dfs (dict):        Dictionary with SISRE and orbit-only SISRE dataframe.
        extra_row_names (list):  List of extra rows removed from the dataframe.
        figure_dir (PosixPath):  Figure directory.
     """
@@ -343,7 +343,7 @@ def _plot_bar_stacked_sisre_satellites(fid, field_dfs, extra_row_names, figure_d
 
     Args:
        fid (_io.TextIOWrapper): File object.
-       field_dfs (dict):        Dictionary with SISRE and orbit-only SISRE dataframe.          
+       field_dfs (dict):        Dictionary with SISRE and orbit-only SISRE dataframe.
        extra_row_names (list):  List of extra rows removed from the dataframe.
        figure_dir (PosixPath):  Figure directory.
     """
@@ -513,7 +513,7 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
                                         ydata (numpy.ndarray):  Y-axis data
        figure_path (PosixPath):     Figure path.
        xlabel (str):                X-axis label.
-       title (str):                 Title of subplot. 
+       title (str):                 Title of subplot.
     """
     marker = "."  # point marker type
 
@@ -614,10 +614,10 @@ def _generate_satellite_index_dataframe(dset):
      Elements            Description
     ==================  ============================================================================================
      field_dfs           Dictionary with field names as keys and dataframe as value. The dataframes have satellite
-                         as indices and statistical information as columns (rms, mean, std, min, max, 95th percentile) 
+                         as indices and statistical information as columns (rms, mean, std, min, max, 95th percentile)
      extra_rows_names    List with extra row names like GNSS and satellite type
     ==================  ============================================================================================
-    
+
     """
     rms = lambda x: np.sqrt(np.mean(np.square(x)))
     percentile = lambda x: np.percentile(x, 95)
@@ -811,19 +811,19 @@ def _write_information(fid):
 
 For the SISRE analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
 
-\\begin{equation}   
+\\begin{equation}
      \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
-  \\label{eq:sisre}  
+  \\label{eq:sisre}
 \\end{equation}
 
-\\begin{equation}   
+\\begin{equation}
      \\text{SISRE(orb)}^s = \sqrt{w_r^2 \cdot \Delta {r^s}^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
-  \\label{eq:sisre_orb}  
+  \\label{eq:sisre_orb}
 \\end{equation}
 
-\\begin{equation}   
+\\begin{equation}
      \\text{SISRE(clk)}^s = \\text{SISRE}^s - \\text{SISRE(orb)}^s
-  \\label{eq:sisre_clk}  
+  \\label{eq:sisre_clk}
 \\end{equation}
 
 \\begin{tabular}{lll}
@@ -848,9 +848,9 @@ It should be noted that we have neglected the uncertainty of precise ephemeris a
 The SISRE analysis is carried out on daily basis. Each daily solution is cleaned for outliers. The outliers are detected and rejected for each day iteratively using a 3-sigma threshold determined for each satellite. After each iteration the SISRE results are again recomputed.
 
 The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is caculated as follows:
-\\begin{equation}   
+\\begin{equation}
      \\text{ORB\_DIFF\_3D}^s = \sqrt{(\Delta {r^s}^2 + \Delta {a^s}^2 + \Delta {c^s}^2)}
-  \\label{eq:orb_diff_3d}  
+  \\label{eq:orb_diff_3d}
 \\end{equation}
 
 \\begin{table}[!ht]
@@ -883,6 +883,7 @@ def _write_title(fid, rundate):
        rundate (date):           Run date.
     """
     title = f"SISRE analysis for day {rundate:%Y-%m-%d}"
+    user_info = util.get_user_info()
 
     fid.write(
         """---
@@ -894,7 +895,7 @@ date: {nowdate:%Y-%m-%d}
             # title=title["text"], version=where.__version__, user=config.analysis.user.str, nowdate=datetime.now()
             title=title,
             version=where.__version__,
-            user=getpass.getuser(),
+            user=user_info.get("name", user_info["user"]),
             nowdate=datetime.now(),  # TODO: Better solution?
         )
     )

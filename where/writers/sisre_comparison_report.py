@@ -12,7 +12,6 @@ asdf
 # Standard library imports
 from collections import namedtuple
 from datetime import datetime
-import getpass
 import os
 import re
 import textwrap
@@ -33,6 +32,7 @@ from where.lib import files
 from where.lib import log
 from where.lib import gnss
 from where.lib import plugins
+from where.lib import util
 
 FIGURE_FORMAT = "png"
 
@@ -225,6 +225,7 @@ def _plot_bar_sisre_satellite_percentile(df, fid, figure_dir, threshold=False):
 
 def _header(fid):
     title = "Where"
+    user_info = util.get_user_info()
 
     fid.write(
         """---
@@ -236,7 +237,7 @@ date: {nowdate:%Y-%m-%d}
             # title=title["text"], version=where.__version__, user=config.analysis.user.str, nowdate=datetime.now()
             title=title,
             version=where.__version__,
-            user=getpass.getuser(),
+            user=user_info.get("name", user_info["user"]),
             nowdate=datetime.now(),  # TODO: Better solution?
         )
     )

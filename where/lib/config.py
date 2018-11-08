@@ -153,7 +153,7 @@ def set_file_vars(file_vars=None):
 
 def program_vars(rundate, tech_name, session, use_options=True, **other_vars):
     prg_vars = dict(rundate="" if rundate is None else rundate.strftime(FMT_date), tech=tech_name, session=session)
-    prg_vars.setdefault("user", getpass.getuser())
+    prg_vars.setdefault("user", getpass.getuser().lower())
     prg_vars.setdefault("id", "")
 
     # Add other variables
