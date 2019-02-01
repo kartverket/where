@@ -2,6 +2,11 @@
 data/
 work/
 publish/
+config/*_local.conf
+external/gpt2w/src/
+external/iers/src_2010/
+external/sofa/doc/
+external/sofa/src/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
