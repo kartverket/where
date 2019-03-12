@@ -32,8 +32,8 @@ def ignore_station(dset):
     remove_idx = np.zeros(dset.num_obs, dtype=bool)
 
     if stations:
-        log.info("Discarding observations from stations: {}", ", ".join(stations))
+        log.info(f"Discarding observations from stations: {', '.join(stations)}")
         for station in stations:
-            remove_idx = np.logical_or(remove_idx, dset.filter(station=station))
+            remove_idx |= dset.filter(station=station)
 
-    return np.logical_not(remove_idx)
+    return ~remove_idx

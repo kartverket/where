@@ -10,11 +10,6 @@ References:
 
    [1] Earth Radiation Pressure Effects on Satellites, P.C. Knocke, J.C. Ries, B. D. Tapley,
        Proceedings of the AIAA/AAS Astrodynamics Conference, pp 577-587 (1988).
-
-
-$Revision: 14978 $
-$Date: 2018-04-30 19:01:11 +0200 (Mon, 30 Apr 2018) $
-$LastChangedBy: hjegei $
 """
 # Standard library imports
 import math
@@ -24,7 +19,7 @@ import numpy as np
 
 # Where imports
 from where import apriori
-from where.lib import constant
+from midgard.math.constant import constant
 from where.ext import sofa
 from where.lib.time import Time, TimeDelta
 
@@ -41,14 +36,16 @@ def register_entry_point():
     return dict(setup=knocke_setup, call=indirect_radiation)
 
 
-def knocke_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
+def knocke_setup(
+        rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs
+):
     """Set up module variables used later during calculation.
-    
-    Args: 
+
+    Args:
         rundate:           Time of integration start
         force_parameters:  Dict of parameters to be estimated
         sat_name:          Name of satellite
-        time_grid:         Table of times in seconds since rundate, in utc. 
+        time_grid:         Table of times in seconds since rundate, in utc.
         epochs:            time_grid converted to Time objects, in utc.
         body_pos_gcrs:     The positions of the bodies in the solar system in GCRS.
         body_pos_itrs:     The positions of the bodies in the solar system in ITRS.
@@ -60,8 +57,8 @@ def knocke_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_po
     global solar_flux_over_c
     global radiation_pressure_coefficient
     global omega
-    global sun_pos_unit 
-    global g2i   
+    global sun_pos_unit
+    global g2i
 
     cdef int i, j
     cdef double days = 0
@@ -70,28 +67,28 @@ def knocke_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_po
     sun_pos_unit = np.zeros((len(epochs), 3))
 
     sat = apriori.get_satellite(sat_name)
-    earth_radius = constant.get('a', source='egm_2008')
-    AU = constant.get('AU', source='web')
-    c = constant.get('c')
+    earth_radius = constant.get("a", source="egm_2008")
+    AU = constant.get("AU", source="web")
+    c = constant.get("c")
     area = sat.area
     mass = sat.mass
-    
-    flux_table = apriori.get('solar_flux', rundate=rundate)
+
+    flux_table = apriori.get("solar_flux", rundate=rundate)
     sun_flux = flux_table(time_grid)
 
-    if 'radiation_pressure_coefficient' in force_parameters:
-        radiation_pressure_coefficient = force_parameters['radiation_pressure_coefficient']
+    if "radiation_pressure_coefficient" in force_parameters:
+        radiation_pressure_coefficient = force_parameters["radiation_pressure_coefficient"]
     else:
         radiation_pressure_coefficient = sat.radiation_pressure_coefficient
-     
-    sun_pos_itrs = body_pos_itrs[bodies.index('sun'), :, :]
+
+    sun_pos_itrs = body_pos_itrs[bodies.index("sun"), :, :]
 
     earth_sun_distance_in_au = np.linalg.norm(sun_pos_itrs, axis=1) / AU
     sun_pos_norm = np.linalg.norm(sun_pos_itrs, axis=1)
 
     for i in range(0, len(epochs)):
         # Days since reference epoch Dec 22 1981
-        days = (epochs.tt[i] - Time('1981-12-22', scale='tt')).jd
+        days = (epochs.tt[i] - Time("1981-12-22", scale="tt")).jd
         omega[i] = 2 * math.pi * days / 365.25
 
         # This is E_S/c in equation 27 in Knocke:
@@ -99,6 +96,7 @@ def knocke_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_po
         for j in range(0, 3):
             sun_pos_unit[i, j] = sun_pos_itrs[i, j] / sun_pos_norm[i]
     g2i = gcrs2itrs
+
 
 def indirect_radiation(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     """Compute the force acting on the satellite from the radiation pressure of the Earth, following Knocke [1]
@@ -137,8 +135,8 @@ def indirect_radiation(double[:] sat_pos_itrs, int num_param, int current_step, 
         latitude = math.radians(latitude)
         sin_latitude = math.sin(latitude)
         cos_latitude = math.cos(latitude)
-        ka = knocke_a(sin_latitude, cos_omega) 
-        ke = knocke_e(sin_latitude, cos_omega)        
+        ka = knocke_a(sin_latitude, cos_omega)
+        ke = knocke_e(sin_latitude, cos_omega)
         for longitude in range(0, 360, steplength):
             # Consider mid-point of surface element:
             longitude += 0.5 * steplength
@@ -147,8 +145,8 @@ def indirect_radiation(double[:] sat_pos_itrs, int num_param, int current_step, 
             surface_elem_vector, j = sofa.iau_gd2gc(2, longitude, latitude, 0)
             surface_elem_sat_vector = sat_pos_itrs - surface_elem_vector
             # To be divided by norms later
-            cos_sat_zenith_angle = np.dot(surface_elem_sat_vector, surface_elem_vector) 
-                                    
+            cos_sat_zenith_angle = np.dot(surface_elem_sat_vector, surface_elem_vector)
+
             if cos_sat_zenith_angle < 0:
                 #Satellite not visible from surface element
                 continue
@@ -172,27 +170,29 @@ def indirect_radiation(double[:] sat_pos_itrs, int num_param, int current_step, 
             # Night-time, no reflection of sunlight
             # Shadow function is zero.
                 cos_theta = 0
-                
+
             # Satellite acceleration due to earth emissivity:
-            acc += ((ka * cos_theta + 0.25 * ke) * effective_area * surface_elem_sat_vector 
+            acc += ((ka * cos_theta + 0.25 * ke) * effective_area * surface_elem_sat_vector
                     / surface_elem_sat_distance**3
                    )
             # Equation for state transition matrix
-            v = ((ka * cos_theta + 0.25 * ke) * area_surface_elem * surface_elem_sat_distance**(-6) 
+            v = ((ka * cos_theta + 0.25 * ke) * area_surface_elem * surface_elem_sat_distance**(-6)
                  * surface_elem_distance**(-1)
                 )
 
             r1, r2, r3 = surface_elem_sat_vector[0: 3]
             rs1, rs2, rs3 = surface_elem_vector[0: 3]
             trans += v * np.array(
-                      [[2 * rs1 * r1 * (r2**2 + r3**2 - r1**2), -8 * r1 * 2 * rs1 * r2, -8 * r1**2 * rs1 * r3], 
-                       [-8 * r1 * r2**2 * rs2, 2 * rs2 * r2 * (r1**2 + r3**2 - r2**2), -8 * r2**2 * rs2 * r3], 
+                      [[2 * rs1 * r1 * (r2**2 + r3**2 - r1**2), -8 * r1 * 2 * rs1 * r2, -8 * r1**2 * rs1 * r3],
+                       [-8 * r1 * r2**2 * rs2, 2 * rs2 * r2 * (r1**2 + r3**2 - r2**2), -8 * r2**2 * rs2 * r3],
                        [-8 * r1 * r3**2 * rs3, -8 * r2 * r3**2 * rs3, 2 * rs3 * r3 * (r1**2 + r2**2 - r3**2)]
                       ])
     for i in range(0, 3):
         acc[i] *= radiation_pressure_coefficient * solar_flux_over_c[current_step] * (area / mass) * (1 / math.pi)
         for j in range(0, 3):
-            trans[i, j] *= radiation_pressure_coefficient * solar_flux_over_c[current_step] * (area / mass) * (1 / math.pi)
+            trans[i, j] *= (
+                radiation_pressure_coefficient * solar_flux_over_c[current_step] * (area / mass) * (1 / math.pi)
+            )
 
     # Transform to space fixed system before returning
     gcrs2itrs = g2i[current_step]
@@ -211,8 +211,8 @@ def knocke_e(sin_latitude, cos_omega):
     Equation 24 in Knocke [1].
 
     Args:
-        sin_latitude:    float, sin of the latitude. 
-        cos_omega:       float, cos of 2*pi*days/365.25, where days is the number of days since reference epoch Dec 22 1981.
+        sin_latitude:    float, sin of the latitude.
+        cos_omega:       float, cos of 2*pi*days/365.25, days is number of days since reference epoch Dec 22 1981.
     Returns:
         emissivity:      float, equation 24.
     """
@@ -230,7 +230,7 @@ def knocke_a(sin_latitude, cos_omega):
 
     Args:
         sin_latitude:    float, sin of the latitude.
-        cos_omega:       float, cos of 2*pi*days/365.25, where days is the number of days since reference epoch Dec 22 1981.
+        cos_omega:       float, cos of 2*pi*days/365.25, days is number of days since reference epoch Dec 22 1981.
     Returns:
         albedo:          float, equation 23.
     """

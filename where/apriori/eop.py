@@ -73,21 +73,15 @@ from where import parsers
 from where.lib import plugins
 from where.lib.exceptions import MissingDataError
 from where.lib.time import Time
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 # Cache for EOP data read from file
 _EOP_DATA = dict()
 
-# List of files to read for EOP data, last file is prioritized for overlapping data
-_EOP_FILE_KEYS = {"c04": ("eop_c04_extended", "eop_c04"), "bulletin_a": ("eop_bulletin_a",)}
-
 
 @plugins.register
-def get_eop(time, models=None, window=4, source=None):
+def get_eop(time, models=None, pole_model=None, window=4, sources=None):
     """Get EOP data for the given time epochs
-
-    Read EOP data from the eopc04-files. Both files are read, with data from the regular IAU file
-    (eopc04_IAU2000.62-now) being prioritized, see `_EOP_FILE_KEYS`.
 
     Args:
         time (Time):   Time epochs for which to calculate EOPs.
@@ -97,13 +91,13 @@ def get_eop(time, models=None, window=4, source=None):
         Eop: Object that calculates EOP corrections.
 
     """
-    # Read the extended and the regular EOP data file (overlapping dates are overwritten by the latter)
     if not _EOP_DATA:
-        source = config.tech.get("eop_source", value=source).str
-        for file_key in _EOP_FILE_KEYS[source]:
-            _EOP_DATA.update(parsers.parse_key(file_key=file_key).as_dict())
 
-    return Eop(_EOP_DATA, time, models=models, window=window)
+        sources = config.tech.get("eop_sources", value=sources).list
+        for source in sources:
+            _EOP_DATA.setdefault(source, {}).update(parsers.parse_key(file_key=f"eop_{source}").as_dict())
+
+    return Eop(_EOP_DATA, time, models=models, pole_model=pole_model, window=window)
 
 
 class Eop:
@@ -115,7 +109,7 @@ class Eop:
 
     _correction_cache = dict()
 
-    def __init__(self, eop_data, time, models=None, window=4):
+    def __init__(self, eop_data, time, models=None, pole_model=None, window=4, sources=None):
         """Create an Eop-instance that calculates EOP corrections for the given time epochs
 
         The interpolation window is based on https://hpiers.obspm.fr/iers/models/interp.f which uses 4 days.
@@ -128,7 +122,8 @@ class Eop:
         """
         self.window = window
         self.time = time
-        self.data = self.pick_data(eop_data, self.time, self.window)
+        self.sources = sources
+        self.data = self.pick_data(eop_data, self.time, self.window, sources)
         self.calculate_leap_second_offset()
 
         # Figure out which correction models to use
@@ -137,10 +132,27 @@ class Eop:
         if "rg_zont2" in self.models:
             self.remove_low_frequency_tides()
 
-        self._mean_pole_cache = dict()
+        # Figure out which pole model to use:
+        self.pole_model = config.tech.get("eop_pole_model", value=pole_model, default=None).str
+        if self.pole_model == "mean_2015":
+            # Read the tabulated data needed for the model
+            data = parsers.parse_key("eop_mean_pole_2015").as_dict()
+            self.mean_pole_last_idx = len(data["year"]) - 1
+            self.mean_pole_years = interpolate.interp1d(
+                data["year"], data["year"], kind="previous", fill_value="extrapolate"
+            )
+            self.mean_pole_idx = interpolate.interp1d(
+                data["year"], range(len(data["year"])), kind="previous", fill_value=np.nan, bounds_error=False
+            )
+            self.mean_pole_x = interpolate.interp1d(
+                range(len(data["x"])), data["x"], kind="previous", fill_value="extrapolate"
+            )
+            self.mean_pole_y = interpolate.interp1d(
+                range(len(data["y"])), data["y"], kind="previous", fill_value="extrapolate"
+            )
 
     @staticmethod
-    def pick_data(eop_data, time, window):
+    def pick_data(eop_data, time, window, sources):
         """Pick out subset of eop_data relevant for the given time epochs and interpolation window
 
         Args:
@@ -158,14 +170,19 @@ class Eop:
             start_time = np.floor(time.min().utc.mjd) - window // 2
             end_time = np.ceil(time.max().utc.mjd) + window // 2
 
-        try:
-            return {d: eop_data[d].copy() for d in np.arange(start_time, end_time + 1)}
-        except KeyError:
-            paths = [str(files.path(k)) for k in _EOP_FILE_KEYS]
-            raise MissingDataError(
-                "Not all days in the time period {:.0f} - {:.0f} MJD were found in EOP-files {}"
-                "".format(start_time, end_time, ", ".join(paths))
-            )
+        sources = config.tech.get("eop_sources", value=sources).list
+        for source in sources:
+            try:
+                return {d: eop_data[source][d].copy() for d in np.arange(start_time, end_time + 1)}
+            except KeyError:
+                pass
+
+        # No data found if we reached this point
+        paths = [str(files.path(f"eop_{k}")) for k in sources]
+        raise MissingDataError(
+            "Not all days in the time period {:.0f} - {:.0f} MJD were found in EOP-files {}"
+            "".format(start_time, end_time, ", ".join(paths))
+        )
 
     def calculate_leap_second_offset(self):
         """Calculate leap second offsets for each day
@@ -175,7 +192,7 @@ class Eop:
         interpolating the UT1 - UTC values.
         """
         days = Time(np.array(list(self.data.keys())), format="mjd", scale="utc")
-        leap_offset = np.round((days.utc.mjd - days.tai.mjd) * unit.day2seconds)
+        leap_offset = np.round((days.utc.mjd - days.tai.mjd) * Unit.day2seconds)
         daily_offset = {int(d): lo for d, lo in zip(days.mjd, leap_offset)}
 
         for d, lo in daily_offset.items():
@@ -192,12 +209,12 @@ class Eop:
         for mjd in self.data.keys():
             # Julian centuries since J2000
             t = Time(mjd, format="mjd")
-            t_julian_centuries = (t.tt.jd - 2451545.0) / 36525
+            t_julian_centuries = (t.tt.jd - 2_451_545.0) / 36525
             dut1_corr = iers.rg_zont2(t_julian_centuries)[0]
             self.data[mjd]["ut1_utc"] -= dut1_corr
 
     @cache.property
-    @unit.register("arcseconds")
+    @Unit.register("arcseconds")
     def x(self):
         """X-motion of the Celestial Intermediate Pole
 
@@ -211,7 +228,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("arcseconds per day")
+    @Unit.register("arcseconds per day")
     def x_rate(self):
         """X-motion of the Celestial Intermediate Pole
 
@@ -226,19 +243,145 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("arcseconds")
-    def x_mean(self):
-        """Returns the the mean value for the X coordinate of the Celestial Intermediate Pole
+    @Unit.register("arcseconds")
+    def x_pole(self):
+        return getattr(self, f"x_{self.pole_model}")()
+
+    #
+    # x-pole models
+    #
+    def x_secular(self):
+        """Returns the x-coordinate of the secular pole
+
+        See chapter 7 in IERS Conventions, ::cite:`iers2010`:
+
+        Returns:
+            Array: Secular X-motion of the CIP, one value for each time epoch [arcseconds].
+        """
+        # IERS conventions 2010 v.1.2.0 (chapter 7, equation 21)
+        return (55.0 + 1.677 * (self.time.jyear - 2000)) * Unit.milliarcsec2arcsec
+
+    def x_mean_2015(self):
+        """x-coordindate of Conventional mean pole model version 2015
+
+        Reimplementation of IERS Conventions 2010 Software function IERS_CMP_2015.F
+        (ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F)
+
+        Units: Arcseconds
+        """
+        epochs = self.time.jyear
+        mean_pole_idx = self.mean_pole_idx(epochs)
+        # Inside of tabulated data range
+        in_range_idx = ~np.isnan(mean_pole_idx)
+        dt = epochs[in_range_idx] - self.mean_pole_years(epochs[in_range_idx])
+        idx = mean_pole_idx[in_range_idx]
+        x = np.full(len(epochs), fill_value=np.nan)
+        x[in_range_idx] = self.mean_pole_x(idx) + dt * (self.mean_pole_x(idx + 1) - self.mean_pole_x(idx))
+
+        # Extrapolate outside of tabulated data range
+        dt = epochs[~in_range_idx] - self.mean_pole_years(epochs[~in_range_idx])
+        x[~in_range_idx] = self.mean_pole_x(self.mean_pole_last_idx) + dt * (
+            self.mean_pole_x(self.mean_pole_last_idx) - self.mean_pole_x(self.mean_pole_last_idx - 1)
+        )
+        return x
+
+    def x_mean_2010(self):
+        """x-coordindate of Conventional mean pole model version 2010
+
+        Reimplementation of IERS Conventions 2010 Software function IERS_CMP_2015.F
+        (ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F)
+
+        Units: Arcseconds
+        """
+        epochs = self.time.jyear
+        dt = epochs - 2000.0
+        idx = dt < 10
+        x = np.zeros(len(epochs))
+        x[idx] = 0.055_974 + 0.001_824_3 * dt[idx] + 0.000_184_13 * dt[idx] ** 2 + 0.000_007_024 * dt[idx] ** 3
+        x[~idx] = 0.23513 + 0.007_614_1 * dt[~idx]
+        return x
+
+    def x_mean_2003(self):
+        """x-coordindate of Conventional mean pole model version 2003
+
+        Reimplementation of IERS Conventions 2010 Software function IERS_CMP_2015.F
+        (ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F)
+
+        Units: Arcseconds
+        """
+        return 0.054 + 0.00083 * (self.time.jyear - 2000.0)
+
+    @cache.property
+    @Unit.register("arcseconds")
+    def y_pole(self):
+        return getattr(self, f"y_{self.pole_model}")()
+
+    #
+    # y-pole models
+    #
+    def y_secular(self):
+        """Returns the x-coordinate of the secular pole
 
         See chapter 7 in IERS Conventions, ::cite:`iers2010`:
 
         Returns:
             Array: Mean X-motion of the CIP, one value for each time epoch [arcseconds].
         """
-        return self._get_mean_pole("x")
+        # IERS conventions 2010 v.1.2.0 (chapter 7, equation 21)
+        return (320.5 + 3.460 * (self.time.jyear - 2000)) * Unit.milliarcsec2arcsec
+
+    def y_mean_2015(self):
+        """y-coordindate of Conventional mean pole model version 2015
+
+        Reimplementation of IERS Conventions 2010 Software function IERS_CMP_2015.F
+        (ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F)
+
+        Units: Arcseconds
+        """
+        epochs = self.time.jyear
+        mean_pole_idx = self.mean_pole_idx(epochs)
+        # Inside of tabulated data range
+        in_range_idx = ~np.isnan(mean_pole_idx)
+        dt = epochs[in_range_idx] - self.mean_pole_years(epochs[in_range_idx])
+        idx = mean_pole_idx[in_range_idx]
+        y = np.full(len(epochs), fill_value=np.nan)
+        y[in_range_idx] = self.mean_pole_y(idx) + dt * (self.mean_pole_y(idx + 1) - self.mean_pole_y(idx))
+
+        # Extrapolate outside of tabulated data range
+        dt = epochs[~in_range_idx] - self.mean_pole_years(epochs[~in_range_idx])
+        y[~in_range_idx] = self.mean_pole_y(self.mean_pole_last_idx) + dt * (
+            self.mean_pole_y(self.mean_pole_last_idx) - self.mean_pole_y(self.mean_pole_last_idx - 1)
+        )
+        return y
+
+    def y_mean_2010(self):
+        """y-coordindate of Conventional mean pole model version 2010
+
+        Reimplementation of IERS Conventions 2010 Software function IERS_CMP_2015.F
+        (ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F)
+
+        Units: Arcseconds
+        """
+        epochs = self.time.jyear
+        dt = epochs - 2000.0
+        idx = dt < 10
+        y = np.zeros(len(epochs))
+        y[idx] = 0.346_346 + 0.001_789_6 * dt[idx] - 0.000_107_29 * dt[idx] ** 2 - 0.000_000_908 * dt[idx] ** 3
+        y[~idx] = 0.358_891 - 0.000_628_7 * dt[~idx]
+        return y
+
+    def y_mean_2003(self):
+        """y-coordindate of Conventional mean pole model version 2003
+
+        Reimplementation of IERS Conventions 2010 Software function IERS_CMP_2015.F
+        (ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F)
+
+        Units: Arcseconds
+        """
+        return 0.357 + 0.00395 * (self.time.jyear - 2000.0)
 
     @cache.property
-    @unit.register("arcseconds")
+    @Unit.register("arcseconds")
     def y(self):
         """Y-motion of the Celestial Intermediate Pole
 
@@ -252,7 +395,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("arcseconds per day")
+    @Unit.register("arcseconds per day")
     def y_rate(self):
         """X-motion of the Celestial Intermediate Pole
 
@@ -267,19 +410,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("arcseconds")
-    def y_mean(self):
-        """Returns the the mean value for the X coordinate of the Celestial Intermediate Pole
-
-        See chapter 7 in IERS Conventions, ::cite:`iers2010`:
-
-        Returns:
-            Array: Mean X-motion of the CIP, one value for each time epoch [arcseconds].
-        """
-        return self._get_mean_pole("y")
-
-    @cache.property
-    @unit.register("seconds")
+    @Unit.register("seconds")
     def ut1_utc(self):
         """Delta between UT1 and UTC
 
@@ -298,7 +429,7 @@ class Eop:
         if "rg_zont2" in self.models:
             correction_cache = self._correction_cache.setdefault("rg_zont2", dict())
             # Julian centuries since J2000
-            t_julian_centuries = (self.time.tt.jd - 2451545.0) / 36525
+            t_julian_centuries = (self.time.tt.jd - 2_451_545.0) / 36525
 
             if self.time.isscalar:
                 mjd = self.time.tt.mjd
@@ -309,7 +440,7 @@ class Eop:
                 dut1_corr = list()
                 for t in self.time.tt:
                     if t.mjd not in correction_cache:
-                        t_julian_centuries = (t.tt.jd - 2451545.0) / 36525
+                        t_julian_centuries = (t.tt.jd - 2_451_545.0) / 36525
                         correction_cache[t.mjd] = iers.rg_zont2(t_julian_centuries)[0]
                     dut1_corr.append(correction_cache[t.mjd])
 
@@ -317,7 +448,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("seconds per day")
+    @Unit.register("seconds per day")
     def ut1_utc_rate(self):
         """Delta between UT1 and UTC
 
@@ -359,7 +490,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("seconds")
+    @Unit.register("seconds")
     def lod(self):
         """Length of day
 
@@ -375,7 +506,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("arcseconds")
+    @Unit.register("arcseconds")
     def dx(self):
         """X-offset of the Celestial Intermediate Pole
 
@@ -388,7 +519,7 @@ class Eop:
         return values
 
     @cache.property
-    @unit.register("arcseconds")
+    @Unit.register("arcseconds")
     def dy(self):
         """Y-offset of the Celestial Intermediate Pole
 
@@ -485,28 +616,7 @@ class Eop:
 
         return corrections
 
-    def _get_mean_pole(self, coord):
-        """Calculate mean pole and cache results
-
-        coord:        'x' or 'y'
-
-        Returns:
-            Array:     mean pole values [arcseconds]
-        """
-        version = config.tech.mean_pole_version.str
-        key = coord + "_" + str(version)
-        if key not in self._mean_pole_cache:
-            mean_xp = np.empty(self.time.size)
-            mean_yp = np.empty(self.time.size)
-            # Calculate correction
-            for obs, time in enumerate(self.time.tt):
-                # Equation (7.25) IERS Conventions 2010
-                mean_xp[obs], mean_yp[obs], _ = iers.iers_cmp_2015(version, time.jyear)
-            self._mean_pole_cache["x_" + str(version)] = mean_xp
-            self._mean_pole_cache["y_" + str(version)] = mean_yp
-        return self._mean_pole_cache[key]
-
-    # Add methods to deal with units for Eop-properties (set by @unit.register)
-    convert_to = unit.convert_factory(__name__)
-    unit_factor = staticmethod(unit.factor_factory(__name__))
-    unit = staticmethod(unit.unit_factory(__name__))
+    # Add methods to deal with units for Eop-properties (set by @Unit.register)
+    convert_to = Unit.convert_factory(__name__)
+    unit_factor = staticmethod(Unit.factor_factory(__name__))
+    unit = staticmethod(Unit.unit_factory(__name__))

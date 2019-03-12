@@ -10,9 +10,6 @@ based on the reference epoch. For ITRF2014 a model for post seismic deformations
 References:
 -----------
 
-
-
-
 """
 
 # External library imports
@@ -27,7 +24,7 @@ from where import parsers
 from where.lib import rotation
 from where.ext import sofa_wrapper as sofa
 from where.lib.time import Time
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -58,7 +55,7 @@ class Itrf(trf.TrfFactory):
                 self.solution = max(candidates)
             except ValueError:
                 log.fatal("No itrf reference frame files found")
-        self.version = "{}_{}".format(self.solution, self.format)
+        self.version = f"{self.solution}_{self.format}"
 
     @property
     def file_paths(self):
@@ -93,9 +90,9 @@ class Itrf(trf.TrfFactory):
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
         try:
-            return getattr(self, "_read_data_{}".format(self.format))()
+            return getattr(self, f"_read_data_{self.format}")()
         except AttributeError:
-            log.fatal("Format '{}' is unknown for reference frame {}", self.format, self)
+            log.fatal(f"Format {self.format!r} is unknown for reference frame {self}")
 
     def _read_data_ssc(self):
         """Read data needed by ITRF SSC for calculating positions of sites
@@ -103,7 +100,9 @@ class Itrf(trf.TrfFactory):
         Returns:
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
-        return parsers.parse_file("trf_ssc", file_path=self.file_paths["ssc"]).as_dict()
+        data_trf = parsers.parse_file("trf_ssc", file_path=self.file_paths["ssc"]).as_dict()
+        data_ssc = {k.lower(): v for k, v in data_trf.items()}
+        return data_ssc
 
     def _read_data_snx(self):
         """Read data needed by ITRF Sinex for calculating positions of sites
@@ -163,7 +162,7 @@ class Itrf(trf.TrfFactory):
                 continue
             ref_pos = np.array([pv["STAX"], pv["STAY"], pv["STAZ"]])
             ref_vel = np.array([pv["VELX"], pv["VELY"], pv["VELZ"]])
-            interval_years = (self.time - ref_epoch).jd * unit.day2julian_years
+            interval_years = (self.time - ref_epoch).jd * Unit.day2julian_years
             if isinstance(interval_years, float):
                 interval_years = np.array([interval_years])
             pos[idx, :] = ref_pos + interval_years[idx, None] * ref_vel[None, :]
@@ -175,7 +174,7 @@ class Itrf(trf.TrfFactory):
             denu = dict(H=np.zeros(self.time.size), E=np.zeros(self.time.size), N=np.zeros(self.time.size))
             for param in psd.values():
                 t_0 = Time(param["epoch"], format="datetime", scale="utc")
-                delta_t = (self.time - t_0).jd * unit.day2julian_years
+                delta_t = (self.time - t_0).jd * Unit.day2julian_years
                 if isinstance(delta_t, float):
                     delta_t = np.array([delta_t])
                 idx = delta_t > 0
@@ -189,7 +188,7 @@ class Itrf(trf.TrfFactory):
                     for a, t in zip(alog, tlog):
                         denu[L][idx] += a * np.log(1 + delta_t[idx] / t)
 
-            rot = rotation.enu2trf(llh[:, 0], llh[:, 1])
+            rot = rotation.enu2trs(llh[:, 0], llh[:, 1])
             denu = np.vstack((denu["E"], denu["N"], denu["H"])).T
             dxyz = (rot @ denu[:, :, None])[:, :, 0]
             pos += dxyz

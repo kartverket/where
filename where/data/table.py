@@ -293,6 +293,9 @@ class Table(object):
         """
         return self._units.get(field, None)
 
+    def set_unit(self, field, unit):
+        self._units[field] = unit
+
     @property
     def _properties(self):
         """List names of properties in table
@@ -359,10 +362,14 @@ class Table(object):
         Args:
             key:   String, the name of the field.
         """
+
         if key in self._fields:
-            del self._fields[key]
+            if isinstance(self._fields, list):
+                self._fields.remove(key)
+            elif isinstance(self._fields, dict):
+                del self._fields[key]
         else:
-            raise KeyError("{} '{}' has no field '{}'".format(type(self).__name__, self.dataset_name, key))
+            raise KeyError("{} has no field '{}'".format(type(self).__name__, key))
 
     def __delattr__(self, key):
         """Delete a field in the table

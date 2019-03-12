@@ -12,7 +12,7 @@ Calculate the geometric propagation delay using the Consensus model as described
 """
 
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import plugins
 

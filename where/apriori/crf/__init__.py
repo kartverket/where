@@ -30,7 +30,7 @@ from where.lib import plugins
 from where.apriori.crf._crf import Crf, CrfFactory, CrfSource  # noqa
 
 
-def get_crf(celestial_reference_frames=None, session=None):
+def get_crf(time, celestial_reference_frames=None):
     """Get a celestial reference frame
 
     The specification of the reference frames takes the form `crf1, crf2, ...` where `crf1` etc is matched with a
@@ -57,10 +57,10 @@ def get_crf(celestial_reference_frames=None, session=None):
 
     """
     celestial_reference_frames = config.tech.get("celestial_reference_frames", celestial_reference_frames).str
-    return Crf(celestial_reference_frames=celestial_reference_frames)
+    return Crf(time=time, celestial_reference_frames=celestial_reference_frames)
 
 
-def get_crf_factory(celestial_reference_frame):
+def get_crf_factory(time, celestial_reference_frame):
     """Get a factory for a given celestial reference frame
 
     The factory knows how to create RadioSource objects for a given reference frame, for instance `icrf2`.
@@ -71,4 +71,6 @@ def get_crf_factory(celestial_reference_frame):
     Returns:
         CrfFactory:  Factory that knows how to create RadioSource objects.
     """
-    return plugins.call_one(package_name=__name__, plugin_name=celestial_reference_frame)
+    name, _, catalog = celestial_reference_frame.partition(":")
+    kwargs = dict(catalog=catalog) if catalog else dict()
+    return plugins.call_one(package_name=__name__, plugin_name=name, time=time, **kwargs)

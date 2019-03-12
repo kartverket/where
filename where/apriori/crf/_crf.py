@@ -3,12 +3,6 @@
 Description:
 ------------
 
-
-
-
-
-
-
 """
 
 # Standard library imports
@@ -33,7 +27,7 @@ class Crf(collections.UserDict):
     """A collection of Celestial Reference Frame sources
     """
 
-    def __init__(self, celestial_reference_frames=None):
+    def __init__(self, time, celestial_reference_frames=None):
         """Set up a new Celestial Reference Frame object, does not parse any data
 
         Here we only set up the Crf-object. The individual sources are added to self.data lazily using the
@@ -42,6 +36,8 @@ class Crf(collections.UserDict):
         Args:
             celestial_reference_frames (String):  Prioritized list of celestial reference frames
         """
+        super().__init__()
+        self.time = time
         self.celestial_reference_frames = config.tech.get(
             "celestial_reference_frames", celestial_reference_frames
         ).list
@@ -49,10 +45,7 @@ class Crf(collections.UserDict):
         # Add factory for each celestial reference frame
         self._factories = list()
         for celestial_reference_frame in self.celestial_reference_frames:
-            self._factories.append(crf.get_crf_factory(celestial_reference_frame))
-
-        # Cache for sources, this is populated lazily by the __missing__-method
-        self.data = dict()
+            self._factories.append(crf.get_crf_factory(time, celestial_reference_frame))
 
     def __missing__(self, key):
         """A CRF source identified by key
@@ -67,9 +60,8 @@ class Crf(collections.UserDict):
                 continue  # If source is not in factory, continue to next factory
         else:  # Exit if site is not found in any factories
             log.fatal(
-                "Source '{}' not found in the celestial reference frames {}",
-                key,
-                ", ".join(self.celestial_reference_frames),
+                f"Source {key!r} not found in the celestial reference frames "
+                f"{', '.join(self.celestial_reference_frames)}"
             )
 
         # Add source to cache
@@ -108,8 +100,9 @@ class Crf(collections.UserDict):
 
 
 class CrfFactory:
-    def __init__(self):
+    def __init__(self, time):
         self.name = self.__class__.__module__.split(".")[-1]
+        self.time = time
         self._data = None
 
     @property
@@ -145,7 +138,7 @@ class CrfFactory:
         source_info = self.data[key]
 
         crf_source = CrfSource(key, crs=pos_crs, source=str(self), **source_info)
-        log.debug("Found source {}".format(crf_source))
+        log.debug(f"Found source {crf_source}")
         return crf_source
 
     #
@@ -196,7 +189,6 @@ class CrfSource:
     # Dunder methods
     #
     def __repr__(self):
-        pos = self.pos.crs
         return "{}('{}', ({:.2f}, {:.2f}), '{}')" "".format(
             self.__class__.__name__, self.name, *self.pos.crs, self.source
         )

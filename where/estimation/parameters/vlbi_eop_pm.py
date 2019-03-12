@@ -15,7 +15,7 @@ This is done according to equations (2.30) and (2.32) in Teke :cite:`teke2011`.
 import numpy as np
 
 # Where imports
-from where.ext import sofa_wrapper as sofa
+from where.lib import rotation
 from where.lib import plugins
 
 
@@ -36,9 +36,13 @@ def eop_pm(dset):
     baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
 
     # x-pole
-    partials[:, 0] = -(src_dir @ sofa.Q(dset.time) @ sofa.R(dset.time) @ sofa.dW_dxp(dset.time) @ baseline)[:, 0, 0]
+    partials[:, 0] = -(
+        src_dir @ rotation.Q(dset.time) @ rotation.R(dset.time) @ rotation.dW_dxp(dset.time) @ baseline
+    )[:, 0, 0]
 
     # y-pole
-    partials[:, 1] = -(src_dir @ sofa.Q(dset.time) @ sofa.R(dset.time) @ sofa.dW_dyp(dset.time) @ baseline)[:, 0, 0]
+    partials[:, 1] = -(
+        src_dir @ rotation.Q(dset.time) @ rotation.R(dset.time) @ rotation.dW_dyp(dset.time) @ baseline
+    )[:, 0, 0]
 
     return partials, column_names, "meter per radian"

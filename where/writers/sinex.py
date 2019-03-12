@@ -13,13 +13,16 @@ References:
 .. [1] SINEX Format https://www.iers.org/IERS/EN/Organization/AnalysisCoordinator/SinexFormat/sinex.html
 
 """
+
+# Midgard imports
+from midgard.dev import plugins
+from midgard.files import dependencies
+
 # Where imports
 from where.writers import _sinex_blocks_202 as sinex_blocks
 from where.lib import config
-from where.lib import dependencies
 from where.lib import files
 from where.lib import log
-from where.lib import plugins
 
 WRITER = __name__.split(".")[-1]
 

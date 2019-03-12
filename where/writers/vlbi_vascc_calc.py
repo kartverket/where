@@ -40,13 +40,13 @@ References:
 .. [1] VLBI analysis software comparison campaign 2015, Grzegorz Klopotek.
        http://www.hobiger.org/VASCC2015/VASCC_INFO.pdf
 
-
-
 """
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import files
-from where.lib import plugins
 
 
 @plugins.register

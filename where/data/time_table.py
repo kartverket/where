@@ -131,7 +131,7 @@ class TimeTable(Table):
         # We should not end up here ...
         from where.lib import log
 
-        log.error("Somehow key is {} but my name is {}", key, self.name)
+        log.error(f"Somehow key is {key} but my name is {self.name}")
 
     def __dir__(self):
         """List all fields and attributes on the table

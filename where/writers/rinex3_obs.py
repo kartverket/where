@@ -10,12 +10,14 @@ Write data in the RINEX observations file format (see :cite:`rinex3`).
 # Standard library imports
 from datetime import datetime
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 import where
 from where.lib import config
 from where.lib import files
 from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register
@@ -159,7 +161,7 @@ def rinex3_obs(dset):
         # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
         #   2016    03    01    00    00   00.0000000     GPS         TIME OF FIRST OBS
         if not meta["time_sys"] == "GPS":
-            log.fatal("Time system '{}' is not implemented so far in Where.", meta["time_sys"])
+            log.fatal(f"Time system {meta['time_sys']!r} is not implemented so far in Where")
         d = dset.time.gps.datetime[0]
         fid.write(
             "{:>6d}{:>6d}{:>6d}{:>6d}{:>6d}{:>13.7f}{:>8s}{:9s}TIME OF FIRST OBS\n"
@@ -329,7 +331,7 @@ def rinex3_obs(dset):
             #       flexible in what kind of order the observation types should be written. The order of the
             #       observation types for a given GNSS is defined via dset.meta['obstypes'] variable.
             if dset.satellite[idx] in obs_epoch_cache:
-                log.fatal("Satellite {} occurs twice in epoch {}.", dset.satellite[idx], dset.time.gps.datetime[idx])
+                log.fatal(f"Satellite {dset.satellite[idx]} occurs twice in epoch {dset.time.gps.datetime[idx]}")
 
             for type_ in dset.meta["obstypes"][dset.system[idx]]:
                 lli = " " if dset[type_ + "_lli"][idx] == 0.0 else str(int(dset[type_ + "_lli"][idx]))

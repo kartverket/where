@@ -24,7 +24,7 @@ from midgard.dev import plugins
 # Where imports
 from where.parsers._parser_chain import ChainParser, ParserDef
 from where.lib import time
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 # TODO: Should we use SINEX class instead?
@@ -133,8 +133,8 @@ class GnssBiasParser(ChainParser):
             print("WARN: Differential phase bias conversion is not handled yet in Where.")
             return 0  # TODO: Is it correct to handle it like that.
         elif line["unit"] == "ns":
-            estimate = float(line["estimate"]) * unit.nanosecond2second
-            sigma = float(line["estimate_sigma"]) * unit.nanosecond2second
+            estimate = float(line["estimate"]) * Unit.nanosecond2second
+            sigma = float(line["estimate_sigma"]) * Unit.nanosecond2second
         else:
             print(
                 "FATAL: Unit '{}' in file {} is not defined in SINEX bias format."

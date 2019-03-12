@@ -36,8 +36,8 @@ def get_ephemeris(rundate, sat_name):
     """
     file_key = "slr_ephemeris"
     sat_data = get_satellite_vars(sat_name)
-
     provider_list = config.tech.prediction_providers.list
+
     # Find the latest version of the observation file
     versions = files.glob_variable(file_key, "version", r"\d{4}", file_vars=sat_data)
     ephemeris_data = dict()
@@ -49,17 +49,20 @@ def get_ephemeris(rundate, sat_name):
             if provider in providers:
                 ephemeris_data["provider"] = provider
                 break
+        else:
+            log.fatal(f"No valid provider found: {', '.join(providers)}")
     except IndexError:
-        print(f"Pattern: '{files.path(file_key)}'")  # TODO: Because of format log does not print this properly
-        log.fatal(f"No ephemeris data found")
+        log.info(f"Pattern: '{files.path(file_key)}'")
+        log.info(f"No ephemeris data found")
+        log.fatal(f"Download manually from ftp://cddis.nasa.gov/slr/cpf_predicts/")
 
-    eph = parsers.parse_key(file_key, file_vars=ephemeris_data, rundate=rundate)
-    eph = calculate_initial_values(eph)
+    eph_parser = parsers.parse_key(file_key, file_vars=ephemeris_data)
+    eph = calculate_initial_values(eph_parser.as_dict(), rundate)
 
     return eph
 
 
-def calculate_initial_values(eph):
+def calculate_initial_values(eph, rundate):
     """Computing initial values for position and velocity in GCRS system
 
     This is for later use in orbit integration, from tables in the prediction files.  Use a lagrange polynomial in
@@ -73,11 +76,11 @@ def calculate_initial_values(eph):
     """
     pos_gcrs = np.empty((3, 0))
     times = np.empty((0))
-    table_of_positions = sorted(eph.data["positions"].items())
+    table_of_positions = sorted(eph["positions"].items())
     mjd1, mjd2 = zip(*[t for t, d in table_of_positions])
 
     for pos_time, (_, data) in zip(time.Time(val=mjd1, val2=mjd2, format="mjd", scale="utc"), table_of_positions):
-        diffsec = (pos_time.utc.datetime - eph.rundate).total_seconds()
+        diffsec = (pos_time.utc.datetime - rundate).total_seconds()
         # Only look at points close to rundate (start of integration)
         # if abs(diffsec) > 4000:
         #    continue

@@ -127,13 +127,6 @@ python module iers_2010 ! in
             double precision, intent(in) :: tjd
             double precision, intent(out) :: hf2002_iers
         end function hf2002_iers
-        subroutine iers_cmp_2015(version,epoch,x,y,error) ! in IERS_CMP_2015.F
-            integer, intent(in) :: version
-            real*8, intent(in) :: epoch
-            real*8, intent(out) :: x
-            real*8, intent(out) :: y
-            integer, intent(out) :: error
-        end subroutine iers_cmp_2015
         subroutine ortho_eop(time,eop) ! in ORTHO_EOP.F
             double precision, intent(in) :: time
             double precision dimension(3), intent(out) :: eop

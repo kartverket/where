@@ -29,5 +29,5 @@ def apply_editors(config_key, dset):
     """
     prefix = config.analysis.get("analysis", default="").str
     editors = plugins.list_all(package_name=__name__, config_key=config_key, prefix=prefix)
-    log.info(f"Applying editors {', '.join(editors)}")
+    log.info(f"Applying editors")
     return plugins.call_all(package_name=__name__, config_key=config_key, prefix=prefix, dset=dset)

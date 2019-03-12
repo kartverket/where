@@ -13,6 +13,7 @@ Each data cleaner should be defined in a one of two directories:
 # Make the apply-functions in subpackages available
 from where.cleaners.editors import apply_editors  # noqa
 from where.cleaners.removers import apply_removers  # noqa
+from where.cleaners.removers import apply_remover  # noqa
 
 # Do not support * imports
 __all__ = []

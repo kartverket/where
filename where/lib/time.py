@@ -29,9 +29,9 @@ import numpy as np
 
 # Where imports
 from where.lib import cache
-from where.lib import constant
+from midgard.math.constant import constant
 from where.ext import iers_2010 as iers
-from where.ext import sofa_wrapper as sofa
+from where.lib import rotation
 
 # Make astropy.time.TimeDelta available
 from astropy.time import TimeDelta  # noqa
@@ -100,7 +100,7 @@ class Time(astropy.time.Time):
 
     """
 
-    @cache.property
+    @property
     def text_repr(self):
         """A text representation of all time epochs
 
@@ -115,18 +115,14 @@ class Time(astropy.time.Time):
     def itrs2gcrs(self):
         """The ITRS to GCRS transformation matrix for the given times
 
-        See ext/sofa_wrapper.py for details about the implementation.
-
         Returns:
             Numpy-float array with transformation matrices, shape is (len(self), 3, 3).
         """
-        return sofa.Q(self) @ sofa.R(self) @ sofa.W(self)
+        return rotation.Q(self) @ rotation.R(self) @ rotation.W(self)
 
     @cache.property
     def gcrs2itrs(self):
         """The GCRS to ITRS transformation matrix for the given times
-
-        See ext/sofa_wrapper.py for details about the implementation.
 
         Returns:
             Numpy-float array with transformation matrices, shape is (len(self), 3, 3).
@@ -140,18 +136,14 @@ class Time(astropy.time.Time):
     def itrs2gcrs_dot(self):
         """The derivative of ITRS to GCRS transformation matrix for the given times
 
-        See ext/sofa_wrapper.py for details about the implementation.
-
         Returns:
             Numpy-float array with transformation matrices, shape is (len(self), 3, 3).
         """
-        return sofa.Q(self) @ sofa.dR_dut1(self) @ sofa.W(self)
+        return rotation.Q(self) @ rotation.dR_dut1(self) @ rotation.W(self)
 
     @cache.property
     def gcrs2itrs_dot(self):
         """The derivative of GCRS to ITRS transformation matrix for the given times
-
-        See ext/sofa_wrapper.py for details about the implementation.
 
         Returns:
             Numpy-float array with transformation matrices, shape is (len(self), 3, 3).
@@ -264,7 +256,7 @@ class Time(astropy.time.Time):
         Returns:
             Numpy-float scalar or array with the integer part of Modified Julian Day.
         """
-        return self.jd_int - 2400000.5
+        return self.jd_int - 2_400_000.5
 
     @cache.property
     def mjd_frac(self):
@@ -348,13 +340,13 @@ class Time(astropy.time.Time):
         func_name = caller.f_code.co_name
         file_name = caller.f_code.co_filename
         line_num = caller.f_lineno
-        log.dev("'time.data' is deprecated. Use 'time' instead in '{}' ({}:{})", func_name, file_name, line_num)
+        log.dev(f"'time.data' is deprecated. Use 'time' instead in {func_name!r} ({file_name}:{line_num})")
 
         return self
 
     def _get_delta_ut1_utc(self, jd1=None, jd2=None):
         """Calculate ut1 - utc based on EOP tables
-
+ 
         Reads the ut1 - utc field in the apriori EOP tables and interpolates for each time epoch.
         TODO: Take jd1, jd2 into account
         """
@@ -439,6 +431,52 @@ class Time(astropy.time.Time):
         )
 
 
+class TimeGPSWeekSec(astropy.time.TimeFormat):
+    """
+    Modified Julian Date time format.
+    This represents the number of days since midnight on November 17, 1858.
+    For example, 51544.0 in MJD is midnight on January 1, 2000.
+    """
+
+    name = "gps_ws"
+
+    def set_jds(self, wwww, sec):
+        self._check_scale(self._scale)  # Validate scale.
+
+        SEC_OF_DAY = 86400.0
+        JD_1980_01_06 = 2_444_244  # Julian date of 6-Jan-1980 + 0.5 d
+
+        # .. Determine GPS day
+        wd = np.floor((sec + 43200.0) / 3600.0 / 24.0)  # 0.5 d = 43200.0 s
+
+        # .. Determine remainder
+        fracSec = sec + 43200.0 - wd * 3600.0 * 24.0
+
+        # .. Conversion GPS week and day to from Julian Date (JD)
+        jd_day = wwww * 7.0 + wd + JD_1980_01_06
+        jd_frac = fracSec / SEC_OF_DAY
+
+        self.jd1, self.jd2 = jd_day, jd_frac
+
+    @property
+    def value(self):
+        JD_1980_01_06 = 2_444_244.5  # Julian date of 6-Jan-1980
+        if np.any(self.jd1 + self.jd2 < JD_1980_01_06):
+            raise ValueError("Julian Day exceeds the GPS time start date of 6-Jan-1980 (JD 2444244.5).")
+
+        # See Time.jd_int for explanation
+        _delta = self.jd1 - (np.floor(self.jd1 + self.jd2 - 0.5) + 0.5)
+        jd_int = self.jd1 - _delta
+        jd_frac = self.jd2 + _delta
+
+        # .. Conversion from Julian Date (JD) to GPS week and day
+        wwww = np.floor((jd_int - JD_1980_01_06) / 7)
+        wd = np.floor(jd_int - JD_1980_01_06 - wwww * 7)
+        gpssec = (jd_frac + wd) * 86400.0
+
+        return wwww, gpssec
+
+
 def _add_gps_scale():
     """Add scale with name gps
 
@@ -470,9 +508,18 @@ def _add_gps_scale():
     del astropy.time.core.TIME_FORMATS["gps"]
 
     # Add 'gps' as a scale
-    astropy.time.core.TIME_SCALES = ("gps",) + astropy.time.core.TIME_SCALES
+    try:  # astropy v3.1 and above, see https://github.com/astropy/astropy/pull/7122/files
+        astropy.time.core.STANDARD_TIME_SCALES = ("gps",) + astropy.time.core.STANDARD_TIME_SCALES
+        astropy.time.core.TIME_SCALES = astropy.time.core.STANDARD_TIME_SCALES + astropy.time.core.LOCAL_SCALES
+        astropy.time.core.TIME_TYPES = dict(
+            (scale, scales)
+            for scales in (astropy.time.core.STANDARD_TIME_SCALES, astropy.time.core.LOCAL_SCALES)
+            for scale in scales
+        )
+    except AttributeError:  # astropy 3.0 and below
+        astropy.time.core.TIME_SCALES = ("gps",) + astropy.time.core.TIME_SCALES
+        astropy.time.core.LOCAL_SCALES = ()  # Dummy to match code for v3.1++
     astropy.time.Time.SCALES = astropy.time.core.TIME_SCALES
-    #    Time.SCALES = astropy.time.core.TIME_SCALES
     astropy.time.formats.TIME_SCALES = astropy.time.core.TIME_SCALES
     astropy.time.core.GEOCENTRIC_SCALES = ("gps",) + astropy.time.core.GEOCENTRIC_SCALES
     astropy.time.core.TIME_DELTA_TYPES = dict(
@@ -481,10 +528,16 @@ def _add_gps_scale():
             astropy.time.core.GEOCENTRIC_SCALES,
             astropy.time.core.BARYCENTRIC_SCALES,
             astropy.time.core.ROTATIONAL_SCALES,
+            astropy.time.core.LOCAL_SCALES,
         )
         for scale in scales
     )
-    astropy.time.core.TIME_DELTA_SCALES = sorted(astropy.time.core.TIME_DELTA_TYPES.keys())
+    astropy.time.core.TIME_DELTA_SCALES = (
+        astropy.time.core.GEOCENTRIC_SCALES
+        + astropy.time.core.BARYCENTRIC_SCALES
+        + astropy.time.core.ROTATIONAL_SCALES
+        + astropy.time.core.LOCAL_SCALES
+    )
     astropy.time.TimeDelta.SCALES = astropy.time.core.TIME_DELTA_SCALES
     astropy.time.formats.TIME_DELTA_SCALES = astropy.time.core.TIME_DELTA_SCALES
 

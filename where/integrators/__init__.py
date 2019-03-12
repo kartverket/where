@@ -12,16 +12,13 @@ needs to be decorated with the :func:`~where.lib.plugins.register` decorator as 
     def cowell(dset):
         ...
 
-
-
-
 """
 
 import importlib
 
 # Where imports
-from where.lib import plugins, log
-
+from where.lib import log
+from where.lib import plugins
 
 # Do not support * imports
 __all__ = []
@@ -50,8 +47,7 @@ def call(integrator, **kwargs):
         Output of integrator
     """
     try:
-        integrator_name = importlib.import_module("{}.{}".format(__name__, integrator))
-        # integrator_function = __name__.rsplit('.', maxsplit=1)[1]
-        return integrator_name.integrate(**kwargs)
+        integrator_module = importlib.import_module(f"{__name__}.{integrator}")
+        return integrator_module.integrate(**kwargs)
     except ImportError:
-        log.fatal("Did not find compiled Cython module '{}.{}'", package, integrator_name)
+        log.fatal(f"Did not find compiled Cython module '{__name__}.{integrator}'")

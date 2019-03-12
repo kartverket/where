@@ -19,10 +19,6 @@ To use a satellite, you will typically use the :func:`get_satellite`-function de
     my_new_satellite = apriori.get_satellite('satellite_1', ...)
 
 The name used in `get` to call the satellite is the lower case name of the class containing the satellite info.
-
-
-
-
 """
 
 # Where imports
@@ -68,7 +64,7 @@ def get_satellite(satellite_name, **kwargs):
     try:
         plugin, part = satellites()[satellite_name.lower()]
     except KeyError:
-        log.fatal("Unknown satellite '{}'. Defined satellites are {}.", satellite_name, ", ".join(names()))
+        log.fatal(f"Unknown satellite '{satellite_name}'. Defined satellites are {', '.join(names())}")
 
     return plugins.call_one(package_name=__name__, plugin_name=plugin, part=part, **kwargs)
 

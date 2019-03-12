@@ -2,9 +2,9 @@
 
 Description:
 ------------
-Write data in the Rinex navigation file format 3.03 (see :cite:`rinex3`). 
+Write data in the Rinex navigation file format 3.03 (see :cite:`rinex3`).
 
-If the writer is called by RINEX_NAV analysis, then the given Dataset includes already necessary apriori broadcast 
+If the writer is called by RINEX_NAV analysis, then the given Dataset includes already necessary apriori broadcast
 ephemeris information. If the writer is called from another analysis (e.g. SISRE), then the Dataset does not include
 apriori broadcast ephemeris. In this case the given Dataset has to be overwritten with a apriori broadcast ephemeris
 Dataset.
@@ -14,12 +14,14 @@ Dataset.
 # Standard library imports
 from datetime import datetime, timedelta
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 import where
 from where import apriori
 from where.lib import config
 from where.lib import files
-from where.lib import plugins
 from where.lib import util
 
 # TODO: SYSTEM_TIME_OFFSET_TO_GPS_SECOND & SYSTEM_TIME_OFFSET_TO_GPS_WEEK should be placed in constans.conf
@@ -36,7 +38,7 @@ SYSTEM_TIME_OFFSET_TO_GPS_WEEK = dict(C=1356, E=0, I=0, J=0)
 
 @plugins.register
 def rinex3_nav(dset):
-    """Write RINEX navigation file 
+    """Write RINEX navigation file
 
     Args:
         dset:       Dataset, a dataset containing the data.
@@ -280,8 +282,8 @@ def _get_fields_based_on_system(data, idx):
     """Get general GNSS fields from GNSS specific ones
 
     Several fields in the RINEX navigation message have a different meaning depending on the GNSS. The GNSS specfic
-    fields are converted to the general fields like 'data_info', 'interval', 'iodc_groupdelay', 'l2p_flag' and 
-    'tgd_bgd'. In the following table the relationship between the general fields and the GNSS dependent fields 
+    fields are converted to the general fields like 'data_info', 'interval', 'iodc_groupdelay', 'l2p_flag' and
+    'tgd_bgd'. In the following table the relationship between the general fields and the GNSS dependent fields
     are shown:
 
     ===================== ==================== =================================================================

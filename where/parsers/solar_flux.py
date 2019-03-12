@@ -25,17 +25,17 @@ import itertools
 from midgard.dev import plugins
 
 # Where imports
-from where.parsers import parser
-from where.lib import constant
+from where.parsers._parser_chain import ChainParser, ParserDef
+from midgard.math.constant import constant
 
 
 @plugins.register
-class SolarFluxParser(parser.ParserDict):
+class SolarFluxParser(ChainParser):
     """A parser for reading Solar Flux data
     """
 
-    def setup_parsers(self):
-        flux_parser = parser.define_parser(
+    def setup_parser(self):
+        flux_parser = ParserDef(
             end_marker=lambda _l, _ln, nextline: nextline[0:1].isdigit(),
             label=lambda line, _ln: line[0:1].isdigit(),
             parser_def={

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Set up the Where program to do analysis of space geodetic data
 
-Usage::
+Usage:
 
-    {exe:setup} date pipeline [--session=session] [options]
+    {exe:setup} <date> <pipeline> [--session=<session>] [options]
 
 The program requires a date. Typically, the date is given in the format
 `<year month day>` (for example 2015 8 4). However, it is also possible to
 specify the date as `<year day-of-year>` (for example 2015 216) by also adding
 the option `--doy`.
+
 In addition, one pipeline must be specified. See below for available pipelines.
 
 ===================  ===========================================================
@@ -25,7 +26,7 @@ Option               Description
 -D, --delete         Delete existing analysis results.
     --doy            Specify date as <year day-of-year>.
 -E, --edit           Edit the configuration of an analysis.
--N, --new            Start a new analysis (combine with -A or -D).
+-N, --new            Start an analysis with a new config.
 -T, --showtb         Show traceback if the program crashes.
 --id=analysisid      Add a special analysis id (to run several versions of the
                      same analysis simultaneously).
@@ -59,15 +60,15 @@ Examples:
 
 Here are some concrete examples of how to run the program:
 
-Set up a VLBI analysis for August 4 2015::
+Set up a VLBI analysis for August 4 2015:
 
     {exe:setup} 2015 8 4 -v
 
-Set up an SLR analysis for September 1 2015 using day-of-year::
+Set up an SLR analysis for September 1 2015 using day-of-year:
 
     {exe:setup} 2015 242 --slr --doy
 
-Change the spam option of the GNSS analysis::
+Change the spam option of the GNSS analysis:
 
     {exe:setup} 2016 3 1 -g --spam=ham
 
@@ -89,7 +90,6 @@ from midgard.config import config as mg_config
 from midgard.dev import console
 
 # Where imports
-from where.tools import delete
 from where import pipelines
 from where.lib import config
 from where.lib import files
@@ -110,15 +110,18 @@ def main():
 
     Do simple parsing of command line arguments. Set up config-files and show the configuration.
     """
+    util.check_help_and_version(doc_module=__name__)
+
     # Start logging
     log.init()
 
     # Read command line options
+    pipeline = pipelines.get_from_options()
+    config.read_pipeline(pipeline)
     if util.check_options("--doy"):
         rundate = util.parse_args("doy", doc_module=__name__)
     else:
         rundate = util.parse_args("date", doc_module=__name__)
-    pipeline = pipelines.get_from_options()
     session = pipelines.get_session(rundate, pipeline)
 
     # Set up the configuration for the analysis
@@ -144,6 +147,8 @@ def setup_config(rundate, pipeline, session):
 
     # Delete an analysis
     if util.check_options("-D", "--delete"):
+        from where.tools import delete
+
         delete.delete_analysis(rundate, pipeline, session)
         if not start_new:
             raise SystemExit
@@ -184,7 +189,6 @@ def create_config(rundate, pipeline, session):
     cfg = mg_config.Configuration(pipeline)
     cfg.update_from_config_section(config.where.all, section=pipeline)
     cfg.update_from_config_section(config.where[pipeline], section=pipeline)
-    log.info(f"Creating new configuration at '{cfg_path}' based on {', '.join(cfg.sources)}")
     cfg.write_to_file(cfg_path, metadata=False)
 
     # Update configuration settings from library
@@ -193,12 +197,13 @@ def create_config(rundate, pipeline, session):
 
     # Write updated configuration to file
     cfg.write_to_file(cfg_path, metadata=False)
-
-    # Add timestamp and creation note
-    add_timestamp(rundate, pipeline, session, "created")
+    log.info(f"Creating new configuration at '{cfg_path}' based on {', '.join(cfg.sources)}")
 
     # Add new dependent sections from newly created config
     add_sections(rundate, pipeline, session)
+
+    # Add timestamp and creation note
+    add_timestamp(rundate, pipeline, session, "created")
 
 
 def update_config(rundate, pipeline, session):
@@ -206,7 +211,7 @@ def update_config(rundate, pipeline, session):
 
     """
     cfg_path = _config_path(rundate, pipeline, session)
-    ts_before = files.get_timestamp(cfg_path)
+    ts_before = cfg_path.stat().st_mtime
 
     # Update with command line options
     with mg_config.Configuration.update_on_file(_config_path(rundate, pipeline, session)) as cfg:
@@ -214,7 +219,7 @@ def update_config(rundate, pipeline, session):
         cfg.update_from_options(_clean_sys_argv())
 
     # Add timestamp and updated note
-    if files.get_timestamp(cfg_path) != ts_before:
+    if cfg_path.stat().st_mtime != ts_before:
         add_timestamp(rundate, pipeline, session, "last update")
 
     # Add new dependent sections from command line options
@@ -226,12 +231,12 @@ def edit_config(rundate, pipeline, session):
 
     """
     cfg_path = _config_path(rundate, pipeline, session)
-    ts_before = files.get_timestamp(cfg_path)
+    ts_before = cfg_path.stat().st_mtime
 
     # Open config file in an editor
     editor.edit(str(cfg_path))
 
-    if files.get_timestamp(cfg_path) != ts_before:
+    if cfg_path.stat().st_mtime != ts_before:
         # Add timestamp and edited note
         add_timestamp(rundate, pipeline, session, "last update")
 
@@ -246,7 +251,7 @@ def add_sections(rundate, pipeline, session):
 
     """
     cfg_path = _config_path(rundate, pipeline, session)
-    ts_before = files.get_timestamp(cfg_path)
+    ts_before = cfg_path.stat().st_mtime
 
     # Add dependent sections that are not already included
     with mg_config.Configuration.update_on_file(cfg_path, metadata=False) as cfg:
@@ -259,7 +264,7 @@ def add_sections(rundate, pipeline, session):
                         cfg.update(section.name, key, entry.str, source=entry.source, meta=entry.meta)
 
     # Add timestamp and updated note
-    if files.get_timestamp(cfg_path) != ts_before:
+    if cfg_path.stat().st_mtime != ts_before:
         add_timestamp(rundate, pipeline, session, "last update")
 
 

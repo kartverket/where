@@ -15,7 +15,7 @@ from where.estimation.estimators._kalman import KalmanFilter
 from where.lib import config
 from where.lib import log
 from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register_named("partial_config_keys")
@@ -78,14 +78,14 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
         const_idx = np.array([c.startswith(param + "-") for c in param_names])
         rate_idx = np.array([c.startswith(param + "-") and c.endswith("rate_") for c in param_names])
 
-        knot_interval[rate_idx] = float(intervals.pop(0)) * unit.seconds2day
+        knot_interval[rate_idx] = float(intervals.pop(0)) * Unit.seconds2day
         for interval in intervals:
             # (Potentially) overwrite with station specific knot_interval
             sta, _, seconds = interval.partition(":")
             rate_idx_sta = np.array(
                 [c.startswith(param + "-") and c.endswith("rate_") and sta in c for c in param_names]
             )
-            knot_interval[rate_idx_sta] = float(seconds) * unit.seconds2day
+            knot_interval[rate_idx_sta] = float(seconds) * Unit.seconds2day
         process_noise[rate_idx] = config.tech[param].process_noise.float
 
         apriori_stdev[const_idx] = config.tech[param].apriori_stdev.float
@@ -143,22 +143,19 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
         # TODO deal with slr_site_pos etc
         log.info(
-            "Applying {} with {} from {}",
-            "/".join(trf_constraints).upper(),
-            ", ".join(stations),
-            reference_frame.upper(),
+            f"Applying {'/'.join(trf_constraints).upper()} with {', '.join(stations)} from {reference_frame.upper()}"
         )
         if "nnt" in constraints and "nnr" in constraints and "vlbi_site_pos" in constant_params:
-            obs_noise = np.hstack((obs_noise, np.array([.0001 ** 2] * 3 + [(1.5e-11) ** 2] * 3))).T
+            obs_noise = np.hstack((obs_noise, np.array([0.0001 ** 2] * 3 + [(1.5e-11) ** 2] * 3))).T
         elif "nnt" in constraints and "nnr" not in constraints and "vlbi_site_pos" in constant_params:
             d = d[:, 0:3]
-            obs_noise = np.hstack((obs_noise, np.array([.0001 ** 2] * 3))).T
+            obs_noise = np.hstack((obs_noise, np.array([0.0001 ** 2] * 3))).T
         elif "nnt" not in constraints and "nnr" in constraints and "vlbi_site_pos" in constant_params:
             d = d[:, 3:6]
             obs_noise = np.hstack((obs_noise, np.array([(1.5e-11) ** 2] * 3))).T
         elif "nnt" not in constraints and "nnr" not in constraints and "vlbi_site_pos" in constant_params:
             d = np.zeros((n, 0))
-            log.warn("Unknown constraints {}. Not applying.", "/".join(constraints).upper())
+            log.warn(f"Unknown constraints {'/'.join(constraints).upper()}. Not applying.")
 
         num_constraints = d.shape[1]
         try:
@@ -168,9 +165,9 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
         if "nnr_crf" in constraints and "vlbi_src_dir" in constant_params:
             celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-            crf = apriori.get("crf", celestial_reference_frames=celestial_reference_frame, session=dset.dataset_name)
+            crf = apriori.get("crf", time=dset.time.mean.utc, celestial_reference_frames=celestial_reference_frame)
             # NNR to CRF
-            log.info("Applying NNR constraint to {}", celestial_reference_frame.upper())
+            log.info(f"Applying NNR constraint to {celestial_reference_frame.upper()}")
             H2 = np.zeros((3, n))
             for idx, column in enumerate(param_names):
                 if "_src_dir-" not in column:

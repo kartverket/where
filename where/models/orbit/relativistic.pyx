@@ -9,10 +9,6 @@ References:
 
    [1] O. Montenbruck and E. Gill: Satellite Orbits, Springer, 2000.
 
-
-$Revision: 14978 $
-$Date: 2018-04-30 19:01:11 +0200 (Mon, 30 Apr 2018) $
-$LastChangedBy: hjegei $
 """
 
 # Standard library imports
@@ -22,26 +18,29 @@ import sys
 import numpy as np
 
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 
 cdef double GM, c
 cdef int num_param
 cdef double [:, :, :] g2i
- 
+
+
 def register_entry_point():
     """Register entry points for setup and later calls."""
     return dict(setup=relativistic_setup, call=relativistic)
 
 
-def relativistic_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
+def relativistic_setup(
+        rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs
+):
     """Set up module variables used later during calculation.
-    
-    Args: 
+
+    Args:
         rundate:           Time of integration start.
         force_parameters:  Dict of parameters to be estimated.
         sat_name:          Name of satellite.
-        time_grid:         Table of times in seconds since rundate, in utc. 
+        time_grid:         Table of times in seconds since rundate, in utc.
         epochs:            time_grid converted to Time objects, in utc.
         body_pos_gcrs:     The positions of the bodies in the solar system in GCRS.
         body_pos_itrs:     The positions of the bodies in the solar system in ITRS.
@@ -52,16 +51,17 @@ def relativistic_setup(rundate, force_parameters, sat_name, time_grid, epochs, b
     global g2i
 
     # Set gravitational constant and speed of light
-    GM = constant.get('GM', source='egm_2008')
-    c = constant.get('c')
+    GM = constant.get("GM", source="egm_2008")
+    c = constant.get("c")
 
     # Number of parameters to be estimated
     num_param = len(force_parameters)
 
-    if not (sat_name == 'lageos1' or sat_name == 'lageos2'):
-        log.fatal('Unknown relativistic effects for satellite {}', sat_name)
+    if not (sat_name == "lageos1" or sat_name == "lageos2"):
+        log.fatal(f"Unknown relativistic effects for satellite {sat_name}")
         sys.exit(0)
     g2i = gcrs2itrs
+
 
 def relativistic(sat_pos_itrs, sat_vel_itrs, int current_step, **_not_used):
     """Compute relativistic gravitational force on satellite
@@ -77,7 +77,7 @@ def relativistic(sat_pos_itrs, sat_vel_itrs, int current_step, **_not_used):
     """
     cdef int i
     cdef double[:] acc = np.zeros(3)
- 
+
     # Equation 3.147 from Montenbruck and Gill [1].
     # Assume circular orbit.
 
@@ -93,4 +93,3 @@ def relativistic(sat_pos_itrs, sat_vel_itrs, int current_step, **_not_used):
     sens = np.zeros((3, num_param))
 
     return (acc, trans, sens)
-

@@ -23,7 +23,7 @@ import numpy as np
 # Where imports
 from where import apriori
 from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -63,17 +63,17 @@ def solid_pole_tides_station(dset):
     eop = apriori.get("eop", time=dset.time)
 
     # Equation (7.24) IERS Conventions 2010
-    m_1 = eop.x - eop.x_mean
-    m_2 = -(eop.y - eop.y_mean)
+    m_1 = eop.x - eop.x_pole
+    m_2 = eop.y_pole - eop.y
 
     lat, lon, _ = dset.site_pos.llh.T
     theta = np.pi / 2 - lat
     coslon, sinlon = np.cos(lon), np.sin(lon)
 
     # Equation (7.26) IERS Conventions 2010
-    dup = -33 * np.sin(2 * theta) * (m_1 * coslon + m_2 * sinlon) * unit.mm2m
-    dsouth = -9 * np.cos(2 * theta) * (m_1 * coslon + m_2 * sinlon) * unit.mm2m
-    deast = 9 * np.cos(theta) * (m_1 * sinlon + m_2 * coslon) * unit.mm2m
+    dup = -33 * np.sin(2 * theta) * (m_1 * coslon + m_2 * sinlon) * Unit.mm2m
+    dsouth = -9 * np.cos(2 * theta) * (m_1 * coslon + m_2 * sinlon) * Unit.mm2m
+    deast = 9 * np.cos(theta) * (m_1 * sinlon + m_2 * coslon) * Unit.mm2m
 
     # Correction in topocentric (east, north, up) coordinates
     denu = np.vstack((deast, -dsouth, dup)).T

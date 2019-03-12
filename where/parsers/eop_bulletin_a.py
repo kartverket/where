@@ -103,7 +103,13 @@ class EopBulletinAParser(LineParser):
         self._array["dy"] *= Unit.milliarcsec2arcsec
         self.data = {
             item["mjd"]: dict(
-                x=item["x"], y=item["y"], ut1_utc=item["ut1_utc"], lod=item["lod"], dx=item["dx"], dy=item["dy"]
+                x=item["x"],
+                y=item["y"],
+                ut1_utc=item["ut1_utc"],
+                lod=item["lod"],
+                dx=item["dx"],
+                dy=item["dy"],
+                source="bulletin_a",
             )
             for item in self._array
         }

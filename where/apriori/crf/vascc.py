@@ -14,14 +14,8 @@ import numpy as np
 
 # Where imports
 from where.apriori import crf
-from where.lib import files
-from where.lib import log
 from where.lib import plugins
 from where import parsers
-from where.lib import rotation
-from where.ext import sofa_wrapper as sofa
-from where.lib.time import Time
-from where.lib.unit import unit
 
 
 @plugins.register

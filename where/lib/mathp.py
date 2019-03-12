@@ -18,7 +18,6 @@ This module will provide functions additional mathematical functions.
 # External library imports
 from scipy import interpolate
 import numpy as np
-import numpy.polynomial.polynomial as poly
 import matplotlib.pyplot as plt
 
 # Where imports
@@ -94,10 +93,8 @@ def _get_nearest_idx_for_given_data(given_data, data):
 
         if not np.any(given_values_less_val):
             log.fatal(
-                "Given data range (from {} to {}) corresponds not to the data value {}.",
-                np.min(given_data),
-                np.max(given_data),
-                val,
+                f"Given data range (from {np.min(given_data)} to {np.max(given_data)}) "
+                f"corresponds not to the data value {val}"
             )
 
         # Convert True/False array to indices
@@ -342,7 +339,7 @@ def unit_vector(vector):
         for i in range(0, vector.shape[1]):
             unit_vector[:, i] = vector[:, i] / norm
     else:
-        log.fatal("Dimension of vector should be either 1- or 2-dimensional and not {}-dimensional.", ndim)
+        log.fatal(f"Dimension of vector should be either 1- or 2-dimensional and not {ndim}-dimensional.")
 
     return unit_vector
 
@@ -372,8 +369,9 @@ def _lagrange2(x, y):
                         continue
                     if x[i] == x[j]:
                         log.fatal(
-                            "Leads to division by zero (x = {}). Identical values given in x array. For example by using Lagrange interpolation for precise orbit, check if identical observation epochs are given in SP3 file.",
-                            x[i],
+                            f"Leads to division by zero (x = {x[i]}). Identical values given in x array. "
+                            "For example by using Lagrange interpolation for precise orbit, "
+                            "check if identical observation epochs are given in SP3 file"
                         )
                     tot_mul *= (x_ip - x[j]) / float(x[i] - x[j])
                 return tot_mul

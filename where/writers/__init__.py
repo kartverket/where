@@ -15,31 +15,22 @@ should be called need to be decorated with the :func:`~where.lib.plugins.registe
 The decorated function will be called with a single parameter, ``dset`` which contains a
 :class:`~where.data.dataset.Dataset` with the data that should be output.
 
-
-
-
 """
+
+# Midgard imports
+from midgard.dev import plugins
+from midgard import writers as mg_writers
+from midgard.writers import names, write as write_one  # noqa
 
 # Where imports
 from where.lib import config
 from where import data
-from where.lib import plugins
+
+# Add Where writers to Midgard writers
+plugins.add_alias(mg_writers.__name__, __name__)
 
 
-def names():
-    """List the names of the available writers specified in the configuration
-
-    The available writers (modules in the writers directory) are compared to the list specified in the ``output``-field
-    of the configuration file. Only writers that appears both places are returned.
-
-    Returns:
-        List: List of strings with the names of the available writers.
-
-    """
-    return plugins.list_all(package_name=__name__, config_key="output")
-
-
-def write(default_stage):
+def write(default_dset):
     """Call all writers specified in the configuration
 
     The list of writers to use is taken from the config file of the given technique. Each writer is passed a
@@ -49,14 +40,14 @@ def write(default_stage):
     By default the last dataset for the default_stage is sent to the writer, but that is possible to override with the
     following notation:
 
-        output = writer_1                 # Use last dataset of default_stage
+        output = writer_1                 # Use default dataset
         output = writer_1:calculate       # Use last dataset of "calculate" stage
         output = writer_1:calculate/2     # Use dataset 2 of "calculate" stage
 
     Args:
-        default_stage (String):    Name of stage to read dataset from by default.
+        default_dset (Dataset):    Dataset used by default.
     """
-    dsets = dict()
+    dsets = {f"{default_dset.vars['stage']}/{default_dset.vars['dataset_id']}": default_dset}
     prefix = config.analysis.get("analysis", default="").str
     output_list = config.tech.output.list
     writer_and_dset = [o.partition(":")[::2] for o in output_list]
@@ -70,7 +61,7 @@ def write(default_stage):
         if dset_str not in dsets:
             stage, _, dset_id = dset_str.partition("/")
             stage, _, dset_name = stage.partition(":")
-            stage = stage if stage else default_stage
+            stage = stage if stage else default_dset.vars["stage"]
             dset_name = dset_name if dset_name else session
             dset_id = int(dset_id) if dset_id else "last"
             dsets[dset_str] = data.Dataset(
@@ -78,14 +69,4 @@ def write(default_stage):
             )
 
         # Call the writers
-        plugins.call_one(package_name=__name__, plugin_name=writer, prefix=prefix, dset=dsets[dset_str])
-
-
-def write_one(writer, dset, **writer_args):
-    """Call one writer
-
-    Args:
-        writer (String):   Name of writer.
-        dset (Dataset):    Model run data.
-    """
-    plugins.call_one(package_name=__name__, plugin_name=writer, dset=dset, **writer_args)
+        plugins.call(package_name=mg_writers.__name__, plugin_name=writer, prefix=prefix, dset=dsets[dset_str])

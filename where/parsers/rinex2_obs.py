@@ -27,7 +27,7 @@ from midgard.dev import plugins
 from where.parsers import parser
 from where.lib import config
 from where.lib import log
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 SYSTEM_TIME_OFFSET_TO_GPS_TIME = dict(BDT=14, GAL=0, IRN=0, QZS=0)
@@ -331,7 +331,7 @@ class Rinex2Parser(parser.ParserDict):
         """Parse time of first observation given in RINEX header to instance variable `meta`.
         """
         if line["time_sys"] != "GPS":
-            log.fatal("Time system {} is not handled so far in Where.", line["time_sys"])
+            log.fatal(f"Time system {line['time_sys']} is not handled so far in Where")
 
         if line["time_sys"]:
             self.meta["time_sys"] = line["time_sys"]
@@ -353,7 +353,7 @@ class Rinex2Parser(parser.ParserDict):
         """Parse time of last observation given in RINEX header to instance variable `meta`.
         """
         if line["time_sys"] != "GPS":
-            log.fatal("Time system {} is not handled so far in Where.", line["time_sys"])
+            log.fatal(f"Time system {line['time_sys']} is not handled so far in Where")
 
         if line["time_sys"]:
             self.meta["time_sys"] = line["time_sys"]
@@ -481,10 +481,8 @@ class Rinex2Parser(parser.ParserDict):
 
                 if first_obs_year != last_obs_year:
                     log.fatal(
-                        "Different year for first and last observation is given in RINEX  with ({}) and ({}). "
-                        "RINEX routine has to be improved.",
-                        first_obs_year,
-                        last_obs_year,
+                        f"Different year for first and last observation is given in RINEX "
+                        f"({first_obs_year} and {last_obs_year}). RINEX routine has to be improved"
                     )
 
             cache["sat_list"] = list()
@@ -497,7 +495,7 @@ class Rinex2Parser(parser.ParserDict):
                 second=float(line["second"]),
             )
             cache["obs_sec"] = (
-                int(line["hour"]) * unit.hour2second + int(line["minute"]) * unit.minute2second + float(line["second"])
+                int(line["hour"]) * Unit.hour2second + int(line["minute"]) * Unit.minute2second + float(line["second"])
             )
             cache["epoch_flag"] = int(line["epoch_flag"])
             cache["rcv_clk_offset"] = _float(line["rcv_clk_offset"])
@@ -510,9 +508,8 @@ class Rinex2Parser(parser.ParserDict):
 
         if (line["epoch_flag"].strip() != "0") and line["epoch_flag"].strip():
             log.fatal(
-                "Epoch {} is not ok, which is indicated by epoch flag {}. How it should be handled in Where?",
-                cache["obs_time"],
-                line["epoch_flag"],
+                f"Epoch {cache['obs_time']} is not ok, which is indicated by epoch flag {line['epoch_flag']}.\n"
+                f"TODO: How should it be handled in Where?"
             )  # TODO: Handle flagged epochs
 
         # Generate satellite list for given epoch
@@ -535,11 +532,8 @@ class Rinex2Parser(parser.ParserDict):
 
         if cache["num_sat"] != cache["len_sat_list"]:
             log.fatal(
-                "Number of satellites ({}) does not agree with number of satellites in satellite PRN list ({}) "
-                "in observation epoch {}.",
-                cache["num_sat"],
-                cache["len_sat_list"],
-                cache["obs_time"],
+                f"Number of satellites ({cache['num_sat']}) does not agree with number of satellites "
+                f"in satellite PRN list ({cache['len_sat_list']}) in observation epoch {cache['obs_time']}"
             )
 
         # Read line with maximal 5 observations
@@ -673,10 +667,8 @@ class Rinex2Parser(parser.ParserDict):
 
         if system not in valid_time_systems:
             log.fatal(
-                "Time system '{}' in file {} is not handled in Where. Following time systems can be used: {}.",
-                system,
-                self.file_path,
-                ", ".join(valid_time_systems),
+                f"Time system {system!r} in file {self.file_path} is not handled in Where. "
+                f"The following time systems can be used: {', '.join(valid_time_systems)}"
             )
 
         # Convert observation time entries of BeiDou to GPS time scale by adding system time offset

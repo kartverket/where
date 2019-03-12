@@ -55,14 +55,12 @@ Version: {version}
 """
 # Standard library imports
 import atexit
-from datetime import datetime, timedelta
+from datetime import timedelta
 import subprocess
 import sys
 
 
 # Where imports
-from midgard.dev.console import indent
-
 import where
 from where.lib import config
 from where.lib import files
@@ -70,7 +68,7 @@ from where.lib import log
 from where import pipelines
 from where.lib.timer import timer
 from where.lib import util
-
+from where.lib.enums import LogLevel
 
 _STATISTICS = {"Number of analyses": 0, "Successful analyses": 0, "Failed analyses": 0}
 
@@ -82,23 +80,32 @@ def main():
     Do simple parsing of command line arguments. Set up config-files and potentially start the analysis. See the help
     docstring at the top of the file for more information about the workflow.
     """
+    util.check_help_and_version(doc_module=__name__)
+    log.init(log_level=config.where.log.default_level.str, prefix="Runner")
+
     # Initialize
+    pipeline = pipelines.get_from_options()
+    config.read_pipeline(pipeline)
     if util.check_options("--doy"):
         from_date = util.parse_args("doy", doc_module=__name__)
         to_date = util.parse_args("doy", doc_module=__name__)
+        sys.argv.remove("--doy")
     else:
         from_date = util.parse_args("date", doc_module=__name__)
         to_date = util.parse_args("date", doc_module=__name__)
-    tech = pipelines.get_from_options()
 
     # Handle list of sessions
     session_list = set(util.read_option_value("--session", default="").replace(",", " ").split())
     sys.argv = [o for o in sys.argv if not o.startswith("--session=")]
 
     # Start logging
-    log.init()
-    file_vars = dict(timestamp=datetime.now().strftime(config.FMT_dt_file), **util.get_user_info())
-    log.file_init(files.path("log_runner", file_vars=file_vars), config.where.runner.filelog_level.str)
+    file_vars = dict(**util.get_user_info())
+    log.file_init(
+        file_path=files.path("log_runner", file_vars=file_vars),
+        log_level=config.where.log.default_level.str,
+        prefix="Runner",
+        rotation=config.where.log.number_of_log_backups.int,
+    )
     atexit.register(log_statistics)
 
     # Should where_runner crash if Where crashes?
@@ -110,70 +117,57 @@ def main():
     stop_on_error = config.where.get("stop_on_error", section="runner", value=stop_on_error_opts).bool
     error_logger = log.fatal if stop_on_error else log.error
 
-    # The remaining options are passed onwhere to Where
-    where_args = sys.argv[1:]
-
     # Loop over dates
     rundate = from_date
     while rundate <= to_date:
-        available_sessions = set(pipelines.list_sessions(rundate, tech))
+        available_sessions = set(pipelines.list_sessions(rundate, pipeline))
         sessions = available_sessions & session_list if session_list else available_sessions
 
+        where_args = remove_runner_args(sys.argv[1:])
         for session in sorted(sessions):
             cmd = f"{where.__executable__} {rundate:%Y %m %d} --session={session}".split() + where_args
-            log.blank()
-            log.blank(log_to_file=True)
             log.info(f"Running '{' '.join(cmd)}'")
             count("Number of analyses")
             try:
-                subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except subprocess.CalledProcessError as err:
                 count("Failed analyses")
-
-                # Attempt to recover errors and traceback from stderr
-                stderr = err.stderr.decode()
-                stderr, *tb_exc = stderr.partition("\nTraceback")  # Regular Python traceback
-                stderr, *tb_fatal = stderr.partition("\nFATAL:")  # Where log.fatal traceback
-                stderr, *tb_error = stderr.partition("\nERROR:")  # Where log.error traceback
-                traceback = indent("".join(tb_exc + tb_fatal + tb_error).strip(), 4)
-                print(stderr, file=sys.stderr)
-                error_logger(f"Command '{' '.join(cmd)}' failed with\n{traceback}")
+                error_msg = err.stderr.decode().strip().split("\n")[-1]
+                error_logger(f"Command '{' '.join(cmd)}' failed: {error_msg}")
             else:
                 count("Successful analyses")
-            copy_log_from_where(rundate, tech, session)
+            copy_log_from_where(rundate, pipeline, session)
 
         rundate += timedelta(days=1)
 
 
-def copy_log_from_where(rundate, tech, session):
-    levels_to_log = config.where.runner.levels_to_log.list
-    file_vars = dict(**config.program_vars(rundate, tech, session), **config.date_vars(rundate))
-    log_path = files.path("log", file_vars=file_vars)
-    if not log_path.exists():
-        log.warn(f"Found no log at '{log_path}'")
-        return
+def remove_runner_args(args):
 
-    log.blank()
-    log.info(f"Information collected from '{log_path}':")
-    with files.open("log", file_vars=file_vars) as fid:
-        log_level = ""
-        for line in fid:
-            if not line.strip():  # Skip empty lines
-                continue
+    args = set(args)
+    runner_args = set()
+    for arg in args:
+        option = arg.replace("-", "").split("=")[0]
+        if config.where.exists(option, section="runner"):
+            runner_args.add(arg)
 
-            _log_level, _, message = line.rpartition(":")
-            if _log_level in log.LOGLEVELS:
-                log_level = _log_level.lower()
-                message = message.strip()
-                print_level = True
-            else:  # Lines without a log level belong to the previous line
-                message = ":".join((_log_level, message)).rstrip()
-                print_level = False
-            if log_level in levels_to_log:
-                try:  # Temporary fix because .format sometimes complains
-                    log.log(log_level.upper(), message, print_level=print_level)
-                except KeyError:
-                    pass
+    return list(args - runner_args)
+
+
+def copy_log_from_where(rundate, pipeline, session):
+    file_vars = dict(**config.program_vars(rundate, pipeline, session), **config.date_vars(rundate))
+    log_level = config.where.runner.log_level.str
+    current_level = "none"
+    try:
+        with files.open("log", file_vars=file_vars) as fid:
+            for line in fid:
+                line_level, _, text = line.partition(" ")
+                line_level = line_level.strip().lower()
+                current_level = line_level if line_level else current_level
+                text = text.strip()
+                if getattr(LogLevel, current_level) >= getattr(LogLevel, log_level) and text:
+                    log.log(text, current_level)
+    except FileNotFoundError as err:
+        log.warn(f"'{err}'")
 
 
 def count(statistic):

@@ -14,7 +14,7 @@ Calculate the partial derivatives of the rate of the :math:`x_p` and :math:`y_p`
 import numpy as np
 
 # Where imports
-from where.ext import sofa_wrapper as sofa
+from where.lib import rotation
 from where.lib import plugins
 
 
@@ -37,9 +37,9 @@ def eop_pm_rate(dset):
     dt = (time.jd - time.mean.jd)[:, None, None]
 
     # x-pole
-    partials[:, 0] = -(src_dir @ sofa.Q(time) @ sofa.R(time) @ sofa.dW_dxp(time) @ baseline @ dt)[:, 0, 0]
+    partials[:, 0] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dxp(time) @ baseline @ dt)[:, 0, 0]
 
     # y-pole
-    partials[:, 1] = -(src_dir @ sofa.Q(time) @ sofa.R(time) @ sofa.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
+    partials[:, 1] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
 
     return partials, column_names, "meter * days / radian"

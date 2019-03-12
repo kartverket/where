@@ -42,7 +42,7 @@ def add(report_name, dset=None, **report_vars):
 
     # Add report to current section
     section = _REPORTS["__section__"]
-    log.debug("Adding {} to {} for report", report_name, section)
+    log.debug(f"Adding {report_name} to {section} for report")
     _REPORTS[section].append(
         dict(report_name=report_name, dset_params={} if dset is None else dset.parameters, **report_vars)
     )
@@ -132,7 +132,7 @@ def write_reports_to_file():
     file_vars = config.files.vars.copy()
 
     def write_to_file():
-        log.debug("Store reports for {} {}".format(tech.upper(), rundate))
+        log.debug(f"Store reports for {tech.upper()} {rundate}")
         with files.open("report_pickle", mode="wb", file_vars=file_vars) as fid:
             pickle.dump(_REPORTS, fid)
 

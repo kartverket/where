@@ -28,7 +28,7 @@ import pandas as pd
 from where.parsers._parser import Parser
 from where.lib import files
 from where.lib import log
-from where.lib.unit import unit
+from where.lib.unit import Unit
 from where.lib import util
 
 # A simple structure used to define a Sinex block
@@ -124,7 +124,7 @@ def parsing_matrix_factory(marker, size_marker):
             n = len(self._sinex[size_marker])
         except KeyError:
             n = max(data["row_idx"])
-            log.dev("'{}'-block was not parsed. Guessing at size of normal equation matrix (n={}).", size_marker, n)
+            log.dev(f"{size_marker!r}-block was not parsed. Guessing at size of normal equation matrix (n={n}).")
         matrix = np.zeros((n, n))
 
         # Loop through each line of values and put it in the correct place in the matrix (cannot simply reshape as
@@ -141,7 +141,7 @@ def parsing_matrix_factory(marker, size_marker):
         elif lower_upper.upper() == "U":
             matrix = np.triu(matrix) + np.triu(matrix, k=1).T
         else:
-            log.warn("'L' or 'U' not specified for {}. Trying to create a symmetric matrix anyway.", marker)
+            log.warn(f"'L' or 'U' not specified for {marker}. Trying to create a symmetric matrix anyway.")
             matrix = matrix + matrix.T - np.diag(np.diag(matrix))
 
         return {"matrix": matrix, "type": type}
@@ -162,8 +162,9 @@ class SinexParser(Parser):
     """
 
     _TECH = {"C": "comb", "D": "doris", "L": "slr", "M": "llr", "P": "gnss", "R": "vlbi"}
+    max_line_width = 80
 
-    def __init__(self, file_path, encoding=None, logger=None, header=True):
+    def __init__(self, file_path, encoding=None, header=True):
         """Set up the basic information needed by the parser
 
         Add a self._sinex dictionary for the raw Sinex data and read which blocks to read from self.setup_parser().
@@ -171,7 +172,6 @@ class SinexParser(Parser):
         Args:
             file_path (String/Path):    Path to file that will be read.
             encoding (String):          Encoding of file that will be read.
-            logger (Function):          Ignored for where.parsers, used for consistency with Midgard.
             header (Boolean):           Whether to parse the header.
         """
         super().__init__(file_path, encoding)
@@ -244,10 +244,8 @@ class SinexParser(Parser):
 
         except StopIteration:  # File ended without reading all sinex_blocks
             log.warn(
-                "SinexParser '{}' did not find Sinex blocks {} in file {}",
-                self.parser_name,
-                ", ".join(sinex_blocks),
-                self.file_path,
+                f"SinexParser {self.parser_name!r} did not find Sinex blocks {', '.join(sinex_blocks)} "
+                f"in file {self.file_path}"
             )
 
     def parse_lines(self, lines, fields):
@@ -257,7 +255,9 @@ class SinexParser(Parser):
             Dict:  Data contained in the line
         """
         # Set up for np.genfromtxt to parse the Sinex block
-        delimiter = np.diff(np.array([0] + [f.start_col for f in fields] + [81]))  # Length of each field
+        delimiter = np.diff(
+            np.array([0] + [f.start_col for f in fields] + [self.max_line_width + 1])
+        )  # Length of each field
         names = [f.name for f in fields if f.dtype]  # Names, only fields with dtype set
         usecols = [i for i, f in enumerate(fields, start=1) if f.dtype]  # Skip 0th and fields without dtype
         dtype = [f.dtype for f in fields if f.dtype]  # Types of fields
@@ -314,7 +314,7 @@ class SinexParser(Parser):
             Float:  Field converted to degrees.
         """
         degrees, minutes, seconds = [float(f) for f in field.split()]
-        return unit.dms_to_rad(degrees, minutes, seconds) * unit.radians2degrees
+        return Unit.dms_to_rad(degrees, minutes, seconds) * Unit.radians2degrees
 
     def _convert_dms2rad(self, field):
         """Convert DMS (degrees, minutes, seconds) to radians
@@ -326,7 +326,7 @@ class SinexParser(Parser):
             Float:  Field converted to radians.
         """
         degrees, minutes, seconds = [float(f) for f in field.split()]
-        return unit.dms_to_rad(degrees, minutes, seconds)
+        return Unit.dms_to_rad(degrees, minutes, seconds)
 
     def _convert_epoch(self, field):
         """Convert epoch field to datetime value
@@ -437,7 +437,7 @@ class SinexParser(Parser):
             header_line (String):  First line of Sinex file.
         """
         if not header_line.startswith(b"%=SNX"):
-            log.warn("The file '{}' is missing the SINEX header", self.file_path)
+            log.warn(f"The file '{self.file_path}' is missing the SINEX header")
             return
 
         # Add header information to self.meta

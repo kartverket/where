@@ -14,7 +14,7 @@ import numpy as np
 import h5py
 
 # Where imports
-from where.lib.unit import unit
+from where.lib.unit import Unit
 from where.lib import log
 from where.lib import config
 from where.lib import files
@@ -92,7 +92,6 @@ class KalmanFilter(object):
         r = self.r
         Q = self.Q
         x_hat = self.x_hat
-        x_hat_ferr = self.x_hat_ferr
         x_smooth = self.x_smooth
         I = np.eye(self.n)
 
@@ -145,7 +144,7 @@ class KalmanFilter(object):
         sq_sum_residuals = np.asscalar(v.T @ P @ v)
         sq_sum_omc_terms = np.asscalar(2 * b.T @ g - g.T @ N @ g)
         variance_factor = sq_sum_residuals / deg_freedom if deg_freedom != 0 else np.inf
-        log.info("Variance factor = {:.4f}, degrees of freedom = {:d}", variance_factor, deg_freedom)
+        log.info(f"Variance factor = {variance_factor:.4f}, degrees of freedom = {deg_freedom:d}")
 
         # Report and set analysis status if there are too few degrees of freedom
         if deg_freedom < 1:
@@ -220,7 +219,7 @@ class KalmanFilter(object):
                     d[idx, :] = np.array([0, 0, 1, y0, -x0, 0])
                 stations.add(station)
 
-        log.info("Applying NNT/NNR with {} from {}", ", ".join(stations), reference_frame.upper())
+        log.info(f"Applying NNT/NNR with {', '.join(stations)} from {reference_frame.upper()}")
         # thaller2008: eq 2.57
         try:
             H = np.linalg.inv(d.T @ d) @ d.T
@@ -232,7 +231,7 @@ class KalmanFilter(object):
         # NNR to CRF
         if "celestial_reference_frames" in config.tech.master_section:
             celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-            crf = apriori.get("crf", celestial_reference_frames=celestial_reference_frame, session=dset.dataset_name)
+            crf = apriori.get("crf", time=dset.time.mean.utc, celestial_reference_frames=celestial_reference_frame)
             H2 = np.zeros((3, n))
             for idx, column in enumerate(names):
                 if "_src_dir-" not in column:
@@ -250,7 +249,7 @@ class KalmanFilter(object):
                         H2[1, idx] = -np.cos(ra)
 
             if H2.any():
-                log.info("Applying NNR constraint to {}", celestial_reference_frame.upper())
+                log.info(f"Applying NNR constraint to {celestial_reference_frame.upper()}")
                 # add NNR to CRF constraints
                 H = np.concatenate((H, H2))
                 sigmas = sigmas + [1e-6] * 3
@@ -302,7 +301,7 @@ class KalmanFilter(object):
                 # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
                 partial_unit = dset.unit("partial_{}".format(param_name))
                 display_unit = dset.meta["display_units"][param_name]
-                factor = unit("meter / ({})".format(partial_unit), display_unit)
+                factor = Unit("meter / ({})".format(partial_unit), display_unit)
                 dset.add_to_meta("display_factors", param_name, factor)
                 dset.add_float(
                     fieldname, table="state", val=value * factor, unit=display_unit, write_level="operational"
@@ -314,7 +313,7 @@ class KalmanFilter(object):
                 # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
                 partial_unit = dset.unit("partial_{}".format(param_name))
                 display_unit = dset.meta["display_units"][param_name]
-                factor = unit("meter / ({})".format(partial_unit), display_unit)
+                factor = Unit("meter / ({})".format(partial_unit), display_unit)
                 dset.add_to_meta("display_factors", param_name, factor)
                 dset.add_float(
                     fieldname_sigma,

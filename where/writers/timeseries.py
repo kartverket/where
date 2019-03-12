@@ -17,11 +17,13 @@ import sys
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where import data
 from where.lib import log
-from where.lib import plugins
 
 
 WRITER = __name__.split(".")[-1]
@@ -67,9 +69,9 @@ def add_to_full_timeseries(dset):
     dsets = {default_dset_str: dset}
     for method, cfg_entry in config.tech[WRITER].items():
         try:
-            method_func = getattr(sys.modules[__name__], "method_{}".format(method))
+            method_func = getattr(sys.modules[__name__], f"method_{method}")
         except AttributeError:
-            log.warn("Method '{}' is unknown", method)
+            log.warn(f"Method {method!r} is unknown")
             continue
 
         for field_cfg in cfg_entry.as_list(split_re=", *"):
@@ -112,7 +114,7 @@ def add_to_full_timeseries(dset):
     else:
         dset_ts.copy_from(dset_session)
 
-    log.info("Updating timeseries dataset '{}'", dset_ts.description)
+    log.info(f"Updating timeseries dataset {dset_ts.description!r}")
     dset_ts.write()
 
 
@@ -137,7 +139,7 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
         idx = np.array([any([n in p for p in params]) for n in idx_names], dtype=bool)
         mean = np.array([np.mean(state) for state, param in zip(x, names) if param in params]).reshape(-1, dim)
         if idx.any():
-            val[idx] = mean
+            val[idx] = mean.reshape(val[idx].shape)
         else:
             val[0] = mean
         # all fields of the same type share the same unit, only the first entry of param_units is needed

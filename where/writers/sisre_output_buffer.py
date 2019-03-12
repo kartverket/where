@@ -8,10 +8,12 @@ programs can access this file to check, if something can be processed.
 """
 import fcntl
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import config
+from where.lib import log
 from where.lib import files
-from where.lib import plugins
 
 
 @plugins.register

@@ -47,7 +47,7 @@ def src_dir(dset):
     """
     column_names = ["ra", "dec"]
     sources = np.asarray(dset.unique("source"))
-    icrf = apriori.get("crf", session=dset.dataset_name)
+    icrf = apriori.get("crf", time=dset.time)
 
     # Remove sources that should be fixed
     fix_idx = np.zeros(len(sources))
@@ -69,7 +69,7 @@ def src_dir(dset):
         src_idx = dset.filter(source=src)
         if np.sum(src_idx) < limit:
             fix_idx[idx] = True
-            log.info("Radio source {} has less than {} observations. Keeping coordinates fixed.".format(src, limit))
+            log.info(f"Radio source {src} has less than {limit} observations. Keeping coordinates fixed.")
 
     sources = sources[np.logical_not(fix_idx)]
 

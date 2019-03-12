@@ -23,11 +23,11 @@ import numpy as np
 
 # Where imports
 from where import apriori
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import plugins
 from where.lib.time import TimeDelta
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -70,12 +70,12 @@ def vlbi_grav_delay(dset):
 
     for body in bodies:
         try:
-            GM_body = constant.get("GM_{}".format(body.split()[0]), source=eph.ephemerides)
+            GM_name = "GM" if body == "earth" else f"GM_{body.split()[0]}"
+            GM_body = constant.get(GM_name, source=eph.ephemerides)
         except KeyError:
             log.warn(
-                "The GM value of {} is not defined for {}. Correction set to zero.",
-                body.split()[0].title(),
-                eph.ephemerides,
+                f"The GM value of {body.split()[0].title()} is not defined for {eph.ephemerides}. "
+                f"Correction set to zero."
             )
             continue
         bcrs_body_t1 = eph.pos_bcrs(body)
@@ -83,7 +83,7 @@ def vlbi_grav_delay(dset):
         # Equation 11.3
         delta_t = TimeDelta(
             np.maximum(0, dset.src_dir.unit_vector[:, None, :] @ (bcrs_body_t1 - bcrs_site1)[:, :, None])[:, 0, 0]
-            * unit.second2day
+            * Unit.second2day
             / constant.c,
             format="jd",
             scale="tdb",

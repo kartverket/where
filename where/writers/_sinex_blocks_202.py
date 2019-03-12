@@ -30,7 +30,7 @@ from where.lib import cache
 from where.lib import config
 from where.lib import log
 from where.lib import time
-from where.lib.unit import unit
+from where.lib.unit import Unit
 from where.lib import util
 
 _PARAMS = dict(
@@ -41,6 +41,7 @@ _PARAMS = dict(
     eop_pm_rate={"dxp": "XPOR", "dyp": "YPOR"},
     eop_dut1={"dut1": "UT"},
     eop_lod={"lod": "LOD"},
+    trop_wet={},
 )
 
 _TECH = {"comb": "C", "doris": "D", "slr": "L", "llr": "M", "gnss": "P", "vlbi": "R"}
@@ -54,16 +55,27 @@ class SinexBlocks:
         self._create_state_vector()
 
     def _create_state_vector(self):
+        self.ids = {sta: self.dset.meta[sta].get("site_id", "----") for sta in self.dset.unique("station")}
+        self.ids.update({src: "{:0>4}".format(i) for i, src in enumerate(self.dset.unique("source"), start=1)})
+        self.ids.update({"----": "----"})
+
         self.state_vector = list()
         for parameter in self.dset.meta["normal equation"]["names"]:
             partial_type, name = parameter.split("-", 1)
             partial_type = partial_type.replace(self.tech_prefix, "")
             name = name.split("_")
-            ident, name = (name[0], name[1]) if len(name) == 2 else ("----", name[0])
+
+            if len(name) == 2:
+                ident, name = (name[0], name[1])
+            elif name[0] in self.ids:
+                ident, name = (name[0], name[0])
+            else:
+                ident, name = ("----", name[0])
             self.state_vector.append({"type": partial_type, "id": ident, "partial": name})
-        self.ids = {sta: self.dset.meta[sta].get("site_id", "----") for sta in self.dset.unique("station")}
-        self.ids.update({src: "{:0>4}".format(i) for i, src in enumerate(self.dset.unique("source"), start=1)})
-        self.ids.update({"----": "----"})
+
+        for e in self.state_vector:
+            if e["type"] == "trop_wet":
+                _PARAMS["trop_wet"][e["partial"]] = "TROWET"
 
     @cache.property
     def _analyst_info(self):
@@ -188,11 +200,11 @@ class SinexBlocks:
         Content:
         *CODE IERS des ICRF designation Comments
         """
-        icrf = apriori.get("crf", session=self.dset.dataset_name)
+        crf = apriori.get("crf", time=self.dset.time)
         self.fid.write("+SOURCE/ID\n")
         self.fid.write("*Code IERS nam ICRF designator \n")
         for iers_name in self.dset.unique("source"):
-            icrf_name = icrf[iers_name].meta["icrf_name"] if "icrf_name" in icrf[iers_name].meta else ""
+            icrf_name = crf[iers_name].meta["icrf_name"] if "icrf_name" in crf[iers_name].meta else ""
             self.fid.write(" {:0>4} {:<8} {:<16}\n".format(self.ids[iers_name], iers_name, icrf_name))
         self.fid.write("-SOURCE/ID\n")
 
@@ -210,8 +222,8 @@ class SinexBlocks:
             marker = self.dset.meta[sta]["marker"]
             height = self.dset.meta[sta]["height"]
             description = self.dset.meta[sta]["description"][0:22]
-            long_deg, long_min, long_sec = unit.rad_to_dms(self.dset.meta[sta]["longitude"])
-            lat_deg, lat_min, lat_sec = unit.rad_to_dms(self.dset.meta[sta]["latitude"])
+            long_deg, long_min, long_sec = Unit.rad_to_dms(self.dset.meta[sta]["longitude"])
+            lat_deg, lat_min, lat_sec = Unit.rad_to_dms(self.dset.meta[sta]["latitude"])
 
             self.fid.write(
                 " {} {:>2} {:5}{:4} {:1} {:<22} {:>3.0f} {:>2.0f} {:4.1f} {:>3.0f} {:>2.0f} {:4.1f} {:7.1f}"
@@ -272,12 +284,6 @@ class SinexBlocks:
         for sta in self.dset.unique("station"):
             site_id = self.dset.meta[sta]["site_id"]
 
-            if ecc[site_id]["type"] == "XYZ":
-                v1, v2, v3 = ecc[site_id]["vector"][0], ecc[site_id]["vector"][1], ecc[site_id]["vector"][2]
-            elif ecc[site_id]["type"] == "NEU":
-                v1 = ecc[site_id]["vector"][2]
-                v2 = ecc[site_id]["vector"][0]
-                v3 = ecc[site_id]["vector"][1]
             self.fid.write(
                 " {:4} {:>2} {:>4} {:1} {:12} {:12} {:3} {: 8.4f} {: 8.4f} {: 8.4f}\n"
                 "".format(
@@ -287,10 +293,10 @@ class SinexBlocks:
                     _TECH[self.dset.meta["tech"]],
                     self.dset.time.yydddsssss[0],
                     self.dset.time.yydddsssss[-1],
-                    ecc[site_id]["type"],
-                    v1,
-                    v2,
-                    v3,
+                    ecc[site_id]["coord_type"],
+                    ecc[site_id]["vector"][0],
+                    ecc[site_id]["vector"][1],
+                    ecc[site_id]["vector"][2],
                 )
             )
         self.fid.write("-SITE/ECCENTRICITY\n")
@@ -390,7 +396,6 @@ class SinexBlocks:
                     )
                 )
             value_sigma = np.sqrt(self.dset.meta["normal equation"]["covariance"][i - 1][i - 1])
-
             self.fid.write(
                 " {:>5} {:6} {:4} {:2} {:>4} {:12} {:4} {:1} {: 20.14e} {:11.5e}\n"
                 "".format(
@@ -531,8 +536,8 @@ class SinexBlocks:
             return trf[self.ids[param["id"]]].pos.itrs[col_idx]
 
         if param["type"] == "src_dir":
-            icrf = apriori.get("crf", session=self.dset.dataset_name)
-            src = icrf[param["id"]]
+            crf = apriori.get("crf", time=self.dset.time)
+            src = crf[param["id"]]
             if param["partial"] == "ra":
                 pos = src.pos.crs[0]
             elif param["partial"] == "dec":
@@ -564,4 +569,11 @@ class SinexBlocks:
             eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
             # return eop.convert_to("lod", param_unit)
             return -1 * eop.convert_to("ut1_utc_rate", param_unit + "/day")
+        if param["type"] == "trop_wet":
+            trop_sta = np.zeros(self.dset.num_obs)
+            idx_1 = self.dset.filter(station_1=param["id"])
+            trop_sta[idx_1] = self.dset.troposphere_zwd_1[idx_1]
+            idx_2 = self.dset.filter(station_2=param["id"])
+            trop_sta[idx_2] = self.dset.troposphere_zwd_2[idx_2]
+            return np.mean(trop_sta)
         return 0

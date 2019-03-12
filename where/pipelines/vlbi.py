@@ -11,17 +11,18 @@ import itertools
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from where import obs
-from where import data
 from where import cleaners
 from where import estimation
 from where.lib import config
 from where.lib import exceptions
 from where.lib import files
 from where.lib import log
-from where.lib import plugins
 from where.lib import util
 from where import models
 from where import writers
@@ -56,15 +57,23 @@ def list_sessions(rundate):
         value=util.read_option_value("--get_session_from_master", default=None),  # TODO: add this to mg_config
         default=False,
     ).bool:
-        skip_sessions = config.where.get(
-            "skip_sessions", section=TECH, value=util.read_option_value("--skip_sessions", default=None), default=""
+        skip_sessions = set(
+            config.where.get(
+                "skip_sessions",
+                section="runner",
+                value=util.read_option_value("--skip_sessions", default=None),
+                default="",
+            ).list
+        )
+        session_types = config.where.get(
+            "session_types",
+            section="runner",
+            value=util.read_option_value("--session_types", default=None),
+            default="",
         ).list
-        master_file = apriori.get("vlbi_master_schedule", rundate=rundate)
-        sessions = master_file.list_sessions(rundate)
-
-        for session in skip_sessions:
-            if session in sessions:
-                sessions.remove(session)
+        master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
+        sessions = set(master_schedule.list_sessions(rundate, session_types=session_types))
+        sessions = sessions - skip_sessions
 
         return sessions
     else:
@@ -161,37 +170,29 @@ def file_vars():
             log.fatal("No VGOSDB observation file found")
 
     # Sinex file vars
-    file_vars["solution"] = config.tech.sinex.solution.str
-    file_vars["file_agency"] = config.tech.sinex.file_agency.str.lower()
+    if "sinex" in config.tech.section_names:
+        file_vars["solution"] = config.tech.sinex.solution.str
+        file_vars["file_agency"] = config.tech.sinex.file_agency.str.lower()
 
     return file_vars
 
 
 @plugins.register
-def read(rundate, session, prev_stage, stage):
+def read(stage, dset):
     """Read VLBI data
 
     Args:
-        rundate (Datetime):  The model run date.
-        session (String):    Name of session.
-        prev_stage (String): Name of previous stage.
-        stage (String):      Name of current stage.
-
-    Returns:
-        Bool: True if data are available for the session, False otherwise
+        dset (Dataset):  Dataset
     """
-    try:
-        dset = obs.get(rundate, TECH, session)
-    except exceptions.MissingDataError:
-        return False
-
-    dset.write_as(rundate=rundate, tech=TECH, stage=stage, dataset_name=session, dataset_id=0)
+    obs.get(dset)
     log.info(f"Parsed {dset.num_obs} observations")
-    return True
+
+    dset.write_as(stage=stage, dataset_id=0)
+    dset.read()
 
 
 @plugins.register
-def edit(rundate, session, prev_stage, stage):
+def edit(stage, dset):
     """Edit the observations
 
     Args:
@@ -200,14 +201,14 @@ def edit(rundate, session, prev_stage, stage):
         prev_stage (String): Name of previous stage.
         stage (String):      Name of current stage.
     """
-    dset = data.Dataset(rundate, tech=TECH, stage=prev_stage, dataset_name=session, dataset_id="last")
     cleaners.apply_editors("editors", dset)
     cleaners.apply_removers("removers", dset)
     dset.write_as(stage=stage, dataset_id=0)
+    dset.read()
 
 
 @plugins.register
-def calculate(rundate, session, prev_stage, stage):
+def calculate(stage, dset):
     """Estimate model parameters
 
     Args:
@@ -216,11 +217,8 @@ def calculate(rundate, session, prev_stage, stage):
         prev_stage (String): Name of previous stage.
         stage (String):      Name of current stage.
     """
-    dset = data.Dataset(rundate, tech=TECH, stage=prev_stage, dataset_name=session, dataset_id="last")
-    dset.delete_from_file(stage=stage, dataset_id="all")
-
     # Run models adjusting station positions
-    log.info("Calculating station displacements for {}", session)
+    log.info(f"Calculating station displacements")
     models.calculate_site("pos_models", dset, shape=(6,))
     delta_pos = np.sum(dset.get_table("pos_models").reshape((dset.num_obs, -1, 6)), axis=1)
     gcrs_dpos_1 = delta_pos[:, :3]
@@ -232,7 +230,7 @@ def calculate(rundate, session, prev_stage, stage):
     log.blank()
 
     # Run models for each term of the observation equation
-    log.info("Calculating theoretical delays for {}", session)
+    log.info(f"Calculating theoretical delays")
     models.calculate_delay("calc_models", dset)
     dset.add_float("obs", val=dset.observed_delay, unit="meter", write_level="operational")
     dset.add_float("calc", val=np.sum(dset.get_table("calc_models"), axis=1), unit="meter", write_level="operational")
@@ -240,7 +238,7 @@ def calculate(rundate, session, prev_stage, stage):
     log.blank()
 
     # Estimate clock polynomial
-    log.info("Calculating clock polynomials for {}", session)
+    log.info(f"Calculating clock polynomials")
     max_iterations = config.tech.calculate_max_iterations.int
     outlier_limit = config.tech.calculate_outlier_limit.float
     store_outliers = config.tech.store_outliers.bool
@@ -250,10 +248,11 @@ def calculate(rundate, session, prev_stage, stage):
         dset.calc[:] = np.sum(np.hstack((dset.get_table("calc_models"), dset.get_table("correction_models"))), axis=1)
         dset.residual[:] = dset.obs - dset.calc
         rms = dset.rms("residual")
-        log.info("{}: {} observations, residual = {:.4f}", session, dset.num_obs, rms)
+        log.info(f"{dset.num_obs} observations, residual = {rms:.4f}")
 
         # Store results
         dset.write_as(stage=stage, dataset_id=iter_num - 1)
+        dset.read()
 
         # Detect and remove extreme outliers
         idx = np.abs(dset.residual) < outlier_limit * rms
@@ -264,25 +263,23 @@ def calculate(rundate, session, prev_stage, stage):
             bad_idx = np.logical_not(idx)
             log.info(f"Adding {np.sum(bad_idx)} observations to ignore_observation")
             bad_obs = np.char.add(np.char.add(dset.time.utc.iso[bad_idx], " "), dset.baseline[bad_idx]).tolist()
-            with config.update_tech_config(rundate, TECH, session) as cfg:
+            with config.update_tech_config(dset.rundate, TECH, dset.vars["session"]) as cfg:
                 current = cfg.ignore_observation.observations.as_list(", *")
                 updated = ", ".join(sorted(current + bad_obs))
                 cfg.update("ignore_observation", "observations", updated, source=util.get_program_name())
 
         dset.subset(idx)
-        log.info(
-            "Removing {} observations with residuals bigger than {:.4f}", sum(np.logical_not(idx)), outlier_limit * rms
-        )
+        log.info(f"Removing {sum(~idx)} observations with residuals bigger than {outlier_limit * rms}")
         log.blank()
 
     # Try to detect clock breaks
     if config.tech.detect_clockbreaks.bool:
-        writers.write_one("vlbi_detect_clockbreaks", dset)
+        writers.write_one("vlbi_detect_clockbreaks", dset=dset)
         dset.write()
 
 
 @plugins.register
-def estimate(rundate, session, prev_stage, stage):
+def estimate(stage, dset):
     """Filter residuals
 
     Args:
@@ -291,15 +288,11 @@ def estimate(rundate, session, prev_stage, stage):
         prev_stage (String): Name of previous stage.
         stage (String):      Name of current stage.
     """
-    dset = data.Dataset(rundate, tech=TECH, stage=prev_stage, dataset_name=session, dataset_id="last")
-    dset.delete_from_file(stage=stage, dataset_id="all")
     partial_vectors = estimation.partial_vectors(dset, "estimate_method")
-
     max_iterations = config.tech.estimate_max_iterations.int
-    outlier_limit = config.tech.estimate_outlier_limit.float
 
     for iter_num in itertools.count(start=1):
-        log.info("Estimating parameters for {} (iteration {})", session, iter_num)
+        log.info(f"Estimating parameters for iteration {iter_num}")
         estimation.call(
             "estimate_method",
             dset=dset,
@@ -307,22 +300,22 @@ def estimate(rundate, session, prev_stage, stage):
             obs_noise=dset.observed_delay_ferr ** 2 + 0.01 ** 2,
         )
         rms = dset.rms("residual")
-        log.info("{}: {} observations, postfit residual = {:.4f}", session, dset.num_obs, rms)
+        log.info(f"{dset.num_obs} observations, postfit residual = {rms:.4f}")
         dset.write_as(stage=stage, dataset_id=iter_num - 1)
+        dset.read()
+        if iter_num >= max_iterations:
+            break
 
         # Detect and remove outliers
-        idx = np.abs(dset.residual) < outlier_limit * rms
-        if iter_num >= max_iterations or idx.all():
+        keep_idx = estimation.detect_outliers("estimate_outlier_detection", dset)
+        if keep_idx.all():
             break
-        dset.subset(idx)
-        log.info(
-            "Removing {} observations with residuals bigger than {:.4f}", sum(np.logical_not(idx)), outlier_limit * rms
-        )
+        dset.subset(keep_idx)
         log.blank()
 
 
 @plugins.register
-def write_result(rundate, session, prev_stage, stage):
+def write(stage, dset):
     """Write results to file
 
     Write results to file. This uses the writers framework which calls different writers depending on the output-field
@@ -334,4 +327,4 @@ def write_result(rundate, session, prev_stage, stage):
         prev_stage (String): Name of previous stage.
         stage (String):      Name of current stage.
     """
-    writers.write(default_stage=prev_stage)
+    writers.write(default_dset=dset)

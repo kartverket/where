@@ -5,19 +5,18 @@ Description:
 
 Suspected clock breaks are added as events to the dataset.
 
-
-
-
 """
 # Standard library imports
 
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where.lib.time import Time
 
 
@@ -95,9 +94,6 @@ def detect_clockbreaks(dset):
     for ratio, time, station in clock_breaks:
         if ratio > ratio_lim:
             dset.add_event(time, "suspected_clock_break", station)
-            log.check(
-                "Found possible clock break for {} at {} ({})",
-                station,
-                time.datetime.strftime(config.FMT_datetime),
-                "*" * int(np.ceil(np.log2(ratio))),
-            )
+            cb_time = time.datetime.strftime(config.FMT_datetime)
+            stars = "*" * int(np.ceil(np.log2(ratio)))
+            log.check(f"Found possible clock break for {station} at {cb_time} ({stars})")

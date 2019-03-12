@@ -38,10 +38,12 @@ import math
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import files
 from where.lib import log
-from where.lib import plugins
 
 MAX_NUM_STARS = 15
 STAR_THRESHOLD = 0.02

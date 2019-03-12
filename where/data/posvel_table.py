@@ -7,8 +7,6 @@ Handle both position and velocity in one structure.
 
 -------
 
-
-
 """
 
 # External library imports
@@ -18,12 +16,11 @@ import numpy as np
 from where import apriori
 from where.data.position_table import PositionTable
 from where.lib import cache
-from where.lib import constant
-from where.lib import gnss
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import mathp
 from where.lib import rotation
-from where.lib.unit import unit as lib_unit
+from where.lib.unit import Unit
 
 
 class PosVelTable(PositionTable):
@@ -34,8 +31,8 @@ class PosVelTable(PositionTable):
     def __init__(self, name, num_obs, dataset):
         super().__init__(name, num_obs, dataset)
 
-        # Add units for PosVelTable-properties (set by @lib_unit.register)
-        self._prop_units.update(lib_unit.units_dict(__name__))
+        # Add units for PosVelTable-properties (set by @Unit.register)
+        self._prop_units.update(Unit.units_dict(__name__))
 
         # Add columns for velocity
         self._itrs = np.full((self.num_obs, 6), np.nan, dtype=float)
@@ -56,7 +53,7 @@ class PosVelTable(PositionTable):
             )[:, :, 0]
 
     @property
-    @lib_unit.register("meter per second")
+    @Unit.register("meter per second")
     def itrs_vel(self):
         """Get velocity vector in ITRS
 
@@ -66,7 +63,7 @@ class PosVelTable(PositionTable):
         return self.itrs[:, 3:6]
 
     @property
-    @lib_unit.register("meter per second")
+    @Unit.register("meter per second")
     def gcrs_vel(self):
         """Get velocity vector in GCRS
 
@@ -76,7 +73,7 @@ class PosVelTable(PositionTable):
         return self.gcrs[:, 3:6]
 
     @cache.dependent_property.pos
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def eccentric_anomaly(self):
         r"""Compute eccentric anomaly.
 
@@ -149,7 +146,7 @@ class PosVelTable(PositionTable):
         return np.vstack((a, e, i, Omega, omega, E)).T
 
     @cache.dependent_property.pos
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def mean_anomaly(self):
         r"""Compute mean anomaly.
 
@@ -164,7 +161,7 @@ class PosVelTable(PositionTable):
         return E - e * np.sin(E)
 
     @cache.dependent_property.pos
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def true_anomaly(self):
         r"""Compute true anomaly.
 

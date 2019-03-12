@@ -67,7 +67,7 @@ def gnss_select_obs(dset):
     elif cfg_code_phase_obs == "both":
         search_pattern = "^D|^S"
     else:
-        log.fatal("Configuration option 'code_phase_obs = {}' is not valid.", cfg_code_phase_obs)
+        log.fatal(f"Configuration option 'code_phase_obs = {cfg_code_phase_obs}' is not valid.")
 
     for type_ in obstypes_all:
         search_obj = re.search(search_pattern, type_)
@@ -198,9 +198,9 @@ def _select_observations(obstypes_all, obstypes):
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
 
         else:
-            log.fatal("Configuration option 'freq_type = {}' is not valid.", freq_type)
+            log.fatal(f"Configuration option 'freq_type = {freq_type}' is not valid")
 
-        log.info("Selected observation types for GNSS '{}': {}", sys, ", ".join(use_obstypes[sys]))
+        log.info(f"Selected observation types for GNSS {sys!r}: {', '.join(use_obstypes[sys])}")
         remove_obstypes.difference_update(use_obstypes[sys])
 
     return use_obstypes, remove_obstypes

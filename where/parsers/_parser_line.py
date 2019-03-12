@@ -24,7 +24,7 @@ class LineParser(Parser):
     and at least specify the necessary parameters in `setup_parser`.
     """
 
-    def __init__(self, file_path, encoding=None, logger=None):
+    def __init__(self, file_path, encoding=None):
         """Set up the basic information needed by the parser
 
         Add a self._array property for the raw numpy array data.
@@ -32,7 +32,6 @@ class LineParser(Parser):
         Args:
             file_path (String/Path):    Path to file that will be read.
             encoding (String):          Encoding of file that will be read.
-            logger (Function):          Ignored for where.parsers, used for consistency with Midgard.
         """
         super().__init__(file_path, encoding)
         self._array = None

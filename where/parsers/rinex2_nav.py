@@ -156,7 +156,7 @@ class Rinex2NavParser(parser.Parser):
         For RINEX 2.11 navigation files is only the file extension an indicator, which GNSS is used.
 
         """
-        file_extension = str(self.file_path)[-1].lower()
+        file_extension = self.file_path.suffixes[0][-1].lower()
         try:
             return SYSTEM_FILE_EXTENSION[file_extension]
         except KeyError:

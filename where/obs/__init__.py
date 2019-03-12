@@ -17,22 +17,19 @@ arguments. Additional parameters to the registered function should be passed as 
 """
 
 from where.lib import plugins
-from where import data
 
 
-def get(rundate, pipeline, session, **obs_args):
+def get(dset, **obs_args):
     """Construct a Dataset for the pipeline based on observations
 
     Args:
-        rundate:   Start date of the observations.
-        pipeline:  Which pipeline to construct the Dataset for.
-        session:   Name of session.
-
-    Returns:
-        Dataset:  A Dataset with observations and necessary fields
+        dset:  A Dataset that will be filled with observations and necessary fields
     """
-    dset = data.Dataset.anonymous()
+    # TODO: These can probably be removed
+    rundate = dset.rundate
+    pipeline = dset.vars["tech"]
+    session = dset.vars["session"]
+
     plugins.call_one(
         package_name=__name__, plugin_name=pipeline, dset=dset, rundate=rundate, session=session, **obs_args
     )
-    return dset

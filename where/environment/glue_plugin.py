@@ -22,6 +22,7 @@ from glue.core import Data
 from glue.utils.qt import update_combobox
 
 from where import data
+from where.data import table
 from where.lib import config
 from where.lib import files
 from where.lib import time
@@ -69,7 +70,6 @@ def open_where_dataset_as_glue(dataset_vars):
     import where
 
     rundate = dataset_vars["rundate"]
-    where.set_config(rundate.year, rundate.month, rundate.day, dataset_vars["tech"])
 
     # Add fields of dataset as components to glue
     components = dict()
@@ -80,6 +80,9 @@ def open_where_dataset_as_glue(dataset_vars):
             values = dset[field]
         except:
             print("Not able to add", field)
+            continue
+
+        if isinstance(values, table.Table):
             continue
 
         if isinstance(values, time.Time):
@@ -98,7 +101,7 @@ def open_where_dataset_as_glue(dataset_vars):
                 continue
 
             components[field] = values
-            print("Adding {}".format(field))
+            print("Adding {}: {}".format(field, type(values)))
 
     glue_data = Data(**components)
     glue_data.label = "{tech} {stage} {rundate:%Y%m%d} {name}".format(name=dset.name, **dataset_vars)

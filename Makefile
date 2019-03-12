@@ -50,6 +50,15 @@ test:
 test_system:
 	pytest -m system_test --durations=0
 
+test_vlbi:
+	pytest -m vlbi --durations=0
+
+test_slr:
+	pytest -m slr --durations=0
+
+test_sisre:
+	pytest -m sisre --durations=0
+
 typing:
 	mypy --ignore-missing-imports where
 

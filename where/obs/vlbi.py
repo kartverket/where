@@ -1,12 +1,6 @@
 """Populates a VLBI Dataset with information from observation files and a priori sources
 
 """
-# Get info about session and date
-# Find info about obs format
-# Find obs_version
-# Call correct parser
-# Construct dataset
-import re
 import numpy as np
 
 from where import apriori
@@ -39,6 +33,27 @@ def _write_to_dataset(parser, dset, rundate, session):
     data = parser.as_dict()
     # TODO: units on fields
 
+    # Session meta
+    dset.meta["tech"] = "vlbi"
+    dset.add_to_meta("input", "file", parser.file_path.stem)
+    dset.add_to_meta("input", "type", config.tech.obs_format.str.upper())
+
+    if "meta" not in data:
+        # Only read master file if session_code is not available in data["meta"]
+        # This is to avoid a dependency to the master file which changes frequently
+        master = apriori.get("vlbi_master_schedule", rundate=rundate)
+        master_data = master.get((rundate.timetuple().tm_yday, session), {})
+        session_code = master_data.get("session_code", "")
+        dset.add_to_meta("input", "session_code", session_code)
+    else:
+        master = apriori.get("vlbi_master_schedule")
+        session_code = data["meta"].get("session_code", "")
+        dset.add_to_meta("input", "session_code", session_code)
+
+    dset.add_to_meta("input", "session_type", master.session_type(session_code))
+
+    log.info(f"Session code: {session_code}")
+
     # Convert source names to official IERS names
     source_names = apriori.get("vlbi_source_names")
     iers_source_names = [source_names[src]["iers_name"] if src in source_names else src for src in data["source"]]
@@ -59,17 +74,17 @@ def _write_to_dataset(parser, dset, rundate, session):
         elif values.dtype.kind in {"O"}:
             continue
         else:
-            log.warn("Unknown datatype {} for field {}", values.dtype, field)
+            log.warn(f"Unknown datatype {values.dtype} for field {field}")
 
     # Source directions
-    crf = apriori.get("crf", session=session)
+    crf = apriori.get("crf", time=dset.time.mean.utc)
     ra = np.array([crf[s].pos.crs[0] if s in crf else 0 for s in data["source"]])
     dec = np.array([crf[s].pos.crs[1] if s in crf else 0 for s in data["source"]])
 
     dset.add_direction("src_dir", ra=ra, dec=dec, write_level="operational")
 
     # Station information
-    log.info("Found stations: {}", ", ".join(dset.unique("station")))
+    log.info(f"Found stations: {', '.join(dset.unique('station'))}")
     trf = apriori.get("trf", time=dset.time)
     station_codes = apriori.get("vlbi_station_codes")
     dset.add_text(
@@ -83,16 +98,15 @@ def _write_to_dataset(parser, dset, rundate, session):
             trf_site = trf[cdp]
         else:
             named_site = trf.named_site(site)
-            trf_site = trf.closest(named_site.pos, max_distance=5)
+            trf_site = trf.closest(named_site.pos)
             cdp = trf_site.key
             ignore_stations = config.tech.ignore_station.stations.list
-            if site in ignore_stations:
-                log.info("Undefined station name {}. Assuming station is {}.", site, trf_site.name)
-            else:
-                log.warn("Undefined station name {}. Assuming station is {}.", site, trf_site.name)
+            logger = log.info if site in ignore_stations else log.warn
+            logger(f"Undefined station name {site}. Assuming station is {trf_site.name}.")
 
         data["pos_" + site] = trf_site.pos.itrs
-        log.debug("Using position {} for {} from {}", np.mean(data["pos_" + site], axis=0), site, trf_site.source)
+        _site_pos = np.mean(data[f"pos_{site}"], axis=0)
+        log.debug(f"Using position {_site_pos} for {site} from {trf_site.source}")
 
         ivsname = station_codes[cdp]["name"]
         data["sta_" + site] = dict(site_id=cdp, cdp=cdp, ivsname=ivsname)
@@ -154,25 +168,10 @@ def _write_to_dataset(parser, dset, rundate, session):
             dset.add_to_meta(sta_name, "latitude", latitude)
             dset.add_to_meta(sta_name, "height", height)
 
-    dset.meta["tech"] = "vlbi"
-    dset.add_to_meta("input", "file", parser.file_path.stem)
-    dset.add_to_meta("input", "type", config.tech.obs_format.str.upper())
-
-    if "meta" not in data:
-        master = apriori.get("vlbi_master_schedule", rundate=rundate)
-        master_data = master.get((rundate.timetuple().tm_yday, session), {})
-        dset.add_to_meta("input", "session_code", master_data.get("session_code", ""))
-    else:
-        dset.add_to_meta("input", "session_code", data["meta"].get("session_code", ""))
-
-    reg_hits = re.search("\d", dset.meta["input"]["session_code"])
-    num_idx = reg_hits.start() if reg_hits else len(dset.meta["input"]["session_code"])
-    dset.add_to_meta("input", "session_type", dset.meta["input"]["session_code"][:num_idx])
-
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish
     bad_source_idx = ra == 0
     bad_sources = np.array(dset.source)[bad_source_idx]
     for s in np.unique(bad_sources):
-        log.warn("Unknown source {}. Observations with this source is discarded", s)
+        log.warn(f"Unknown source {s}. Observations with this source is discarded")
     dset.subset(np.logical_not(bad_source_idx))

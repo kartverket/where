@@ -1,16 +1,51 @@
-#!/usr/bin/env python3
 """Delete a Where analysis
+
+Usage:
+
+    {exe:tools} delete <date> <pipeline> [--session=<session>] [options]
+
+The tool requires a date given in the format `<year month day>` (for example
+2015 8 4).
+
+In addition, one pipeline must be specified. See below for available pipelines.
+
+===================  ===========================================================
+Pipeline             Description
+===================  ===========================================================
+{pipelines_doc:Delete}
+===================  ===========================================================
+
 
 Description:
 ------------
 
-The :func:`delete_analysis` function deletes all files for a given model run from
-the work directory.
+The delete tool deletes all files for a given model run from the work
+directory.
+
+
+Examples:
+---------
+
+Delete the VLBI analysis for August 4 2015:
+
+    {exe:tools} delete 2015 8 4 -v --session=XA
+
+
+Current Maintainers:
+--------------------
+
+{maintainers}
+
+Version: {version}
+
 """
 
 # Standard library imports
 import pathlib
 import shutil
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.lib import config
@@ -18,7 +53,8 @@ from where.lib import files
 from where.lib import log
 
 
-def delete_analysis(rundate, pipeline, session=""):
+@plugins.register
+def delete_analysis(rundate: "date", pipeline: "pipeline", session: "option" = ""):  # typing: ignore
     """Delete working directory for a given model run date
 
     Args:

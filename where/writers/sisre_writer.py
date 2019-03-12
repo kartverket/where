@@ -14,14 +14,18 @@ from datetime import datetime
 import midgard
 import numpy as np
 
+# Midgard imports
+from midgard.dev import console
+from midgard.dev import plugins
+
 # Where imports
 import where
 from where.lib import config
 from where.lib import enums
 from where.lib import files
-from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 from where.lib import util
+from where import pipelines
 from where.writers import sisre_output_buffer
 
 WriterField = namedtuple("WriterField", ["field", "attrs", "dtype", "format", "width", "header", "unit"])
@@ -53,7 +57,8 @@ def sisre_writer(dset):
         WriterField("trans_time_gpsweek", (), object, "%15s", 15, "TRANS_TIME"),
         WriterField("toe_gpsweek", (), object, "%15s", 15, "TOE"),
         WriterField("diff_trans_toe", (), float, "%8d", 8, "TM-TOE"),
-        WriterField("diff_time_toe", (), float, "%8d", 8, "T-TOE"),
+        WriterField("age_of_ephemeris", (), float, "%8d", 8, "T-TOE"),
+        # WriterField("diff_time_trans", (), float, "%8d", 8, "T-TM"),
         WriterField("clk_diff", (), float, "%16.4f", 16, "ΔCLOCK"),
         WriterField("clk_diff_with_dt_mean", (), float, "%16.4f", 16, "ΔCLOCK_MEAN"),
         WriterField("dalong_track", (), float, "%16.4f", 16, "ΔALONG_TRACK"),
@@ -83,25 +88,22 @@ def sisre_writer(dset):
         val=[f"{t.gpsweek:04.0f}{t.gpsday:1.0f}:{t.gpssec:06.0f}" for t in dset.used_toe],
         unit="wwwwd:ssssss",
     )
-    dset.add_float(
-        "diff_trans_toe", val=(dset.used_transmission_time.mjd - dset.used_toe.mjd) * unit.day2second, unit="second"
-    )
-    dset.add_float("diff_time_toe", val=(dset.time.mjd - dset.used_toe.mjd) * unit.day2second, unit="second")
+    # dset.add_float("diff_time_trans", val=(dset.time.mjd - dset.used_transmission_time.mjd) * Unit.day2second, Unit="second")
     dset.add_float("dalong_track", val=dset.orb_diff_acr.itrs[:, 0], unit=dset.unit("orb_diff_acr.itrs"))
     dset.add_float("dcross_track", val=dset.orb_diff_acr.itrs[:, 1], unit=dset.unit("orb_diff_acr.itrs"))
     dset.add_float("dradial", val=dset.orb_diff_acr.itrs[:, 2], unit=dset.unit("orb_diff_acr.itrs"))
 
-    # Add 'detail' fields used by the writer
-    if write_level <= enums.get_value("write_level", "detail"):
-        fields += (
-            WriterField("clk_brdc_com", (), float, "%16.4f", 16, "CLK_BRDC"),
-            WriterField("clk_precise_com", (), float, "%16.4f", 16, "CLK_PRECISE"),
-            WriterField("bias_brdc", (), float, "%10.4f", 10, "B_BRDC"),
-            WriterField("bias_precise", (), float, "%10.4f", 10, "B_PREC"),
-            WriterField("clk_sys", (), float, "%10.4f", 10, "CLK_SYS"),
-        )
-
-        dset.add_float("clk_sys", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter")
+    ## Add 'detail' fields used by the writer
+    # if write_level <= enums.get_value("write_level", "detail"):
+    #    fields += (
+    #        WriterField("clk_brdc_com", (), float, "%16.4f", 16, "CLK_BRDC"),
+    #        WriterField("clk_precise_com", (), float, "%16.4f", 16, "CLK_PRECISE"),
+    #        WriterField("bias_brdc", (), float, "%10.4f", 10, "B_BRDC"),
+    #        WriterField("bias_precise", (), float, "%10.4f", 10, "B_PREC"),
+    #        WriterField("dt_mean", (), float, "%10.4f", 10, "dt_MEAN"),
+    #    )
+    #
+    #    dset.add_float("dt_mean", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter")
 
     # List epochs ordered by satellites
     idx = np.concatenate([np.where(dset.filter(satellite=s))[0] for s in dset.unique("satellite")])
@@ -164,19 +166,11 @@ def _get_header(dset):
     run_by = util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else ""
     file_created = datetime.utcnow().strftime("%Y%m%d %H%M%S") + " UTC"
     header = "PGM: {:s}  RUN_BY: {:s}  DATE: {:s}\n\n".format(pgm, run_by, file_created)
-    header += "SISRE ANALYSIS RESULTS\n\n"
+    header += "SISRE ANALYSIS CONFIGURATION\n\n"
 
-    # Used input files
+    # SISRE configuration
     header += str(config.tech.as_str(key_width=25, width=70, only_used=True)) + "\n\n\n"
-    header += "{:24s} {}\n".format(
-        "Broadcast orbit:", str(files.path("gnss_rinex_nav_M", file_vars=dset.vars))
-    )  # TODO: Not correct if station specific file is used!!!
-    header += "{:24s} {}\n".format("Precise orbit:", str(files.path("gnss_orbit_sp3", file_vars=dset.vars)))
-    if config.tech.clock_product.str == "clk":
-        header += "{:24s} {}\n".format("Precise clock:", str(files.path("gnss_rinex_clk", file_vars=dset.vars)))
-    header += "{:24s} {}\n".format("Bias:", str(files.path("gnss_sinex_bias", file_vars=dset.vars)))
-    header += "{:24s} {}\n".format("ANTEX (broadcast):", str(files.path("sisre_antex_brdc", file_vars=dset.vars)))
-    header += "{:24s} {}\n\n\n".format("ANTEX (precise):", str(files.path("gnss_antex", file_vars=dset.vars)))
+    header += _get_paths()
 
     # Information about used biases and phase center offsets (PCOs)
     header += "{:^4s}{:>10s}{:>10s}{:^26s}{:^26s}\n".format("SAT", "BIAS_BRDC", "BIAS_PREC", "PCO_BRDC", "PCO_PREC")
@@ -195,3 +189,31 @@ def _get_header(dset):
         )
 
     return header + "\n\n"
+
+
+def _get_paths():
+    """Get file paths of used files
+
+    Returns:
+        str:  Header file path lines
+    """
+    lines = "[file_paths]\n"
+    key_width = 25
+    fill_args = dict(width=120, hanging=key_width + 3, break_long_words=False, break_on_hyphens=False)
+    path_def = {
+        "Broadcast orbit": "gnss_rinex_nav_.",
+        "Precise orbit": "gnss_orbit_sp3",
+        "Bias": "gnss_sinex_bias",
+        "Precise clock": "gnss_rinex_clk",
+    }
+
+    for name, file_key in sorted(path_def.items()):
+        if file_key == "gnss_rinex_clk":
+            if config.tech.clock_product.str != "clk":
+                continue
+        path = ", ".join(str(p) for p in sorted(pipelines.paths(file_key)))
+        lines += console.fill(f"{name:<{key_width}} = {path}", **fill_args)
+        lines += "\n"
+
+    lines += "\n\n"
+    return lines

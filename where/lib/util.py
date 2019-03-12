@@ -102,13 +102,32 @@ def no_traceback(func):
     return _no_traceback
 
 
+def check_help_and_version(doc_module=None):
+    """Show help or version if asked for
+
+    Show the help message parsed from the script's docstring if -h or
+    --help option is given. Show the script's version if --version is
+    given.
+
+    Args:
+        doc_module:   Module containing help text.
+    """
+    # Help message
+    if check_options("-h", "--help"):
+        _print_help_from_doc(doc_module)
+        raise SystemExit
+
+    # Version information
+    if check_options("--version"):
+        _print_version_from_doc(doc_module)
+        raise SystemExit
+
+
 @no_traceback
 def parse_args(*param_types, doc_module=None):
     """Parse command line arguments and general options
 
-    Show the help message parsed from the script's docstring if -h or
-    --help option is given. Show the script's version if --version is
-    given. Log versions of python, the script and the configuration.
+    Log versions of python, the script and the configuration.
     Finally parse arguments from the given parameter types.
 
     Args:
@@ -118,22 +137,13 @@ def parse_args(*param_types, doc_module=None):
     Returns:
         List of command line arguments parsed according to param_types.
     """
-    # Help message
-    if check_options("-h", "--help"):
-        _print_help_from_doc(doc_module)
-        sys.exit(0)
-
-    # Version information
-    if check_options("--version"):
-        _print_version_from_doc(doc_module)
-        sys.exit(0)
-
     # Log version of python and the program, and the configuration file used
     if doc_module:
-        log.info("Start {} at {}", _get_program_version(doc_module), datetime.now().strftime(config.FMT_datetime))
-        log.python_version()
-        log.debug("Receive command line arguments [{}]", ", ".join(sys.argv[1:]))
-        log.configuration(cfg=get_program_name())
+        log.info(f"Start {_get_program_version(doc_module)} at {datetime.now().strftime(config.FMT_datetime)}")
+        log.debug(f"Receive command line arguments [{', '.join(sys.argv[1:])}]")
+        title, sources = get_configuration(cfg=get_program_name())
+        # TODO log something meaningful when session config already exists
+        log.info(f"Use {title} configuration from {', '.join(sources)}")
 
     # Parse arguments
     try:
@@ -159,7 +169,7 @@ def not_implemented():
     args = ", ".join([k + "=" + str(v) for k, v in caller.f_locals.items()])
     filename = caller.f_code.co_filename
     lineno = caller.f_lineno
-    log.fatal("Function {}({}) is not implemented in {}, line {}", funcname, args, filename, lineno)
+    log.fatal(f"Function {funcname}({args}) is not implemented in {filename}, line {lineno}")
 
 
 def get_callers():
@@ -231,6 +241,44 @@ def get_user_info(user=None):
         info_dict.update(dict(zip(("inst_name", "inst_address"), inst_info)))
 
     return info_dict
+
+
+def get_python_version():
+    """ Find python version used
+
+    Returns:
+        String:     Name of executable and version number
+    """
+    pyexe = os.path.basename(sys.executable)
+    version = ".".join(str(v) for v in sys.version_info[:3])
+    return f"{pyexe}, version {version}"
+
+
+def get_configuration(cfg="where"):
+    """Log info message with information about the configuration file
+
+    Finds the name by using the where.config module.
+
+    Args:
+        cfg:  Which configuration to report files from.
+    """
+    try:
+        config_files = getattr(config, cfg).sources
+    except AttributeError:
+        cfg = "where"
+        config_files = config.where.sources
+
+    return cfg.title(), config_files
+
+
+def get_pid_and_server():
+    """Find process id and name of server the analysis is running on
+
+    Use the platform.uname to find servername instead of os.uname because the latter is not supported on Windows.
+    """
+    pid = os.getpid()
+    server = platform.uname().node
+    return f"{pid}@{server}"
 
 
 def write_requirements():
@@ -355,9 +403,11 @@ def _print_help_from_doc(doc_module=None):
     removed.
     """
     from where import pipelines  # Local import to avoid circular import
+    from where import tools  # Local import to avoid circular import
 
     replace_vars = dict(
         pipelines_doc=pipelines.doc(),
+        tools_doc=tools.doc(),
         maintainers="{maintainers}",  # Handled by where._update_doc
         version=where.__version__,
         exe=where.__executable__,

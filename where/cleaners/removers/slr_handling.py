@@ -17,8 +17,8 @@ from where.lib import plugins
 
 
 @plugins.register
-def data_quality(dset):
-    """Edits data based on data quality
+def data_handling(dset):
+    """Edits data based on SLR handling file
 
     Args:
         dset:     A Dataset containing model data.
@@ -26,20 +26,23 @@ def data_quality(dset):
     Returns:
         Array containing False for observations to throw away
     """
-    session = dset.dataset_name
-    handling_str = config.session[session].slr_handling.str  # TODO: this is not used ...
     handling = apriori.get("slr_handling_file", time=dset.time)
 
     remove_idx = np.zeros(dset.num_obs, dtype=bool)
     for station in dset.unique("station"):
-        intervals = handling.get(station, {}).get("X", [])
-        for interval in intervals:
-            start_x = interval[0][0]
-            end_x = interval[0][1]
-            int_idx = np.logical_and(
-                dset.filter(station=station), np.logical_and(dset.date_list >= start_x, dset.date_list <= end_x)
-            )
-            if np.any(int_idx):
-                log.warn("Removed data for station {} in interval {}-{}", station, start_x, end_x)
-                remove_idx = np.logical_or(remove_idx, int_idx)
-    return np.logical_not(remove_idx)
+        # TODO: To be implemented
+        if "V" in handling.get(station, {}):
+            log.dev(f"TODO: Station {station}, marked with a V, not sure what that means")
+
+        # X is data to be deleted
+        # N is a non reliable station, not to be used for operational analysis
+        # Q is a station in quarantene
+        for key in ["X", "N", "Q"]:
+            intervals = handling.get(station, {}).get(key, [])
+            for interval in intervals:
+                start_x, end_x = interval[0]
+                int_idx = dset.filter(station=station) & (dset.time >= start_x) & (dset.time <= end_x)
+                if np.any(int_idx):
+                    log.debug(f"Removed data for station {station} in interval {start_x}-{end_x}, marked with {key}")
+                    remove_idx |= int_idx
+    return ~remove_idx

@@ -27,10 +27,10 @@ The name used in `parse_file` to call the parser is the name of the module (file
 from midgard.parsers import names, parse_file  # noqa
 from midgard import parsers as mg_parsers
 from midgard.dev import plugins
+from midgard.files import dependencies
 
 # Where imports
 from where.lib import config
-from where.lib import dependencies
 from where.lib import files
 from where.lib import log
 
@@ -58,7 +58,8 @@ def setup_parser(parser_name=None, file_key=None, **kwargs):
 
     """
     parser_name = config.files.get(section=file_key, key="parser", value=parser_name).str
-    log.assert_not_none(parser_name, "No parser found for '{}' in {}", file_key, ", ".join(config.files.sources))
+    if not parser_name:
+        log.warn(f"No parser found for {file_key!r} in {', '.join(config.files.sources)}")
 
     parser = plugins.call(package_name=mg_parsers.__name__, plugin_name=parser_name, **kwargs)
 
@@ -87,7 +88,7 @@ def parse(parser_name=None, file_key=None, **kwargs):
     return setup_parser(parser_name=parser_name, file_key=file_key, **kwargs).parse()
 
 
-def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, logger=log.info, **parser_args):
+def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, **parser_args):
     """Parse a file given in the Where file-list and return parsed data
 
     By specifying a `file_key`. The file_key is looked up in the file list to figure out which file that should be
@@ -108,7 +109,6 @@ def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, logger
         file_vars (Dict):      Additional file variables used when looking up file path in configuration.
         parser_name (String):  Name of parser to use. Default is to use parser named in the file list.
         use_cache (Boolean):   Whether to use a cache to avoid parsing the same file several times.
-        logger (Function):     Function used to perform logging in the parser.
         parser_args:           Input arguments to the parser.
 
     Returns:
@@ -116,15 +116,14 @@ def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, logger
     """
     # Read parser_name from config.files if it is not given
     parser_name = config.files.get(section=file_key, key="parser", value=parser_name).str
-    log.assert_not_none(parser_name, f"No parser found for {file_key!r} in {', '.join(config.files.sources)}")
+    if not parser_name:
+        log.warn(f"No parser found for {file_key!r} in {', '.join(config.files.sources)}")
 
     # Figure out the file path
     file_vars = dict() if file_vars is None else file_vars
     file_path = files.path(file_key, file_vars=file_vars, download_missing=True, use_aliases=True)
-    dependencies.add(file_path)
+    dependencies.add(file_path, label=file_key)
     parser_args.setdefault("encoding", files.encoding(file_key))
 
     # Use the Midgard parser function to create parser and parse data
-    return parse_file(
-        parser_name, file_path, use_cache=use_cache, parser_logger=logger, timer_logger=log.time, **parser_args
-    )
+    return parse_file(parser_name, file_path, use_cache=use_cache, timer_logger=log.time, **parser_args)

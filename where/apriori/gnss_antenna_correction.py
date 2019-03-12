@@ -17,7 +17,7 @@ import numpy as np
 # Where imports
 from where import data
 from where import parsers
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import plugins
 

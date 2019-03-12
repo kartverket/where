@@ -12,7 +12,7 @@ Calculate the partial derivatives of the Earth orientation parameter Length of D
 """
 
 # Where imports
-from where.ext import sofa_wrapper as sofa
+from where.lib import rotation
 from where.lib import plugins
 
 
@@ -30,9 +30,9 @@ def eop_lod(dset):
 
     src_dir = dset.src_dir.unit_vector[:, None, :]
     baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
-    dR_dut1 = sofa.dR_dut1(dset.time)
+    dR_dut1 = rotation.dR_dut1(dset.time)
     dt = (dset.time.jd - dset.time.mean.jd)[:, None, None]
     # lod = - ut1_rate * 1 day -> lod_partial = - ut1_rate_partial / 1 day
-    partials = (src_dir @ sofa.Q(dset.time) @ dR_dut1 @ sofa.W(dset.time) @ baseline @ dt)[:, :, 0]
+    partials = (src_dir @ rotation.Q(dset.time) @ dR_dut1 @ rotation.W(dset.time) @ baseline @ dt)[:, :, 0]
 
     return partials, column_name, "meter * radians / seconds"

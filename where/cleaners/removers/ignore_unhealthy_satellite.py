@@ -3,7 +3,7 @@
 Description:
 ------------
 
-Removes all observations of unhealthy satellites, if `remover` is selected by `True`.
+Removes all observations of unhealthy satellites even if only one satellite navigation record is declared as unhealthy.
 
 """
 # External library imports
@@ -20,7 +20,8 @@ def ignore_unhealthy_satellite(dset):
     """Remove all data for satellites, which are declared as unhealthy in GNSS broadcast ephemeris
 
     If a satellite is set to unhealthy (brdc.sv_health > 0) in one of the given broadcast ephemeris blocks, then the
-    satellite observations are removed.
+    satellite observations are removed. That means, that a satellite is maybe only unhealthy for a certain time period
+    and not the whole day.
 
     The definition of the satellite vehicle health flags depends on GNSS:
         - GPS: see section 20.3.3.3.1.4 in :cite:`is-gps-200h`
@@ -41,22 +42,19 @@ def ignore_unhealthy_satellite(dset):
     brdc = apriori.get(
         "orbit",
         rundate=dset.rundate,
-        time=dset.time,
-        satellite=tuple(dset.satellite),
-        system=tuple(dset.system),
         station=dset.vars["station"],
         apriori_orbit="broadcast",
     )
     unhealthy_satellites = brdc.unhealthy_satellites()
 
     if not set(unhealthy_satellites).intersection(dset.satellite):
-        log.info("The unhealthy satellites {} are not given in Dataset.", ", ".join(unhealthy_satellites))
-        return np.logical_not(remove_idx)
+        log.info(f"The unhealthy satellites {', '.join(unhealthy_satellites)} are not given in Dataset.")
+        return ~remove_idx
 
     # Remove unhealthy satellites
     if unhealthy_satellites:
-        log.info("Discarding observations for unhealthy satellites: {}", ", ".join(unhealthy_satellites))
+        log.info(f"Discarding observations for unhealthy satellites: {', '.join(unhealthy_satellites)}")
         for satellite in unhealthy_satellites:
-            remove_idx = np.logical_or(remove_idx, dset.filter(satellite=satellite))
+            remove_idx |= dset.filter(satellite=satellite)
 
-    return np.logical_not(remove_idx)
+    return ~remove_idx

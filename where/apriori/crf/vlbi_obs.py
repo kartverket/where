@@ -36,9 +36,9 @@ class VlbiObsCrf(crf.CrfFactory):
         """
         fmt = config.tech.obs_format.str
         try:
-            return getattr(self, "_read_data_{}".format(fmt))()
+            return getattr(self, f"_read_data_{fmt}")()
         except AttributeError:
-            log.fatal("Format '{}' is unknown for reference frame {}", fmt, self)
+            log.fatal(f"Format {fmt!r} is unknown for reference frame {self}")
 
     def _read_data_vgosdb(self):
         """Read data from vgosdb observation files
@@ -48,11 +48,15 @@ class VlbiObsCrf(crf.CrfFactory):
         """
         source_names = apriori.get("vlbi_source_names")
         data = parsers.parse_key("vlbi_obs_sources_vgosdb").as_dict()
-
+        try:
+            sources = data["AprioriSourceList"]
+            radec = data["AprioriSource2000RaDec"]
+        except KeyError:
+            return {}
         # Replace IVS name of source with official IERS name
         return {
             source_names[ivsname]["iers_name"] if ivsname in source_names else ivsname: dict(ra=coord[0], dec=coord[1])
-            for ivsname, coord in zip(data["AprioriSourceList"], data["AprioriSource2000RaDec"])
+            for ivsname, coord in zip(sources, radec)
         }
 
     def _read_data_ngs(self):

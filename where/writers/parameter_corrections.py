@@ -6,9 +6,6 @@ Description:
 Write the final parameter estimates to screen. These estimates are corrections to the apriori values.
 The printed number is just the mean value.
 
-
-
-
 """
 # Standard library imports
 from collections import OrderedDict
@@ -16,9 +13,11 @@ from collections import OrderedDict
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register
@@ -35,7 +34,7 @@ def parameter_corrections(dset):
     print_data = OrderedDict()
     for field in state_vector_fields:
         param_type, name = field[6:].split("-", maxsplit=1)
-        name = name.split("_")
+        name = name.rsplit("_", maxsplit=1)
         field_sigma = field + "_sigma"
         key = (param_type, name[0], dset.unit(field))
         if len(name) == 1:

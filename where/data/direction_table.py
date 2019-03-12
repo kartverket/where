@@ -19,7 +19,7 @@ import numpy as np
 
 # Where imports
 from where.data.table import Table
-from where.lib.unit import unit as lib_unit
+from where.lib.unit import Unit
 
 
 class DirectionTable(Table):
@@ -34,8 +34,8 @@ class DirectionTable(Table):
         """
         super().__init__(name, num_obs, dataset)
 
-        # Add units for DirectionTable-properties (set by @lib_unit.register)
-        self._prop_units = lib_unit.units_dict(__name__)
+        # Add units for DirectionTable-properties (set by @Unit.register)
+        self._prop_units = Unit.units_dict(__name__)
 
     def add(self, fieldname, ra=None, dec=None, write_level=None, **_kwargs):
         """Add a field with direction values
@@ -131,12 +131,12 @@ class DirectionTable(Table):
         return self._data / norms
 
     @property
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def declination(self):
         return np.arcsin(self.unit_vector[:, 2])
 
     @property
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def right_ascension(self):
         return np.arctan2(self.unit_vector[:, 1], self.unit_vector[:, 0])
 

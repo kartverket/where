@@ -3,12 +3,6 @@
 Description:
 ------------
 
-
-
-
-
-
-
 """
 
 # Standard library imports
@@ -42,6 +36,7 @@ class Trf(collections.UserDict):
             time (Time):                Time epochs for which to calculate positions.
             reference_frames (String):  Prioritized list of reference frames
         """
+        super().__init__()
         self.time = time
         self.reference_frames = config.tech.get("reference_frames", reference_frames).list
 
@@ -49,9 +44,6 @@ class Trf(collections.UserDict):
         self._factories = list()
         for reference_frame in self.reference_frames:
             self._factories.append(trf.get_trf_factory(time, reference_frame))
-
-        # Cache for sites, this is populated lazily by the __missing__-method
-        self.data = dict()
 
     def __missing__(self, key):
         """A TRF site identified by key
@@ -65,7 +57,7 @@ class Trf(collections.UserDict):
             except exceptions.UnknownSiteError:
                 continue  # If site is not in factory, continue to next factory
         else:  # Exit if site is not found in any factories
-            log.fatal("Site '{}' not found in the reference frames {}", key, ", ".join(self.reference_frames))
+            log.fatal(f"Site {key} not found in the reference frames {', '.join(self.reference_frames)}")
 
         # Add site to cache
         self.data[key] = site
@@ -81,7 +73,7 @@ class Trf(collections.UserDict):
 
         return sorted(sites)
 
-    def closest(self, pos, max_distance=5):
+    def closest(self, pos, max_distance=None):
         """Find site closest to the given position
 
         Args:
@@ -95,12 +87,15 @@ class Trf(collections.UserDict):
         closest = min(distances, key=distances.get)
 
         # Check that distance is within threshold
+        if not max_distance:
+            return self[closest]
+
         if distances[closest] < max_distance:
             return self[closest]
         else:
             raise ValueError(
                 "No site found within {} meters of ({:.2f}, {:.2f}, {:.2f}) in '{!r}'"
-                "".format(max_distance, *pos, self)
+                "".format(max_distance, *np.mean(pos.itrs, axis=0), self)
             )
 
     def named_site(self, name):
@@ -109,7 +104,7 @@ class Trf(collections.UserDict):
         for k in self.sites:
             if name == self[k].name:
                 return self[k]
-        raise ValueError("No site found with name {} in '{!r}'".format(name, self))
+        raise ValueError(f"No site found with name {name} in '{self!r}'")
 
     #
     # Dunder-methods
@@ -119,7 +114,7 @@ class Trf(collections.UserDict):
 
     def __repr__(self):
         reference_frames = ", ".join(str(f) for f in self._factories)
-        return "{}({}, '{}')".format(self.__class__.__name__, repr(self.time), reference_frames)
+        return f"{type(self).__name__}({self.time!r}, {reference_frames!r})"
 
     def __contains__(self, item):
         if item in self.data:
@@ -164,12 +159,12 @@ class TrfFactory:
             TrfSite:  Object with positions and information about site.
         """
         if key not in self.data:
-            raise exceptions.UnknownSiteError("Unknown site '{}' in reference frame '{}'".format(key, self))
+            raise exceptions.UnknownSiteError(f"Unknown site {key} in reference frame '{self}'")
 
         pos_itrs = self._calculate_pos_itrs(key)
         site_info = self.data[key]
         trf_site = TrfSite(key, time=self.time, itrs=pos_itrs, source=str(self), **site_info)
-        log.debug("Found site {}".format(trf_site))
+        log.debug(f"Found site {trf_site}")
         return trf_site
 
     #
@@ -201,12 +196,12 @@ class TrfFactory:
         """String representation of factory recreates 'name:version'-string
         """
         if self.version:
-            return "{}:{}".format(self.name, self.version)
+            return f"{self.name}:{self.version}"
         else:
             return self.name
 
     def __repr__(self):
-        return "{}({!r}, '{}')".format(self.__class__.__name__, self.time, self.version)
+        return f"{type(self).__name__}({self.time!r}, {self.version!r})"
 
 
 class TrfSite:
@@ -253,4 +248,5 @@ class TrfSite:
             pos = self.pos.itrs
         else:
             pos = self.pos.itrs.mean(axis=0)
-        return "{}('{}', ({:.2f}, {:.2f}, {:.2f}), '{}')".format(self.__class__.__name__, self.name, *pos, self.source)
+        pos_str = "({:.2f}, {:.2f}, {:.2f})".format(*pos)
+        return f"{type(self).__name__}({self.name!r}, {pos_str}, {self.source!r})"

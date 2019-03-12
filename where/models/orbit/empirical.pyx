@@ -8,12 +8,8 @@ Empirical accelerations, to account for unmodeled forces.
 References:
 
    [1] O. Montenbruck and E. Gill: Satellite Orbits, Springer, 2000, section 3.7.4.
-
-
-$Revision: 14978 $
-$Date: 2018-04-30 19:01:11 +0200 (Mon, 30 Apr 2018) $
-$LastChangedBy: hjegei $
 """
+
 # Standard library imports
 import sys
 import math
@@ -23,26 +19,29 @@ import numpy as np
 
 # Where imports
 from where import apriori
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import plugins
 
 cdef double GM = constant.GM
 cdef double[:] a0, a1, a2
 
+
 def register_entry_point():
     """Register entry points for setup and later calls."""
     return dict(setup=empirical_setup, call=empirical)
 
 
-def empirical_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
+def empirical_setup(
+        rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs
+):
     """Set up module variables used later during calculation.
-    
-    Args: 
+
+    Args:
         rundate:           Time of integration start
         force_parameters:  Dict of parameters to be estimated
         sat_name:          Name of satellite
-        time_grid:         Table of times in seconds since rundate, in utc. 
+        time_grid:         Table of times in seconds since rundate, in utc.
         epochs:            time_grid converted to Time objects, in utc.
         body_pos:          The positions of the bodies in the solar system, in gcrs
         bodies:            List of bodies
@@ -61,6 +60,7 @@ def empirical_setup(rundate, force_parameters, sat_name, time_grid, epochs, body
     a0 = a[0, :]
     a1 = a[1, :]
     a2 = a[2, :]
+
 
 def empirical(double[:] sat_pos_gcrs, double[:] sat_vel_gcrs, force_parameters, **_not_used):
     """Compute empirical force on satellite
@@ -164,13 +164,13 @@ def empirical(double[:] sat_pos_gcrs, double[:] sat_vel_gcrs, force_parameters, 
     # Bookkeeping
     keys = list(force_parameters.keys())
     for i in range(0, len(keys)):
-        if keys[i].startswith('a'):
+        if keys[i].startswith("a"):
             for j in range(0, 3):
                 k1 = int(keys[i][1: 2])
                 k2 = int(keys[i][2: 3])
                 if k1 == 0:
                     k = k2
-                if k1 == 1: 
+                if k1 == 1:
                     k = k2 + 3
                 if k1 == 2:
                     k = k2 + 6

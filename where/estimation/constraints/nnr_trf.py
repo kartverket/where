@@ -34,12 +34,12 @@ def nnt_trf(dset, param_names):
             stations.add(station)
 
     constraint = __name__
-    log.info("Applying {} with {} from {}", constraint, ", ".join(stations), reference_frame.upper())
+    log.info(f"Applying {constraint} with {', '.join(stations)} from {reference_frame.upper()}")
     # thaller2008: eq 2.57
     try:
         h = np.linalg.inv(d.T @ d) @ d.T
     except np.linalg.LinAlgError:
         h = np.zeros((3, n))
-        log.warn("Applying {} failed", constraint)
+        log.warn(f"Applying {constraint} failed")
     sigma = np.array([s] * 3)
     return h, sigma

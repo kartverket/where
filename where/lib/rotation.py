@@ -1,220 +1,351 @@
-"""Library for basic rotation matrices
-
+"""Library for geodetic rotation matrices
 
 Description:
 ------------
+
 Creates rotation matrices for rotation around the axes of a right handed Cartesian coordinate system and
 their derivatives.
 
-For instance, for an XYZ-system, R1 returns a rotation matrix around the x-axis and for an ENU-system, R1 returns a
-rotation matrix around the east-axis. dR1 returns the derivative of the R1 matrix with respect to the rotation
-angle. All functions are vectorized, so that one rotation matrix is returned per input angle.
-
-Example:
-
->>> from where.lib import rotation
->>> rotation.R1([0, 1])
-array([[[ 1.        ,  0.        ,  0.        ],
-        [ 0.        ,  1.        ,  0.        ],
-        [ 0.        , -0.        ,  1.        ]],
-
-       [[ 1.        ,  0.        ,  0.        ],
-        [ 0.        ,  0.54030231,  0.84147098],
-        [ 0.        , -0.84147098,  0.54030231]]])
-
-
-
-
+Contains the rotation matrices (and angles) for the transition from a terrestrial reference system to a 
+geocentric celestial reference system according to the IERS 2010 Conventions.
 """
+# Include all rotation matrices defined in Midgard
+from midgard.math.constant import constant
+from midgard.math.rotation import *  # noqa
 
-import numpy as np
+from where import apriori
+from where.lib import cache
+from where.lib.unit import Unit
+from where.ext import sofa_wrapper as sofa
+
+#
+# Transformations
+#
 
 
-def R1(angle):
-    """Rotation matrix around the first axis
+@cache.function
+def gcrs2trs(time):
+    """Transformation from space fixed to earth fixed coordinate system
+
+    According to IERS 2010 Conventions
+    """
+    if time.isscalar:
+        return (Q(time) @ R(time) @ W(time)).transpose()
+    else:
+        return (Q(time) @ R(time) @ W(time)).transpose(0, 2, 1)
+
+
+@cache.function
+def trs2gcrs(time):
+    """Transformation from earth fixed to space fixed coordinate system
+
+    According to IERS 2010 Conventions
+    """
+    return Q(time) @ R(time) @ W(time)
+
+@cache.function
+def dtrs2gcrs_dt(time):
+    """Derivative of transformation from earth fixed to space fixed coordinate system with regards to time
+
+    dQ/dt and dW/dt is approximated to zero since these matrices change slowly compared to dR/dt 
+    """
+    return Q(time) @ dR_dut1(time) @ W(time)
+
+@cache.function
+def dgcrs2trs_dt(time):
+    """Transformation from space fixed to earth fixed coordinate system
+
+    dQ/dt and dW/dt is approximated to zero since these matrices change slowly compared to dR/dt
+    """
+    if time.isscalar:
+        return (Q(time) @ dR_dut1(time) @ W(time)).transpose()
+    else:
+        return (Q(time) @ dR_dut1(time) @ W(time)).transpose(0, 2, 1)
+
+
+#
+# Rotation matrices
+#
+@cache.function
+def Q(time):
+    """Transformation matrix for the celestial motion of the CIP
+
+    The transformation matrix is described in the IERS Conventions [2], section 5.4.4. The implementation is based on
+    section 5.6 "IAU 2006/2000A, CIO based, using X, Y series" in the SOFA Tools for Earth Attitude [1].
 
     Args:
-        angle:  Scalar, list or numpy array of angles in radians.
+        time:  A lib.time Time-object
 
     Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
+        numpy.array: An array of 3x3 transformation matrices
     """
-    zero, one = _zero(angle), _one(angle)
-    cosA, sinA = np.cos(angle), np.sin(angle)
-    return _roll_axes(np.array([[one, zero, zero], [zero, cosA, sinA], [zero, -sinA, cosA]]))
+    return R3(-E(time)) @ R2(-d(time)) @ R3(E(time)) @ R3(s(time))
 
 
-def R2(angle):
-    """Rotation matrix around the second axis
+@cache.function
+def R(time):
+    """Transformation matrix for the Earth rotation
+
+    The transformation matrix is described in the IERS Conventions [2]_, section 5.4.2. The implementation is based on
+    section 5.6 "IAU 2006/2000A, CIO based, using X, Y series" in the SOFA Tools for Earth Attitude [1]_.
+
+    According to equation (5.5) in the IERS Conventions [2]_, `The CIO based transformation matrix arising from the
+    rotation of the Earth around the axis of the CIP can be expressed as`
+
+    .. math::
+
+        R(t) = R_3(-ERA)
 
     Args:
-        angle:  Scalar, list or numpy array of angles in radians.
+        time:  A lib.time Time-object
 
     Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
+        numpy.array: An array of 3x3 transformation matrices
+
     """
-    zero, one = _zero(angle), _one(angle)
-    cosA, sinA = np.cos(angle), np.sin(angle)
-    return _roll_axes(np.array([[cosA, zero, -sinA], [zero, one, zero], [sinA, zero, cosA]]))
+
+    return R3(-ERA(time))
 
 
-def R3(angle):
-    """Rotation matrix around the third axis
+@cache.function
+def W(time):
+    """Transformation matrix for the polar motion
+
+    The transformation matrix is described in the IERS Conventions [2], section 5.4.1. The implementation is based on
+    section 5.6 "IAU 2006/2000A, CIO based, using X, Y series" in the SOFA Tools for Earth Attitude [1].
 
     Args:
-        angle:  Scalar, list or numpy array of angles in radians.
+        time:  A lib.time Time-object
 
     Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
+        numpy.array: An array of 3x3 transformation matrices
     """
-    zero, one = _zero(angle), _one(angle)
-    cosA, sinA = np.cos(angle), np.sin(angle)
-    return _roll_axes(np.array([[cosA, sinA, zero], [-sinA, cosA, zero], [zero, zero, one]]))
+    return R3(-s_prime(time)) @ R2(xp(time)) @ R1(yp(time))
 
 
-def dR1(angle):
-    """Derivative of a rotation matrix around the first axis with respect to the rotation angle.
+#
+# Rotation angles
+#
+@cache.function
+def s(time):
+    """CIO locator
+    """
+    return sofa.vectorized_s06(time)
+
+
+@cache.function
+def s_prime(time):
+    """TIO locator
+    """
+    return sofa.vectorized_sp00(time)
+
+
+@cache.function
+def ERA(time):
+    """Earth rotation angle
+    """
+    return sofa.vectorized_era00(time)
+
+
+@cache.function
+def d(time):
+    """Polar angle of CIP from positive z-axis
+
+    Spherical coordinate with radius = 1
+    """
+    return np.arccos(Z(time))
+
+
+@cache.function
+def E(time):
+    """Azimuth angle of CIP in xy-plane
+
+    Spherical coordinate with radius = 1
+    """
+    return np.arctan2(Y(time), X(time))
+
+
+@cache.function
+def xp(time):
+    """X coordinate of the CIP in ITRS
+    """
+    eop = apriori.get("eop", time=time)
+    return eop.x * Unit.arcsec2rad
+
+
+@cache.function
+def yp(time):
+    """Y coordinate of the CIP in ITRS
+    """
+    eop = apriori.get("eop", time=time)
+    return eop.y * Unit.arcsec2rad
+
+
+@cache.function
+def X(time):
+    """Total X coordinate of CIP
+
+    Returns:
+        model + celestial pole offset
+    """
+    eop = apriori.get("eop", time=time)
+    return sofa.X_model(time) + eop.dx * Unit.arcsec2rad
+
+
+@cache.function
+def Y(time):
+    """Total Y coordinate of CIP
+
+    Returns:
+        model + celestial pole offset
+    """
+    eop = apriori.get("eop", time=time)
+    return sofa.Y_model(time) + eop.dy * Unit.arcsec2rad
+
+
+@cache.function
+def Z(time):
+    """Total Z coordinate of CIP
+
+    Derived from X and Y with assumption of unit sphere with
+
+    Returns:
+        model + celestial pole offset
+    """
+    return np.sqrt(1 - (X(time) ** 2 + (Y(time) ** 2)))
+
+
+#
+# Rotation matricies differentiated with regards to earth orientation parameters
+#
+
+
+@cache.function
+def dW_dxp(time):
+    """Derivative of transformation matrix for the polar motion with regards to the CIP (Celestial Intermediate Pole)
+    in TRF along the Greenwich meridian x_p.
+
+    This is done according to equations (2.31) in Teke :cite:`teke2011` which is the analytical partial derivative of
+    equation (5.3) in :cite:'iers2010'.
+    """
+    return R3(-s_prime(time)) @ dR2(xp(time)) @ R1(yp(time))
+
+
+@cache.function
+def dW_dyp(time):
+    """Derivative of transformation matrix for the polar motion with regards to the CIP in ITRS.
+
+    Analytical partial derivative of equation (5.3) in :cite:'iers2010'.
+    """
+    return R3(-s_prime(time)) @ R2(xp(time)) @ dR1(yp(time))
+
+
+@cache.function
+def dR_dut1(time):
+    """Derivative of transformation matrix for the Earth rotation with respect to time (UT1??)
+
+    The transformation matrix is described in the IERS Conventions [2]_, section 5.4.2. The implementation is based on
+    section 5.6 "IAU 2006/2000A, CIO based, using X, Y series" in the SOFA Tools for Earth Attitude [1]_.
+
+    Unit of return value: radians / seconds ??
 
     Args:
-        angle:  Scalar, list or numpy array of angles in radians.
+        time:  A lib.time Time-object
 
     Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
+        numpy.array: An array of 3x3 transformation matrices
+
     """
-    zero = _zero(angle)
-    cosA, sinA = np.cos(angle), np.sin(angle)
-    return _roll_axes(np.array([[zero, zero, zero], [zero, -sinA, cosA], [zero, -cosA, -sinA]]))
+
+    return -dR3(-ERA(time)) * constant.omega
 
 
-def dR2(angle):
-    """Derivative of a rotation matrix around the second axis with respect to the rotation angle
-
-    Args:
-        angle:  Scalar, list or numpy array of angles in radians.
-
-    Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
+@cache.function
+def dQ_dX(time):
+    """Derivative of transformation matrix for nutation/presession with regards to the X coordinate of CIP in GCRS
     """
-    zero = _zero(angle)
-    cosA, sinA = np.cos(angle), np.sin(angle)
-    return _roll_axes(np.array([[-sinA, zero, -cosA], [zero, zero, zero], [cosA, zero, -sinA]]))
+    # Rotation matrices
+    R3_E = R3(E(time))
+    R3_s = R3(s(time))
+    R2_md = R2(-d(time))
+    R3_mE = R3(-E(time))
+    dR3_s = dR3(s(time))
+    dR3_E = dR3(E(time))
+    dR3_mE = dR3(-E(time))
+    dR2_md = dR2(-d(time))
 
-
-def dR3(angle):
-    """Derivative of a rotation matrix around the third axis with respect to the rotation angle
-
-    Args:
-        angle:  Scalar, list or numpy array of angles in radians.
-
-    Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
-    """
-    zero = _zero(angle)
-    cosA, sinA = np.cos(angle), np.sin(angle)
-    return _roll_axes(np.array([[-sinA, cosA, zero], [-cosA, -sinA, zero], [zero, zero, zero]]))
-
-
-def enu2trf(lat, lon):
-    """Rotation matrix for rotating an ENU coordinate system to an earth oriented one
-
-    See for instance http://www.navipedia.net/index.php/Transformations_between_ECEF_and_ENU_coordinates
-    This is equal to doing::
-
-        R3(-(np.pi/2 + lon)) @ R1(-(np.pi/2 - lat))
-
-    Args:
-        lat (Float or Array):   Latitude of origin of ENU coordinate system.
-        lon (Float or Array):   Longitude of origin of ENU coordinate system.
-
-    Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
-    """
-    zero = _zero(lat)
-    coslat, coslon, sinlat, sinlon = np.cos(lat), np.cos(lon), np.sin(lat), np.sin(lon)
-    return _roll_axes(
-        np.array(
-            [
-                [-sinlon, -coslon * sinlat, coslon * coslat],
-                [coslon, -sinlon * sinlat, sinlon * coslat],
-                [zero, coslat, sinlat],
-            ]
-        )
+    return (
+        dR3_mE @ R2_md @ R3_E @ R3_s * (-dE_dX(time))
+        + R3_mE @ dR2_md @ R3_E @ R3_s * (-dd_dX(time))
+        + R3_mE @ R2_md @ dR3_E @ R3_s * (dE_dX(time))
+        + R3_mE @ R2_md @ R3_E @ dR3_s * (ds_dX(time))
     )
 
 
-def trf2enu(lat, lon):
-    """Rotation matrix for rotating an earth oriented coordinate system to an ENU one
-
-    See for instance http://www.navipedia.net/index.php/Transformations_between_ECEF_and_ENU_coordinates
-    This is equal to doing::
-
-        R1(np.pi/2 - lat) @ R3(np.pi/2 + lon)
-
-    Args:
-        lat (Float or Array):   Latitude of origin of ENU coordinate system.
-        lon (Float or Array):   Longitude of origin of ENU coordinate system.
-
-    Returns:
-        Numpy array:   Rotation matrix or array of rotation matrices.
+@cache.function
+def dQ_dY(time):
+    """Derivative of transformation matrix for nutation/presession with regards to the Y coordinate of CIP in GCRS
     """
-    zero = _zero(lat)
-    coslat, coslon, sinlat, sinlon = np.cos(lat), np.cos(lon), np.sin(lat), np.sin(lon)
-    return _roll_axes(
-        np.array(
-            [
-                [-sinlon, coslon, zero],
-                [-sinlat * coslon, -sinlat * sinlon, coslat],
-                [coslat * coslon, coslat * sinlon, sinlat],
-            ]
-        )
+    # Rotation matrices
+    R3_E = R3(E(time))
+    R3_s = R3(s(time))
+    R2_md = R2(-d(time))
+    R3_mE = R3(-E(time))
+    dR3_s = dR3(s(time))
+    dR3_E = dR3(E(time))
+    dR3_mE = dR3(-E(time))
+    dR2_md = dR2(-d(time))
+
+    return (
+        dR3_mE @ R2_md @ R3_E @ R3_s * (-dE_dY(time))
+        + R3_mE @ dR2_md @ R3_E @ R3_s * (-dd_dY(time))
+        + R3_mE @ R2_md @ dR3_E @ R3_s * (dE_dY(time))
+        + R3_mE @ R2_md @ R3_E @ dR3_s * (ds_dY(time))
     )
 
 
-def _roll_axes(mat):
-    """Move the axes of an array of 2-d matrices properly
+#
+# Rotation angles differentiated with regards to earth orientation parameters
+#
 
-    Roll the first two dimensions to the end, so that indexing works as expected.
 
-    Args:
-        mat (numpy array):  Array of 2-d matrices, can be a numpy array of any dimension.
-
-    Returns:
-        Numpy array:  The same array as mat, but with the first two dimensions rolled to the end.
+@cache.function
+def dE_dX(time):
+    """Derivative of azimuth angle of CIP in GCRS with regards to the X coordinate of CIP in GCRS
     """
-    return mat if mat.ndim < 3 else mat.transpose(np.roll(np.arange(mat.ndim), -2))
+    return (-Y(time) / (X(time) ** 2 + Y(time) ** 2))[:, None, None]
 
 
-def _zero(angle):
-    """Returns a scalar or array of zeros with the same shape as angle
-
-    Args:
-        angle:   Scalar, list or numpy array.
-
-    Returns:
-        Scalar or numpy array:  Zero-scalar or array.
+@cache.function
+def ds_dX(time):
+    """Derivative of CIO locator with regards the X coordinate of CIP in GCRS
     """
-    try:
-        return np.zeros(angle.shape)  # angle is numpy array
-    except AttributeError:
-        try:
-            return np.zeros(len(angle))  # angle is list or other iterable
-        except TypeError:
-            return 0  # angle is scalar
+    return (-Y(time) / 2)[:, None, None]
 
 
-def _one(angle):
-    """Returns a scalar or array of ones with the same shape as angle
-
-    Args:
-        angle:   Scalar, list or numpy array.
-
-    Returns:
-        Scalar or numpy array:  One-scalar or array.
+@cache.function
+def dd_dX(time):
+    """Derivative of polar angle of CIP in GCRS with regards to the X coordinate of CIP in GCRS
     """
-    try:
-        return np.ones(angle.shape)  # angle is numpy array
-    except AttributeError:
-        try:
-            return np.ones(len(angle))  # angle is list or other iterable
-        except TypeError:
-            return 1  # angle is scalar
+    return (X(time) / (Z(time) * np.sqrt(X(time) ** 2 + Y(time) ** 2)))[:, None, None]
+
+
+@cache.function
+def dE_dY(time):
+    """Derivative of azimuth angle of CIP in GCRS with regards to the Y coordinate of CIP in GCRS
+    """
+    return (X(time) / (X(time) ** 2 + Y(time) ** 2))[:, None, None]
+
+
+@cache.function
+def ds_dY(time):
+    """Derivative of CIO locator with regards the X coordinate of CIP in GCRS
+    """
+    return (-X(time) / 2)[:, None, None]
+
+
+@cache.function
+def dd_dY(time):
+    """Derivative of polar angle of CIP in GCRS with regards to the Y coordinate of CIP in GCRS
+    """
+    return (Y(time) / (Z(time) * np.sqrt(X(time) ** 2 + Y(time) ** 2)))[:, None, None]

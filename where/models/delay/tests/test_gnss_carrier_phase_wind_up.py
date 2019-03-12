@@ -4,7 +4,7 @@ The test set up compares results from Where against gLAB solution for satellite 
 whereby precise orbits are used.
 
 $Revision: 15940 $
-$Date: 2018-09-11 16:32:58 +0200 (Tue, 11 Sep 2018) $
+$Date: 2018-09-11 16:32:58 +0200 (ti., 11 sep. 2018) $
 $LastChangedBy: hjegei $
 """
 

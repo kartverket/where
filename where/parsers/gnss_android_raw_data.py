@@ -4,7 +4,7 @@ Example:
 --------
 
     from where import parsers
-    parser = parsers.parse('gnss_sinex_bias', rundate=rundate)
+    parser = parsers.parse('gnss_android_raw_data', rundate=rundate)
 
 Description:
 ------------
@@ -24,9 +24,9 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers import parser
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import gnss
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -159,30 +159,30 @@ class GnssAndroidRawDataParser(parser.Parser):
         """
 
         # Determine GPS week
-        week = np.floor(-np.array(self.data["FullBiasNanos"]) * unit.nanosecond2second / 604800)
+        week = np.floor(-np.array(self.data["FullBiasNanos"]) * Unit.nanosecond2second / 604800)
 
         # GNSS signal arriving time at measurement time (GPS time) referenced to GPS week
         tRxNanos = (
             (np.array(self.data["TimeNanos"], dtype=float) + np.array(self.data["TimeOffsetNanos"], dtype=float))
             - (np.array(self.data["FullBiasNanos"], dtype=float) + np.array(self.data["BiasNanos"], dtype=float))
-            - (week * 604800e+9)
+            - (week * 604800e9)
         )
 
-        if np.all(tRxNanos >= 604800e+9):
+        if np.all(tRxNanos >= 604800e9):
             log.fatal("tRxNanos should be <= GPS nanoseconds.")
         if np.all(tRxNanos <= 0.0):
             log.fatal("tRxNanos should be >= 0.")
 
         self.data["week"] = week
         self.data["tRxNanos"] = tRxNanos
-        self.data["time"] = gnss.gpssec2jd(week, tRxNanos * unit.ns2s)  # TODO: Better solution -> time.py?
+        self.data["time"] = gnss.gpssec2jd(week, tRxNanos * Unit.ns2s)  # TODO: Better solution -> time.py?
 
         # GNSS satellite transmission time at measurement time (GPS time) referenced to GPS week
         tTxNanos = np.array(self.data["ReceivedSvTimeNanos"], dtype=float)
-        self.data["sat_time"] = gnss.gpssec2jd(week, tTxNanos * unit.nanosecond2second)
+        self.data["sat_time"] = gnss.gpssec2jd(week, tTxNanos * Unit.nanosecond2second)
         # TODO: Check GPS week rollover (see ProcessGnssMeas.m)
 
-        self.data["pseudorange"] = (tRxNanos - tTxNanos) * unit.nanosecond2second * constant.c  # in meters
+        self.data["pseudorange"] = (tRxNanos - tTxNanos) * Unit.nanosecond2second * constant.c  # in meters
 
     def get_sitepos(self):
         """Determine site position by converting given longitude, latitude and height for a station to geocentric

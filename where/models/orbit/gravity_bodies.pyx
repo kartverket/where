@@ -9,12 +9,8 @@ Montenbruck and Gill [1].
 References:
 [1] Montenbruck, Oliver and Gill, Eberhard, Satellite Orbits,
     Springer Verlag, 2000.
-
-
-$Revision: 14978 $
-$Date: 2018-04-30 19:01:11 +0200 (Mon, 30 Apr 2018) $
-$LastChangedBy: hjegei $
 """
+
 # External library imports
 import numpy as np
 import cython
@@ -22,30 +18,33 @@ import math
 
 # Where imports
 from where import apriori
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import config
 
 # Name of model
-MODEL = __name__.split('.')[-1]
+MODEL = __name__.split(".")[-1]
 
 # Module variables set during setup
 cdef double[:] GM_bodies
 cdef double[:, :, :] body_pos
 cdef int num_bodies
 
+
 def register_entry_point():
     """Register entry points for setup and later calls."""
     return dict(setup=gravity_bodies_setup, call=gravity_bodies)
 
 
-def gravity_bodies_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
+def gravity_bodies_setup(
+        rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs
+):
     """Set up module variables used later during calculation.
-    
-    Args: 
+
+    Args:
         rundate:            Time of integration start.
         force_parameters:   Dict of parameters to be estimated.
         sat_name:           Name of satellite.
-        time_grid:          Table of times in seconds since rundate, in utc. 
+        time_grid:          Table of times in seconds since rundate, in utc.
         epochs:             time_grid converted to Time objects, in utc.
         body_pos_gcrs:      The positions of the bodies in the solar system in GCRS.
         body_pos_itrs:      The positions of the bodies in the solar system in ITRS.
@@ -57,9 +56,9 @@ def gravity_bodies_setup(rundate, force_parameters, sat_name, time_grid, epochs,
     body_pos = body_pos_gcrs
     num_bodies = len(bodies)
     GM_bodies = np.zeros(num_bodies)
-    
+
     for idx in range(num_bodies):
-        GM_bodies[idx] = constant.get('GM_' + bodies[idx])
+        GM_bodies[idx] = constant.get("GM_" + bodies[idx])
 
 
 @cython.boundscheck(False)
@@ -90,7 +89,7 @@ def gravity_bodies(double[:] sat_pos_gcrs, force_parameters, int current_step, *
     cdef double[:] acc, sat_body_norm
     cdef double[:, :] trans, sat_body_vec
     cdef int idx, i
-    
+
     acc = np.zeros(3)
     trans = np.zeros((3, 3))
     sat_body_vec = np.zeros((num_bodies, 3))
@@ -110,11 +109,10 @@ def gravity_bodies(double[:] sat_pos_gcrs, force_parameters, int current_step, *
         body_pos_norm[idx] = math.sqrt(body_pos_norm[idx])
 
         for i in range(0, 3):
-            acc[i] += GM_bodies[idx] * (sat_body_vec[idx, i] / sat_body_norm[idx]**3 
+            acc[i] += GM_bodies[idx] * (sat_body_vec[idx, i] / sat_body_norm[idx]**3
                                         - body_pos_temp[idx, i] / body_pos_norm[idx]**3)
             for j in range(0, 3):
-                trans[i, j] += -GM_bodies[idx] * ((i == j) / sat_body_norm[idx]**3 - 3 * sat_body_vec[idx, i] * 
+                trans[i, j] += -GM_bodies[idx] * ((i == j) / sat_body_norm[idx]**3 - 3 * sat_body_vec[idx, i] *
                                                   sat_body_vec[idx, j] / sat_body_norm[idx]**5)
 
     return acc, np.hstack((trans, np.zeros((3, 3)))), np.zeros((3, len(force_parameters)))
-    

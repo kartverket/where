@@ -30,7 +30,7 @@ from where.lib import plugins
 def get_solar_flux(rundate):
     """Read time-dependent solar flux from file
     """
-    flux = parsers.parse(file_key="solar_flux")
+    flux = parsers.parse_key(file_key="solar_flux").as_dict()
     arc_length = config.tech.arc_length.int
 
     date_to_add = rundate - timedelta(days=5)

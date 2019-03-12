@@ -3,7 +3,7 @@
 Description:
 ------------
 
-Asdf
+A parser for reading the ILRS Data handling file from DGFI. This file summarizes information on range-, time- or pressure biases and data to be deleted. It is adopted by the ILRS Analysis Working Group. 
 
 References:
 -----------
@@ -12,60 +12,79 @@ http://ilrs.dgfi.tum.de/fileadmin/data_handling/ILRS_Data_Handling_File.snx
 
 """
 # Standard library imports
-from datetime import datetime, timedelta
-import itertools
+from datetime import datetime
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers import parser
+from midgard.parsers._parser_sinex import SinexParser, SinexBlock, SinexField
+from midgard.dev import log
 
 
 @plugins.register
-class SlrHandlingFileParser(parser.ParserDict):
+class SlrHandlingFileParser(SinexParser):
     """A parser for reading SLR handling file
     """
 
-    def __init__(self, time):
-        super().__init__()
+    def setup_parser(self):
+        return (self.solution_data_handling,)
 
-        self.start_time = min(time.utc).datetime
-        self.end_time = max(time.utc).datetime
+    @property
+    def solution_data_handling(self):
+        """
 
-    def setup_parsers(self):
-        # Each line contains data for a given station and period of time.
-        handling_parser = parser.define_parser(
-            end_marker=lambda _l, _ln, _n: True,
-            label=lambda line, _ln: line[1:5].isnumeric() and line[18:19].isnumeric(),
-            parser_def={
-                True: {
-                    "parser": self.parse_handling_line,
-                    "fields": {
-                        "station": (1, 5),
-                        "unit": (10, 12),
-                        "start_time": (17, 29),
-                        "end_time": (30, 42),
-                        "code": (43, 44),
-                    },
-                }
-            },
+        Example:
+            *CODE PT_ UNIT T _DATA_START_ __DATA_END__ M __E-VALUE___ STD_DEV ___COMMENTS______
+             7080 --- mm   A 16:106:00000 00:000:00000 E                      small remaining range bias
+                      1111111111222222222233333333334444444444555555555566666666667777777777
+            01234567890123456789012345678901234567890123456789012345678901234567890123456789
+        """
+        return SinexBlock(
+            marker="SOLUTION/DATA_HANDLING",
+            fields=(
+                SinexField("site_code", 1, "U4"),
+                SinexField("point_code", 6, "U3"),  # TODO "---" means all satellites, not sure what L55 etc means.
+                SinexField("unit", 10, "U4"),
+                SinexField(
+                    "obs_code", 15, "U1"
+                ),  # TODO: Indicates if information involves first or second wavelength?
+                SinexField("start_time", 17, "O", "epoch"),
+                SinexField("end_time", 30, "O", "epoch"),
+                SinexField("handling_code", 43, "U1"),  # Indicated what is to be done with the data.
+                SinexField("e_value", 45, "U12"),
+                SinexField("std_dev", 58, "U7"),
+                SinexField("comments1", 66, "U9"),
+                SinexField("comments2", 76, "U7"),
+            ),
+            parser=self.parse_data_handling,
         )
-        return itertools.repeat(handling_parser)
 
-    def parse_handling_line(self, line, _):
-        # The infinity mark on file is 00:000:00000
-        if line["start_time"] == "00:000:00000":
-            start_time = datetime.min
-        else:
-            start_time = datetime.strptime(line["start_time"][:6], "%y:%j") + timedelta(
-                seconds=int(line["start_time"][7:])
-            )
-        if line["end_time"] == "00:000:00000":
-            end_time = datetime.max
-        else:
-            end_time = datetime.strptime(line["end_time"][:6], "%y:%j") + timedelta(seconds=int(line["end_time"][7:]))
+    def parse_data_handling(self, data):
+        for d in data:
+            start_time = datetime.min if d["start_time"] is None else d["start_time"]
+            end_time = datetime.max if d["end_time"] is None else d["end_time"]
+            interval = (start_time, end_time)
+            info = {"unit": d["unit"]}
 
-        interval = (start_time, end_time)
-        if (start_time <= self.start_time <= end_time) or (self.start_time <= start_time <= self.end_time):
-            self.data.setdefault(line["station"], {}).setdefault(line["code"], []).append((interval, line["unit"]))
+            if d["e_value"]:
+                try:
+                    e_value = float(d["e_value"])
+                except ValueError:
+                    log.fatal("ILRS Data handling: Not able to convert value to float")
+                info.update({"e_value": e_value})
+            if d["std_dev"]:
+                try:
+                    std_dev = float(d["std_dev"])
+                except ValueError:
+                    log.fatal("ILRS Data handling: Not able to convert value to float")
+                info.update({"std_dev": std_dev})
+
+            # Unfortunately we have to deal with two different line formats.
+            # Split the comments field in the second line format:
+            # *CODE PT_ UNIT T _DATA_START_ __DATA_END__ M __E-VALUE___ STD_DEV ___COMMENTS______
+            # *CODE PT_ UNIT T _DATA_START_ __DATA_END__ M __E-VALUE___ STD_DEV _E-RATE__ _CMNTS_
+            try:
+                info.update({"comments": d["comments2"], "e_rate": float(d["comments1"])})
+            except ValueError:
+                info.update({"comments": d["comments1"] + d["comments2"]})
+
+            self.data.setdefault(d["site_code"], {}).setdefault(d["handling_code"], []).append((interval, info))

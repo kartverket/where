@@ -9,6 +9,7 @@ Adds analysis status to the meta field of the dataset.
 
 # Where imports
 from where.lib import config
+from where.lib import log
 from where.lib import plugins
 
 # Name of section in configuration
@@ -25,3 +26,4 @@ def analysis_status(dset):
     """
     status = config.tech[_SECTION].status.str
     dset.meta["analysis_status"] = status
+    log.info(f"{_SECTION}: Setting status to '{status}'")

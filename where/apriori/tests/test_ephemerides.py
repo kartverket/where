@@ -12,7 +12,6 @@ import numpy as np
 # Where imports
 from where import apriori
 from where.lib.time import Time
-from where.lib.unit import unit  # MURKS
 
 
 class TestEphemerides(unittest.TestCase):

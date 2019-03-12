@@ -6,9 +6,6 @@ Description:
 Reads station positions through a web service. A time series of positions is available, so positions are given
 according to the time series.
 
-
-
-
 """
 # Standard library imports
 from datetime import datetime, timedelta
@@ -54,10 +51,10 @@ class NmaTrf(trf.TrfFactory):
         """
         if key not in self.data:
             url = self.url["site"].format(site=key)
-            log.info("Reading information about {} from {}", key, url)
+            log.info(f"Reading information about {key} from {url}")
             db_data = json.loads(requests.get(url).text)
             if not db_data:
-                log.warn("No information returned for {}", key)
+                log.warn(f"No information returned for {key}")
                 self._data[key] = dict(id=None, provider=None, siteConfig_id=None)
                 return super().site(key)
 

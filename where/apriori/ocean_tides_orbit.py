@@ -4,9 +4,6 @@ Description:
 
 Reads ocean tides coefficients from file.
 
-
-
-
 """
 
 # Where imports
@@ -26,6 +23,6 @@ def get_ocean_tides():
         A dictionary with information about ocean tidal coefficients.
     """
     model = config.tech.orbit_ocean_tides.str
-    file_key = "ocean_tides_{}".format(model) if model else "ocean_tides"
+    file_key = f"ocean_tides_{model}" if model else "ocean_tides"
 
-    return parsers.parse(file_key=file_key)
+    return parsers.parse_key(file_key).as_dict()

@@ -33,7 +33,7 @@ from where.lib import config
 from where.lib import files
 from where.lib import log
 from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 # Name of model
 MODEL = __name__.split(".")[-1]
@@ -119,10 +119,10 @@ def troposphere(dset):
         mh="detail",
         zhd="detail",
         mw="operational",
-        zwd="detail",
+        zwd="operational",  # If estimated, apriori value must be reported in Sinex
         mg="operational",
-        gn="detail",
-        ge="detail",
+        gn="operational",  # If estimated, apriori value must be reported in Sinex
+        ge="operational",  # If estimated, apriori value must be reported in Sinex
     )
     for term, write_level in terms_and_levels.items():
         field = "troposphere_{}{}".format(term, (dset.default_field_suffix or ""))
@@ -179,12 +179,11 @@ def meteorological_data(dset):
             model = MAPPING_METEO_RELATION[mapping_function]
         except KeyError:
             log.fatal(
-                "Unknown mapping function '{}'. Available mapping functions are {}",
-                mapping_function,
-                ", ".join(MAPPING_FUNCTIONS),
+                f"Unknown mapping function {mapping_function}. "
+                f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
             )
 
-    log.debug("Meteorological data model: {}", model)
+    log.debug(f"Meteorological data model: {model}")
 
     if model == "vmf1_gridded":
         pressure = vmf1_gridded_pressure(dset)
@@ -203,7 +202,7 @@ def meteorological_data(dset):
 
     else:
         log.fatal(
-            "Unknown meteorological data model {}. Available models are {}", model, ", ".join(METEOROLOGICAL_MODELS)
+            f"Unknown meteorological data model {model}. Available models are {', '.join(METEOROLOGICAL_MODELS)}"
         )
 
     return pressure, temperature, e, tm, lambd
@@ -219,7 +218,7 @@ def gradient_model(dset):
         numpy.ndarray:  Troposphere asymmetric delay in [m] for each observation
     """
     model = config.tech.get("gradients", section=MODEL, default="apg").str
-    log.debug("Troposphere gradient model: {}", model)
+    log.debug(f"Troposphere gradient model: {model}")
 
     # Note: Be aware, that the apg.f function uses c = 0.0031 instead of c = 0.0032.
     mg = 1 / (np.sin(dset.site_pos.elevation) * np.tan(dset.site_pos.elevation) + 0.0032)
@@ -229,9 +228,9 @@ def gradient_model(dset):
     elif model == "apg":
         gn, ge = apg_gradient_model(dset)
     else:
-        log.fatal("Unknown troposphere gradient model {}. Available models are {}", model, ", ".join(GRADIENT_MODELS))
+        log.fatal(f"Unknown troposphere gradient model {model}. Available models are {', '.join(GRADIENT_MODELS)}")
 
-    log.debug("Troposphere gradients North and East (average): {} {} [m]", np.mean(gn), np.mean(ge))
+    log.debug(f"Troposphere gradients North and East (average): {np.mean(gn)} {np.mean(ge)} [m]")
 
     return mg, gn, ge
 
@@ -253,7 +252,7 @@ def mapping_function(dset):
     ============  ===========  =====================================================================================
     """
     model = config.tech[MODEL].mapping_function.str
-    log.debug("Troposphere mapping function: {}", model)
+    log.debug(f"Troposphere mapping function: {model}")
 
     if model == "gmf":
         mh, mw = gmf_mapping_function(dset)
@@ -269,9 +268,8 @@ def mapping_function(dset):
 
     else:
         log.fatal(
-            "Unknown troposphere mapping function {}. Available mapping functions are {}",
-            model,
-            ", ".join(MAPPING_FUNCTIONS),
+            f"Unknown troposphere mapping function {model}. "
+            f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
         )
 
     return mh, mw
@@ -289,18 +287,17 @@ def zenith_hydrostatic_delay(pressure, latitude, height):
         numpy.ndarray:         Array with zenith hydrostatic delay for each observation in [m]
     """
     model = config.tech.get("zenith_hydrostatic_delay", section=MODEL, default="saastamoinen").str
-    log.debug("Troposphere zenith hydrostatic delay model: {}", model)
+    log.debug(f"Troposphere zenith hydrostatic delay model: {model}")
 
     if model == "saastamoinen":
         zhd = saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height)
     else:
         log.fatal(
-            "Unknown zenith hydrostatic troposphere delay model {}. Available models are {}",
-            model,
-            ", ".join(ZENITH_HYDROSTATIC_MODELS),
+            f"Unknown zenith hydrostatic troposphere delay model {model}. "
+            f"Available models are {', '.join(ZENITH_HYDROSTATIC_MODELS)}"
         )
 
-    log.debug("Troposphere zenith hydrostatic delay (average): {} [m]", np.mean(zhd))
+    log.debug(f"Troposphere zenith hydrostatic delay (average): {np.mean(zhd)} [m]")
 
     return zhd
 
@@ -328,18 +325,17 @@ def zenith_wet_delay(dset, temperature, e, tm, lambd):
             model = MAPPING_ZENITH_WET_RELATION[mapping_function]
         except KeyError:
             log.fatal(
-                "Unknown mapping function {}. Available mapping functions are {}",
-                mapping_function,
-                ", ".join(MAPPING_FUNCTIONS),
+                f"Unknown mapping function {mapping_function}. "
+                f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
             )
-    log.debug("Troposphere zenith wet delay model: {}", model)
+    log.debug(f"Troposphere zenith wet delay model: {model}")
 
     if model == "none":
         zwd = np.zeros(dset.num_obs)
     elif model == "askne":
         zwd = askne_zenith_wet_delay(e, tm, lambd)
-        # TODO: log.fatal("Meteorological model '{}' does not provide input parameters for using Askne and "
-        #                 "Nordius zenith wet delay model. Use 'gpt2w' model.", met_model)
+        # TODO: log.fatal(f"Meteorological model {met_model!r} does not provide input parameters for using Askne and "
+        #                 "Nordius zenith wet delay model. Use 'gpt2w' model")
 
     elif model == "davis":
         latitude, _, height = dset.site_pos.llh.T
@@ -348,19 +344,18 @@ def zenith_wet_delay(dset, temperature, e, tm, lambd):
     elif model == "saastamoinen":
         latitude, _, height = dset.site_pos.llh.T
         zwd = saastamoinen_zenith_wet_delay(latitude, height, temperature, e)
-        # TODO: log.fatal("Meteorological model '{}' does not provide input parameters for using Saastamoinen "
-        #                 "zenith wet delay model. Use 'gpt2' or 'gpt2w' model.", met_model)
+        # TODO: log.fatal(f"Meteorological model {met_model} does not provide input parameters for using Saastamoinen "
+        #                 "zenith wet delay model. Use 'gpt2' or 'gpt2w' model")
 
     elif model == "vmf1_gridded":
         zwd = vmf1_zenith_wet_delay(dset)
     else:
         log.fatal(
-            "Unknown zenith wet troposphere delay model {}. Available models are {}",
-            model,
-            ", ".join(ZENITH_WET_DELAY_MODELS),
+            f"Unknown zenith wet troposphere delay model {model}. "
+            f"Available models are {', '.join(ZENITH_WET_DELAY_MODELS)}"
         )
 
-    log.debug("Troposphere zenith wet delay (average): {} [m]", np.mean(zwd))
+    log.debug(f"Troposphere zenith wet delay (average): {np.mean(zwd)} [m]")
 
     return zwd
 
@@ -393,7 +388,7 @@ def apg_gradient_model(dset):
         # Get horizontal gradients G_N and G_E
         _, gn[obs], ge[obs] = iers.apg(lat, lon, dset.site_pos.azimuth[obs], dset.site_pos.elevation[obs])
 
-    return gn * unit.mm2m, ge * unit.mm2m
+    return gn * Unit.mm2m, ge * Unit.mm2m
 
 
 def askne_zenith_wet_delay(e, tm, lambd):
@@ -464,7 +459,7 @@ def davis_zenith_wet_delay(latitude, height, temperature, e):
 
     # Zenith wet delay based on Eq. (19a) in Saastamoinen :cite:`saastamoinen1972` with additional gravity
     # correction
-    zwd = 0.0022768 * (1255 / unit.celsius_to_kelvin(temperature) + 0.05) * e / gravity_corr
+    zwd = 0.002_276_8 * (1255 / Unit.celsius_to_kelvin(temperature) + 0.05) * e / gravity_corr
 
     return zwd
 
@@ -787,9 +782,8 @@ def pressure_zhd(zhd, latitude, height):
         pressure = saastamoinen_pressure(zhd, latitude, height)
     else:
         log.fatal(
-            "Zenith troposphere delay definition '{}' is not correct in configuration file. It should be "
-            "'saastamoinen'.",
-            model,
+            f"Zenith troposphere delay definition {model!r} is not correct in configuration file. "
+            "It should be 'saastamoinen'"
         )
 
     return pressure
@@ -838,7 +832,7 @@ def pressure_height_correction(pressure_ref, height_ref, height):
     Returns:
         numpy.ndarray:      Pressure for given height for each observation in [hPa]
     """
-    return ((1 - 0.0000226 * height) ** 5.225) / ((1 - 0.0000226 * height_ref) ** 5.225) * pressure_ref
+    return ((1 - 0.000_022_6 * height) ** 5.225) / ((1 - 0.000_022_6 * height_ref) ** 5.225) * pressure_ref
 
 
 def saastamoinen_gravity_correction(latitude, height):
@@ -855,7 +849,7 @@ def saastamoinen_gravity_correction(latitude, height):
         numpy.ndarray: Gravity correction for each observation in [m]
     """
     # Gravity correction based on Eq. (A13) in Davis et al. :cite:`davis1985`
-    return 1 - 0.00266 * np.cos(2 * latitude) - 0.00000028 * height
+    return 1 - 0.00266 * np.cos(2 * latitude) - 0.000_000_28 * height
 
 
 def saastamoinen_pressure(zhd, latitude, height):
@@ -877,7 +871,7 @@ def saastamoinen_pressure(zhd, latitude, height):
         >>> saastamoinen_pressure(2.2762945349647778, 0.83776, 200)
         1000.0
     """
-    return zhd * saastamoinen_gravity_correction(latitude, height) / 0.0022768
+    return zhd * saastamoinen_gravity_correction(latitude, height) / 0.002_276_8
 
 
 def saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height):
@@ -917,7 +911,7 @@ def saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height):
         Example is not compatible to http://ggosatm.hg.tuwien.ac.at/DELAY/SOURCE/GPT2w/FORTRAN/saasthyd.f
         example (zhd = 2.2695 m).
     """
-    return 0.0022768 * pressure / saastamoinen_gravity_correction(latitude, height)
+    return 0.002_276_8 * pressure / saastamoinen_gravity_correction(latitude, height)
 
 
 def saastamoinen_zenith_wet_delay(latitude, height, temperature, e):
@@ -947,7 +941,7 @@ def saastamoinen_zenith_wet_delay(latitude, height, temperature, e):
         numpy.ndarray:     Zenith wet delay for each observation in [m]
     """
     # Zenith wet delay based on Eq. (19a) in Saastamoinen :cite:`saastamoinen1972`
-    return 0.0022768 * (1255 / unit.celsius_to_kelvin(temperature) + 0.05) * e
+    return 0.002_276_8 * (1255 / Unit.celsius_to_kelvin(temperature) + 0.05) * e
 
 
 def site_pressure(dset):

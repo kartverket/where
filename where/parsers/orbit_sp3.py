@@ -30,6 +30,7 @@ The file to be parsed should be specified like:
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.files import dependencies
 
 # Where imports
 from where.lib import files
@@ -49,13 +50,14 @@ def get_sp3c_or_sp3d(rundate, file_path=None, **kwargs):
         file_path (str):          Optional path to orbit-file to parse.
     """
     version = _get_sp3_file_version(file_path)
+    dependencies.add(file_path, label="gnss_orbit_sp3")  # MURKS_hjegei: Better solution?
 
     if version in "ac":
-        return orbit_sp3c.OrbitSp3cParser(rundate=rundate, file_path=file_path, **kwargs)
+        return orbit_sp3c.OrbitSp3cParser(file_path=file_path, **kwargs)
     elif version.startswith("d"):
-        return orbit_sp3d.OrbitSp3dParser(rundate=rundate, file_path=file_path, **kwargs)
+        return orbit_sp3d.OrbitSp3dParser(file_path=file_path, **kwargs)
     else:
-        log.fatal("Unknown SP3 format '{}' is used in file {}.", version, file_path)
+        log.fatal(f"Unknown SP3 format {version!r} is used in file {file_path}")
 
 
 def _get_sp3_file_version(file_path):
@@ -71,6 +73,6 @@ def _get_sp3_file_version(file_path):
         version = infile.readline().split()[0]
 
     if len(version) < 2 or version[1] not in "acd":
-        log.fatal("Unknown SP3 format '{}' is used in file {}.", version, file_path)
+        log.fatal(f"Unknown SP3 format {version!r} is used in file {file_path}")
 
     return version[1]

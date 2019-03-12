@@ -80,7 +80,7 @@ def thermal_deformation_station(dset, temp_funcs):
 
     for ivsname in dset.unique("ivsname"):
         if ivsname not in antenna_info:
-            log.warn("Missing thermal deformation for ivsname '{}'. Correction set to zero.", ivsname)
+            log.warn(f"Missing thermal deformation for ivsname {ivsname!r}. Correction set to zero")
             continue
 
         idx = dset.filter(ivsname=ivsname)
@@ -102,7 +102,7 @@ def thermal_deformation_station(dset, temp_funcs):
         elif focus_type == "FO_SECN":
             F_a = 1.8
         else:
-            log.warn("Unknown antenna focus type '{}' for {}. Correction set to zero", focus_type, ivsname)
+            log.warn(f"Unknown antenna focus type {focus_type!r} for {ivsname}. Correction set to zero")
             continue
 
         if axis_type == "MO_AZEL":
@@ -122,11 +122,11 @@ def thermal_deformation_station(dset, temp_funcs):
                 T(t - dt_a)[idx] - T_0
             ) * (h_p * sin_e[idx] + AO * np.sqrt(1 - (cos_e[idx] * sin_a[idx]) ** 2) + h_v - F_a * h_s)
         else:
-            log.warn("Unknown antenna axis type '{}' for {}. Correction set to zero", axis_type, ivsname)
+            log.warn(f"Unknown antenna axis type {axis_type!r} for {ivsname}. Correction set to zero")
             continue
 
         if any(np.isnan(delays)):
-            # log.warn("Unable to interpolate temperatures for {}. Correction set to zero", ivsname)
+            # log.warn(f"Unable to interpolate temperatures for {ivsname}. Correction set to zero")
             delays[idx] = 0
     return delays
 
@@ -157,7 +157,7 @@ def calculate_temperature_functions(dset):
         temp = np.append(temp_1, temp_2)
 
         if any(np.isnan(temp)):
-            log.warn("Missing temperature data for {}. Thermal deformation correction set to zero", ivsname)
+            log.warn(f"Missing temperature data for {ivsname}. Thermal deformation correction set to zero")
 
         # Amplitude, phase, offset, trend
         guess = [3 * np.std(temp) / (2 ** 0.5), 0, np.mean(temp), 0]
@@ -166,7 +166,7 @@ def calculate_temperature_functions(dset):
         if len(temp) >= 4:
             coeff = optimize.leastsq(optimize_func, guess)[0]
         else:
-            log.warn("Few datapoints, applying constant temperature for {}", ivsname)
+            log.warn(f"Few datapoints, applying constant temperature for {ivsname}")
             coeff = [0, 0, np.mean(temp), 0]
         temperature_funcs[ivsname] = _get_temperature_func(*coeff)
     return temperature_funcs

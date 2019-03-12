@@ -29,7 +29,7 @@ from midgard.dev import plugins
 from where.parsers import parser
 from where.lib import config
 from where.lib import log
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 SYSTEM_TIME_OFFSET_TO_GPS_TIME = dict(BDT=14, GAL=0, IRN=0, QZS=0)
@@ -432,7 +432,7 @@ class Rinex3Parser(parser.ParserDict):
     def parse_scale_factor(self, line, _):
         """Parse entries of RINEX header `SYS / SCALE FACTOR` to instance variable `meta`.
         """
-        log.fatal("Reading and applying of RINEX header entry 'SYS / SCALE FACTOR' is not implemented.")
+        log.fatal("Reading and applying of RINEX header entry 'SYS / SCALE FACTOR' is not implemented")
 
     def parse_string(self, line, _):
         """Parse string entries of RINEX header to instance variable 'meta'.
@@ -490,17 +490,15 @@ class Rinex3Parser(parser.ParserDict):
         """Parse time of first observation given in RINEX header to instance variable `meta`.
         """
         if line["time_sys"] != "GPS":
-            log.fatal("Time system {} is not handled so far in Where.", line["time_sys"])
+            log.fatal(f"Time system {line['time_sys']} is not handled so far in Where")
 
         if line["time_sys"] not in self.meta:
             self.meta["time_sys"] = line["time_sys"]
         else:
             if line["time_sys"] != self.meta["time_sys"]:
                 log.fatal(
-                    "Time system definition in 'TIME OF FIRST OBS' ({}) and 'TIME OF LAST OBS' ({}) are not"
-                    "identical.",
-                    line["time_sys"],
-                    self.meta["time_sys"],
+                    f"Time system definition in 'TIME OF FIRST OBS' ({line['time_sys']}) "
+                    f"and 'TIME OF LAST OBS' ({self.meta['time_sys']}) are not identical"
                 )
 
         if line["year"]:
@@ -520,7 +518,7 @@ class Rinex3Parser(parser.ParserDict):
         """Parse time of last observation given in RINEX header to instance variable `meta`.
         """
         if line["time_sys"] != "GPS":
-            log.fatal("Time system {} is not handled so far in Where.", line["time_sys"])
+            log.fatal(f"Time system {line['time_sys']} is not handled so far in Where.")
 
         if line["time_sys"]:
             if line["time_sys"] not in self.meta:
@@ -528,10 +526,8 @@ class Rinex3Parser(parser.ParserDict):
             else:
                 if line["time_sys"] != self.meta["time_sys"]:
                     log.fatal(
-                        "Time system definition in 'TIME OF FIRST OBS' ({}) and 'TIME OF LAST OBS' ({}) are"
-                        "not identical.",
-                        self.meta["time_sys"],
-                        line["time_sys"],
+                        f"Time system definition in 'TIME OF FIRST OBS' ({self.meta['time_sys']}) "
+                        f"and 'TIME OF LAST OBS' ({line['time_sys']}) are not identical"
                     )
 
         if line["year"]:
@@ -572,16 +568,15 @@ class Rinex3Parser(parser.ParserDict):
             second=float(line["second"]),
         )
         cache["obs_sec"] = (
-            int(line["hour"]) * unit.hour2second + int(line["minute"]) * unit.minute2second + float(line["second"])
+            int(line["hour"]) * Unit.hour2second + int(line["minute"]) * Unit.minute2second + float(line["second"])
         )
         cache["epoch_flag"] = int(line["epoch_flag"])
         cache["rcv_clk_offset"] = _float(line["rcv_clk_offset"])
 
         if line["epoch_flag"].strip() != "0":
             log.fatal(
-                "Epoch {} is not ok, which is indicated by epoch flag {}. How it should be handled in Where?",
-                cache["obs_time"],
-                line["epoch_flag"],
+                f"Epoch {cache['obs_time']} is not ok, which is indicated by epoch flag {line['epoch_flag']}.\n"
+                "TODO: How should it be handled in Where?"
             )  # TODO: Handle flagged epochs
 
         # Decimate RINEX observation defined by sampling rate [seconds]
@@ -662,7 +657,7 @@ class Rinex3Parser(parser.ParserDict):
         """
         for sys in list(self.meta["obstypes"].keys()):
             if sys not in self.data["text"]["system"]:
-                log.debug("No observation given for GNSS '{}'. GNSS '{}' is removed from Dataset.", sys, sys)
+                log.debug(f"No observation given for GNSS {sys!r}. GNSS {sys!r} is removed from Dataset.")
                 del self.meta["obstypes"][sys]
 
     def remove_empty_obstype_fields(self):
@@ -677,8 +672,7 @@ class Rinex3Parser(parser.ParserDict):
         observations for this observation type are still given in the Dataset, which are set to zero.
         """
         remove_obstype = []  # List with observation types, which should be removed from Dataset.
-        remove_obstype_sys = {}  # Dictionary with observation types given for each GNSS, which should be removed from
-        # meta['obstypes'].
+        remove_obstype_sys = {}  # Dictionary with obstypes for each GNSS, should be removed from meta['obstypes'].
         for obstype, obs in self.data["obs"].items():
             if not obs or np.all(np.array(obs) == 0.0):
                 remove_obstype.append(obstype)
@@ -692,8 +686,8 @@ class Rinex3Parser(parser.ParserDict):
                     remove_obstype_sys.setdefault(sys, list()).append(obstype)
 
         log.debug(
-            "Following observation types are removed, because no observation given: {}",
-            " ".join(sorted(remove_obstype)),
+            f"The following observation types are removed, because no observations were found: "
+            f"{' '.join(sorted(remove_obstype))}"
         )
 
         # Remove empty observation type data fields
@@ -737,10 +731,8 @@ class Rinex3Parser(parser.ParserDict):
 
         if system not in valid_time_systems:
             log.fatal(
-                "Time system '{}' in file {} is not handled in Where. Following time systems can be used: {}.",
-                system,
-                self.file_path,
-                ", ".join(valid_time_systems),
+                f"Time system {system!r} in file {self.file_path} is not handled in Where. "
+                f"The following time systems can be used: {', '.join(valid_time_systems)}"
             )
 
         # Convert observation time entries of BeiDou to GPS time scale by adding system time offset

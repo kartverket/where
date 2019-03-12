@@ -20,7 +20,7 @@ import numpy as np
 import math
 
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import plugins
 from where.lib.time import TimeDelta
 from where import apriori

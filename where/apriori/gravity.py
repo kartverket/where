@@ -25,15 +25,10 @@ References:
 
 [5] http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/
 
-
-
 """
-# Standard library imports
-import math
-from datetime import datetime
 
-# External library imports
-import numpy as np
+# Standard library imports
+from datetime import datetime
 
 # Where imports
 from where.lib import log
@@ -58,14 +53,15 @@ def get_gravity_coefficients(gravity_field, truncation_level, rundate):
     Returns:
         A dictionary containing C and S coefficients.
     """
-    log.info("Reading gravity field {} up to degree and order {}", gravity_field, truncation_level)
+    log.info(f"Reading gravity field {gravity_field} up to degree and order {truncation_level}")
     try:
-        gravity_coefficients = parsers.parse(
-            file_key="gravity_coefficients", gravity_field=gravity_field, truncation_level=truncation_level
+        gravity_parser = parsers.parse_key(
+            "gravity_coefficients", file_vars=dict(gravity_field=gravity_field), num_degrees=truncation_level
         )
     except FileNotFoundError:
-        log.fatal("Unknown gravity field {}, exiting!", gravity_field)
+        log.fatal(f"Unknown gravity field {gravity_field}, exiting!")
 
+    gravity_coefficients = gravity_parser.as_dict()
     if gravity_field == "egm2008":  # TODO: Why do we treat this differently ... Should be done by properties not name
         apply_rates(gravity_coefficients, truncation_level, rundate)
 
@@ -90,7 +86,7 @@ def apply_rates(coefficients, truncation_level, rundate):
 
     if truncation_level >= 2:
         # coefficients['C'][2,0] += 11.6e-12 * years
-        coefficients["C"][2, 0] = -0.48416531e-3 + 11.6e-12 * years
+        coefficients["C"][2, 0] = -0.484_165_31e-3 + 11.6e-12 * years
     if truncation_level >= 3:
         coefficients["C"][3, 0] += 4.9e-12 * years
     if truncation_level >= 4:

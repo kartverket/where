@@ -21,7 +21,6 @@ import numpy as np
 # WHERE imports
 from where import apriori
 from where.lib import plugins
-from where.lib import log
 
 
 @plugins.register
@@ -61,17 +60,12 @@ def eccentricity_vector_station(ecc, dset):
 
     denu = np.full((dset.num_obs, 3), np.nan)
     for site_id in dset.unique("site_id"):
-        if ecc[site_id]["type"] == "NEU":
-            denu[dset.filter(site_id=site_id)] = ecc[site_id]["vector"][[1, 0, 2]]  # Convert from NEU to ENU
+        if ecc[site_id]["coord_type"] == "ENU":
+            denu[dset.filter(site_id=site_id)] = ecc[site_id]["vector"]
 
     dxyz = dset.site_pos.convert_enu_to_itrs(denu)
     for site_id in dset.unique("site_id"):
-        if ecc[site_id]["type"] == "XYZ":
+        if ecc[site_id]["coord_type"] == "XYZ":
             dxyz[dset.filter(site_id=site_id)] = ecc[site_id]["vector"]
-
-    missing_index = np.any(np.isnan(dxyz), axis=1)
-    for site_id in np.unique(dset.site_id[missing_index]):
-        log.error("Missing eccentricity vector for site_id '{}'. Correction set to zero.", site_id)
-    dxyz[np.isnan(dxyz)] = 0
 
     return dset.site_pos.convert_itrs_to_gcrs(dxyz)

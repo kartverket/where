@@ -8,10 +8,12 @@ Write simple output from an analysis.
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where.lib import files
-from where.lib import plugins
 
 
 @plugins.register

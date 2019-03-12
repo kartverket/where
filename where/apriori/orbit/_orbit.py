@@ -6,18 +6,16 @@ Description:
 Implementations of apriori orbits should inherit from `AprioriOrbit` and define their own read and calculate methods.
 
 
-
-
 """
-
-# Standard library imports
 
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.math.constant import constant
+
 # Where imports
 from where.lib import config
-from where.lib import constant
 from where import data
 from where.lib import util
 
@@ -46,9 +44,9 @@ class AprioriOrbit:
         except AttributeError:
             tech = None
 
-        self.time = time
         self.satellite = satellite
         self.system = [s[0] for s in satellite] if system is None else system
+        self.time = time
         self._dset_raw = data.Dataset(
             rundate=rundate, tech=tech, stage=self.name, dataset_name="raw", dataset_id=0, empty=True, session=""
         )
@@ -67,7 +65,6 @@ class AprioriOrbit:
         """
         if not self._dset_raw.num_obs:
             self._dset_raw = self._read(self._dset_raw)
-
         return self._dset_raw
 
     @property
@@ -91,6 +88,16 @@ class AprioriOrbit:
             self._dset = self._calculate(self._dset)
 
         return self._dset
+
+    def calculate(self, dset: "Dataset", time: str='time') -> None:
+        """Calculate apriori orbit based on given observation
+
+        Args:
+            dset:   A dataset containing the data.
+        """
+        if not dset.num_obs: 
+            log.fatal(f"Dataset is empty. No observation epochs given for calculating orbits.")
+        self._calculate(dset, time=time)
 
     def update_time(self, time, satellite=None):
         """Update which time epochs to calculate orbit for
@@ -135,17 +142,20 @@ class AprioriOrbit:
     #
     # Common methods for all apriori orbits
     #
-    def relativistic_clock_correction(self):
+    def relativistic_clock_correction(self, dset: "Dataset") -> np.ndarray:
         """Determine relativistic clock correction due to orbit eccentricity
 
         The correction is caluclated for precise and broadcast orbits after Eq. 10.10 and 10.11 in :cite:`iers2010`.
 
+        Args:
+            dset:       A dataset containing the data.
+
         Returns:
-            numpy.ndarray:    Relativistic clock correction due to orbit eccentricity corrections for each observation
+            Relativistic clock correction due to orbit eccentricity corrections for each observation
         """
-        return -2.0 / constant.c * np.einsum("ij,ij->i", self.dset.sat_posvel.itrs_pos, self.dset.sat_posvel.itrs_vel)
-        # return -2 / constant.c * (self.dset.sat_posvel.itrs_pos[:, None, :] @
-        #                           self.dset.sat_posvel.itrs_vel[:, :, None])[:, 0, 0]
+        return -2.0 / constant.c * np.einsum("ij,ij->i", dset.sat_posvel.itrs_pos, dset.sat_posvel.itrs_vel)
+        # return -2 / constant.c * (dset.sat_posvel.itrs_pos[:, None, :] @
+        #                           dset.sat_posvel.itrs_vel[:, :, None])[:, 0, 0]
 
     def satellite_clock_correction_com(self, antex, sys_freq):
         """Determine satellite clock correction related to center of mass (CoM)

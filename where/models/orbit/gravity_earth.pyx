@@ -11,12 +11,8 @@ References:
 
 [2] Petit, G. and Luzum, B. (eds.), IERS Conventions (2010), IERS Technical Note No. 36, BKG (2010)
 
-
-
-$Revision: 13095 $
-$Date: 2017-08-23 21:17:56 +0200 (Wed, 23 Aug 2017) $
-$LastChangedBy: hjegei $
 """
+
 # Standard library imports
 import numpy as np
 import cython
@@ -24,7 +20,7 @@ import math
 
 # Where imports
 from where.lib import config
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where import apriori
 
@@ -34,19 +30,22 @@ cdef int degree_and_order
 cdef double[:, :, :] gcrs2itrs
 cdef int c20_index
 
+
 def register_entry_point():
     """Register entry points for setup and later calls."""
     return dict(setup=gravity_earth_setup, call=gravity_earth)
 
 
-def gravity_earth_setup(rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
+def gravity_earth_setup(
+        rundate, force_parameters, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs
+):
     """Set up module variables used later during calculation.
-    
-    Args: 
+
+    Args:
         rundate:           Time of integration start
         force_parameters:  Dict of parameters to be estimated
         sat_name:          Name of satellite
-        time_grid:         Table of times in seconds since rundate, in utc. 
+        time_grid:         Table of times in seconds since rundate, in utc.
         epochs:            time_grid converted to Time objects, in utc.
         body_pos_gcrs:     The positions of the bodies in the solar system in GCRS.
         body_pos_itrs:     The positions of the bodies in the solar system in ITRS.
@@ -59,22 +58,23 @@ def gravity_earth_setup(rundate, force_parameters, sat_name, time_grid, epochs, 
     global g2i
     global c20_index
 
-    GM = constant.get('GM', source='egm_2008')
-    R = constant.get('a', source='egm_2008')
+    GM = constant.get("GM", source="egm_2008")
+    R = constant.get("a", source="egm_2008")
     gravity_field = config.tech.gravity_field.str
     truncation_level = config.tech.gravity_truncation_level.int
-    gravity_coeffs = apriori.get('gravity', gravity_field=gravity_field, truncation_level=truncation_level,
+    gravity_coeffs = apriori.get("gravity", gravity_field=gravity_field, truncation_level=truncation_level,
                                  rundate=rundate)
-    C = gravity_coeffs['C']
-    S = gravity_coeffs['S']
+    C = gravity_coeffs["C"]
+    S = gravity_coeffs["S"]
     #Assume for now that degree and order of gravity field are equal.
     degree_and_order = C.shape[0]
     g2i = gcrs2itrs
     c20_index = -1
-    if 'c20' in force_parameters: 
-        C[2, 0] = force_parameters['c20']
-        c20_index = list(force_parameters.keys()).index('c20')
-        
+    if "c20" in force_parameters:
+        C[2, 0] = force_parameters["c20"]
+        c20_index = list(force_parameters.keys()).index("c20")
+
+
 def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **_not_used):
     """Compute force on satellite from the gravity field of the earth
 
@@ -125,7 +125,7 @@ def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **
         for m in range(0, n + 1):
             f = (n - m + 2) * (n - m + 1)    # Scaling factor
             # Denormalize the C and S coefficients in the equations
-            normalization_factor = np.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m == 0)) / 
+            normalization_factor = np.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m == 0)) /
                                            math.factorial(n + m))
             # The m = 0 case is handled separately:
             if m == 0:
@@ -146,11 +146,13 @@ def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **
                 dxy += normalization_factor * (C[n, 1] * W[n + 2, 3] - S[n, 1] * V[n + 2, 3]
                         + f * (-C[n, 1] * W[n + 2, 1] - S[n, 1] * V[n + 2, 1])) / 4
             else:
-                dxx += normalization_factor * (C[n, m] * V[n + 2, m + 2] + S[n, m] * W[n + 2, m + 2] + 2 * (n - m + 2) * (n - m + 1)
-                        * (-C[n, m] * V[n + 2, m] - S[n, m] * W[n + 2, m]) + (n - m + 4) * (n - m + 3) * (n - m + 2)
-                        * (n - m + 1) * (C[n, m] * V[n + 2, m - 2] + S[n, m] * W[n + 2, m - 2])) / 4
-                dxy += normalization_factor * (C[n, m] * W[n + 2, m + 2] - S[n, m] * V[n + 2, m + 2] + (n - m + 4) * (n - m + 3) * (n - m + 2)
-                        * (n - m + 1) * (-C[n, m] * W[n + 2, m - 2] + S[n, m] * V[n + 2, m - 2])) / 4
+                dxx += (normalization_factor
+                        * (C[n, m] * V[n + 2, m + 2] + S[n, m] * W[n + 2, m + 2] + 2 * (n - m + 2) * (n - m + 1)
+                           * (-C[n, m] * V[n + 2, m] - S[n, m] * W[n + 2, m]) + (n - m + 4) * (n - m + 3) * (n - m + 2)
+                           * (n - m + 1) * (C[n, m] * V[n + 2, m - 2] + S[n, m] * W[n + 2, m - 2])) / 4)
+                dxy += (normalization_factor
+                        * (C[n, m] * W[n + 2, m + 2] - S[n, m] * V[n + 2, m + 2] + (n - m + 4) * (n - m + 3)
+                           * (n - m + 2) * (n - m + 1) * (-C[n, m] * W[n + 2, m - 2] + S[n, m] * V[n + 2, m - 2])) / 4)
 
             # For 0 < m <= n:
             f = (n - m + 2) * (n - m + 1)    # Scaling factor
@@ -160,12 +162,13 @@ def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **
                        + f * (-C[n, m] * W[n + 1, m - 1] + S[n, m] * V[n + 1, m - 1])) / 2
             acc[2] += normalization_factor * (n - m + 1) * (-C[n, m] * V[n + 1, m] - S[n, m] * W[n + 1, m])
 
-            dxz += normalization_factor * ((n - m + 1) * (C[n, m] * V[n + 2, m + 1] + S[n, m] * W[n + 2, m + 1]) + (n - m + 3) * f *
-                    (-C[n, m] * V[n + 2, m - 1] - S[n, m] * W[n + 2, m - 1])) / 2
-            dyz += normalization_factor * ((n - m + 1) * (C[n, m] * W[n + 2, m + 1] - S[n, m] * V[n + 2, m + 1]) + (n - m + 3) * f *
-                    (C[n, m] * W[n + 2, m - 1] - S[n, m] * V[n + 2, m - 1])) / 2
+            dxz += (normalization_factor
+                    * ((n - m + 1) * (C[n, m] * V[n + 2, m + 1] + S[n, m] * W[n + 2, m + 1]) + (n - m + 3) * f
+                       * (-C[n, m] * V[n + 2, m - 1] - S[n, m] * W[n + 2, m - 1])) / 2)
+            dyz += (normalization_factor
+                    * ((n - m + 1) * (C[n, m] * W[n + 2, m + 1] - S[n, m] * V[n + 2, m + 1]) + (n - m + 3) * f
+                       * (C[n, m] * W[n + 2, m - 1] - S[n, m] * V[n + 2, m - 1])) / 2)
             dzz += normalization_factor * f * (C[n, m] * V[n + 2, m] + S[n, m] * W[n + 2, m])
-
 
     for i in range(3):
         acc[i] *= GM / R**2
@@ -192,7 +195,7 @@ def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **
 
     sens_itrs = np.zeros((3, len(force_parameters)))
     sens_gcrs = np.zeros((3, len(force_parameters)))
-    if not c20_index == -1: 
+    if not c20_index == -1:
         # Equation (7.73) in [1].
         sens_itrs[0, c20_index] = -GM / R**2 * V[3, 1]
         sens_itrs[1, c20_index] = -GM / R**2 * W[3, 1]
@@ -231,7 +234,7 @@ cdef double[:, :, :] compute_VW(double[:] pos_xyz):
     if r < R:
         log.fatal("SATELLITE CRASHED !!!")
     elif r > 36e6:
-        log.warn("Satellite flying high, r={} m", r)
+        log.warn(f"Satellite flying high, r={r} m")
         if r > 40e7:
             log.fatal("SATELLITE FLYING TOO HIGH, BYE BYE SATELLITE")
 

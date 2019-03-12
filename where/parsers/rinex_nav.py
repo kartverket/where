@@ -60,4 +60,4 @@ def get_rinex2_or_rinex3(rundate, file_vars):
     elif version.startswith("3"):
         return rinex3_nav.Rinex3NavParser(rundate, file_vars["station"])
     else:
-        log.fatal("Unknown RINEX format {} is used in file {}.", version, file_path)
+        log.fatal(f"Unknown RINEX format {version} is used in file {file_path}")

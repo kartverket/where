@@ -1,7 +1,11 @@
-#!/usr/bin/env python3
 """Run Where with profiling turned on
 
-See below for regular options for running Where.
+Usage:
+
+    {exe:profiler} [arguments]
+
+Typically, arguments and options are the same as when running Where
+normally. See below for regular options for running Where.
 
 Added options when profiling:
 
@@ -86,16 +90,21 @@ particular command. Some simple examples are
 
 Where:
 ------
+
 """
 
 # Standard library imports
 import sys
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where import __main__
 from where.lib import profiler as _profiler
 
 
+@plugins.register
 def profiler():
     """Run Where with profiling turned on"""
     # Use profiler doc for help message when running where_profiler

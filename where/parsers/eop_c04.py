@@ -31,7 +31,13 @@ class EopC04Parser(LineParser):
     def structure_data(self):
         self.data = {
             item["mjd"]: dict(
-                x=item["x"], y=item["y"], ut1_utc=item["ut1_utc"], lod=item["lod"], dx=item["dx"], dy=item["dy"]
+                x=item["x"],
+                y=item["y"],
+                ut1_utc=item["ut1_utc"],
+                lod=item["lod"],
+                dx=item["dx"],
+                dy=item["dy"],
+                source="c04",
             )
             for item in self._array
         }

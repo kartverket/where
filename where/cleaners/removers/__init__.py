@@ -13,6 +13,8 @@ be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
         ...
 
 """
+# Standard library imports
+from typing import Any, Dict
 
 # External library imports
 import numpy as np
@@ -24,12 +26,12 @@ from where.lib import plugins
 from where.reports import report
 
 
-def apply_removers(config_key, dset):
+def apply_removers(config_key: str, dset: "Dataset") -> None:
     """Apply all removers for a given session
 
     Args:
-        config_key (String):  The configuration key listing which removers to apply.
-        dset (Dataset):       Dataset containing analysis data.
+        config_key:  The configuration key listing which removers to apply.
+        dset:        Dataset containing analysis data.
     """
     prefix = config.analysis.get("analysis", default="").str
     log.info(f"Applying removers")
@@ -43,3 +45,17 @@ def apply_removers(config_key, dset):
 
     log.info(f"Keeping {sum(all_keep_idx)} of {dset.num_obs} observations")
     dset.subset(all_keep_idx)
+
+
+def apply_remover(remover: str, dset: "Dataset", **kwargs: Dict[Any, Any]) -> None:
+    """Apply defined remover for a given session
+
+    Args:
+        remover:   The remover name.
+        dset:      Dataset containing analysis data.
+        kwargs:    Input arguments to the remover.
+    """
+    log.info(f"Apply remover {remover!r}")
+    keep_idx = plugins.call_one(package_name=__name__, plugin_name=remover, dset=dset, **kwargs)
+    log.info(f"Keeping {sum(keep_idx)} of {dset.num_obs} observations")
+    dset.subset(keep_idx)

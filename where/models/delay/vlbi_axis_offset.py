@@ -14,8 +14,6 @@ References:
 
 .. [2] http://hpiers.obspm.fr/combinaison/documentation/articles/Thermal_Expansion_Modelling_Radio_Telescopes_Nothnagel.pdf
 
-
-
 """
 # External library imports
 import numpy as np
@@ -62,7 +60,7 @@ def axis_offset_station(dset):
 
     for ivsname in dset.unique("ivsname"):
         if ivsname not in antenna_info:
-            log.warn("Missing antenna axis offset for ivsname '{}'. Correction set to zero.", ivsname)
+            log.warn(f"Missing antenna axis offset for ivsname {ivsname!r}. Correction set to zero.")
             continue
 
         idx = dset.filter(ivsname=ivsname)
@@ -78,7 +76,7 @@ def axis_offset_station(dset):
         elif axis_type == "MO_XYEA":
             delays[idx] = -ao * np.sqrt(1 - (cos_e[idx] * sin_a[idx]) ** 2)
         else:
-            log.warn("Unknown antenna axis type '{}' for {}. Correction set to zero", axis_type, ivsname)
+            log.warn(f"Unknown antenna axis type {axis_type!r} for {ivsname}. Correction set to zero")
             continue
 
     return delays

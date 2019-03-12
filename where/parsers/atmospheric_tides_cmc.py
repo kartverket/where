@@ -32,4 +32,4 @@ class AtmosphericTidesComParser(LineParser):
         Returns:
             Dict:  Parameters needed by np.genfromtxt to parse the input file.
         """
-        return dict(names=True, dtype=("U2", "f8", "f8", "f8", "f8"))
+        return dict(comments="#", names=("xyz", "A1", "B1", "A2", "B2"), dtype=("U2", "f8", "f8", "f8", "f8"))

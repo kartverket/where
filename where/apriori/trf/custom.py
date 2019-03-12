@@ -6,17 +6,17 @@ Description:
 Reads station positions and velocities from a custom config file. No velocities are available in the file, so the same
 position is used for all time epochs.
 
-
-
 """
 # External library imports
 import numpy as np
 
-# Where imports
+# Midgard imports
 from midgard.config.config import Configuration
+from midgard.files import dependencies
+
+# Where imports
 from where.apriori import trf
 from where.lib import config
-from where.lib import dependencies
 from where.lib import files
 from where.lib import plugins
 
@@ -40,10 +40,10 @@ class CustomTrf(trf.TrfFactory):
         trf_local_path = files.path("trf-custom_local")
 
         trf.update_from_file(trf_path)
-        dependencies.add(trf_path)
+        dependencies.add(trf_path, label="trf")
         if trf_local_path.exists():
             trf.update_from_file(trf_local_path)
-            dependencies.add(trf_local_path)
+            dependencies.add(trf_local_path, label="trf")
 
         data = dict()
         for section in trf.sections:

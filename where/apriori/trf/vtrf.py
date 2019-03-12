@@ -24,7 +24,7 @@ from where.lib import log
 from where.lib import plugins
 from where import parsers
 from where.lib.time import Time
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -54,7 +54,7 @@ class Vtrf(trf.TrfFactory):
                 self.solution = max(candidates)
             except ValueError:
                 log.fatal("No vtrf reference frame files found")
-        self.version = "{}_{}".format(self.solution, self.format)
+        self.version = f"{self.solution}_{self.format}"
 
     @property
     def file_paths(self):
@@ -78,9 +78,9 @@ class Vtrf(trf.TrfFactory):
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
         try:
-            return getattr(self, "_read_data_{}".format(self.format))()
+            return getattr(self, f"_read_data_{self.format}")()
         except AttributeError:
-            log.fatal("Format '{}' is unknown for reference frame {}", self.format, self)
+            log.fatal(f"Format {self.format} is unknown for reference frame {self}")
 
     def _read_data_ssc(self):
         """Read data needed by ITRF SSC for calculating positions of sites
@@ -121,7 +121,7 @@ class Vtrf(trf.TrfFactory):
                 continue
             ref_pos = np.array([pv["STAX"], pv["STAY"], pv["STAZ"]])
             ref_vel = np.array([pv["VELX"], pv["VELY"], pv["VELZ"]])
-            interval_years = (self.time - ref_epoch).jd * unit.day2julian_years
+            interval_years = (self.time - ref_epoch).jd * Unit.day2julian_years
             if isinstance(interval_years, float):
                 interval_years = np.array([interval_years])
             pos[idx, :] = ref_pos + interval_years[idx, None] * ref_vel[None, :]

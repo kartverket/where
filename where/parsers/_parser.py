@@ -14,7 +14,6 @@ import pathlib
 import pandas as pd
 
 # Where imports
-from where.lib import dependencies
 from where.lib import log
 from where.lib.timer import timer
 from where.lib import util
@@ -35,13 +34,12 @@ class Parser:
         meta (Dict):                  Metainformation read from file.
     """
 
-    def __init__(self, file_path, encoding=None, logger=None):
+    def __init__(self, file_path, encoding=None):
         """Set up the basic information needed by the parser
 
         Args:
             file_path (String/Path):    Path to file that will be read.
             encoding (String):          Encoding of file that will be read.
-            logger (Function):          Ignored for where.parsers, used for consistency with Midgard.
         """
         self.file_path = pathlib.Path(file_path)
         self.file_encoding = encoding
@@ -49,7 +47,7 @@ class Parser:
 
         # Initialize the data
         self.data_available = self.file_path.exists()
-        self.meta = dict(__parser_name__=self.parser_name, __data_path__=self.file_path)
+        self.meta = dict(__parser_name__=self.parser_name, __data_path__=str(self.file_path))
         self.data = dict()
 
     def setup_parser(self):
@@ -72,12 +70,11 @@ class Parser:
             self.read_data()
 
         if not self.data_available:  # May have been set to False by self.read_data()
-            log.warn("No data found by {} in {}", self.__class__.__name__, self.file_path)
+            log.warn(f"No data found by {type(self).__name__} in {self.file_path}")
             return self
 
         self.calculate_data()
 
-        dependencies.add(self.file_path)
         return self
 
     def read_data(self):
@@ -100,8 +97,8 @@ class Parser:
         of all calculators.
         """
         for calculator in self.setup_calculators():
-            log.debug("Start calculator {} in {}", calculator.__name__, self.__module__)
-            with timer("Finish calculator {} ({}) in".format(calculator.__name__, self.__module__), logger=log.debug):
+            log.debug(f"Start calculator {calculator.__name__} in {self.__module__}")
+            with timer(f"Finish calculator {calculator.__name__} ({self.__module__}) in", logger=log.debug):
                 calculator()
 
     def as_dict(self, include_meta=False):

@@ -3,8 +3,8 @@
 -------
 
 
-$Revision: 16296 $
-$Date: 2018-10-24 13:07:24 +0200 (Wed, 24 Oct 2018) $
+$Revision: 17313 $
+$Date: 2019-02-15 09:36:36 +0100 (Fri, 15 Feb 2019) $
 $LastChangedBy: dahmic $
 
 """
@@ -150,11 +150,11 @@ class TestBroadcast(unittest.TestCase):
             expected_a = np.array([26561612.084130041])  # Semimajor axis
             expected_E = np.array([8.190663e-03])  # Eccentric anomaly
             expected_i = np.array([9.616826e-01])  # Inclination
-            expected_lambda = np.array([-4.659860e+00])  # Instantaneous Greenwich longitude of the ascending node
+            expected_lambda = np.array([-4.659860e00])  # Instantaneous Greenwich longitude of the ascending node
             expected_n = np.array([1.458482e-04])  # Corrected mean motion
             expected_r = np.array([26501967.581685])  # Orbit radius
-            expected_tk = np.array([-7.200000e+03])  # Eclapsed time referred to ephemeris reference epoch
-            expected_u = np.array([2.071945e+00])  # Argument of latitude
+            expected_tk = np.array([-7.200000e03])  # Eclapsed time referred to ephemeris reference epoch
+            expected_u = np.array([2.071945e00])  # Argument of latitude
             expected_vega = np.array([8.208996e-03])  # True anomaly
 
         elif TEST == "test_2":
@@ -172,16 +172,16 @@ class TestBroadcast(unittest.TestCase):
 
         elif TEST == "test_3":
             expected_a = np.array([29600364.402609915])  # Semimajor axis (a^2)
-            expected_E = np.array([2.509278395268e+00])  # Eccentric anomaly (E)
+            expected_E = np.array([2.509278395268e00])  # Eccentric anomaly (E)
             expected_i = np.array([0.967948])  # Inclination (i)
             expected_lambda = np.array(
-                [-1.392631397645e+01]
+                [-1.392631397645e01]
             )  # Instantaneous Greenwich longitude of the ascending node (O)
             expected_n = np.array([1.239749284615e-04])  # Corrected mean motion (n)
             expected_r = np.array([29608136.838406])  # Orbit radius (r)
             expected_tk = np.array([899.999000000000024])  # Eclapsed time referred to ephemeris reference epoch (diff)
-            expected_u = np.array([1.850446560922e+00])  # Argument of latitude (u)
-            expected_vega = np.array([2.509473815034e+00])  # True anomaly (fk)
+            expected_u = np.array([1.850446560922e00])  # Argument of latitude (u)
+            expected_vega = np.array([2.509473815034e00])  # True anomaly (fk)
 
         with self.subTest(msg="a"):
             np.testing.assert_allclose(brdc_dict["a"], expected_a, rtol=0, atol=1e-6)

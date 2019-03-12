@@ -18,7 +18,7 @@ import numpy as np
 
 # Where imports
 from where import apriori
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import plugins
 
 

@@ -3,10 +3,7 @@
 Description:
 ------------
 
-
-
-
-
+Correct relativistic clock effect due to orbit eccentricity either based on precise or broadcast orbits.
 """
 # Where imports
 from where import apriori
@@ -20,9 +17,6 @@ def gnss_relativistic_clock(dset):
 
     The correction is caluclated for precise and broadcast orbits after Eq. 10.10 and 10.11 in :cite:`iers2010`.
 
-    TODO: 'gnss_relativistic_clock' could be saved in Dataset and used here to avoid calculation of relativistic clock
-          correction twice.
-
     Args:
         dset (Dataset):   Model data.
 
@@ -30,16 +24,17 @@ def gnss_relativistic_clock(dset):
         numpy.ndarray:    Relativistic clock correction due to orbit eccentricity corrections for each observation
 
     """
-    # TODO: Is there a way that relativistic_clock_correction() could be called directly, without generating an orbit
-    #       object? -> Should it be handled over dset.gnss_relativistic_clock ????
-    orbit = apriori.get(
-        "orbit",
-        apriori_orbit=dset.vars["orbit"],
-        rundate=dset.rundate,
-        time=dset.sat_time,
-        satellite=tuple(dset.satellite),
-        system=tuple(dset.system),
-        station=dset.vars["station"],
-    )
+    if "gnss_relativistic_clock" in dset.fields:
+        return -dset.gnss_relativistic_clock
+    else:
+        orbit = apriori.get(
+            "orbit",
+            apriori_orbit=dset.vars["orbit"],
+            rundate=dset.rundate,
+            time=dset.sat_time,
+            satellite=tuple(dset.satellite),
+            system=tuple(dset.system),
+            station=dset.vars["station"],
+        )
 
-    return -orbit.relativistic_clock_correction()
+        return -orbit.relativistic_clock_correction(dset.sat_posvel.itrs_pos, dset.sat_posvel.itrs_vel)

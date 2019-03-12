@@ -11,7 +11,7 @@ gravity field of the Earth.
 
 """
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import plugins
 
 
@@ -28,4 +28,4 @@ def slr_range(dset):
     Returns:
         Numpy array: Distance for each observation in meters
     """
-    return (dset.up_leg + dset.down_leg) / 2 * constant.c
+    return dset.up_leg * constant.c

@@ -12,9 +12,11 @@ This module contains functions and classes for parsing datafiles in Where.
 from collections import UserDict
 import itertools
 
+# Midgard imports
+from midgard.files import dependencies
+
 # Where imports
 from where.lib import config
-from where.lib import dependencies
 from where.lib import files
 from where.lib import log
 from where.lib.timer import timer
@@ -94,8 +96,8 @@ class Parser(object):
 
         # Use _parser.Parser and subclasses instead
         log.dev(
-            "parser.Parser is deprecated, let {} subclass one of LineParser, ChainParser or SinexParser instead",
-            self.__class__.__name__,
+            f"parser.Parser is deprecated, let {self.__class__.__name__} subclass one of "
+            f"LineParser, ChainParser or SinexParser instead"
         )
 
     def setup_parsers(self):
@@ -123,20 +125,23 @@ class Parser(object):
 
             if not self.data_available:  # May have been set to False by self.read_data()
                 log.warn(
-                    "No data found by {} for {} (was looking for {})",
-                    self.__class__.__name__,
-                    self.rundate.strftime(config.FMT_date),
-                    self.file_path,
+                    f"No data found by {self.__class__.__name__} for {self.rundate.strftime(config.FMT_date)} "
+                    f"(was looking for {self.file_path})"
                 )
                 return self
 
             self.calculate_data()
-            dependencies.add(*self.dependencies)
+            dependencies.add(*self.dependencies, label=self.file_key)
 
         return self
 
     def process_data(self):
-        log.dev("{p}.process_data is deprecated. Use {p}.parse instead", p=self.__class__.__name__)
+        """Deprecate this method
+
+        Can be removed when all references to process_data() are gone
+        """
+        name = self.__class__.__name__
+        log.dev(f"{name}.process_data is deprecated. Use {name}.parse instead")
         self.parse()
 
     def read_data(self):
@@ -160,8 +165,8 @@ class Parser(object):
         TODO: Description?
         """
         for calculator in self.setup_calculators():
-            log.debug("Start calculator {} in {}", calculator.__name__, self.__module__)
-            with timer("Finish calculator {} ({}) in".format(calculator.__name__, self.__module__), logger=log.debug):
+            log.debug(f"Start calculator {calculator.__name__} in {self.__module__}")
+            with timer(f"Finish calculator {calculator.__name__} ({self.__module__}) in", logger=log.debug):
                 calculator()
 
     def write_to_dataset(self, data_out):
@@ -223,7 +228,7 @@ class Parser(object):
         if not parser["label"]:
             return
 
-        # log.debug('{:>3d}: {}', cache['line_num'], line)
+        # log.debug(f"{cache['line_num']:>3d}: {line}")
 
         label = parser["label"](line.rstrip(), cache["line_num"])
         if label not in parser["parser_def"]:

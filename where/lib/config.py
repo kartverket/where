@@ -42,9 +42,9 @@ The `files` configuration also has some variables defined based on the current a
 run). These can be used to replace the values of the configuration entries. For instance,
 
     >>> config.files.dataset_json.filename.str
-    '{$tech}-dataset-{$stage}-{$yyyy}{$mm}{$dd}.json'
+    '{tech}-dataset-{stage}-{yyyy}{mm}{dd}.json'
     >>> config.files.dataset_json.filename.replaced.str
-    'vlbi-dataset-{$stage}-20091102.json'
+    'vlbi-dataset-{stage}-20091102.json'
     >>> config.files.dataset_json.filename.replace(stage='read').str
     'vlbi-dataset-read-20091102.json'
 
@@ -75,20 +75,21 @@ import sys
 
 # Where imports
 from midgard.config.config import Configuration
+from midgard.config.files import FileConfiguration
 from where.lib import enums  # noqa  # Register Where enums
 
 
 # Base directory of the Where installation
-WHERE_DIR = pathlib.Path(__file__).parent.parent.parent.resolve()
+WHERE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent
 
-# Possible names of Where config files
+# Prioritized list of possible names of Where config files
 _CONFIG_FILENAMES = dict(
-    where=("where_local.conf", "where_pipeline_*.conf", "where_pipelines.conf", "where.conf"),
-    files=("files_local.conf", "files_pipeline_*.conf", "files_pipelines.conf", "files.conf"),
-    there=("there_local.conf", "there.conf"),
+    where=("where_local.conf", "where_pipeline_{pipeline}.conf", "where_pipelines.conf", "where.conf"),
+    files=("files_local.conf", "files_pipeline_{pipeline}.conf", "files_pipelines.conf", "files.conf"),
+    there=("there_local.conf", "there_pipeline_{pipeline}.conf", "there.conf"),
 )
 
-# Possible locations for all Where config files
+# Prioritized list of possible locations for all Where config files
 _CONFIG_DIRECTORIES = (pathlib.Path.cwd(), pathlib.Path.home() / ".where", WHERE_DIR / "config")
 
 # Date format, defined here for consistency
@@ -122,10 +123,17 @@ def init(rundate, tech_name, session, **cfg_vars):
         tech.master_section = tech_name
 
 
+def read_pipeline(pipeline):
+    """Read special pipeline config files"""
+    read_where_config(pipeline=pipeline)
+    read_files_config(pipeline=pipeline)
+    read_there_config(pipeline=pipeline)
+
+
 def set_analysis(rundate, **cfg_vars):
     """Set analysis configuration
 
-    TODO; The analysis config should eventually replace the program config
+    TODO: The analysis config should eventually replace the program config
     """
     analysis_vars = program_vars(rundate, cfg_vars["tech"], **cfg_vars)
     analysis.update_from_dict(analysis_vars, section="config", source="config.set_analysis", allow_new=True)
@@ -144,7 +152,7 @@ def set_file_vars(file_vars=None):
     Args:
         file_vars (Dict):   Variables that will be made available in files-configuration
     """
-    files.clear_vars()
+    # files.clear_vars()
     files.update_vars({"path_where": str(WHERE_DIR)})
     files.update_vars({"path_{}".format(k): str(v.path) for k, v in where.path.data.items()})
     if file_vars is not None:
@@ -170,9 +178,9 @@ def program_vars(rundate, tech_name, session, use_options=True, **other_vars):
             if opt_key in prg_vars:
                 prg_vars[opt_key] = opt_value
 
-    # Update id to make sure it starts with an underscore, `_`
-    if prg_vars["id"] and not prg_vars["id"].startswith("_"):
-        prg_vars["id"] = "_{}".format(prg_vars["id"])
+    # Update id to make sure it starts with a dash, `-`
+    if prg_vars["id"] and not prg_vars["id"].startswith("-"):
+        prg_vars["id"] = "-{}".format(prg_vars["id"])
 
     return prg_vars
 
@@ -206,6 +214,7 @@ def date_vars(date):
 
     # Create the dict of date variables
     return dict(
+        date=date.strftime("%Y%m%d"),
         yyyy=date.strftime("%Y"),
         ce=date.strftime("%Y")[:2],
         yy=date.strftime("%y"),
@@ -222,13 +231,16 @@ def date_vars(date):
     )
 
 
-def config_paths(cfg_name):
+def config_paths(cfg_name, **path_vars):
+    """Yield all files that contain the given configuration"""
     for file_name in _CONFIG_FILENAMES.get(cfg_name, (f"{cfg_name}.conf",))[::-1]:
+        for var, val in path_vars.items():
+            file_name = file_name.replace(f"{{{var}}}", val)
+
         for file_dir in _CONFIG_DIRECTORIES:
-            file_paths = sorted(pathlib.Path(file_dir).glob(file_name))
-            if file_paths:
-                for file_path in file_paths:
-                    yield file_path
+            file_path = file_dir / file_name
+            if file_path.exists():
+                yield file_path
                 break
 
 
@@ -255,38 +267,42 @@ def timestamps(rundate, pipeline, session, **kwargs):
         return dict()
 
 
-def reset_config():
-    # Where-configuration
+def read_where_config(**path_vars):
+    """Read Where-configuration"""
     where.clear()
-    for file_path in config_paths("where"):
+    for file_path in config_paths("where", **path_vars):
         where.update_from_file(file_path, interpolate=True)
     where.master_section = "all"
 
-    # Files-configuration
+
+def read_files_config(**path_vars):
+    """Read Files-configuration"""
     files.clear()
-    for file_path in config_paths("files"):
+    for file_path in config_paths("files", **path_vars):
         files.update_from_file(file_path, interpolate=False)
     set_file_vars()
 
-    # There-configuration
+
+def read_there_config(**path_vars):
+    """Read There-configuration"""
     there.clear()
-    for file_path in config_paths("there"):
+    for file_path in config_paths("there", **path_vars):
         there.update_from_file(file_path, interpolate=True, case_sensitive=True)
     there.master_section = "general"
-
-    # Analysis, Tech and Session-configurations are initialised by config.init later
-    analysis.clear()
-    tech.clear()
-    tech.fallback_config = where
-    session.clear()
 
 
 # Add configurations as module variables
 where = Configuration("where")
-files = Configuration("files")
-program = Configuration("program")
-analysis = Configuration("analysis")
-tech = Configuration("tech")
-session = Configuration("session")
+read_where_config()
+
+files = FileConfiguration("files")
+read_files_config()
+
 there = Configuration("there")
-reset_config()
+read_there_config()
+
+program = Configuration("program")  # Initialized by config.init later
+analysis = Configuration("analysis")  # Initialized by config.init later
+tech = Configuration("tech")  # Initialized by config.init later
+tech.fallback_config = where
+session = Configuration("session")

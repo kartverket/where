@@ -5,9 +5,6 @@ Description:
 
 asdf
 
-
-
-
 """
 # Standard library imports
 from collections import namedtuple
@@ -22,6 +19,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Midgard imports
+from midgard.dev import plugins
+
 # WHERE imports
 import where
 from where import apriori
@@ -30,7 +30,6 @@ from where.lib import enums
 from where.lib import files
 from where.lib import gnss
 from where.lib import log
-from where.lib import plugins
 from where.lib import util
 
 FIGURE_DPI = 200
@@ -57,24 +56,26 @@ AxhlineConfig.__doc__ = """A convenience class for defining matplotlib axhline c
     """
 
 # Define dictionary with fields to be printed in SISRE report
-FIELDS = {
-    "sisre": "SISRE",
-    "sisre_orb": "orbit-only SISRE",
-    "orb_diff_3d": "3D orbit error",
-    "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
-    "bias_brdc": "satellite bias of broadcast clocks",
-    "bias_precise": "satellite bias of precise clocks",
-}
+write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
+if write_level <= enums.get_value("write_level", "detail"):
+    FIELDS = {
+        "age_of_ephemeris": "Age of ephemeris",
+        "sisre": "SISRE",
+        "sisre_orb": "orbit-only SISRE",
+        "orb_diff_3d": "3D orbit error",
+        "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
+        "bias_brdc": "satellite bias of broadcast clocks",
+        "bias_precise": "satellite bias of precise clocks",
+    }
+else:
+    FIELDS = {
+        "age_of_ephemeris": "Age of ephemeris",
+        "sisre": "SISRE",
+        "sisre_orb": "orbit-only SISRE",
+        "orb_diff_3d": "3D orbit error",
+        "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
+    }
 
-
-FIELDS_OLD = {
-    "sisre": "Global averaged signal-in-space range error (SISRE)",
-    "sisre_orb": "Orbit related error of global average SISRE",
-    "orb_diff_3d": "3D orbit error based on difference between broadcast and precise orbit",
-    "clk_diff_with_dt_mean": "Satellite clock correction difference between broadcast and precise orbit, whereby averaged clock offset in each epoch is applied.",
-    "bias_brdc": "Satellite bias of broadcast clocks",
-    "bias_precise": "Satellite bias of precise clocks",
-}
 
 # TODO: Maybe better to write a SisreReport class.
 @plugins.register
@@ -90,7 +91,9 @@ def sisre_report(dset):
     if "sampling_rate" not in dset.vars:  # necessary if called for example by where_concatenate.py
         dset.vars["sampling_rate"] = ""
 
-    with files.open(file_key="output_sisre_report", file_vars=dset.vars, mode="wt") as fid:
+    with files.open(
+        file_key=f"output_sisre_report_{dset.dataset_id}", file_vars=dset.vars, create_dirs=True, mode="wt"
+    ) as fid:
         _write_title(fid, dset.rundate)
         _write_information(fid)
         _write_config(fid)
@@ -108,13 +111,14 @@ def sisre_report(dset):
         _plot_scatter_field(fid, figure_dir, dset, "sisre")
         # _plot_scatter_field(fid, figure_dir, dset, 'sisre', label=False, legend=False)
         _plot_histogram_sisre(fid, figure_dir, dset)
+        _plot_scatter_field(fid, figure_dir, dset, "age_of_ephemeris")
         _satellite_statistics_and_plot(fid, figure_dir, dset)
 
-        fid.write("\n# Analysis of input files\n\n")
-        if write_level <= enums.get_value("write_level", "detail"):
-            # _plot_scatter_satellite_bias(fid, figure_dir, dset)
-            _plot_scatter_field(fid, figure_dir, dset, "bias_brdc")
-            _plot_scatter_field(fid, figure_dir, dset, "bias_precise")
+        # if write_level <= enums.get_value("write_level", "detail"):
+        #    fid.write("\n# Analysis of input files\n\n")
+        #    # _plot_scatter_satellite_bias(fid, figure_dir, dset)
+        #    _plot_scatter_field(fid, figure_dir, dset, "bias_brdc")
+        #    _plot_scatter_field(fid, figure_dir, dset, "bias_precise")
 
     # Generate PDF from Markdown file
     _markdown_to_pdf(dset)
@@ -163,28 +167,28 @@ def _markdown_to_pdf(dset):
     """
 
     if config.where.sisre_report.get("markdown_to_pdf", default=False).bool:
-        md_path = str(files.path("output_sisre_report", file_vars=dset.vars))
+        md_path = str(files.path(f"output_sisre_report_{dset.dataset_id}", file_vars=dset.vars))
         pdf_path = md_path.replace(".md", ".pdf")
         program = "pandoc"
 
         # Convert markdown to pdf with pandoc
         pandoc_args = ["-f markdown", "-V classoption:twoside", "-N", "-o " + pdf_path, md_path]
 
-        log.info("Start: {} {}".format(program, " ".join(pandoc_args)))
+        log.info(f"Start: {program} {' '.join(pandoc_args)}")
         status = os.system(f"{program} {' '.join(pandoc_args)}")
         if status != 0:
-            log.error("{} failed with error code {} ({})", program, status, " ".join([program] + pandoc_args))
+            log.error(f"{program} failed with error code {status} ({' '.join([program] + pandoc_args)})")
 
         # TODO: pandoc subprocess call does not work. Why?
         # process = subprocess.run([program] + pandoc_args)
         # if process.returncode:
-        #    log.error("{} failed with error code {} ({})", program, process.returncode, " ".join(process.args))
+        #    log.error(f"{program} failed with error code {process.returncode} ({' '.join(process.args)})")
 
 
 #
 # BAR PLOT
 #
-def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None, column="rms"):
+def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None, column="rms", unit=""):
     """Generate bar plot of given dataframe columns (colored and ordered by satellite type)
 
     Args:
@@ -228,11 +232,11 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None
     fig_width = len(df_reduced.index) / 4 if len(df_reduced.index) > 30 else 6.4
     ax = df_reduced[column].plot(kind="bar", color=df_color, width=0.8, figsize=(fig_width, fig_width / 1.33))
     ax.set_xlabel("Satellite", fontsize=fontsize)
-    ax.set_ylabel(f"{field.upper()} {column.upper()} [m]", fontsize=fontsize)
+    ax.set_ylabel(f"{field.upper()} {column.upper()} [{unit}]", fontsize=fontsize)
 
     # Make legend
     satellite_type_patch = [mpatches.Patch(color=v, label=k) for k, v in sorted(colors.items())]
-    ax.legend(handles=satellite_type_patch, bbox_to_anchor=(1.04, 1), loc=2, borderaxespad=0., ncol=1)
+    ax.legend(handles=satellite_type_patch, bbox_to_anchor=(1.04, 1), loc=2, borderaxespad=0.0, ncol=1)
 
     plt.tight_layout()
     plt.savefig(figure_dir / f"plot_bar_{field}_{column}.{FIGURE_FORMAT}", dpi=FIGURE_DPI)
@@ -286,7 +290,7 @@ def _plot_bar_stacked(
         for idx in range(0, len(axhline)):
             plt.axhline(y=axhline[idx].y_value, linewidth=2, color=axhline[idx].color)
     # ax.legend(bbox_to_anchor=(1.04, 1), loc=2, borderaxespad=0., ncol=1)
-    ax.legend(bbox_to_anchor=(1, 1.15), loc=1, borderaxespad=0., ncol=2)
+    ax.legend(bbox_to_anchor=(1, 1.15), loc=1, borderaxespad=0.0, ncol=2)
 
     if xticks_rotation is not None:
         plt.xticks(rotation=xticks_rotation)
@@ -443,8 +447,8 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
         for field, orbit in {"bias_brdc": "Broadcast", "bias_precise": "Precise"}.items():
             if np.sum(dset[field][idx]) != 0:
                 figure_path = figure_dir / f"plot_scatter_{field}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
-                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx])
-                plt.ylabel(f"{orbit} satellite bias [m]")
+                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], alpha=0.7)
+                plt.ylabel(f"{orbit} satellite bias [dset.unit(field)]")
                 plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
                 plt.xlabel("Time [GPS]")
                 plt.title(f"{GNSS_NAME[sys]}")
@@ -465,6 +469,8 @@ def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
        figure_dir (PosixPath):   Figure directory
        dset (Dataset):           A dataset containing the data.
        field (str):              Dataset field.
+       label(bool):              Plot label or not
+       legend(bool):             Plot legend or not
     """
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
@@ -475,19 +481,21 @@ def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
             for sat in dset.unique("satellite", idx=idx):
                 idx_sat = dset.filter(system=sys, satellite=sat)
                 if np.sum(dset[field][idx_sat]) != 0:
-                    plt.scatter(dset.time.gps.datetime[idx_sat], dset[field][idx_sat], label=sat, marker="o", s=10)
+                    plt.scatter(
+                        dset.time.gps.datetime[idx_sat], dset[field][idx_sat], label=sat, marker="o", s=10, alpha=0.7
+                    )
         else:
             if np.sum(dset[field][idx]) != 0:
-                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], marker="o", s=10)
+                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], marker="o", s=10, alpha=0.7)
 
         if legend == True:
             plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
         text = (
-            f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ m"
-            f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ m"
+            f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ {dset.unit(field)}"
+            f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ {dset.unit(field)}"
         )
         fig.text(0.83, 0.9, text, horizontalalignment="right", verticalalignment="top", multialignment="left")
-        plt.ylabel(f"{field.upper()} [m]")
+        plt.ylabel(f"{field.upper()} [{dset.unit(field)}]")
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
         plt.xlabel("Time [GPS]")
         plt.title(f"{GNSS_NAME[sys]}")
@@ -718,12 +726,12 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset):
     )
     for field, df in field_dfs.items():
         fid.write(f"\n\n##Statistic for {FIELDS[field]}\n")
-        fid.write("Unit: meter\n")
+        fid.write(f"Unit: {dset.unit(field)}\n")
         _write_dataframe_to_markdown(fid, df, float_format="6.3f")
         fid.write("  ")
 
-        # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column)
-        _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column)
+        # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column, unit=dset.unit(field))
+        _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column, unit=dset.unit(field))
 
 
 def _unhealthy_satellites(fid, dset):
@@ -859,11 +867,11 @@ The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is cacula
     \\hline
     System       & $w_r$  & $w_{a,c}$ \\\\
     \\hline
-    GPS          & $0.980$ & $0.139$ \\\\
-    Galileo      & $0.984$ & $0.124$ \\\\
+    GPS          & $0.979$ & $0.143$ \\\\
+    Galileo      & $0.984$ & $0.128$ \\\\
     \\hline
   \\end{tabular}
-  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $5^{\circ}$ based on Table 4 in Montenbruck et al. 2018.}
+  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\circ}$ based on Table 4 in Montenbruck et al. 2018.}
   \\label{tab:sisre_weight_factors}
 \\end{center}
 \\end{table}

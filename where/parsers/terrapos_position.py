@@ -28,7 +28,7 @@ class TerraposPositionParser(LineParser):
     """A parser for reading Terrapos position output file
     """
 
-    def setup_parser(self) -> Dict=[str, str]:
+    def setup_parser(self) -> Dict[str, str]:
         """Set up information needed for the parser
 
         This should return a dictionary with all parameters needed by np.genfromtxt to do the actual parsing.

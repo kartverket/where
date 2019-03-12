@@ -16,7 +16,7 @@ import numpy as np
 
 # Where imports
 from where.lib import plugins
-from where.ext import sofa_wrapper as sofa
+from where.lib import rotation
 
 
 @plugins.register
@@ -34,7 +34,11 @@ def eop_nut(dset):
     src_dir = dset.src_dir.unit_vector[:, None, :]
     baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
 
-    partials[:, 0] = -(src_dir @ sofa.dQ_dX(dset.time) @ sofa.R(dset.time) @ sofa.W(dset.time) @ baseline)[:, 0, 0]
-    partials[:, 1] = -(src_dir @ sofa.dQ_dY(dset.time) @ sofa.R(dset.time) @ sofa.W(dset.time) @ baseline)[:, 0, 0]
+    partials[:, 0] = -(src_dir @ rotation.dQ_dX(dset.time) @ rotation.R(dset.time) @ rotation.W(dset.time) @ baseline)[
+        :, 0, 0
+    ]
+    partials[:, 1] = -(src_dir @ rotation.dQ_dY(dset.time) @ rotation.R(dset.time) @ rotation.W(dset.time) @ baseline)[
+        :, 0, 0
+    ]
 
     return partials, column_names, "meter per radian"

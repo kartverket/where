@@ -23,10 +23,6 @@ References:
        Presentation at IERS Workshop on Conventions, September 2007.
        http://maia.usno.navy.mil/conv2010/chapter6/add_info/BIPM_ocean_tides_2007.pdf
 
-
-
-
-
 """
 # External library imports
 import numpy as np
@@ -62,7 +58,7 @@ def ocean_tides(dset):
     phases = {s: otc[s]["phases"] for s in dset.unique("site_id") if s in otc}
     # Warn about missing Ocean Tides Coefficients
     for site_id in set(dset.unique("site_id")) - set(amplitudes.keys()):
-        log.error("Missing ocean loading coefficients for site id '{}'. Correction set to zero.", site_id)
+        log.error(f"Missing ocean loading coefficients for site id {site_id!r}. Correction set to zero.")
 
     data_out = list()
     for _ in dset.for_each("station"):

@@ -8,8 +8,7 @@ Example:
     from where import apriori
 
     # Get broadcast ephemeris object
-    precise = apriori.get('orbit', rundate=rundate, time=time, satellite=satellite, system=system, station=station,
-                          apriori_orbit='precise')
+    precise = apriori.get('orbit', apriori_orbit='precise')
 
     # Write calculated Dataset to file
     precise.dset.write()
@@ -19,6 +18,7 @@ Example:
 """
 # Standard library imports
 from datetime import timedelta
+from typing import List, Tuple
 
 # External library imports
 from midgard.math import interpolation
@@ -28,6 +28,7 @@ from scipy import interpolate
 
 # Where imports
 from where import apriori
+from where import cleaners
 from where import data
 from where.apriori import orbit
 from where.lib import config
@@ -57,9 +58,6 @@ class PreciseOrbit(orbit.AprioriOrbit):
         file_key (str):         Key to the precise orbit file defined in files.conf file.
         file_path (pathlib.PosixPath):  File path to SP3 orbit file.
         name (str):             Apriori orbit name
-        satellite (tuple):      Satellite number together with GNSS system identifier given for each observation epoch
-        system (tuple):         GNSS system identifier given for each observation epoch
-        time (Time):            Observation epochs
 
     Methods:
         satellite_clock_correction():  Determine satellite clock correction
@@ -71,21 +69,18 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
     name = "precise"
 
-    def __init__(self, rundate, time, satellite, system=None, file_key=None, file_path=None, day_offset=1, **kwargs):
+    def __init__(self, rundate, file_key=None, file_path=None, day_offset=1, **kwargs):
         """Set up a new PreciseOrbit object, does not parse any data
 
         TODO: Remove dependency on rundate, use time to read correct files. (What to do with dataset?)
 
         Args:
             rundate (date):     Date of model run.
-            time (Time):        Time epochs at the satellite for which to calculate the apriori orbit.
-            satellite (list):   Strings with names of satellites.
-            system (list):      Strings with codes of systems (G, E, R, etc.).
             file_key (str):     Key to the precise orbit file that will be read.
             file_path (pathlib.PosixPath):  File path to SP3 orbit file.
             day_offset (int):   Day offset used to calculate the number of days to read.
         """
-        super().__init__(rundate=rundate, time=time, satellite=satellite, system=system)
+        super().__init__(rundate=rundate)
         self.file_key = "gnss_orbit_sp3" if file_key is None else file_key
         self.day_offset = day_offset
         self.file_path = file_path
@@ -112,7 +107,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
             else:
                 file_path = self.file_path
 
-            log.debug("Parse precise orbit file {}.", file_path)
+            log.debug(f"Parse precise orbit file {file_path}")
 
             # Generate temporary Dataset with orbit file data
             dset_temp = data.Dataset(
@@ -128,7 +123,10 @@ class PreciseOrbit(orbit.AprioriOrbit):
             file_paths.append(str(parser.file_path))
 
             # Extend Dataset dset_raw with temporary Dataset
-            dset_raw.copy_from(dset_temp) if dset_raw.num_obs == 0 else dset_raw.extend(dset_temp)
+            date = date_to_read.strftime("%Y-%m-%d")
+            dset_raw.copy_from(dset_temp, meta_key=date) if dset_raw.num_obs == 0 else dset_raw.extend(
+                dset_temp, meta_key=date
+            )
             dset_raw.add_to_meta("parser", "file_path", file_paths)
 
             date_to_read += timedelta(days=1)
@@ -138,10 +136,10 @@ class PreciseOrbit(orbit.AprioriOrbit):
     def _edit(self, dset_edit):
         """Edit precise orbit data and save it in a Dataset
 
-        First the precise orbits are sorted after the satellite and time. Afterwards duplicated precise orbits for a 
+        First the precise orbits are sorted after the satellite and time. Afterwards duplicated precise orbits for a
         satellite are removed, whereby the last accurance of the precise orbit entry is kept (Note: SP3 files include
         often at the end the first epoch of the next day, whereby satellite clock corrections are not given. Therefore
-        we keep the last accurance to be sure to have satellite clock corrections values for the first epoch of a day). 
+        we keep the last accurance to be sure to have satellite clock corrections values for the first epoch of a day).
 
         Args:
             dset_edit (Dataset):     Dataset representing edited data from precise orbit file
@@ -159,7 +157,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
         idx = precise_filtered.duplicated(subset=["satellite", "time"], keep="last")
         with pd.option_context("display.max_rows", None, "display.max_columns", 5):
             log.debug(
-                "Remove following duplicated precise orbit entries: \n{}", precise_filtered[["satellite", "time"]][idx]
+                f"Remove following duplicated precise orbit entries: \n{precise_filtered[['satellite', 'time']][idx]}"
             )
         precise_filtered = precise_filtered.drop_duplicates(subset=["satellite", "time"], keep="last")
 
@@ -199,15 +197,18 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
         return dset_edit
 
-    def _calculate(self, dset):
+
+    def _calculate(self, dset_out: "Dataset", dset_in: "Dataset", time: str='time') -> None:
         """Calculate precise orbits and satellite clock correction for given observation epochs
 
-        The satellite position is determined for each observation epoch by interpolating within the given SP3 orbit time
-        entries. The satellite velocities are calculated based on satellite positions 0.5 second before and after the
-        observation epoch.
+        As a first step observations are removed from unavailable satellites and for exceeding the interpolation
+        boundaries. The input Dataset contains observation epochs for which the broadcast ephemeris and satellite
+        clock correction should be determined. The satellite position is determined for each observation epoch by
+        interpolating within the given SP3 orbit time entries. The satellite velocities are calculated based on
+        satellite positions 0.5 second before and after the observation epoch.
 
         Args:
-            dset (Dataset): Dataset representing calculated precise orbits with following fields:
+            dset_out (Dataset): Dataset representing calculated precise orbits with following fields:
 
         ========================  ===============  =======  ========================================================
          Field                     Type             Unit     Description
@@ -219,64 +220,53 @@ class PreciseOrbit(orbit.AprioriOrbit):
          system                   numpy.ndarray             GNSS identifiers
          time                     TimeTable                 Observation epochs
         =======================  ===============  =======  ========================================================
+
+            dset_in:  Input Dataset containing model data for which broadcast ephemeris should be determined.
+            time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
+                  observation time and 'sat_time' to satellite transmission time.
         """
-        # Check if satellites are given in SP3 file
+        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking interpolation boundaries
+        cleaners.apply_remover("gnss_clean_orbit", dset_in)
+
         # TODO: Another solution has to be found for satellites not given in SP3 file, e.g. use of broadcast
         #       ephemeris.
-        not_available_sat = set(self.satellite) - set(self.dset_edit.satellite)
-        if not_available_sat:
-            log.fatal(
-                "Satellites {} are not given in precise orbit file {}.",
-                ", ".join(sorted(not_available_sat)),
-                self.dset_edit.meta["parser"]["file_path"],
-            )
 
         log.info(
-            "Calculating satellite position/velocity (precise) based on SP3 precise orbit file {}.",
-            ", ".join(self.dset_edit.meta["parser"]["file_path"]),
+            f"Calculating satellite position/velocity (precise) based on SP3 precise orbit file "
+            f"{', '.join(self.dset_edit.meta['parser']['file_path'])}"
         )
 
-        dset.vars["orbit"] = self.name
-        dset.num_obs = len(self.time)
-        dset.add_time("time", val=self.time, scale=self.time.scale)
-        dset.add_text("satellite", val=self.satellite)
-        dset.add_text("system", val=self.system)
-
-        sat_pos = np.zeros((dset.num_obs, 3))
-        sat_vel = np.zeros((dset.num_obs, 3))
-        ref_time = dset.time[0]  # Reference epoch used for interpolation
+        sat_pos = np.zeros((dset_in.num_obs, 3))
+        sat_vel = np.zeros((dset_in.num_obs, 3))
+        ref_time = dset_in[time][0]  # Reference epoch used for interpolation
 
         # Loop over all given satellites
-        for sat in set(self.satellite):
+        for sat in set(dset_in.satellite):
 
-            log.debug("Interpolation for satellite: {}", sat)
+            log.debug(f"Interpolation for satellite: {sat}")
 
             # Get array with information about, when observation are available for the given satellite (indicated by
             # True)
-            idx = dset.filter(satellite=sat)
+            idx = dset_in.filter(satellite=sat)
             orb_idx = self.dset_edit.filter(satellite=sat)
 
-            if np.min(dset.time[idx].gps.mjd) < np.min(self.dset_edit.time[orb_idx].mjd):
+            if np.min(dset_in[time][idx].gps.mjd) < np.min(self.dset_edit.time[orb_idx].mjd):
                 log.fatal(
-                    "Interpolation range is exceeded by satellite {} ( {} [epoch] < {} [precise orbit])."
-                    "".format(
-                        sat, np.max(dset.time[idx].gps.datetime), np.max(self.dset_edit.time[orb_idx].gps.datetime)
-                    )
+                    f"Interpolation range is exceeded by satellite {sat} ({np.max(dset_in[time][idx].gps.datetime)} "
+                    f"[epoch] < {np.max(self.dset_edit.time[orb_idx].gps.datetime)} [precise orbit])"
                 )
 
-            if np.max(dset.time[idx].gps.mjd) > np.max(self.dset_edit.time[orb_idx].mjd):
+            if np.max(dset_in[time][idx].gps.mjd) > np.max(self.dset_edit.time[orb_idx].mjd):
                 log.fatal(
-                    "Interpolation range is exceeded by satellite {} ({} [epoch] > {} [precise orbit])."
-                    "".format(
-                        sat, np.max(dset.time[idx].gps.datetime), np.max(self.dset_edit.time[orb_idx].gps.datetime)
-                    )
+                    f"Interpolation range is exceeded by satellite {sat} ({np.max(dset_in[time][idx].gps.datetime)} "
+                    f"[epoch] > {np.max(self.dset_edit.time[orb_idx].gps.datetime)} [precise orbit])"
                 )
 
             # Interpolation for given observation epochs (transmission time)
             sat_pos[idx], sat_vel[idx] = interpolation.interpolate_with_derivative(
                 self.dset_edit.time[orb_idx].gps.sec_to_reference(ref_time),
                 self.dset_edit.sat_pos.itrs[orb_idx],
-                dset.time[idx].gps.sec_to_reference(ref_time),
+                dset_in[time][idx].gps.sec_to_reference(ref_time),
                 kind="lagrange",
                 window=10,
                 dx=0.5,
@@ -284,31 +274,77 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
             if np.isnan(np.sum(sat_pos[idx])) or np.isnan(np.sum(sat_vel[idx])):
                 log.fatal(
-                    "NaN occurred by determination of precise satellite position and velocity for satellite {}.", sat
+                    f"NaN occurred by determination of precise satellite position and velocity for satellite {sat}"
                 )
 
-        # Add satellite clock correction to Dataset
-        dset.add_float("gnss_satellite_clock", val=self.satellite_clock_correction(), unit="meter")
+        # Copy fields from model data Dataset
+        dset_out.num_obs = dset_in.num_obs
+        dset_out.add_text("satellite", val=dset_in.satellite)
+        dset_out.add_text("system", val=dset_in.system)
+        dset_out.add_time("time", val=dset_in.time, scale=dset_in.time.scale)
+        dset_out.vars["orbit"] = self.name
+
+        # Add float fields
+        dset_out.add_float(
+                "gnss_relativistic_clock", 
+                val=self.relativistic_clock_correction(sat_pos, sat_vel), 
+                unit="meter"
+        )
+        dset_out.add_float(
+                "gnss_satellite_clock", 
+                val=self.satellite_clock_correction(dset_in, time=time), 
+                unit="meter"
+        )
 
         # Add satellite position and velocity to Dataset
-        dset.add_posvel("sat_posvel", time="time", itrs=np.hstack((sat_pos, sat_vel)))
-
-        # Add relativistic clock correction to Dataset
-        dset.add_float("gnss_relativistic_clock", val=self.relativistic_clock_correction(), unit="meter")
+        dset_out.add_posvel("sat_posvel", time="time", itrs=np.hstack((sat_pos, sat_vel)))
 
         # +DEBUG
-        # for num_obs  in range(0, dset.num_obs):
-        #    print('DEBUG: ', dset.satellite[num_obs],
-        #                     dset.time.gps.datetime[num_obs],
-        #                     dset.time.gps.mjd_frac[num_obs]*24*3600,
-        #                     ' '.join([str(v) for v in dset.sat_posvel.itrs_pos[num_obs]]),
-        #                     dset.gnss_satellite_clock[num_obs],
-        #                     dset.gnss_relativistic_clock[num_obs])
+        # for num_obs  in range(0, dset_out.num_obs):
+        #    print('DEBUG: ', dset_out.satellite[num_obs],
+        #                     dset_out[time].gps.datetime[num_obs],
+        #                     dset_out[time].gps.mjd_frac[num_obs]*24*3600,
+        #                     ' '.join([str(v) for v in dset_out.sat_posvel.itrs_pos[num_obs]]),
+        #                     dset_out.gnss_satellite_clock[num_obs],
+        #                     dset_out.gnss_relativistic_clock[num_obs])
         # -DEBUG
 
-        return dset
 
-    def satellite_clock_correction(self):
+    def _get_nearest_sample_point(self, satellite: Tuple[str], time: "Time") -> List[int]:
+        """Get nearest sample point of precise orbits for given observation epochs
+
+        Args:
+            satellite:  Array with satellites related to given observation epochs
+            time:       Observation epochs given as Time object
+
+        Returns:
+            List with nearest precise orbit sample point indices for given observation epochs.
+        """
+        precise_idx = list()
+
+        log.debug(f"Get nearest interpolation sample points for given precise orbits.")
+
+        # Check if precise orbits are available
+        not_available_sat = sorted(set(satellite) - set(self.dset_edit.satellite))
+        if not_available_sat:
+            log.fatal(
+                f"The following satellites are not given in apriori precise orbit file "
+                f"{', '.join(self.dset_edit.meta['parser']['file_path'])}: {', '.join(not_available_sat)}"
+            )
+
+        # Determine nearest precise orbit sample point for a given satellite and observation epoch
+        for sat, time in zip(satellite, time):
+
+            idx = self.dset_edit.filter(satellite=sat)
+            diff = time.gps.mjd - self.dset_edit.time.gps.mjd[idx]
+            nearest_idx = np.array([abs(diff)]).argmin()
+
+            precise_idx.append(idx.nonzero()[0][nearest_idx])
+
+        return precise_idx
+
+
+    def satellite_clock_correction(self, dset: "Dataset", time: str="time") -> np.ndarray:
         """Determine satellite clock correction based on precise satellite clock product
 
         The GNSS satellite clock bias is read from RINEX clock files. Afterwards the satellite clock bias is determined
@@ -319,11 +355,16 @@ class PreciseOrbit(orbit.AprioriOrbit):
             * Check for satellite clock interpolation in:
               "Hesselbarth, A.: Statische und kinematische GNSS-Auswertung mittels PPP, 2011"
 
+        Args:
+            dset: A Dataset containing model data.
+            time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
+                  observation time and 'sat_time' to satellite transmission time.
+
         Returns:
-            numpy.ndarray:    GNSS satellite clock corrections for each observation
+            GNSS satellite clock corrections for each observation
         """
-        correction = np.zeros(self.dset.num_obs)
-        sat_transmission_time = self.dset.time.gps.gpssec
+        correction = np.zeros(dset.num_obs)
+        sat_transmission_time = dset[time].gps.gpssec
 
         # Get precise GNSS satellite clock values
         clock_product = config.tech.get("clock_product", default="clk").str
@@ -333,14 +374,14 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
             # TODO: File path information has to be improved, because 3 consecutive days are read.
             log.info(
-                "Calculating satellite clock correction (precise) based on RINEX clock file {}.",
-                files.path(file_key="gnss_rinex_clk"),
+                f"Calculating satellite clock correction (precise) based on RINEX clock file "
+                f"{files.path(file_key='gnss_rinex_clk')}"
             )
 
             all_sat_clk = data.Dataset(
-                rundate=self.dset.rundate, tech=None, stage=None, dataset_name="gnss_sat_clk", dataset_id=0, empty=True
+                rundate=dset.rundate, tech=None, stage=None, dataset_name="gnss_sat_clk", dataset_id=0, empty=True
             )
-            parser = parsers.parse("rinex_clk", rundate=self.dset.rundate)
+            parser = parsers.parse("rinex_clk", rundate=dset.rundate)
             parser.write_to_dataset(all_sat_clk)  # TODO Read RINEX clock file, from day before and day after.
             #     Needed for interpolation. Add handling if these clk-files
             #     are not available. Remove first and last observations?
@@ -348,12 +389,12 @@ class PreciseOrbit(orbit.AprioriOrbit):
             #     ephemeris should be used.
         else:
             log.fatal(
-                "Unknown clock product '{}'. Configuration option 'clock_product' can only be 'sp3' or 'clk'.",
-                clock_product,
+                f"Unknown clock product {clock_product!r}. "
+                "Configuration option 'clock_product' can only be 'sp3' or 'clk'"
             )
 
         # Loop over all satellites given in configuration file
-        for sat in self.dset.unique("satellite"):
+        for sat in dset.unique("satellite"):
 
             # Skip satellites, which are not given in RINEX clock file
             if sat not in all_sat_clk.unique("satellite"):
@@ -362,7 +403,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
                 #      every 5 min (or 30 s by use of igs<wwwwd>.clk_30s).
                 continue
 
-            idx = self.dset.filter(satellite=sat)
+            idx = dset.filter(satellite=sat)
             clk_idx = all_sat_clk.filter(satellite=sat)
 
             # Interpolation of GNSS precise satellite clock values

@@ -10,13 +10,8 @@ References:
 [1] Montenbruck, Oliver and Gill, Eberhard, Satellite Orbits, Springer Verlag, 2000.
 
 [2] Petit, G. and Luzum, B. (eds.), IERS Conventions (2010), IERS Technical Note No. 36, BKG (2010)
-
-
-
-$Revision: 15003 $
-$Date: 2018-05-04 15:38:08 +0200 (Fri, 04 May 2018) $
-$LastChangedBy: fauing $
 """
+
 # Standard library imports
 import math
 
@@ -26,8 +21,7 @@ import numpy as np
 # Where imports
 from where import apriori
 from where.lib import config
-from where.lib import constant
-from where.lib import log
+from midgard.math.constant import constant
 from where.ext import sofa
 
 cdef double GM_earth, R_earth, GM_moon, GM_sun
@@ -39,18 +33,30 @@ cdef epoch_list
 cdef double[:] GMST
 cdef double[:, :, :] g2i
 
+
 def register_entry_point():
     """Register entry points for setup and later calls."""
     return dict(call=tides, setup=tides_setup)
 
-def tides_setup(rundate, force_parameters, sat_name, double[:] time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
+
+def tides_setup(
+        rundate,
+        force_parameters,
+        sat_name,
+        double[:] time_grid,
+        epochs,
+        body_pos_gcrs,
+        body_pos_itrs,
+        bodies,
+        gcrs2itrs,
+):
     """Set up module variables used later during calculation.
-    
-    Args: 
+
+    Args:
         rundate:           Time of integration start
         force_parameters:  Dict of parameters to be estimated
         sat_name:          Name of satellite
-        time_grid:         Table of times in seconds since rundate, in utc. 
+        time_grid:         Table of times in seconds since rundate, in utc.
         epochs:            time_grid converted to Time objects, in utc.
         body_pos_gcrs:     The positions of the bodies in the solar system in GCRS.
         body_pos_itrs:     The positions of the bodies in the solar system in ITRS.
@@ -65,37 +71,38 @@ def tides_setup(rundate, force_parameters, sat_name, double[:] time_grid, epochs
     global epoch_list, GMST
     global g2i
     epoch_list = epochs
- 
-    GM_earth = constant.get('GM', source='egm_2008')
-    R_earth = constant.get('a', source='egm_2008')
-    GM_moon = constant.get('GM_moon')
-    GM_sun = constant.get('GM_sun')
+
+    GM_earth = constant.get("GM", source="egm_2008")
+    R_earth = constant.get("a", source="egm_2008")
+    GM_moon = constant.get("GM_moon")
+    GM_sun = constant.get("GM_sun")
 
     # Ocean tides coefficients, corrections to the gravity coefficients C and S.
     # The dict containing the values Cp, Cm, Sp and Sm
-    ocean_tides_coeffs = apriori.get('ocean_tides_orbit')
-    
-    Cp = ocean_tides_coeffs['C+']
-    Cm = ocean_tides_coeffs['C-']
-    Sp = ocean_tides_coeffs['S+']
-    Sm = ocean_tides_coeffs['S-']
+    ocean_tides_coeffs = apriori.get("ocean_tides_orbit")
+
+    Cp = ocean_tides_coeffs["C+"]
+    Cm = ocean_tides_coeffs["C-"]
+    Sp = ocean_tides_coeffs["S+"]
+    Sm = ocean_tides_coeffs["S-"]
 
     # Read configuration settings
     truncation_level = config.tech.gravity_truncation_level.int
 
     # Tides from Moon:
-    idx_moon = bodies.index('moon')
+    idx_moon = bodies.index("moon")
     moon_pos = body_pos_itrs[idx_moon, :, :]
     moon_distance = np.linalg.norm(moon_pos, axis=1)
-    
+
     # Tides from the Sun:
-    idx_sun = bodies.index('sun')
+    idx_sun = bodies.index("sun")
     sun_pos = body_pos_itrs[idx_sun, :, :]
     sun_distance = np.linalg.norm(sun_pos, axis=1)
 
-    GMST = epochs.sidereal_time('mean', longitude='greenwich').to('radian').value
+    GMST = epochs.sidereal_time("mean", longitude="greenwich").to("radian").value
     g2i = gcrs2itrs
-    
+
+
 def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     """Compute force on satellite from the gravity field of the earth
 
@@ -132,11 +139,11 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     cdef int i, n, m, f
     cdef double[:, :] V, W
     V, W = compute_VW(sat_pos_itrs)
-    
+
     cdef double[:] acc = np.zeros(3)
     cdef double[:] delaunay_variables
     gcrs2itrs = g2i[current_step]
-   
+
     # Need Greenwich mean sidereal time
     time_now = epoch_list[current_step]
     delaunay_variables = delaunay(time_now.tt.jd)
@@ -157,7 +164,7 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     for n in range(0, truncation_level):
         for m in range(0, n + 1):
             f = (n - m + 2) * (n - m + 1)    # Scaling factor
-            
+
             # The m = 0 case is handled separately:
             if m == 0:
                 acc[0] += -C[n, 0] * V[n+1, 1]
@@ -200,7 +207,7 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
 
     for i in range(3):
         acc[i] *= GM_earth / R_earth**2
-    
+
     cdef double fact = GM_earth / R_earth**3
 
     dxx *= fact
@@ -221,7 +228,7 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
 
     sens_itrs = np.zeros((3, num_param))
     sens_gcrs = np.zeros((3, num_param))
-    
+
     for i in range(0, 3):
         for j in range(0, num_param):
             for k in range(0, 3):
@@ -248,7 +255,7 @@ cdef compute_VW(double[:] pos_xyz):
     a = R_earth
     cdef double x, y, z, r, f
     cdef int n, m
-    
+
     x, y, z = pos_xyz
     r = np.linalg.norm(pos_xyz)
 
@@ -282,7 +289,7 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
         gcrs2itrs:           Matrix for transforming from gcrs to itrs.
         delaunay_variables:  Variables for use in tidal model, described in Section 5.7 in IERS Conventions [2].
         current_step:        Current step number of the integrator
-        
+
     Returns:
         C,S:                 Tides part of Gravity coefficients at time t.
     """
@@ -296,7 +303,7 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
     cdef complex factor_sun, factor_moon, correction
     V_sun, W_sun = compute_VW(sun_pos[current_step])
     V_moon, W_moon = compute_VW(moon_pos[current_step])
- 
+
     C = np.zeros((truncation_level, truncation_level))
     S = np.zeros((truncation_level, truncation_level))
     # Earth-fixed geodetic coordinates of the Moon.
@@ -311,10 +318,10 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
     # Equation (6.6)
     for n in range(2, min(4, C.shape[0])):
         for m in range(0, n + 1):
-            factor_moon = k(n, m) / (2 * n + 1) * (GM_moon / GM_earth) 
-            factor_sun = k(n, m) / (2 * n + 1) * (GM_sun / GM_earth) 
+            factor_moon = k(n, m) / (2 * n + 1) * (GM_moon / GM_earth)
+            factor_sun = k(n, m) / (2 * n + 1) * (GM_sun / GM_earth)
 
-            correction = (factor_moon * V_moon[n, m] + factor_sun * V_sun[n, m] + 
+            correction = (factor_moon * V_moon[n, m] + factor_sun * V_sun[n, m] +
                           (factor_moon * W_moon[n, m] + factor_sun * W_sun[n, m]) * 1j)
 
             C[n, m] = correction.real * normalization_factor(n, m)**2
@@ -324,8 +331,8 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
     # Equation (6.7)
     if C.shape[0] > 4:
         for m in range(0, 3):
-            factor_moon = k(4, m) / 5 * (GM_moon / GM_earth) 
-            factor_sun = k(4, m) / 5 * (GM_sun / GM_earth) 
+            factor_moon = k(4, m) / 5 * (GM_moon / GM_earth)
+            factor_sun = k(4, m) / 5 * (GM_sun / GM_earth)
             correction = (factor_moon * V_moon[2, m] + factor_sun * V_sun[2, m]
                           + 1j * (factor_moon * W_moon[2, m] + factor_sun * W_sun[2, m]))
             C[4, m] = correction.real * normalization_factor(2, m) * normalization_factor(4, m)
@@ -333,7 +340,7 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
 
     # Eqation (6.8a)
     C[2, 0] += normalization_factor(2, 0) * equation_68a(delaunay_variables)
-    
+
     # Equation (6.8b) with m=1.
     correction1, correction2 = equation_68b_m1(GMST[current_step], delaunay_variables)
     C[2, 1] += normalization_factor(2, 1) * correction1
@@ -388,11 +395,11 @@ def ocean_tides(C, S, GMST, delaunay_variables):
                 sin_theta_f = math.sin(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables))
                 cos_theta_f = math.cos(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables))
 
-                C[n, m] += normalization_factor(n, m)**2 * (Cp[n, m][doodson] * cos_theta_f 
-                                + Sp[n, m][doodson] * sin_theta_f + Cm[n, m][doodson] * cos_theta_f 
+                C[n, m] += normalization_factor(n, m)**2 * (Cp[n, m][doodson] * cos_theta_f
+                                + Sp[n, m][doodson] * sin_theta_f + Cm[n, m][doodson] * cos_theta_f
                                 + Sm[n, m][doodson] * sin_theta_f)
-                S[n, m] += normalization_factor(n, m)**2 * (-Cp[n, m][doodson] * sin_theta_f 
-                                + Sp[n, m][doodson] * cos_theta_f + Cm[n, m][doodson] * sin_theta_f 
+                S[n, m] += normalization_factor(n, m)**2 * (-Cp[n, m][doodson] * sin_theta_f
+                                + Sp[n, m][doodson] * cos_theta_f + Cm[n, m][doodson] * sin_theta_f
                                 - Sm[n, m][doodson] * cos_theta_f)
     return C, S
 
@@ -559,8 +566,10 @@ cdef equation_68b_m1(double GMST, double[:] delaunay_variables):
         sin_theta_f[i] = math.sin(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables))
         cos_theta_f[i] = math.cos(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables))
 
-    return math.sqrt(5 / 3) * (np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip)), -math.sqrt(5 / 3) * (-np.dot(cos_theta_f, ip) + np.dot(sin_theta_f, op))
-
+    return (
+        math.sqrt(5 / 3) * (np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip)),
+        -math.sqrt(5 / 3) * (-np.dot(cos_theta_f, ip) + np.dot(sin_theta_f, op))
+    )
 
 
 cdef table_65a():
@@ -699,7 +708,7 @@ cdef delaunay(double tt):
     """
     # Julian day for January 2000 1d 12h
     cdef double tt_2000 = 2451545.0
-    
+
     # Time to be given in Julian centuries.
     cdef double t = (tt - tt_2000) / 36525
 
@@ -717,11 +726,11 @@ cdef delaunay(double tt):
 cdef normalization_factor(int n, int m):
     """
     Normalization factor, see Conventions chapter 6
-    
-    Input: 
+
+    Input:
         n:  Integer
         m:  Integer
-    Returns 
+    Returns
        integer
     """
     return np.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m ==0)) / math.factorial(n + m))

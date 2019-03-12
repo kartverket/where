@@ -22,8 +22,6 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib import cache
-from where.lib import log
 
 
 @plugins.register
@@ -57,35 +55,27 @@ class VlbiStationCodesParser(ChainParser):
     def parse_station(self, line, _):
         """Parse one line of station data
 
+        Note: Some stations does not have a cdp number or a name.
+
         Args:
             line:  Dict containing the fields of a line.
         """
         line_copy = line.copy()
         name = line_copy.pop("name")
         cdp = line.pop("cdp")
+
+        if cdp == "----":
+            # Create a unique key
+            cdp = "-" + line["ivscode"] + "-"
+            line_copy["cdp"] = cdp
+
+        if name == "--------":
+            # Create a unique key
+            name = "---" + line["ivscode"] + "---"
+            line["name"] = name
+
         # If there are multiple entries with the same cdp number use the first
         if cdp not in self.data:
             # Store data twice with different keys
             self.data[cdp] = line
             self.data[name] = line_copy
-
-    @cache.function
-    def __missing__(self, cdp):
-        """Handle missing keys
-
-        Give a warning and return a consistent value when eccentricity vectors are missing from the file.
-
-        The special __missing__ method is called when doing a __getitem__ (i.e. `dict_name[key]`) lookup on a
-        dictionary and the key is missing.
-
-        The caching is used mainly as a simple way of only warning about missing eccentricity data. This could also
-        have been implemented by keeping a class set containing which CDPs we have already warned about.
-
-        Args:
-            cdp (String):  cdp for the missing station
-
-        Returns:
-            Dict:  Dummy information
-        """
-        log.warn("Missing station codes for '{}'.", cdp)
-        return dict(ivscode="", ivsname="", domes="", marker="", description="")

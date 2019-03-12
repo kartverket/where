@@ -88,14 +88,13 @@ def clock_correction(dset):
     threshold = 1e-12
     if np.abs(det) < threshold:
         # TODO: what is a good threshold value?
-        log.warn("Determinant of normal matrix in clock correction is close to zero ({})".format(det))
-        log.info(
-            "Normal matrix shape = {}, normal matrix rank = {}", N.shape, np.linalg.matrix_rank(N[idx, :][:, idx])
-        )
+        rank = np.linalg.matrix_rank(N[idx, :][:, idx])
+        log.warn(f"Determinant of normal matrix in clock correction is close to zero ({det})")
+        log.info(f"Normal matrix shape = {N.shape}, normal matrix rank = {rank}")
         _, R = np.linalg.qr(N[idx, :][:, idx])
         for i, row in enumerate(R):
             if np.max(np.abs(row)) < threshold * 10 ** 3:
-                log.error("{} linearly dependent (max_row = {})".format(param_names[i], np.max(np.abs(row))))
+                log.error(f"{param_names[i]} linearly dependent (max_row = {np.max(np.abs(row))})")
     try:
         X[idx] = np.linalg.inv(N[idx, :][:, idx]) @ U[idx]
     except np.linalg.LinAlgError:
@@ -129,7 +128,7 @@ def parse_clock_breaks(dset, clock_breaks):
         s: [min(dset.time.utc), max(dset.time.utc) + TimeDelta(1, format="sec")] for s in dset.unique("station")
     }
     if clock_breaks:
-        log.info("Applying clock breaks: {}", ", ".join(clock_breaks))
+        log.info(f"Applying clock breaks: {', '.join(clock_breaks)}")
 
     for cb in clock_breaks:
         # Station names may contain spaces
@@ -140,9 +139,7 @@ def parse_clock_breaks(dset, clock_breaks):
         cb_time = Time(" ".join(cb_date), scale="utc", format="iso")
         if cb_station not in station_breaks:
             log.warn(
-                "Station '{}' with clock break unknown. Available options are {}",
-                cb_station,
-                ", ".join(station_breaks.keys()),
+                f"Station {cb_station} with clock break unknown. Available options are {', '.join(station_breaks)}"
             )
             continue
         station_breaks[cb_station].append(cb_time)
@@ -172,9 +169,9 @@ def parse_reference_clock(stations, ref_clock_str):
     """
     if ref_clock_str not in stations:
         if ref_clock_str:
-            log.warn("Reference clock '{}' unknown. Available options are {}", ref_clock_str, ", ".join(stations))
+            log.warn(f"Reference clock {ref_clock_str!r} unknown. Available options are {', '.join(stations)}")
 
         # Pick last station as default
         ref_clock_str = stations[-1]
-    log.info("Reference clock is '{}'", ref_clock_str)
+    log.info(f"Reference clock is {ref_clock_str!r}")
     return ref_clock_str

@@ -25,7 +25,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -75,9 +75,9 @@ class VlbiNgsSourcesParser(ChainParser):
         """
         src_name = line["name"]
         self.data[src_name] = dict()
-        self.data[src_name]["ra"] = unit.hms_to_rad(
+        self.data[src_name]["ra"] = Unit.hms_to_rad(
             float(line["ra_hrs"]), int(line["ra_mins"]), float(line["ra_secs"])
         )
-        self.data[src_name]["dec"] = unit.dms_to_rad(
+        self.data[src_name]["dec"] = Unit.dms_to_rad(
             float(line["dec_degs"].replace(" ", "")), int(line["dec_mins"]), float(line["dec_secs"])
         )

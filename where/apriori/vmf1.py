@@ -31,7 +31,7 @@ References:
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-from datetime import timedelta, datetime, time
+from datetime import timedelta
 
 # Where imports
 from where.lib import config
@@ -150,6 +150,6 @@ def vmf1_interpolator(vmf1_data):
 
             return value
         else:
-            log.fatal("Input {} is not a list, array, float or int", type(longitude))
+            log.fatal(f"Input {type(longitude)} is not a list, array, float or int")
 
     return interpolate

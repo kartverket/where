@@ -130,10 +130,6 @@ If it is the case that JPL ephemeris are referred to the BCRS, also a vector bet
 is related to the BCRS and not to the Geocentric Celestial Reference Frame (GCRS). So far corrections between BCRS and
 GCRS are not applied. What are the consequences, if we do not consider these corrections?
 
--------
-
-
-
 """
 
 # External library imports
@@ -141,14 +137,15 @@ from jplephem.spk import SPK
 from jplephem import names as eph_names
 import numpy as np
 
+# Midgard imports
+from midgard.files import dependencies
+
 # Where imports
 from where.lib import cache
 from where.lib import config
-from where.lib import dependencies
 from where.lib import files
-from where.lib import log
 from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -197,7 +194,7 @@ class Ephemerides:
         # Open the SPK-file corresponding to the ephemerides
         eph_filepath = files.path("ephemerides", file_vars=dict(ephemerides=ephemerides), download_missing=True)
         self._spk = SPK.open(eph_filepath)  # TODO: Close file in destructor
-        dependencies.add(eph_filepath)
+        dependencies.add(eph_filepath, label="ephemerides")
 
         # Parse segments in SPK file
         self._names, self._segments = self._parse_segments()
@@ -228,7 +225,7 @@ class Ephemerides:
         for segment, factor in self._find_path(from_name, to_name):
             vector += self._spk[segment].compute(time.tdb.jd) * factor
 
-        return vector.T * unit.kilometer2meter
+        return vector.T * Unit.kilometer2meter
 
     @cache.function
     def gcrs(self, from_name, to_name, time=None):
@@ -331,7 +328,7 @@ class Ephemerides:
         for segment, factor in self._find_path(from_name, to_name):
             vector += self._spk[segment].compute_and_differentiate(time.tdb.jd)[1] * factor
 
-        return vector.T * unit.kilometer2meter / unit.day2second
+        return vector.T * Unit.kilometer2meter / Unit.day2second
 
     @cache.function
     def vel_bcrs(self, name, time=None):

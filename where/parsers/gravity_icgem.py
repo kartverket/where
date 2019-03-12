@@ -3,15 +3,14 @@
 Description:
 ------------
 
-asdf
+TODO: Should we use constants in header of file instead of where constants?
 
 
 References:
 -----------
 
-http://icgem.gfz-potsdam.de/ICGEM/documents/ICGEM-Format-2011.pdf
-http://icgem.gfz-potsdam.de/ICGEM/
-
+http://icgem.gfz-potsdam.de/ICGEM-Format-2011.pdf
+http://icgem.gfz-potsdam.de/tom_longtime
 
 http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/
 
@@ -22,72 +21,88 @@ Petit, G. and Luzum, B. (eds.), IERS Conventions (2010),
 
 # Standard library imports
 import itertools
+import pathlib
+from typing import Callable, NamedTuple, Optional, Union
 
 # External library imports
 import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.parsers._parser import Parser
 
-# Where imports
-from where.lib import log
-from where.parsers import parser
+
+class HeaderField(NamedTuple):
+    name: str
+    converter: Callable
+
+
+HEADER_FIELDS = (
+    HeaderField("earth_gravity_constant", float),
+    HeaderField("radius", float),
+    HeaderField("max_degree", int),
+)
 
 
 @plugins.register
-class GravityIcgemParser(parser.ParserDict):
+class GravityIcgemParser(Parser):
     """A parser for reading gravity coefficients from files
     """
 
-    def __init__(self, gravity_field, truncation_level):
-        super().__init__()
+    def __init__(
+        self, file_path: Union[str, pathlib.Path], num_degrees: Optional[int] = None, encoding: Optional[str] = None
+    ) -> None:
+        """Set up the basic information needed by the parser
 
-        self.vars["gravity_field"] = gravity_field
-        self.truncation_level = truncation_level
-        self.data["C"] = np.zeros((truncation_level + 1, truncation_level + 1))
-        self.data["S"] = np.zeros((truncation_level + 1, truncation_level + 1))
-        self.data["C"][0, 0] = 1  # C[0, 0] is always 1, but not always given on file
-
-        # Keep track of which coefficients that have been read
-        self.coeff_read = np.triu(np.ones((truncation_level + 1, truncation_level + 1)), 1)
-        self.coeff_read[0:2, :] = True  # Coeffs of degree 0 and 1 not on file
-
-    #
-    # PARSER for reading geopotential coefficients
-    #
-    def setup_parsers(self):
-        header_parser = parser.define_parser(
-            end_marker=lambda line, _ln, _n: line.startswith("end_of_head"),
-            label=lambda line, _ln: (line + " .").split()[0],
-            parser_def={
-                "earth_gravity_constant": {"parser": self.parse_constant, "fields": [None, "GM"]},
-                "radius": {"parser": self.parse_constant, "fields": [None, "a"]},
-            },
-        )
-
-        coefficient_parser = parser.define_parser(
-            end_marker=lambda _l, _ln, _n: np.all(self.coeff_read),
-            label=lambda line, _ln: (line + " .").split()[0],
-            parser_def={
-                "gfc": {"parser": self.parse_coeff, "fields": [None, "degree", "order", "coeff_C", "coeff_S"]}
-            },
-        )
-
-        return itertools.chain([header_parser, coefficient_parser])
-
-    def parse_coeff(self, line, _):
-        """Parse one line of gravitational data
+        Args:
+            file_path:    Path to file that will be read.
+            num_degrees:  Number of degrees of coefficients to read.
+            encoding:     Encoding of file that will be read.
         """
-        n = int(line["degree"])
-        m = int(line["order"])
+        super().__init__(file_path, encoding=encoding)
+        self.num_degrees = num_degrees
+        self.raw = None
 
-        if n > self.truncation_level or m > self.truncation_level:
-            return
+    def read_data(self):
+        with open(self.file_path, mode="rt", encoding=self.file_encoding) as fid:
+            self._read_header(fid)
+            self._read_coeffs(fid)
 
-        # TODO: Conversion from d to e only needed for C_00 in egm2008.gfc?
-        self.data["C"][n, m] = float(line["coeff_C"].replace("d", "e"))
-        self.data["S"][n, m] = float(line["coeff_S"].replace("d", "e"))
-        self.coeff_read[n, m] = True
+        self._organize_data()
 
-    def parse_constant(self, line, _):
-        log.warn("TODO: parse_constant {}", line)
+    def _read_header(self, fid):
+        header_fields = {h.name: h for h in HEADER_FIELDS}
+        for line in fid:
+            if line.startswith("end_of_head"):
+                break
+            fields = line.strip().split()
+            if fields and fields[0] in header_fields:
+                header_def = header_fields[fields[0]]
+                self.meta[header_def.name] = header_def.converter(fields[1])
+        else:
+            raise  # File ended without end_of_head
+
+    def _read_coeffs(self, fid):
+        if self.num_degrees is None:
+            self.num_degrees = self.meta["max_degree"]
+
+        # Skip orders below 2
+        fid = itertools.dropwhile(lambda line: int(line.split()[1]) < 2, fid)
+
+        # Read coefficient lines
+        num_coeffs = int((self.num_degrees + 1) * (self.num_degrees + 2) / 2) - 3  # Skipping orders 00, 10, 11
+        coeff_lines = itertools.islice(fid, num_coeffs)
+        self.raw = np.genfromtxt(
+            coeff_lines,
+            names=("key", "degree", "order", "C", "S", "sigma_C", "sigma_S"),
+            dtype=("U4", "i8", "i8", "f8", "f8", "f8", "f8"),
+        )
+
+    def _organize_data(self):
+        self.data["C"] = np.zeros((self.num_degrees + 1, self.num_degrees + 1))
+        self.data["S"] = np.zeros((self.num_degrees + 1, self.num_degrees + 1))
+        self.data["C"][0, 0] = 1  # C[0, 0] is always 1
+
+        # Add data to matrices
+        self.data["C"][self.raw["degree"], self.raw["order"]] = self.raw["C"]
+        self.data["S"][self.raw["degree"], self.raw["order"]] = self.raw["S"]

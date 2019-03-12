@@ -39,7 +39,7 @@ def write_notebook(rundate, tech):
 
     nb_filename = files.path("output_notebook")
     nbformat.write(notebook, nb_filename)
-    log.info("Create Jupyter Notebook report. To open:\n        jupyter notebook {}", nb_filename)
+    log.info(f"Create Jupyter Notebook report. To open:\n        jupyter notebook {nb_filename}")
 
 
 def _get_kernelspec(name):

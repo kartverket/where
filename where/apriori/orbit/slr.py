@@ -34,21 +34,20 @@ from where import parsers
 class Slr(orbit.AprioriOrbit):
     """A class for representing apriori slr orbits
 
-    SP3 orbit files can be read. 
+    SP3 orbit files can be read.
 
     Attributes:
         day_offset (int):       Day offset used to calculate the day to read.
-        dset_orbit (Dataset):   Dataset object, which includes orbits read from SP3 file 
+        dset_orbit (Dataset):   Dataset object, which includes orbits read from SP3 file
         dset_raw (Dataset):     Dataset object, which includes observations etc.
         file_key (str):         Key to the orbit file defined in files.conf file.
         file_path (pathlib.PosixPath):  File path to SP3 orbit file.
-        satellite (tuple):      Satellite number 
+        satellite (tuple):      Satellite number
         time (Time):            epochs
 
 
     Methods:
         _read():                Read orbit file data and save it in a Dataset
-
     """
 
     def __init__(self, rundate, time, satellite, system=None, file_key=None, file_path=None, day_offset=6, **kwargs):
@@ -73,7 +72,7 @@ class Slr(orbit.AprioriOrbit):
     def _read(self, dset_raw, provider, version):
         """Read SP3 orbit file data and save it in a Dataset
 
-        Naming convention correspond to end of arc, at midnight, hence we add day_offset, 
+        Naming convention correspond to end of arc, at midnight, hence we add day_offset,
         which is usually arc_length - 1
 
         Args:
@@ -92,7 +91,7 @@ class Slr(orbit.AprioriOrbit):
         else:
             file_path = self.file_path
 
-        log.debug("Parse precise orbit file {}.", file_path)
+        log.debug(f"Parse precise orbit file {file_path}")
 
         # Generate temporary Dataset with orbit file data
         dset_orbit = data.Dataset(

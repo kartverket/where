@@ -3,7 +3,7 @@
 Example:
 --------
 
-    from where import parsers
+    from midgard import parsers
     p = parsers.parse_file(parser_name='terrapos_residual', file_path='PPP-residuals.txt')
     data = p.as_dict()
 
@@ -15,9 +15,7 @@ Reads data from files in Terrapos residual format.
 """
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_line import LineParser
+from midgard.parsers import LineParser
 
 
 @plugins.register

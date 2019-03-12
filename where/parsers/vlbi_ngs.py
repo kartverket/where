@@ -23,21 +23,18 @@ References:
 # Standard library imports
 import itertools
 
-# External library imports
-import numpy as np
-
 # Midgard imports
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
-class VlbiNgs2Parser(ChainParser):
+class VlbiNgsParser(ChainParser):
     """A parser for reading VLBI data from NGS files
     """
 
@@ -171,12 +168,12 @@ class VlbiNgs2Parser(ChainParser):
         if unit_in == "meter":
             scale_factor = 1
         else:
-            quantity = unit(unit_in)
+            quantity = Unit(unit_in)
             try:
                 scale_factor = quantity.to("meter").magnitude
-            except unit.DimensionalityError:
+            except Unit.DimensionalityError:
                 # Try to convert between time and length by multiplying by the speed of light
-                scale_factor = (quantity * constant.c * unit("meters per second")).to("meter").magnitude
+                scale_factor = (quantity * constant.c * Unit("meters per second")).to("meter").magnitude
         obs = {}
 
         # Define the function doing the actual parsing
@@ -188,7 +185,7 @@ class VlbiNgs2Parser(ChainParser):
                     obs[field] = float(line[field])
                 except ValueError:
                     obs[field] = 0
-                    log.debug("Could not convert {} to a number for {}. Value set to 0.0.", line[field], field)
+                    log.debug(f"Could not convert {line['field']} to a number for {field}. Value set to 0.0")
                 if field not in except_fields:
                     obs[field] *= scale_factor
             for field, value in obs.items():

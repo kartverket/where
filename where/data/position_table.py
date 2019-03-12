@@ -3,9 +3,6 @@
 Description:
 
 asdf.
-
-
-
 """
 
 # External library imports
@@ -18,10 +15,10 @@ from where.data.table import Table
 from where.ext import sofa
 from where.lib import cache
 from where.lib import config
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import rotation
-from where.lib.unit import unit as lib_unit
+from where.lib.unit import Unit
 
 
 class PositionTable(Table):
@@ -36,8 +33,8 @@ class PositionTable(Table):
         """
         super().__init__(name, num_obs, dataset)
 
-        # Add units for PositionTable-properties (set by @lib_unit.register)
-        self._prop_units = lib_unit.units_dict(__name__)
+        # Add units for PositionTable-properties (set by @Unit.register)
+        self._prop_units = Unit.units_dict(__name__)
 
         # Organize data in attributes instead of a data-dict
         self._itrs = np.full((self.num_obs, 3), np.nan, dtype=float)
@@ -260,7 +257,7 @@ class PositionTable(Table):
         self.clear_cache("time")
 
     @property
-    @lib_unit.register("meter")
+    @Unit.register("meter")
     def itrs(self):
         self._assert_itrs()
         return self._itrs
@@ -274,7 +271,7 @@ class PositionTable(Table):
         self.clear_cache("pos")
 
     @property
-    @lib_unit.register("meter")
+    @Unit.register("meter")
     def itrs_pos(self):
         """Get position vector in ITRS
 
@@ -292,7 +289,7 @@ class PositionTable(Table):
         self.itrs += dxyz
 
     @property
-    @lib_unit.register("meter")
+    @Unit.register("meter")
     def gcrs(self):
         self._assert_gcrs()
         return self._gcrs
@@ -306,7 +303,7 @@ class PositionTable(Table):
         self.clear_cache("pos")
 
     @property
-    @lib_unit.register("meter")
+    @Unit.register("meter")
     def gcrs_pos(self):
         """Get position vector in GCRS
 
@@ -331,7 +328,7 @@ class PositionTable(Table):
         """
         ref_ellipsoid_cfg = config.tech.get("reference_ellipsoid")
         ref_ellipsoid = ref_ellipsoid_cfg.as_enum("reference_ellipsoid")
-        log.debug("Using reference ellipsoid {} as specified in {}", ref_ellipsoid.name, ref_ellipsoid_cfg.source)
+        log.debug(f"Using reference ellipsoid {ref_ellipsoid.name} as specified in {ref_ellipsoid_cfg.source}")
         return ref_ellipsoid
 
     @property
@@ -380,7 +377,7 @@ class PositionTable(Table):
             numpy.ndarray: Rotation matrix
         """
         lat, lon, _ = self.llh.T
-        return rotation.enu2trf(lat, lon)
+        return rotation.enu2trs(lat, lon)
 
     @cache.dependent_property.pos
     def _itrs2enu(self):
@@ -444,7 +441,7 @@ class PositionTable(Table):
         return llh
 
     @cache.dependent_property.pos.other.time
-    @lib_unit.register("meter")
+    @Unit.register("meter")
     def vector(self):
         try:
             return self._other_tbl.gcrs[:, :3] - self.gcrs[:, :3]
@@ -452,7 +449,7 @@ class PositionTable(Table):
             raise TypeError("No other position or direction defined. Use connect to add.") from None
 
     @cache.dependent_property.pos.other.time
-    @lib_unit.register("meter")
+    @Unit.register("meter")
     def distance(self):
         return np.linalg.norm(self.vector, axis=1)
 
@@ -481,20 +478,20 @@ class PositionTable(Table):
             raise TypeError("No other position or direction defined. Use connect to add.") from None
 
     @cache.dependent_property.pos.other.time
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def azimuth(self):
         east_proj = (self.direction[:, None, :] @ self._time.itrs2gcrs @ self.enu_east[:, :, None])[:, 0, 0]
         north_proj = (self.direction[:, None, :] @ self._time.itrs2gcrs @ self.enu_north[:, :, None])[:, 0, 0]
         return np.arctan2(east_proj, north_proj)
 
     @cache.dependent_property.pos.other.time
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def elevation(self):
         up_proj = (self.direction[:, None, :] @ self._time.itrs2gcrs @ self.enu_up[:, :, None])[:, 0, 0]
         return np.arcsin(up_proj)
 
     @cache.dependent_property.pos.other.time
-    @lib_unit.register("radians")
+    @Unit.register("radians")
     def zenith_distance(self):
         return np.pi / 2 - self.elevation
 

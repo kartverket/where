@@ -18,7 +18,7 @@ import numpy as np
 from where.apriori import trf
 from where.lib import plugins
 from where.lib.time import Time
-from where.lib.unit import unit
+from where.lib.unit import Unit
 from where import parsers
 
 
@@ -51,7 +51,7 @@ class Vascc(trf.TrfFactory):
 
         ref_pos = np.array(station_info["pos"])
         ref_vel = np.array(station_info["vel"])
-        interval_years = (self.time - ref_epoch).jd * unit.day2julian_years
+        interval_years = (self.time - ref_epoch).jd * Unit.day2julian_years
         pos[:, :] = ref_pos + interval_years[:, None] * ref_vel[None, :]
 
         return pos

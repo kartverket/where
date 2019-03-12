@@ -29,7 +29,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers import parser
-from where.lib import constant
+from midgard.math.constant import constant
 
 
 @plugins.register

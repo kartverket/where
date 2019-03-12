@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run the Where program to do analysis of space geodetic data
 
-Usage::
+Usage:
 
-    {exe} date pipeline [--session=session] [options]
+    {exe} <date> <pipeline> [--session=<session>] [options]
 
 The program requires a date. Typically, the date is given in the format
 `<year month day>` (for example 2015 8 4). However, it is also possible to
@@ -28,7 +28,7 @@ Option               Description
 -E, --edit           Edit the configuration of an analysis.
 -F, --force          Run all stages even if no dependencies have changed.
 -I, --interactive    Start an interactive session with analysis data available.
--N, --new            Start a new analysis (combine with -A or -D).
+-N, --new            Start an analysis with a new config.
 -S, --showconfig     Show the configuration of an analysis.
 -T, --showtb         Show traceback if the program crashes.
 --id=analysisid      Add a special analysis id (to run several versions of the
@@ -46,9 +46,9 @@ Option               Description
 -h, --help           Show this help message and exit.
 ===================  ===========================================================
 
-
 Finally, configuration settings of an analysis can be changed using command line
 options. Run an analysis with the `-S` option for details.
+
 
 Description:
 ------------
@@ -59,7 +59,7 @@ This program is used to run a Where analysis.
 Examples:
 ---------
 
-Here are some concrete examples of how to run the program:
+Here are some concrete examples of how to run Where:
 
 Run a VLBI analysis for August 4 2015:
 
@@ -73,17 +73,9 @@ Change the spam option of the GNSS analysis:
 
     {exe} 2016 3 1 -g --spam=ham
 
-Look at the configuration of all VLBI analyses set up for November 2 2009::
+Look at the configuration of all VLBI analyses set up for November 2 2009:
 
     {exe} 2009 11 2 --vlbi -S
-
-Run a complete SLR analysis for January 28 2017::
-
-    {exe} 2017 1 28 -s -F
-
-Run the VLBI analysis for August 4 2015 only for session XA::
-
-    {exe} 2015 8 4 --vlbi --only_session=XA
 
 
 Current Maintainers:
@@ -100,6 +92,7 @@ import sys
 # Where imports
 from where import pipelines
 from where import setup
+from where.lib import config
 from where.lib import log
 from where.lib.timer import timer
 from where.lib import util
@@ -113,15 +106,19 @@ def main():
     Do simple parsing of command line arguments. Set up config-files and start the analysis. See the help docstring at
     the top of the file for more information about the workflow.
     """
+    util.check_help_and_version(doc_module=__name__)
+
     # Start logging
-    log.init()
+    log.init(config.where.log.default_level.str)
+    log.debug(f"Use {util.get_python_version()} on process {util.get_pid_and_server()}")
 
     # Read command line options
+    pipeline = pipelines.get_from_options()
+    config.read_pipeline(pipeline)
     if util.check_options("--doy"):
         rundate = util.parse_args("doy", doc_module=__name__)
     else:
         rundate = util.parse_args("date", doc_module=__name__)
-    pipeline = pipelines.get_from_options()
     session = pipelines.get_session(rundate, pipeline)
 
     # Pretend to empty mailbox
@@ -129,7 +126,7 @@ def main():
 
     # Start an interactive session
     if util.check_options("-I", "--interactive"):
-        from where.tools import interactive
+        from where.tools import interactive  # Local import because interactive imports many external packages
 
         interactive.interactive(rundate, pipeline, session)
         return

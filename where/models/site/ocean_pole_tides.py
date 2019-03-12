@@ -23,9 +23,9 @@ import numpy as np
 
 # Where imports
 from where import apriori
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -78,8 +78,8 @@ def ocean_pole_tides_station(dset, opt):
     gamma_2_I = 0.0036
 
     # Equation (7.24) IERS Conventions 2010
-    m_1 = (eop.x - eop.x_mean) * unit.arcsec2rad
-    m_2 = (eop.y_mean - eop.y) * unit.arcsec2rad
+    m_1 = (eop.x - eop.x_pole) * Unit.arcsec2rad
+    m_2 = (eop.y_pole - eop.y) * Unit.arcsec2rad
 
     lat, lon, _ = dset.site_pos.llh.T
 

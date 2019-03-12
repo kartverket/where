@@ -12,28 +12,23 @@ import itertools
 
 # External library imports
 import numpy as np
-from scipy import misc, interpolate
 
 # Midgard imports
 from midgard.dev import plugins
 
 # Where imports
-from where.parsers import parser
-from where.lib.unit import unit
+from where.parsers._parser_chain import ChainParser, ParserDef
+from where.lib.unit import Unit
 
 
 @plugins.register
-class SlrPredictionParser(parser.ParserDict):
+class SlrPredictionParser(ChainParser):
     """A parser for reading SLR prediction files (CPF format)
     """
 
-    def __init__(self, rundate, file_path):
-        super().__init__(rundate)
-        self.file_path = file_path
-
-    def setup_parsers(self):
+    def setup_parser(self):
         # Data are organized in tables of positions (and sometimes velocities)
-        header_parser = parser.define_parser(
+        header_parser = ParserDef(
             end_marker=lambda _l, _ln, nextline: nextline[0:2].isnumeric(),
             label=lambda line, _ln: line[0:2].upper(),
             parser_def={
@@ -51,7 +46,7 @@ class SlrPredictionParser(parser.ParserDict):
             },
         )
         # Each line contains information about the satellite at a given time.
-        orbit_parser = parser.define_parser(
+        orbit_parser = ParserDef(
             end_marker=lambda _l, _ln, nextline: nextline[0:2] == "99",
             label=lambda line, _ln: line[0:2],
             parser_def={
@@ -77,9 +72,17 @@ class SlrPredictionParser(parser.ParserDict):
 
         return itertools.chain([header_parser], itertools.repeat(orbit_parser))
 
+    def parse_default(self, line, _):
+        """Add the contents of line to data
+
+        Args:
+            line: Dict containing the fields of a line.
+        """
+        self.data.update(line)
+
     def parse_position(self, line, cache):
         mjd1 = int(line.pop("mjd"))
-        mjd2 = float(line.pop("seconds_of_day")) * unit.sec2day
+        mjd2 = float(line.pop("seconds_of_day")) * Unit.sec2day
         line["pos"] = np.array([float(line.pop("pos_x")), float(line.pop("pos_y")), float(line.pop("pos_z"))])
 
         self.data.setdefault("positions", dict()).setdefault((mjd1, mjd2), dict()).update(line)

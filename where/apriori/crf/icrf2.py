@@ -3,13 +3,11 @@
 Description:
 ------------
 
-Reads source positions ICRF2 files. Source positions are considered constant in ICRF2. See :cite:'icrf2009'
+Reads source positions ICRF2 files. Source positions are considered constant in ICRF2. 
 
 References:
 -----------
-
-
-
+:cite:'icrf2009'
 
 """
 
@@ -18,14 +16,8 @@ import numpy as np
 
 # Where imports
 from where.apriori import crf
-from where.lib import files
-from where.lib import log
 from where.lib import plugins
 from where import parsers
-from where.lib import rotation
-from where.ext import sofa_wrapper as sofa
-from where.lib.time import Time
-from where.lib.unit import unit
 
 
 @plugins.register
@@ -34,12 +26,10 @@ class Icrf2(crf.CrfFactory):
     """
 
     def _read_data(self):
-        """Read data needed by this Reference Frame for calculating positions of sites
-
-        Delegates to _read_data_<self.format> to read the actual data.
+        """Read data needed by this Celestial Reference Frame for calculating positions of sources
 
         Returns:
-            Dict:  Dictionary containing data about each site defined in this reference frame.
+            Dict:  Dictionary containing data about each source defined in this reference frame.
         """
         data = parsers.parse_key(file_key="icrf2_non_vcs").as_dict()
         data.update(parsers.parse_key(file_key="icrf2_vcs_only").as_dict())

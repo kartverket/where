@@ -25,7 +25,7 @@ from where.lib import config
 from where.estimation import estimators
 from where.lib import log
 from where.lib import plugins
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 def partial_vectors(dset, estimator_config_key):
@@ -51,12 +51,13 @@ def partial_vectors(dset, estimator_config_key):
 
         for param, (data, names, data_unit) in partial_data.items():
             param_unit_cfg = config.tech[param].unit
-            log.assert_true(param_unit_cfg.str, "No unit given for parameter '{}' in {}", param, param_unit_cfg.source)
+            if not param_unit_cfg.str:
+                log.fatal(f"No unit given for parameter {param!r} in {param_unit_cfg.source}")
 
             display_unit = config.tech[param].display_unit.str
             display_unit = param_unit_cfg.str if not display_unit else display_unit
-            partial_unit = str(unit("{} / ({})".format(dset.unit("calc"), param_unit_cfg.str)).u)
-            factor = unit(data_unit, partial_unit)
+            partial_unit = str(Unit("{} / ({})".format(dset.unit("calc"), param_unit_cfg.str)).u)
+            factor = Unit(data_unit, partial_unit)
             for values, name in zip(data.T, names):
                 partial_name = "{}-{}".format(param, name)
                 dset.add_float(

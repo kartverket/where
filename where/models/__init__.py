@@ -30,12 +30,22 @@ from where.lib import log
 from where.models import delay
 from where.models import site
 
-# Make orbit functions available
-# from where.models.orbit._orbit import calculate as calculate_orbit, update_orbit  # noqa
-
 # Make documentation functions available
 from where.models.delay import doc as doc_delay  # noqa
 from where.models.site import doc as doc_site  # noqa
+
+# Make orbit functions optionally available (does not require compilation if orbits are not used)
+try:
+    from where.models.orbit._orbit import calculate as calculate_orbit, update_orbit  # noqa
+except ImportError:
+    from midgard.dev import optional
+
+    calculate_orbit = optional.SimpleMock(
+        "where.models.orbit._orbit.calculate", error_msg="Try running setup_cython.py to compile the orbit modules"
+    )
+    update_orbit = optional.SimpleMock(
+        "where.models.orbit._orbit.update_orbit", error_msg="Try running setup_cython.py to compile the orbit modules"
+    )
 
 
 def calculate_delay(config_key, dset_in, dset_out=None, shape=(), write_levels=None):
@@ -92,6 +102,8 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, shape, write
 
     for model_name, values in sorted(model_output.items()):
         if model_name in dset_out.fields:
+            # TODO: Add possibilty to change table to 'calc_models' from a 'float_data' table 
+            #       (dset_out._fields[model_name] = config_key)
             dset_out[model_name][:] = values
         else:
             dset_out.add_float(
@@ -103,4 +115,4 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, shape, write
                 write_level=write_levels.get(model_name, "analysis"),
             )
 
-        log.info("Average correction = {:14.5f} in {} model", dset_out.rms(model_name), model_name)
+        log.info(f"Average correction = {dset_out.rms(model_name):14.5f} in {model_name} model")

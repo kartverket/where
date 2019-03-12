@@ -24,7 +24,6 @@ import pandas as pd
 import where
 from where import apriori
 from where import cleaners
-from where.lib import config
 from where.lib import files
 from where.lib import gnss
 from where.lib import plugins

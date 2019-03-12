@@ -59,7 +59,7 @@ class NetCDFParser(Parser):
         if variable.dtype == "S1":
             try:
                 values = np.core.defchararray.strip(netCDF4.chartostring(variable[:]))
-            except UnicodeDecodeError:
+            except (UnicodeDecodeError, ValueError):
                 # TODO: only happened with fields we are ignoring anyway so far
                 values = np.core.defchararray.strip(netCDF4.chartostring(variable[:], encoding="bytes"))
         else:

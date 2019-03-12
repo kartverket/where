@@ -7,7 +7,7 @@ Example:
     from where import parsers
 
     # Parse data
-    parser = parsers.parse('orbit_sp3d', file_path=file_path, rundate=rundate)
+    parser = parsers.parse('orbit_sp3d', file_path=file_path)
 
     # Create a empty Dataset
     dset = data.Dataset(rundate=rundate, tech=tech, stage=stage, dataset_name=name, dataset_id=0, empty=True)
@@ -26,7 +26,7 @@ the GPS time scale. The orbit position and velocities are given normally for eve
 The file to be parsed should be specified like:
 
     from where import parsers
-    parser = parsers.parse('orbit_sp3c', file_path=file_path, rundate=rundate)
+    parser = parsers.parse('orbit_sp3c', file_path=file_path)
 
 
 TODO:
@@ -47,15 +47,15 @@ import numpy as np
 from midgard.dev import plugins
 
 # Where imports
-from where.parsers import parser
+from where.parsers._parser_chain import ChainParser, ParserDef
 from where.lib import config
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
-class OrbitSp3dParser(parser.Parser):
+class OrbitSp3dParser(ChainParser):
     """A parser for reading data from SP3-d orbit files
 
     Attributes:
@@ -64,12 +64,8 @@ class OrbitSp3dParser(parser.Parser):
         dependencies (list):     List of files that have been read by the parser.
         file_key (str):          Key to the SP3 orbit file defined in files.conf file.
         file_path (pathlib.PosixPath):  File path to SP3 orbit file.
-        meta (dict):             Dict containing the metainformation read from file, whereby the current days define the
-                                 keys and the values are the SP3 header entries.
-        rundate (datetime.date): Date of model run.
-        vars (dict):             Variables needed to define date identifiers for saving SP3 header information in 'meta'
-                                 variable.
-
+        meta (dict):             Dict containing the metainformation read from file, whereby SP3 header entries define
+                                 the keys.
 
     Methods:
         calculate_data()        Carry out the defined calculators
@@ -92,23 +88,13 @@ class OrbitSp3dParser(parser.Parser):
         _parse_velocity()       Parse orbit velocity
     """
 
-    def __init__(self, rundate, file_path):
-        """Set up the basic information needed by the parser
-
-        Args:
-            rundate (datetime.date):    The model run date.
-            file_path (str):            Path to orbit-file to parse.
-        """
-        super().__init__(rundate=rundate, file_path=file_path)
-        self.vars = config.date_vars(rundate)
-
     #
     # PARSER for reading each line of the SP3 file.
     #
-    def setup_parsers(self):
+    def setup_parser(self):
 
         # Parser for SP3 header
-        header_parser = parser.define_parser(
+        header_parser = ParserDef(
             end_marker=lambda _l, _ln, next_line: next_line.startswith("*"),
             # end_marker=lambda _l, line_num, _n: line_num == 22,
             label=lambda _l, line_num: line_num,
@@ -165,7 +151,7 @@ class OrbitSp3dParser(parser.Parser):
         # PG06 -19896.425641    760.039334 -17564.616810    153.322562 12 10 13 104
         # PG07  -5499.233721 -14614.719047  21564.675152    467.390140  7 10  7 123
         # PG08   7359.468852 -20268.667422  15550.334189    -25.778533  8  6  8 113
-        data_parser = parser.define_parser(
+        data_parser = ParserDef(
             end_marker=lambda _l, _ln, next_line: next_line.startswith("*"),
             label=lambda line, _ln: line[0],
             parser_def={
@@ -210,6 +196,9 @@ class OrbitSp3dParser(parser.Parser):
 
         return itertools.chain([header_parser], itertools.repeat(data_parser))
 
+    #
+    # HEADER PARSER
+    #
     def _parse_date(self, line, cache):
         """Parse date orbit position/velocity block
 
@@ -233,45 +222,49 @@ class OrbitSp3dParser(parser.Parser):
         Args:
             line (dict):  Dict containing the fields of a line.
         """
-        date = "{year}-{month:02d}-{day:02d}".format(
-            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-        )  # TODO: What would be a better solution for getting current date?
-
         for k, v in line.items():
-            self.meta.setdefault(date, dict()).update({k: float(v)})
+            self.meta[k] = float(v)
 
+    def _parse_string(self, line, _):
+        """Parse string entries of SP3 header to instance variable 'meta'
+
+        Args:
+            line (dict):  Dict containing the fields of a line.
+        """
+        for k, v in line.items():
+            self.meta[k] = v
+
+    #
+    # OBSERVATION PARSER
+    #
     def _parse_position(self, line, cache):
         """Parse orbit position
 
         Bad or absent position values indicated by 0.000000 and clock values indicated by 999999.999999 are set to
         not a number 'nan'.
 
-        Satellite identifier (e.g. G01) consists of satellite system identicator 'G' and a satellite number '01'. In the
-        SP3-a format the satellite system identicator is not used. SP3-a was designed only for GPS satellites, therefore
-        if the format version 'a' is given, the satellite system identicator 'G' is introduced before the satellite
-        number.
+        Satellite identifier (e.g. G01) consists of satellite system identicator 'G' and a satellite number '01'. In
+        the SP3-a format the satellite system identicator is not used. SP3-a was designed only for GPS satellites,
+        therefore if the format version 'a' is given, the satellite system identicator 'G' is introduced before the
+        satellite number.
 
-        The standard deviations of the satellite and the clock correction has to multiplied with the base floating point
-        numbers defined in header line 15.
+        The standard deviations of the satellite and the clock correction has to multiplied with the base floating
+        point numbers defined in header line 15.
 
         Args:
             line (dict):  Dict containing the fields of a line.
             cache (dict): Temporary dictionary with the fields 'key' and 'values'.
+
         """
 
         # Remove identical epochs given in two different SP3 files
         if cache["line_num"] == 2:
-            if "time" in self.data:
-                if cache["time"] in self.data["time"]:
-                    log.warn("Identical epoch {} given in the SP3 files.", cache["time"])
-                    return
-
-        date = "{year}-{month:02d}-{day:02d}".format(
-            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-        )  # TODO: What would be a better solution for getting current date?
+            if "time" in self.data and cache["time"] in self.data["time"]:
+                log.warn(f"Identical epoch {cache['time']} given in the SP3 files")
+                return
 
         # SP3-a (GPS-only) format files missing satellite system identicator 'G' before satellite number
-        if self.meta[date]["version"] == "a":
+        if self.meta["version"] == "a":
             line["sat"] = "G" + line["sat"].zfill(2)
 
         # Set bad or absent positional values to 'nan' indicated by 0.000000
@@ -280,7 +273,7 @@ class OrbitSp3dParser(parser.Parser):
                 line[k] = float("nan")
 
         # Set bad or absent clock bias values to 'nan' indicated by 999999.999999
-        if float(line["clk_bias"]) == 999999.999999:
+        if float(line["clk_bias"]) == 999_999.999_999:
             line["clk_bias"] = float("nan")
 
         # Set not given sigmas in SP3 file to 'nan'
@@ -291,36 +284,23 @@ class OrbitSp3dParser(parser.Parser):
         self.data.setdefault("time", list()).append(cache["time"])
         self.data.setdefault("satellite", list()).append(line["sat"])
         self.data.setdefault("sat_pos", list()).append(
-            np.array([float(line["pos_x"]), float(line["pos_y"]), float(line["pos_z"])]) * unit.kilometer2meter
+            np.array([float(line["pos_x"]), float(line["pos_y"]), float(line["pos_z"])]) * Unit.kilometer2meter
         )
         self.data.setdefault("sat_clock_bias", list()).append(
-            float(line["clk_bias"]) * unit.microsecond2second * constant.c
+            float(line["clk_bias"]) * Unit.microsecond2second * constant.c
         )
         self.data.setdefault("sat_pos_sigma", list()).append(
             np.array([float(line["sig_pos_x"]), float(line["sig_pos_y"]), float(line["sig_pos_z"])])
-            * self.meta[date]["base_posvel"]
-            * unit.millimeter2meter
+            * self.meta["base_posvel"]
+            * Unit.millimeter2meter
         )
         self.data.setdefault("sat_clock_bias_sigma", list()).append(
-            float(line["sig_clk_bias"]) * self.meta[date]["base_clkrate"] * unit.picosecond2second * constant.c
+            float(line["sig_clk_bias"]) * self.meta["base_clkrate"] * Unit.picosecond2second * constant.c
         )
 
         # Get GNSS identifier
         sys = line["sat"][0]
         self.data.setdefault("system", list()).append(sys)
-
-    def _parse_string(self, line, _):
-        """Parse string entries of SP3 header to instance variable 'meta'
-
-        Args:
-            line (dict):  Dict containing the fields of a line.
-        """
-        date = "{year}-{month:02d}-{day:02d}".format(
-            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-        )  # TODO: What would be a better solution for getting current date?
-
-        for k, v in line.items():
-            self.meta.setdefault(date, dict()).update({k: v})
 
     def _parse_velocity(self, line, cache):
         """Parse orbit velocity
@@ -334,20 +314,20 @@ class OrbitSp3dParser(parser.Parser):
         return  # TODO: Has to be implemented correctly!!!!
 
         self.data.setdefault("sat_vel", list()).append(
-            np.array([float(line["vel_x"]), float(line["vel_y"]), float(line["vel_z"])]) * unit.decimeter2meter
+            np.array([float(line["vel_x"]), float(line["vel_y"]), float(line["vel_z"])]) * Unit.decimeter2meter
         )
-        self.data.setdefault("sat_clock_rate", list()).append(float(line["clk_rate"]) * unit.microsecond2second)
+        self.data.setdefault("sat_clock_rate", list()).append(float(line["clk_rate"]) * Unit.microsecond2second)
 
         # Check if sigmas are defined in SP3 file (TODO: better solution?)
         if line["sig_vel_x"] != "":
             self.data.setdefault("sat_vel_sigma", list()).append(
                 np.array([float(line["sig_vel_x"]), float(line["sig_vel_y"]), float(line["sig_vel_z"])])
                 * 10 ** -4
-                * self.meta[date]["base_posvel"]
-                * unit.millimeter2meter
+                * self.meta["base_posvel"]
+                * Unit.millimeter2meter
             )
             self.data.setdefault("sat_clock_rate_sigma", list()).append(
-                float(line["sig_clk_rate"]) * 10 ** -4 * self.meta[date]["base_clkrate"] * unit.picosecond2second
+                float(line["sig_clk_rate"]) * 10 ** -4 * self.meta["base_clkrate"] * Unit.picosecond2second
             )
 
     #
@@ -401,7 +381,7 @@ class OrbitSp3dParser(parser.Parser):
         mjd_int                Integer part of Modified Julian Day at the first orbit epoch
         month                  Month of Gregorian date of first orbit epoch
         num_epoch              Number of epochs in the ephermeris file
-        orb_type               Orbit type  (F - fitted, E - extrapolated or predicted, B - broadcast, HLM - Helmert ...)
+        orb_type               Orbit type (F - fitted, E - extrapolated or predicted, B - broadcast, HLM - Helmert ...)
         pv_flag                Position (P) or velocity (V) flag
         second                 Seconds of Gregorian date of first orbit epoch
         time_sys               Time system (GPS, GLO, GAL, TAI, UTC)
@@ -412,15 +392,13 @@ class OrbitSp3dParser(parser.Parser):
         """
         dset.num_obs = len(self.data["time"])
         dset.meta.update(self.meta)
-        date = "{year}-{month:02d}-{day:02d}".format(
-            year=int(self.vars["yyyy"]), month=int(self.vars["m"]), day=int(self.vars["d"])
-        )  # TODO: What would be a better solution for getting current date?
-        if dset.meta[date]["time_sys"] == "GPS":
+
+        if dset.meta["time_sys"] == "GPS":
             dset.add_time("time", val=self.data["time"], scale="gps")
-        elif dset.meta[date]["time_sys"] == "UTC":
+        elif dset.meta["time_sys"] == "UTC":
             dset.add_time("time", val=self.data["time"], scale="utc")
         else:
-            log.fatal("Time system {} is not handled so far in Where.", dset.meta[date]["time_sys"])
+            log.fatal(f"Time system {dset.meta['time_sys']} is not handled so far in Where.")
 
         dset.add_text("satellite", val=self.data["satellite"])
         dset.add_text("system", val=self.data["system"])

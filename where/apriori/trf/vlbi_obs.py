@@ -5,9 +5,6 @@ Description:
 
 Reads station positions and velocities from the VLBI observation files in either NGS or vgosdb format. No velocities
 are available in the observation files, so the same position is used for all time epochs.
-
-
-
 """
 
 # Where imports
@@ -36,7 +33,7 @@ class VlbiObsTrf(trf.TrfFactory):
         try:
             return getattr(self, "_read_data_{}".format(fmt))()
         except AttributeError:
-            log.fatal("Format '{}' is unknown for reference frame {}", fmt, self)
+            log.fatal(f"Format {fmt!r} is unknown for reference frame {self}")
 
     def _read_data_vgosdb(self):
         """Read data from vgosdb observation files
@@ -46,11 +43,17 @@ class VlbiObsTrf(trf.TrfFactory):
         """
         station_codes = apriori.get("vlbi_station_codes")
         data = parsers.parse_key("vlbi_obs_stations_vgosdb").as_dict()
+        try:
+            stations = data["AprioriStationList"]
+            xyz = data["AprioriStationXYZ"]
+        except KeyError:
+            return {}
+
         return {
             (station_codes[n]["cdp"] if n in station_codes else "key{}".format(i)): (
                 dict(name=n, pos=p, **station_codes[n]) if n in station_codes else dict(name=n, pos=p, real=False)
             )
-            for i, (n, p) in enumerate(zip(data["AprioriStationList"], data["AprioriStationXYZ"]))
+            for i, (n, p) in enumerate(zip(stations, xyz))
         }
 
     def _read_data_ngs(self):

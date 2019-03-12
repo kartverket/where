@@ -15,7 +15,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_line import LineParser
-from where.lib.unit import unit
+from where.lib.unit import Unit
 
 
 @plugins.register
@@ -52,8 +52,8 @@ class Icrf2VscOnlyParser(LineParser):
         )
 
     def structure_data(self):
-        ra = unit.hms_to_rad(self._array["ra_h"], self._array["ra_m"], self._array["ra_s"])
-        dec = unit.dms_to_rad(self._array["dec_deg"], self._array["dec_m"], self._array["dec_s"])
+        ra = Unit.hms_to_rad(self._array["ra_h"], self._array["ra_m"], self._array["ra_s"])
+        dec = Unit.dms_to_rad(self._array["dec_deg"], self._array["dec_m"], self._array["dec_s"])
 
         src_type = dict(vcs=True, non_vcs=False, defining=False, special=False, undefined=False)
         self.data = {

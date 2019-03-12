@@ -135,7 +135,7 @@ class Dataset(object):
         if self.name not in json_all:
             raise FileNotFoundError("Dataset {} not found in file {}".format(self.name, json_path))
 
-        log.debug("Read dataset {tech}-{stage} from disk at {directory}", directory=json_path.parent, **self.vars)
+        log.debug(f"Read dataset {self.vars['tech']}-{self.vars['stage']} from disk at {json_path.parent}")
         json_data = json_all[self.name]
         self._num_obs = json_data["_num_obs"]
         tables = json_data["_tables"]
@@ -194,7 +194,7 @@ class Dataset(object):
         HDF5-files, as long as they are able to recover all the data.
         """
         json_path = files.path("dataset_json", file_vars=self.vars)
-        log.debug("Write dataset {tech}-{stage} to disk at {directory}", directory=json_path.parent, **self.vars)
+        log.debug(f"Write dataset {self.vars['tech']}-{self.vars['stage']} to disk at {json_path.parent}")
 
         # Read write level from config
         write_level = config.tech.get("write_level", value=write_level).as_enum("write_level").name
@@ -283,13 +283,7 @@ class Dataset(object):
                 name = "{name}/{id:04d}".format(name=dataset_name, id=id_to_delete)
                 del json_all[name]
                 del f_hdf5[name]
-                log.debug(
-                    "Deleted {name} from dataset {tech}-{stage} at {directory}",
-                    name=name,
-                    tech=tech,
-                    stage=stage,
-                    directory=json_path.parent,
-                )
+                log.debug(f"Deleted {name} from dataset {tech}-{stage} at {json_path.parent}"),
 
         with files.open_path(json_path, mode="wt", write_log=False) as f_json:
             json.dump(json_all, f_json)
@@ -299,7 +293,13 @@ class Dataset(object):
             json_path.unlink()
             files.path("dataset_hdf5", file_vars=file_vars).unlink()
 
-    def copy_from(self, other_dataset):
+    def copy_from(self, other_dataset, meta_key=None):
+        """Copy observations from another dataset
+
+        Args:
+            other_dset (Dataset):  The other dataset.
+            meta_key (str):        Dictionary key for introduction of an additional level in dictionary.
+        """
         # Check and update number of observations
         if self.num_obs and self.num_obs != other_dataset.num_obs:
             raise ValueError(
@@ -313,7 +313,11 @@ class Dataset(object):
         self._data = dict()
 
         # Update meta information
-        self.meta = copy.deepcopy(other_dataset.meta)
+        if meta_key is None:
+            self.meta = copy.deepcopy(other_dataset.meta)
+        else:
+            self.meta.setdefault(meta_key, dict())
+            self.meta[meta_key] = copy.deepcopy(other_dataset.meta)
 
         # Create each table, copy the data and register fields
         for table, table_obj in other_dataset.data.items():
@@ -368,7 +372,7 @@ class Dataset(object):
             table.subset(idx)
         self._num_obs = int(np.sum(idx))
 
-    def extend(self, other_dset):
+    def extend(self, other_dset, meta_key=None):
         """Add observations from another dataset at the end of this dataset
 
         Note that this is quite strict in terms of which datasets can extend each other. They must have exactly the
@@ -378,23 +382,26 @@ class Dataset(object):
 
         Args:
             other_dset (Dataset):  The other dataset.
+            meta_key (str):        Dictionary key for introduction of an additional level in dictionary.
         """
         # Make sure tables are equal
         tbl_s = tuple([(k, type(v)) for k, v in sorted(self.data.items())])
         tbl_o = tuple([(k, type(v)) for k, v in sorted(other_dset.data.items())])
         if tbl_s != tbl_o:
             log.fatal(
-                "Dataset '{}' can not be extended by '{}' as their tables are different",
-                self.description,
-                other_dset.description,
+                f"Dataset {self.description!r} can not be extended by {other_dset.description!r} "
+                f"as their tables are different"
             )
 
         # Extend each table by calling extend on each of them
         for table_name, table in self._data.items():
             table.extend(other_dset.data[table_name])
         self._num_obs += other_dset.num_obs
-        self.meta.update(other_dset.meta)  # TODO hjegei: Should it be done like that? If key already exists, should
-        #              the values be merged together?
+        # TODO hjegei: Should it be done like that? If key already exists, should the values be merged together?
+        if meta_key is None:
+            self.meta.update(other_dset.meta)
+        else:
+            self.meta.setdefault(meta_key, dict()).update(other_dset.meta)
 
     def unique(self, field, **filters):
         """List all unique values of a given field
@@ -498,6 +505,10 @@ class Dataset(object):
         """
         table = self._data[self._fields[field]]
         return table.unit(field)
+
+    def set_unit(self, field, unit):
+        table = self._data[self._fields[field]]
+        table.set_unit(field, unit)
 
     def plot_values(self, field):
         """Return values of a field in a form that can be plotted
@@ -650,7 +661,7 @@ class Dataset(object):
             stage=self.vars["stage"],
             dataset_name=self.dataset_name,
             dataset_id=self.dataset_id,
-            **self._kwargs
+            **self._kwargs,
         )
 
     @property
@@ -883,7 +894,6 @@ class Dataset(object):
         """
         super().__setattr__(key, value)
         if key in self._fields:
-            delattr(self, key)
             raise AttributeError(
                 "Can't set attribute '{}' on '{}' object, use dset.{}[:] instead"
                 "".format(key, type(self).__name__, key)

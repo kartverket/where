@@ -44,7 +44,7 @@ def list_datasets(rundate, tech, session, stage, **kwargs):
             json_data = json.load(fid)
     except FileNotFoundError:
         return list()
-        log.fatal("No data found for {} {} {}", tech.upper(), stage, rundate.strftime(config.FMT_date))
+        log.fatal(f"No data found for {tech.upper()} {stage} {rundate.strftime(config.FMT_date)}")
 
     return sorted(k for k in json_data.keys() if not k.startswith("_") and "/" in k)
 
@@ -114,14 +114,23 @@ def list_datasets_from_filename(filename):
     TODO: This does not work at the moment, because session is not handled
     """
     # Get info about dataset from filename
-    tech, _, stage, rundate = os.path.basename(filename).split(".")[0].split("-")
-    rundate = datetime.strptime(rundate, "%Y%m%d")
-    names, ids = list_dataset_names_and_ids(rundate=rundate, tech=tech, stage=stage)
+    tech, rundate_session, stage, _ = os.path.basename(filename).split(".")[0].split("-")
+
+    session = rundate_session[8:]
+    rundate = datetime.strptime(rundate_session[0:8], "%Y%m%d")
+    names, ids = list_dataset_names_and_ids(rundate, tech, session, stage)
 
     dataset_list = list()
     for dataset_name, dataset_id in zip(names, ids):
         dataset_list.append(
-            dict(rundate=rundate, tech=tech, stage=stage, dataset_name=dataset_name, dataset_id=dataset_id)
+            dict(
+                rundate=rundate,
+                tech=tech,
+                session=session,
+                stage=stage,
+                dataset_name=dataset_name,
+                dataset_id=dataset_id,
+            )
         )
     return dataset_list
 
@@ -161,7 +170,7 @@ def _register_tables():
     directory = os.path.dirname(__file__)
     packagename = os.path.splitext(__name__)[0]
     for filename in glob.glob(os.path.join(directory, "*.py")):
-        if filename.startswith("_"):
+        if filename.startswith("_") or filename.startswith("dataset3"):
             continue
         modulename = os.path.splitext(os.path.basename(filename))[0]
         module = importlib.import_module(packagename + "." + modulename)
@@ -175,7 +184,7 @@ def _register_tables():
             if is_table:
                 add_funcname = "add_" + cls.datatype
                 read_funcname = "_read_" + cls.datatype
-                log.debug("Registering data table {} from {} to Dataset.{}", cls.datatype, filename, add_funcname)
+                log.debug(f"Registering data table {cls.datatype} from {filename} to Dataset.{add_funcname}")
                 setattr(Dataset, add_funcname, Dataset._add(cls))
                 setattr(Dataset, read_funcname, Dataset._read(cls))
 

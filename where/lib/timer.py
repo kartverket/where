@@ -34,22 +34,18 @@ As can be seen in the examples above, `timer()` may be called with several optio
 report when the timer ends, which units to show the time in and which logger is used to report the timing. See
 `timer.__init__` for more details.
 
-
-
-
-
 """
 
 # Standard library imports
 from contextlib import ContextDecorator
 import time
-
+import sys
 
 # External library imports
 
 # Where imports
 from where.lib import log
-from where.lib.unit import unit as lib_unit
+from where.lib.unit import Unit
 
 
 class timer(ContextDecorator):
@@ -74,8 +70,15 @@ class timer(ContextDecorator):
         self._end = None
         self.text = text if "{}" in text else (text + " {}").strip()
         self.unit_name = "seconds" if unit is None else unit
-        self.unit_factor = 1 if unit is None else lib_unit("seconds", unit)
+        self.unit_factor = 1 if unit is None else Unit("seconds", unit)
         self.logger = logger
+
+        # Use midgard instead
+        caller = sys._getframe(1)
+        func_name = caller.f_code.co_name
+        file_name = caller.f_code.co_filename
+        line_num = caller.f_lineno
+        log.dev(f"{file_name} ({line_num}) {func_name}: where.lib.timer is deprecated, use midgard.dev.timer instead")
 
     @staticmethod
     def timer():
@@ -115,7 +118,7 @@ class timer(ContextDecorator):
             Float:  The time elapsed in terms of `self.unit_name` (default seconds).
         """
         if self._start is None:
-            log.warn("The timer is not running. See `help({})` for information on how to start one.", self.__module__)
+            log.warn(f"The timer is not running. See `help({self.__module__})` for information on how to start one.")
             return
 
         timer_end = self.timer() if self._end is None else self._end
@@ -130,7 +133,7 @@ class timer(ContextDecorator):
         Args:
             time_elapsed (Float):  The time elapsed in terms of `self.unit_name` (default seconds).
         """
-        time_text = "{:.4f} {}".format(time_elapsed, self.unit_name)
+        time_text = f"{time_elapsed:.4f} {self.unit_name}"
         if self.logger:
             self.logger(self.text.format(time_text))
 

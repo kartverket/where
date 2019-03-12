@@ -1,0 +1,19 @@
+--- external/iers/src_2010/DEHANTTIDEINEL.F.orig	2019-01-08 09:49:16.043410349 +0100
++++ external/iers/src_2010/DEHANTTIDEINEL.F	2019-01-08 09:50:07.307410349 +0100
+@@ -320,14 +320,14 @@
+ *        
+ *   1) CALL THE SUBROUTINE COMPUTING THE JULIAN DATE 
+ *++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+-      CALL CAL2JD ( YR, MONTH, DAY, JJM0, JJM1, STATUT )
++      CALL iau_CAL2JD ( YR, MONTH, DAY, JJM0, JJM1, STATUT )
+       FHRD = FHR/24.D0
+ *     17 May 2013 Corrected bug as noted in header
+       T=((JJM0-2451545.0D0)+JJM1+FHRD)/36525D0
+ *++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+ *   2) CALL THE SUBROUTINE COMPUTING THE CORRECTION OF UTC TIME  
+ *++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+-      CALL DAT ( YR, MONTH, DAY, FHRD, DTT, STATUT )
++      CALL iau_DAT ( YR, MONTH, DAY, FHRD, DTT, STATUT )
+ *++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+       DTT = DTT + 32.184D0
+ *     CONVERSION OF T IN TT TIME

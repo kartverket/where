@@ -5,11 +5,7 @@ Description:
 
 asdf
 
-
-
 """
-# External library imports
-import numpy as np
 
 # Where imports
 from where import apriori
@@ -26,10 +22,5 @@ def center_of_mass(dset):
     Returns:
         Numpy array:     Corrections in meters for each observation.
     """
-    output = np.zeros(dset.num_obs)
     com = apriori.get("slr_center_of_mass", sat_name=dset.dataset_name)
-
-    for obs, (time, station) in enumerate(dset.values("time", "station")):
-        output[obs] = com[station, time]
-
-    return -output
+    return -com.get(dset.station, dset.time)

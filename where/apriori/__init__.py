@@ -69,12 +69,12 @@ def get(datasource_name, **kwargs):
 
         try:
             data = parsers.parse_key(file_key=datasource_name, **kwargs).as_dict()
-            log.dev("Called parsers.parse_key({}) in apriori.get()".format(datasource_name))
+            log.dev(f"Called parsers.parse_key({datasource_name}) in apriori.get()")
             return data
         except (AttributeError) as att:
             try:
                 data = parsers.parse(datasource_name, **kwargs)
-                log.dev("Called parsers.parse({}) in apriori.get()".format(datasource_name))
+                log.dev(f"Called parsers.parse({datasource_name}) in apriori.get()")
                 return data
             except exceptions.UnknownPluginError:
                 raise apriori_err from None

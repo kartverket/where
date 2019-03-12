@@ -26,10 +26,10 @@ def profiler(func_to_profile):
     # Read command line options
     filename = util.read_option_value("--profile_output", default="where")
     if not os.path.splitext(filename)[1]:
-        filename = "{}.{}".format(filename, info["extension"])
+        filename = f"{filename}.{info['extension']}"
 
     # Start profiling and run Where as usual. Store and print profile even if Where crashes
-    log.info("Enable {}, output stored in {}", info["doc"], filename)
+    log.info(f"Enable {info['doc']}, output stored in {filename}")
     prof.enable()
     try:
         func_to_profile()
@@ -37,8 +37,8 @@ def profiler(func_to_profile):
         prof.disable()
 
         # Store profile to file
-        inspect_str = "Inspect it using e.g. {}".format(" or ".join(info["inspect"]))
-        log.info("Profile information stored to {f}\n       " + inspect_str, f=filename)
+        inspect_str = f"Inspect it using e.g. {' or '.join(info['inspect'])}"
+        log.info(("Profile information stored to {f}\n       " + inspect_str).format(f=filename))
         prof.dump_stats(filename)
 
         # Print profile to terminal
@@ -59,7 +59,7 @@ def _setup_line_profiler():
     info = dict(
         extension="lprof",
         inspect=['"python -m line_profiler {f}"'],
-        doc="line profiling functions {}".format(", ".join(funcs)),
+        doc=f"line profiling functions {', '.join(funcs)}",
     )
 
     return prof, info
@@ -93,7 +93,7 @@ def _get_func_from_name(name):
     if name.endswith("*"):
         fnames = [f for f in dir(obj) if f.startswith(fname[:-1]) and not f.startswith("__")]
         if not fnames:
-            raise TypeError("Found no functions named '{}'".format(name))
+            raise TypeError(f"Found no functions named {name!r}")
     else:
         fnames = [fname]
 
@@ -114,7 +114,7 @@ def _get_func_from_name(name):
             if isinstance(func, types.FunctionType):
                 yield func
             elif not name.endswith("*"):
-                raise TypeError("'{}.{}' is not a function".format(modname, fname))
+                raise TypeError(f"'{modname}.{fname}' is not a function")
 
 
 def _setup_cprofile():

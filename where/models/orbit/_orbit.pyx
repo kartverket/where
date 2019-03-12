@@ -24,12 +24,8 @@ References:
 -----------
 
 [1] Montenbruck, Oliver and Gill, Eberhard: Satellite Orbits, Springer Verlag, 2000.
-
-
-$Revision: 15091 $
-$Date: 2018-05-14 14:13:25 +0200 (Mon, 14 May 2018) $
-$LastChangedBy: fauing $
 """
+
 # Standard library imports
 import os
 import sys
@@ -40,25 +36,29 @@ from collections import OrderedDict
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev.timer import Timer
+from midgard.dev import plugins
+from midgard.dev import log
+from midgard.math import interpolation
+
 # Where imports
 from where import apriori
 from where.lib import config
-from where.lib import log
-from where.lib import plugins
 from where.lib.time import Time
 from where.lib.time import TimeDelta
-from where.lib.timer import timer
 from where import integrators
-from midgard.math import interpolation
 
 _INITIAL_POSVEL = dict()
 _TRANSITION_MATRIX = dict()
 _PARAMETERS = dict()
+_MEASUREMENT_PARAMETERS = dict()
 _SENSITIVITY_MATRIX = dict()
+_MEASUREMENT_MATRIX = dict()
 _MODELS = dict()
 
 
-def calculate(rundate, sat_name, obs_sec, return_full_table=False):
+def calculate(rundate, sat_name, obs_sec, range_bias_stations, time_bias_stations, return_full_table=False):
     """Calculate the orbit for a satellite at the given observation epochs
 
     Solve the differential equation of motion of the satellite and the differential equation of the state transition
@@ -89,16 +89,20 @@ def calculate(rundate, sat_name, obs_sec, return_full_table=False):
     # Set initial state of satellite orbit: position and velocity, and
     # of the state transition matrix, the 6x6 identity matrix
     if sat_name not in _INITIAL_POSVEL:
-        satellite = apriori.get_satellite(*sat_name.split('-'))
+        satellite = apriori.get_satellite(*sat_name.split("-"))
         _INITIAL_POSVEL[sat_name] = satellite.initial_posvel(rundate)
 
     # Set parameters to be estimated:
-    parameter_names = config.tech.force_parameters.list
-    set_parameters(sat_name, parameter_names, rundate)
+    force_parameter_names = config.tech.force_parameters.list
+    measurement_parameter_names = config.tech.measurement_parameters.list
+    set_parameters(sat_name, force_parameter_names, rundate)
+    set_measurement_parameters(sat_name, measurement_parameter_names, rundate, range_bias_stations, time_bias_stations)
     num_param = len(_PARAMETERS[sat_name])
     end_time = max(obs_sec)
-    log.info('Calculating orbit of {} from {} to {}', sat_name, rundate.strftime(config.FMT_datetime),
-             (Time(rundate, scale='utc') + TimeDelta(end_time, format='sec')))
+    log.info(
+        f"Calculating orbit of {sat_name} from {rundate.strftime(config.FMT_datetime)} to "
+        f"{(Time(rundate, scale='utc') + TimeDelta(end_time, format='sec'))}"
+    )
 
     step_length = config.tech.orbit_step_length.float
     arc_length = config.tech.arc_length.int
@@ -114,33 +118,34 @@ def calculate(rundate, sat_name, obs_sec, return_full_table=False):
     # first order differential equations are solved by the integrator.
     integrand = construct_forces(rundate, sat_name, arc_length, num_param, time_grid2, c)
 
-    log.info('Integrating orbit to {}-second time grid', grid_step)
-    log.info('Initial position: {:0.8f} {:0.8f} {:0.8f}', *initial_state[0: 3])
-    log.info('Initial velocity: {:0.8f} {:0.8f} {:0.8f}', *initial_state[3: 6])
-    with timer('Finish integrating orbit in'):
+    log.info(f"Integrating orbit to {grid_step}-second time grid")
+    log.info("Initial position: {:0.8f} {:0.8f} {:0.8f}".format(*initial_state[0: 3]))
+    log.info("Initial velocity: {:0.8f} {:0.8f} {:0.8f}".format(*initial_state[3: 6]))
+
+    with Timer('Finish integrating orbit in'):
         state, time_grid = integrators.call(integrate_method, integrand=integrand, initial_state=initial_state,
                                             grid_step=grid_step, end_time=end_time)
     if not set(time_grid).issubset(time_grid2):
-        log.fatal('Something wrong with the time grid')
+        log.fatal("Something wrong with the time grid")
 
     sat_pos = state[:, :3]
     sat_vel = state[:, 3: 6]
     trans_mat = interpolation.interpolate(np.array(time_grid), state[:, 6: 42], obs_sec,
-                                                     kind='interpolated_univariate_spline')
+                                                     kind="interpolated_univariate_spline")
     # Store the state transition matrix at observation epochs for
     # updating the initial state in later iterations.
     _TRANSITION_MATRIX[sat_name] = trans_mat.reshape(-1, 6, 6)
     # Store the sensitivity matrix
     if num_param > 0:
         sens_mat = interpolation.interpolate(np.array(time_grid), state[:, 42:], obs_sec,
-                                                        kind='interpolated_univariate_spline')
+                                                        kind="interpolated_univariate_spline")
         _SENSITIVITY_MATRIX[sat_name] = sens_mat.reshape(-1, 6, num_param)
 
     if not return_full_table:
         sat_pos = interpolation.interpolate(np.array(time_grid), sat_pos, obs_sec,
-                                                                      kind='interpolated_univariate_spline')
+                                                                      kind="interpolated_univariate_spline")
         sat_vel = interpolation.interpolate(np.array(time_grid), sat_vel, obs_sec,
-                                                                      kind='interpolated_univariate_spline')
+                                                                      kind="interpolated_univariate_spline")
         time_grid = obs_sec
 
     return sat_pos, sat_vel, time_grid
@@ -183,7 +188,7 @@ cdef construct_forces(rundate, sat_name, int arc_length, int num_param, double[:
     cdef int num_bodies
     vars_ = dict(rundate=rundate, sat_name=sat_name, force_parameters=_PARAMETERS[sat_name], num_param=num_param)
 
-    epochs = Time([Time(rundate, scale='utc') + TimeDelta(t, format='sec') for t in time_grid])
+    epochs = Time([Time(rundate, scale="utc") + TimeDelta(t, format="sec") for t in time_grid])
     cdef double[:, :, :] gcrs2itrs = epochs.gcrs2itrs
 
     # Ephemerides of sun, moon and planets
@@ -192,7 +197,7 @@ cdef construct_forces(rundate, sat_name, int arc_length, int num_param, double[:
     cdef double[:, :, :] body_pos_gcrs = np.zeros((num_bodies, len(epochs), 3))
     cdef double[:, :, :] body_pos_itrs = np.zeros((num_bodies, len(epochs), 3))
 
-    eph = apriori.get('ephemerides')
+    eph = apriori.get("ephemerides")
     for idx in range(0, num_bodies):
         pos_gcrs = eph.pos_gcrs(bodies[idx], time=epochs)
         pos_itrs = eph.pos_itrs(bodies[idx], time=epochs)
@@ -255,7 +260,7 @@ cdef construct_forces(rundate, sat_name, int arc_length, int num_param, double[:
 
         cdef double[:] vec = np.zeros(42 + 6 * num_param)
         for i in range(3):
-            vec[i] = vars_['sat_vel_gcrs'][i]
+            vec[i] = vars_["sat_vel_gcrs"][i]
             vec[3 + i] = sat_acc_gcrs[i]
         l = 6
         # np.dot(trans_matrix, phi_matrix).reshape(-1)
@@ -283,55 +288,73 @@ cdef set_parameters(sat_name, parameter_names, rundate):
 
     orbit_models = config.tech.orbit_models.list
 
-    if 'empirical' in orbit_models and 'empirical' not in parameter_names:
+    if "empirical" in orbit_models and "empirical" not in parameter_names:
         log.fatal("Empirical is included in orbit_models, not in force_parameters")
-    if 'empirical' in parameter_names:
+    if "empirical" in parameter_names:
         empirical_parameters = config.tech.empirical.empirical_parameters.list
-        parameter_names.remove('empirical')
+        parameter_names.remove("empirical")
         parameter_names = parameter_names + empirical_parameters
 
-    # Set the initial state of the sensitivity matrix, the 6xp zero matrix.
     if sat_name not in _PARAMETERS:
-        satellite = apriori.get_satellite(*sat_name.split('-'))
+        satellite = apriori.get_satellite(*sat_name.split("-"))
         _PARAMETERS[sat_name] = OrderedDict()
 
         for i in range(0, len(parameter_names)):
             # Test if parameters given on config file are valid
             # and set default values for parameters
-            if parameter_names[i] == 'drag_coefficient':
-                if 'drag' in orbit_models:
-                    _PARAMETERS[sat_name]['drag_coefficient'] = satellite.drag_product
+            if parameter_names[i] == "drag_coefficient":
+                if "drag" in orbit_models:
+                    _PARAMETERS[sat_name]["drag_coefficient"] = satellite.drag_product
                     continue
                 else:
                     log.warn("Could not estimate drag coefficient")
                     log.fatal("Drag is not included in orbit models")
-            elif parameter_names[i] == 'radiation_pressure_coefficient':
-                if 'solar_radiation_pressure' in orbit_models:
-                    _PARAMETERS[sat_name]['radiation_pressure_coefficient'] = satellite.radiation_pressure_coefficient
+            elif parameter_names[i] == "radiation_pressure_coefficient":
+                if "solar_radiation_pressure" in orbit_models:
+                    _PARAMETERS[sat_name]["radiation_pressure_coefficient"] = satellite.radiation_pressure_coefficient
                     continue
                 else:
                     log.warn("Could not estimate radiation pressure coefficient")
                     log.fatal("Solar radiation pressure is not included in orbit models")
-            elif parameter_names[i].startswith('a'):
+            elif parameter_names[i].startswith("a"):
                 _PARAMETERS[sat_name][parameter_names[i]] = 0
-            elif parameter_names[i] == 'c20':
-                if 'gravity_earth' in orbit_models:
+            elif parameter_names[i] == "c20":
+                if "gravity_earth" in orbit_models:
                     gravity_field = config.tech.gravity_field.str
-                    gravity_coeffs = apriori.get('gravity', gravity_field=gravity_field, truncation_level=2, rundate=rundate)
-                    _PARAMETERS[sat_name]['c20'] = gravity_coeffs['C'][2, 0]
+                    gravity_coeffs = apriori.get(
+                        "gravity", gravity_field=gravity_field, truncation_level=2, rundate=rundate
+                    )
+                    _PARAMETERS[sat_name]["c20"] = gravity_coeffs["C"][2, 0]
                     log.info("in order to get initial value for gravity coefficient")
-                    log.info('C20 = {}', _PARAMETERS[sat_name]['c20'])
+                    log.info(f"C20 = {_PARAMETERS[sat_name]['c20']}")
                     continue
                 else:
                     log.warn("Could not estimate c20")
                     log.fatal("gravity_earth is not included in orbit models")
             else:
-                log.fatal("Not a valid parameter name '{}'", parameter_names[i])
-
-    return
+                log.fatal(f"Not a valid parameter name {parameter_names[i]!r}")
 
 
-def update_orbit(sat_name, sta_pos_gcrs, sat_pos_gcrs, residual, weight):
+cdef set_measurement_parameters(sat_name, parameter_names, rundate, range_bias_stations, time_bias_stations):
+    # TODO: Add station in dict
+    if sat_name not in _MEASUREMENT_PARAMETERS:
+        satellite = apriori.get_satellite(*sat_name.split("-"))
+        _MEASUREMENT_PARAMETERS[sat_name] = OrderedDict()
+        for i in range(0, len(parameter_names)):
+            # Test if parameters given on config file are valid
+            # and set default values for parameters
+            if parameter_names[i] == "range_bias":
+                for j in range(0, len(range_bias_stations)):
+                    _MEASUREMENT_PARAMETERS[sat_name][f"range_bias_{range_bias_stations[j]}"] = 0
+            elif parameter_names[i] == "time_bias":
+                for j in range(0, len(time_bias_stations)):
+                    _MEASUREMENT_PARAMETERS[sat_name][f"time_bias_{time_bias_stations[j]}"] = 0
+            else:
+                log.fatal(f"Not a valid parameter name {parameter_names[i]!r}")
+
+
+
+def update_orbit(sat_name, sta_pos_gcrs, sat_pos_gcrs, sat_vel, residual, weight, stations):
     """
     Compute correction to the initial value of position
     and velocity of the satellite in meters and meters/sec
@@ -342,34 +365,61 @@ def update_orbit(sat_name, sta_pos_gcrs, sat_pos_gcrs, residual, weight):
         sat_pos_gcrs: Satellite position in the gcrs system
         residual:     Observation residual
         weight:       Weight of the observation
+        stations:     List of stations, one for each observations
+
     References:
          Montenbruck and Gill [1], Section 8.1.1.
     """
-
+    num_obs = len(weight)
     sta_sat_vector = sat_pos_gcrs - sta_pos_gcrs
     unit_vector = (sta_sat_vector / np.linalg.norm(sta_sat_vector, axis=1)[:, None])
-    unit_vector = np.hstack((unit_vector, np.zeros(unit_vector.shape)))
+    unit_vector_ext = np.hstack((unit_vector, np.zeros(unit_vector.shape)))
     weight_matrix = np.diag(weight)
+    
     if sat_name in _SENSITIVITY_MATRIX:
-        H = np.hstack((np.sum(unit_vector[:, :, None] * _TRANSITION_MATRIX[sat_name], axis=1),
-                       np.sum(unit_vector[:, :, None] * _SENSITIVITY_MATRIX[sat_name], axis=1)))
+        H = np.hstack((np.sum(unit_vector_ext[:, :, None] * _TRANSITION_MATRIX[sat_name], axis=1),
+                       np.sum(unit_vector_ext[:, :, None] * _SENSITIVITY_MATRIX[sat_name], axis=1)))
     else:
-        H = np.sum(unit_vector[:, :, None] * _TRANSITION_MATRIX[sat_name], axis=1)
+        H = np.sum(unit_vector_ext[:, :, None] * _TRANSITION_MATRIX[sat_name], axis=1)
 
+    _MEASUREMENT_MATRIX[sat_name] = np.zeros((len(stations), len(_MEASUREMENT_PARAMETERS[sat_name])))
+    for i in range(0, len(stations)):
+        for j, (k, val) in enumerate(_MEASUREMENT_PARAMETERS[sat_name].items()):
+            if f"range_bias_{stations[i]}" == k:
+                _MEASUREMENT_MATRIX[sat_name][i, j] = 1
+            elif f"time_bias_{stations[i]}" == k:
+                # TODO! Not sure if this is the correct way of estimating partials of 
+                # measurement with respect to time bias
+                _MEASUREMENT_MATRIX[sat_name][i, j] = np.sum(unit_vector * sat_vel, axis=1)[i]
+    H = np.hstack((H, _MEASUREMENT_MATRIX[sat_name]))
+    
     # Equation 8.15 in Montenbruck and Gill:
-    N = np.linalg.pinv(np.dot(H.T, weight_matrix @ H))     # todo: seems to be getting singular matrix?
+    N = np.linalg.pinv(np.dot(H.T, weight_matrix @ H))
     NH = np.dot(N, H.T)
-    _INITIAL_POSVEL[sat_name] += np.dot(NH, weight_matrix @ residual)[0: 6]
+    _INITIAL_POSVEL[sat_name] += np.dot(NH, weight_matrix @ residual)[: 6]
 
-    log.info('Estimated initial position {}', _INITIAL_POSVEL[sat_name][0:3])
-    log.info('Estimated initial velocity {}', _INITIAL_POSVEL[sat_name][3:6])
+    log.info(f"Estimated initial position {_INITIAL_POSVEL[sat_name][0:3]}")
+    log.info(f"Estimated initial velocity {_INITIAL_POSVEL[sat_name][3:6]}")
 
     if sat_name in _SENSITIVITY_MATRIX:
         keys = list(_PARAMETERS[sat_name].keys())
+        keys_measurement = list(_MEASUREMENT_PARAMETERS[sat_name].keys())
         for i in range(0, len(keys)):
-            _PARAMETERS[sat_name][keys[i]] += (np.dot(NH, weight_matrix @ residual)[6:])[i]
-            log.info('Estimate of {} is {}:', keys[i], _PARAMETERS[sat_name][keys[i]])
+            _PARAMETERS[sat_name][keys[i]] += np.dot(NH, weight_matrix @ residual)[6:][i]
+            log.info(f"Estimate of {keys[i]} is {_PARAMETERS[sat_name][keys[i]]}:")
+        for i in range(0, len(keys_measurement)): 
+            _MEASUREMENT_PARAMETERS[sat_name][keys_measurement[i]] += np.dot(NH, weight_matrix @ residual)[6 + len(keys):][i]
+            log.info(f"Estimate of {keys_measurement[i]} is {_MEASUREMENT_PARAMETERS[sat_name][keys_measurement[i]]}:")
 
+    estimated_range_bias = np.zeros(num_obs)
+    estimated_time_bias = np.zeros(num_obs)
+    for i in range(0, len(stations)):
+        for (k, val) in _MEASUREMENT_PARAMETERS[sat_name].items():
+            if f"range_bias_{stations[i]}" == k:
+                estimated_range_bias[i] = val
+            if f"time_bias_{stations[i]}" == k:
+                estimated_time_bias[i] = val
+    return estimated_range_bias, estimated_time_bias
 
 def read_models(rundate, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
     """Read Cython or Python orbit models
@@ -385,30 +435,41 @@ def read_models(rundate, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_it
     """
     orbit_models = config.tech.orbit_models.list
 
-    log.info('Using Cython implementation of orbit models')
+    log.info("Using Cython implementation of orbit models")
 
     import importlib
-    package = __name__.rsplit('.', maxsplit=1)[0]
+    package = __name__.rsplit(".", maxsplit=1)[0]
     modules = [m[:-4] for m in os.listdir(os.path.dirname(__file__))
-               if (m.endswith('.pyx') and not m.startswith('_'))]
+               if (m.endswith(".pyx") and not m.startswith("_"))]
     for module_name in modules:
         try:
-            module = importlib.import_module('{}.{}'.format(package, module_name))
+            module = importlib.import_module("{}.{}".format(package, module_name))
             entry_points = module.register_entry_point()
-            if 'setup' in entry_points and module_name in orbit_models:
-                entry_points['setup'](rundate, _PARAMETERS[sat_name], sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs)
-            _MODELS[module_name] = entry_points['call']
+            if "setup" in entry_points and module_name in orbit_models:
+                entry_points["setup"](
+                    rundate,
+                    _PARAMETERS[sat_name],
+                    sat_name,
+                    time_grid,
+                    epochs,
+                    body_pos_gcrs,
+                    body_pos_itrs,
+                    bodies,
+                    gcrs2itrs,
+                )
+            _MODELS[module_name] = entry_points["call"]
         except ImportError:
-            log.warn("Did not find compiled Cython module '{}.{}'", package, module_name)
+            log.warn(f"Did not find compiled Cython module '{package}.{module_name}'")
 
     # Compare with orbit_models
     for missing_model in (set(orbit_models) - set(_MODELS.keys())):
-        log.warn("Unknown model '{}'", missing_model)
+        log.warn(f"Unknown model {missing_model!r}")
 
     for not_included_model in (set(_MODELS.keys()) - set(orbit_models)):
         del _MODELS[not_included_model]
 
-    log.info('Integrating with orbit models {}', ', '.join(_MODELS.keys()))
+    log.info(f"Integrating with orbit models {', '.join(_MODELS)}")
+
 
 def calculate_epoch(**kwargs):
     """Call all orbit models
@@ -422,8 +483,8 @@ def calculate_epoch(**kwargs):
     Returns:
         Acceleration (3-vector) and lower 3x6 transition matrix.
     """
-    sat_name = kwargs['sat_name']   # TODO: sat_name is not used
-    num_param = kwargs['num_param']
+    sat_name = kwargs["sat_name"]   # TODO: sat_name is not used
+    num_param = kwargs["num_param"]
     # Call each orbit model
     acceleration = np.zeros(3)
     transition_matrix = np.zeros((3, 6))
@@ -435,3 +496,7 @@ def calculate_epoch(**kwargs):
         sensitivity_matrix += sens_part
 
     return acceleration, transition_matrix, sensitivity_matrix
+
+
+    
+

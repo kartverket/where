@@ -13,6 +13,30 @@ Description:
 This module will provide functions for GNSS modeling.
 
 
+TODO: How to move routines to Midgard?
+========================================
+check_satellite_eclipse(dset)
+findsun(time)                                  -> Midgard: planetary_motion?
+gsdtime_sun(time)                              -> Midgard: planetary_motion?
+get_earth_rotation(dset)                       -> Midgard: PosVel (see function)
+get_code_observation(dset)                     -> Midgard: gnss
+get_flight_time(dset)                          -> Midgard: PosVel (see function)
+get_gnss_freq(sys, obstype)                    -> Midgard: gnss
+get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None)  -> Midgard: gnss
+get_line_of_sight(dset)                        -> Midgard: Position library
+get_rinex_file_version(file_key, file_vars)    -> Is that needed in the future?
+gpssec2jd(wwww, sec)                           -> in time.gps_ws
+Example:
+    from where.lib import time
+    t = time.Time([2000, 2000, 2000, 2004], [0, 100000, 200000, 86400], format="gps_ws", scale="gps")
+    t.gps_ws
+jd2gps(jd)                                     -> in time
+ionosphere_free_combination(dset)              -> Midgard: gnss
+llh2xyz(lat, lon, h)                           -> midgard.math.transformation.llh2trs
+plot_skyplot(dset)                             -> Midgard: plot
+
+Should we more specific in using arguments, that instead of using 'dset'? -> Maybe
+
 """
 
 # External library imports
@@ -22,7 +46,7 @@ import matplotlib.pyplot as plt
 # WHERE imports
 from where import apriori
 from where.lib import config
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import files
 from where.lib import log
 from where.lib import mathp
@@ -64,7 +88,7 @@ def findsun(time):
     Returns:
         numpy.ndarray:  Sun position vector given in ECEF [m]
     """
-    AU = 1.49597870e8
+    AU = 1.495_978_70e8
     gstr, slong, sra, sdec = gsdtime_sun(time)
 
     sun_pos_x = np.cos(np.deg2rad(sdec)) * np.cos(np.deg2rad(sra)) * AU
@@ -100,14 +124,14 @@ def gsdtime_sun(time):
     """
     jd = time.mjd_int - 15019.5
     frac = time.jd_frac
-    vl = np.mod(279.696678 + 0.9856473354 * jd, 360)
-    gstr = np.mod(279.690983 + 0.9856473354 * jd + 360 * frac + 180, 360)
-    g = np.deg2rad(np.mod(358.475845 + 0.985600267 * jd, 360))
+    vl = np.mod(279.696_678 + 0.985_647_335_4 * jd, 360)
+    gstr = np.mod(279.690_983 + 0.985_647_335_4 * jd + 360 * frac + 180, 360)
+    g = np.deg2rad(np.mod(358.475_845 + 0.985_600_267 * jd, 360))
 
-    slong = vl + (1.91946 - 0.004789 * jd / 36525) * np.sin(g) + 0.020094 * np.sin(2 * g)
-    obliq = np.deg2rad(23.45229 - 0.0130125 * jd / 36525)
+    slong = vl + (1.91946 - 0.004_789 * jd / 36525) * np.sin(g) + 0.020_094 * np.sin(2 * g)
+    obliq = np.deg2rad(23.45229 - 0.013_012_5 * jd / 36525)
 
-    slp = np.deg2rad(slong - 0.005686)
+    slp = np.deg2rad(slong - 0.005_686)
     sind = np.sin(obliq) * np.sin(slp)
     cosd = np.sqrt(1 - sind * sind)
     sdec = np.rad2deg(np.arctan2(sind, cosd))
@@ -117,6 +141,8 @@ def gsdtime_sun(time):
     return gstr, slong, sra, sdec
 
 
+# TODO: pv.trs.observed - pv.trs # calculate property 'observed' = rotation.R3(rotation_angle[idx]).dot(dset.sat_posvel.itrs_pos[idx])
+# def get_earth_rotation(posvel: PositionVelocityArray, flight_time: np.ndarray):
 def get_earth_rotation(dset):
     """Get corrections for satellite position and velocity by Earth rotation
 
@@ -192,6 +218,8 @@ def get_code_observation(dset):
     return code_obs
 
 
+# TODO: Connect needed between station and satellite position
+#      Already part of Position library: posistion.distance / constant.c
 def get_flight_time(dset):
     """Get flight time of GNSS signal between satellite and receiver
 
@@ -207,6 +235,60 @@ def get_flight_time(dset):
     geometric_range = gnss_range.gnss_range(dset)
 
     return geometric_range / constant.c
+
+
+def get_gnss_freq(sys, obstype):
+    """Get GNSS frequency based on given GNSS observation type
+
+    Args:
+        sys(str):     GNSS identifier (e.g. 'E', 'G', ...)
+        obstype(str): Observation type (e.g. 'L1', 'P1', 'C1X', ...)
+
+    Return:
+        float:    GNSS frequency in [Hz]
+    """
+
+    # GNSS          Freq number      GNSS freq
+    #               L<num>/C<num>
+    # ___________________________________________
+    # C (BeiDou):   2                'B1'
+    #               7                'B2'
+    #               6                'B3'
+    # G (GPS):      1                'L1'
+    #               2                'L2'
+    #               5                'L5'
+    # R (GLONASS):  1                'G1'
+    #               2                'G2'
+    #               3                'G3'
+    # E (Galileo):  1                'E1'
+    #               8                'E5 (E5a+E5b)'
+    #               5                'E5a'
+    #               7                'E5b'
+    #               6                'E6'
+    # I (IRNSS):    5                'L5'
+    #               9                'S'
+    # J (QZSS):     1                'L1'
+    #               2                'L2'
+    #               5                'L5'
+    #               6                'LEX'
+    # S (SBAS):     1                'L1'
+    #               5                'L5'
+    obstype_to_gnss_freq = {
+        "C": {"2": "B1", "7": "B2", "6": "B3"},
+        "E": {"1": "E1", "8": "E5", "5": "E5a", "7": "E5b", "6": "E6"},
+        "G": {"1": "L1", "2": "L2", "5": "L5"},
+        "I": {"5": "L5", "9": "S"},
+        "J": {"1": "L1", "2": "L2", "5": "L5", "6": "LEX"},
+        "R": {"1": "G1", "2": "G2", "3": "G3"},
+        "S": {"1": "L1", "5": "L5"},
+    }
+
+    try:
+        freq = constant.get("gnss_freq_" + sys, source=obstype_to_gnss_freq[sys][obstype[1]])
+    except KeyError:
+        log.fatal(f"Frequency for GNSS '{sys}' and observation type '{obstype}' is not defined.")
+
+    return freq
 
 
 def get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None):
@@ -259,9 +341,7 @@ def get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None):
             # Note: First element of GNSS observation type list should be used.
             obstype = dset.meta["obstypes"][sys][0]
             log.debug(
-                "Code observation '{}' for GNSS '{}' is selected for determination of initial flight time.",
-                obstype,
-                sys,
+                f"Code observation '{obstype}' for GNSS '{sys}' is selected for determination of initial flight time."
             )
 
             idx = dset.filter(system=sys)
@@ -276,6 +356,7 @@ def get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None):
     return TimeDelta(flight_time, format="sec")
 
 
+# TODO: already in Position via 'direction'
 def get_line_of_sight(dset):
     """Get the Line of Sight vector from receiver to satellite in the ITRS.
     """
@@ -283,7 +364,7 @@ def get_line_of_sight(dset):
     return mathp.unit_vector(dset.sat_posvel.itrs_pos - dset.site_pos.itrs)
 
 
-def get_rinex_file_version(file_key, file_vars):
+def get_rinex_file_version(file_key, file_vars=None):
     """ Get RINEX file version for a given file key
 
     Args:
@@ -300,6 +381,7 @@ def get_rinex_file_version(file_key, file_vars):
      filepath         RINEX file path
     ===============  ==================================================================================
     """
+    file_vars = dict() if file_vars is None else file_vars
     file_path = files.path(file_key, file_vars=file_vars)
     with files.open(file_key, file_vars=file_vars, mode="rt") as infile:
         try:
@@ -321,7 +403,7 @@ def gpssec2jd(wwww, sec):
     INPUT:    (int) wwww, (float) sec - GPS week and second
     """
     SEC_OF_DAY = 86400.0
-    JD_1980_01_06 = 2444244  # Julian date of 6-Jan-1980 + 0.5 d
+    JD_1980_01_06 = 2_444_244  # Julian date of 6-Jan-1980 + 0.5 d
 
     # .. Determine GPS day
     wd = np.floor((sec + 43200.0) / 3600.0 / 24.0)  # 0.5 d = 43200.0 s
@@ -346,7 +428,7 @@ def jd2gps(jd):
 
     INPUT:    (float) jd - Julian Date
     """
-    JD_1980_01_06 = 2444244.5  # Julian date of 6-Jan-1980
+    JD_1980_01_06 = 2_444_244.5  # Julian date of 6-Jan-1980
     if np.any(jd < JD_1980_01_06):
         log.fatal("Julian Day exceeds the GPS time start date of 6-Jan-1980 (JD 2444244.5).")
 
@@ -418,8 +500,8 @@ def llh2xyz(lat, lon, h):
     """
 
     # .. Local variables
-    SEMI_MAJOR_AXIS_WGS84 = 6378137.0
-    FLATTENING_WGS84 = 1.0 / 298.257223563
+    SEMI_MAJOR_AXIS_WGS84 = 6_378_137.0
+    FLATTENING_WGS84 = 1.0 / 298.257_223_563
     a = SEMI_MAJOR_AXIS_WGS84
     f = FLATTENING_WGS84
 
@@ -447,7 +529,9 @@ def plot_skyplot(dset):
     cm = plt.get_cmap("gist_rainbow")
     ax = plt.subplot(111, projection="polar")
     ax.set_prop_cycle(
-        plt.cycler("color", [cm(1. * i / len(dset.unique("satellite"))) for i in range(len(dset.unique("satellite")))])
+        plt.cycler(
+            "color", [cm(1.0 * i / len(dset.unique("satellite"))) for i in range(len(dset.unique("satellite")))]
+        )
     )
     for sat in dset.unique("satellite"):
         idx = dset.filter(satellite=sat)

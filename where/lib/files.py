@@ -24,9 +24,8 @@ files are properly closed they should normally be used with a context manager as
 # Standard library imports
 import builtins
 from contextlib import contextmanager
-from datetime import datetime
 import gzip
-import hashlib
+import itertools
 import pathlib
 import re
 import shutil
@@ -46,7 +45,7 @@ from where.lib import log
 class URL(str):
     """Simple wrapper around String to have URLs work similar to pathlib.Path
 
-    TODO: Move this to Midgard, add concatenation with "/", download to path etc
+    TODO: Remove when files.path() is removed
     """
 
     @property
@@ -91,7 +90,7 @@ def open(file_key, file_vars=None, create_dirs=False, is_zipped=None, download_m
     Open a Where file based on file key which is looked up in the Where file list.
 
     The function automatically handles reading from gzipped files if the filename is specified with the special
-    {$gz}-ending (including the parantheses) in the file list. In that case, the mode should be specified to be 'rt' if
+    {gz}-ending (including the curly braces) in the file list. In that case, the mode should be specified to be 'rt' if
     the contents of the file should be treated as text. If both a zipped and an unzipped version is available, the
     zipped version is used. This can be overridden by specifying True or False for the is_zipped-parameter.
 
@@ -112,6 +111,16 @@ def open(file_key, file_vars=None, create_dirs=False, is_zipped=None, download_m
     Returns:
         File object representing the file.
     """
+    import sys
+
+    caller = sys._getframe(2)
+    func_name = caller.f_code.co_name
+    file_name = caller.f_code.co_filename
+    line_num = caller.f_lineno
+    log.dev(
+        f"{file_name} ({line_num}) {func_name}: 'lib.files.open()' is deprecated. Use 'lib.config.files.open()' instead"
+    )
+
     download_missing = download_missing and "r" in kwargs.get("mode", "r")
     file_path = path(file_key, file_vars, is_zipped=is_zipped, download_missing=download_missing)
     kwargs.setdefault("encoding", encoding(file_key))
@@ -128,6 +137,7 @@ def open(file_key, file_vars=None, create_dirs=False, is_zipped=None, download_m
 def open_datafile(file_key, file_vars=None, mode="r", create_dirs=True, write_log=True, **kwargs):
     """Open an HDF5 datafile
 
+    TODO: Remove when switching to dataset 3
     """
     file_path = path(file_key, file_vars)
     if write_log:
@@ -145,6 +155,8 @@ def open_datafile(file_key, file_vars=None, mode="r", create_dirs=True, write_lo
 @contextmanager
 def open_path(file_path, description="", mode="rt", create_dirs=False, is_zipped=None, write_log=True, **kwargs):
     """Open a local file
+
+    TODO: Possibly not needed, if needed -> move to a method on midgard.config.files.FileConfiguration
 
     Open a local file based on file name. This function behaves similar to the built-in open-function, the difference
     is that we do some extra logging. The function should typically be used with a context manager as follows:
@@ -185,6 +197,8 @@ def open_path(file_path, description="", mode="rt", create_dirs=False, is_zipped
 def encoding(file_key):
     """Look up the encoding for a given file key
 
+    TODO: Remove when files.path() is removed
+
     Args:
         file_key (String):  Key that is looked up in the Where file list.
 
@@ -198,7 +212,7 @@ def encoding(file_key):
 def path(file_key, file_vars=None, default=None, is_zipped=None, download_missing=False, use_aliases=True):
     """Construct a filepath for a given file with variables
 
-    If `is_zipped` is None, and the file_path contains `<filename>{$gz}`, the file will be assumed to be a gzip-file if
+    If `is_zipped` is None, and the file_path contains `<filename>{gz}`, the file will be assumed to be a gzip-file if
     there exists a file named `<filename>.gz`.
 
     When setting `use_aliases` to True, the aliases as specified in the files configuration file represent alternative
@@ -219,6 +233,16 @@ def path(file_key, file_vars=None, default=None, is_zipped=None, download_missin
     Return:
         Path: Full path with replaced variables in file name and path.
     """
+    import sys
+
+    caller = sys._getframe(1)
+    func_name = caller.f_code.co_name
+    file_name = caller.f_code.co_filename
+    line_num = caller.f_lineno
+    log.dev(
+        f"{file_name} ({line_num}) {func_name}: 'lib.files.path()' is deprecated. Use 'lib.config.files.path()' instead"
+    )
+
     file_vars = dict() if file_vars is None else file_vars
     directory = config.files[file_key].directory.replace(default=default, **file_vars).path
     file_name = config.files[file_key].filename.replace(default=default, **file_vars).path
@@ -244,7 +268,9 @@ def path(file_key, file_vars=None, default=None, is_zipped=None, download_missin
 def url(file_key, file_vars=None, default=None, is_zipped=None, use_aliases=True):
     """Construct a URL for a given file with variables
 
-    If `is_zipped` is None, and the file_path contains `<filename>{$gz}`, the file will be assumed to be a gzip-file if
+    TODO: Remove when files.path() is removed
+
+    If `is_zipped` is None, and the url contains `<filename>{gz}`, the url will be assumed to point to a gzip-file if
     there exists a file named `<filename>.gz` on the server.
 
     Args:
@@ -273,9 +299,11 @@ def url(file_key, file_vars=None, default=None, is_zipped=None, use_aliases=True
 
 
 def _replace_gz(file_path, is_zipped=None):
-    """Replace the {$gz} pattern with '.gz' or '' depending on whether the file is zipped
+    """Replace the {gz} pattern with '.gz' or '' depending on whether the file is zipped
 
-    If `is_zipped` is None, and the file_path contains `<filename>{$gz}`, the file will be assumed to be a gzip-file if
+    TODO: Remove when files.path() is removed
+
+    If `is_zipped` is None, and the file_path contains `<filename>{gz}`, the file will be assumed to be a gzip-file if
     there exists a file named `<filename>.gz`.
 
     Args:
@@ -283,21 +311,23 @@ def _replace_gz(file_path, is_zipped=None):
         is_zipped (Bool/None):  True, False or None. If True, open with gzip. If None automatically decide.
 
     Returns:
-        Path:  File path with {$gz} replaced.
+        Path:  File path with {gz} replaced.
     """
-    if "{$gz}" not in file_path.name:
+    if "{gz}" not in file_path.name:
         return file_path
 
     if is_zipped is None:
-        is_zipped = file_path.with_name(file_path.name.replace("{$gz}", ".gz")).exists()
+        is_zipped = file_path.with_name(file_path.name.replace("{gz}", ".gz")).exists()
     if is_zipped:
-        return file_path.with_name(file_path.name.replace("{$gz}", ".gz"))
+        return file_path.with_name(file_path.name.replace("{gz}", ".gz"))
     else:
-        return file_path.with_name(file_path.name.replace("{$gz}", ""))
+        return file_path.with_name(file_path.name.replace("{gz}", ""))
 
 
 def empty_file(file_path):
     """Check if a file is empty
+
+    TODO: Remove when files.path() is removed
 
     Args:
         file_path (Path):  Path to a file.
@@ -318,6 +348,8 @@ def path_exists(file_path):
     like *. Thus, we wrap this in a check on whether the file path syntax is correct before calling file_path.exists.
     If the file path contains non-path characters, the file path can not exist.
 
+    TODO: Remove when files.path() is removed
+
     Args:
         file_path (Path):  Path to a file.
 
@@ -335,6 +367,8 @@ def is_path_zipped(file_path):
 
     For now, this simply checks whether the path ends in .gz or not.
 
+    TODO: Remove when files.path() is removed
+
     Args:
         file_path (Path):  Path to a file.
 
@@ -351,10 +385,12 @@ def is_path_zipped(file_path):
 def print_file(file_path):
     """Print the contents of a file to the console
 
+    TODO: Only used as fallback if editor package is not installed. Can probably be removed?
+
     Args:
         file_path (Path):  Path to a file.
     """
-    log.info("Printing contents of {}", file_path)
+    log.info(f"Printing contents of {file_path}")
     with open_path(file_path, mode="r") as fid:
         for line in fid:
             print(line.rstrip())
@@ -365,18 +401,22 @@ def delete_file(file_path):
 
     Does not delete directories
 
+    TODO: Only used by _kalman. Can maybe use pathlib.Path.unlink directly?
+
     Args:
         file_path(Path):     Path to a file
     """
     try:
         file_path.unlink()
-        log.debug("Deleted {}".format(file_path))
+        log.debug(f"Deleted {file_path}")
     except OSError:
-        log.warn("Unable to delete {}", file_path)
+        log.warn(f"Unable to delete {file_path}")
 
 
 def publish_files(publish=None):
     """Publish files to specified directories
+
+    TODO: Not moved! Seems Where-specific?
 
     The publish string should list file_keys specified in files.conf. Each file_key needs to have a field named publish
     specifying a directory the file should be copied to.
@@ -395,7 +435,10 @@ def publish_files(publish=None):
             log.error(f"File key '{file_key}' in publish configuration is unknown. Ignored")
             continue
         if not source.exists():
-            log.error(f"File '{source}' (file key='{file_key}') does not exist, and can not be published")
+            try:
+                log.error(f"File '{source}' (file key='{file_key}') does not exist, and can not be published")
+            except KeyError:
+                log.error(f"File key='{file_key}' has incomplete filename information and can not be published")
             continue
 
         try:
@@ -406,13 +449,15 @@ def publish_files(publish=None):
 
         # Copy file to destinations
         for destination in destinations:
-            log.info("Publishing {}-file {} to {}", file_key, source, destination)
+            log.info(f"Publishing {file_key}-file {source} to {destination}")
             destination.mkdir(parents=True, exist_ok=True)
             shutil.copy(source, destination)
 
 
 def download_file(file_key, file_vars=None, create_dirs=True):
     """Download a file from the web and save it to disk
+
+    TODO: Remove when files.path() is removed
 
     Use pycurl (libcurl) to do the actual downloading. Request might be nicer for this, but turned out to be much
     slower (and in practice unusable for bigger files) and also not really supporting ftp-downloads.
@@ -466,8 +511,17 @@ def glob_paths(file_key, file_vars=None, is_zipped=None):
     Using pathlib.Path.glob() here is not trivial because we need to split into a base directory to start searching
     from and a pattern which may include directories. With glob.glob() this is trivial. The downside is that it only
     returns strings and not pathlib.Paths.
-
     """
+    import sys
+
+    caller = sys._getframe(1)
+    func_name = caller.f_code.co_name
+    file_name = caller.f_code.co_filename
+    line_num = caller.f_lineno
+    log.dev(
+        f"{file_name} ({line_num}) {func_name}: 'lib.files.glob_paths()' is deprecated. Use 'lib.config.files.glob_paths()' instead"
+    )
+
     path_string = str(path(file_key, file_vars, default="*", is_zipped=is_zipped))
     glob_path = pathlib.Path(re.sub(r"\*+", "*", path_string))
     idx = min((i for i, p in enumerate(glob_path.parts) if "*" in p), default=len(glob_path.parts) - 1)
@@ -479,90 +533,41 @@ def glob_paths(file_key, file_vars=None, is_zipped=None):
 def glob_variable(file_key, variable, pattern, file_vars=None):
     """Find all possible values of variable
     """
+    import sys
+
+    caller = sys._getframe(1)
+    func_name = caller.f_code.co_name
+    file_name = caller.f_code.co_filename
+    line_num = caller.f_lineno
+    log.dev(
+        f"{file_name} ({line_num}) {func_name}: 'lib.files.glob_variable()' is deprecated. Use 'lib.config.files.glob_variable()' instead"
+    )
+
     # Find available paths
-    file_vars = dict() if file_vars is None else file_vars
+    file_vars = dict() if file_vars is None else dict(file_vars)
     file_vars[variable] = "*"
     search_paths = glob_paths(file_key, file_vars)
 
     # Set up the regular expression
-    re_vars = {**file_vars, variable: "(?P<{}>{})".format(variable, "{pattern}")}
-    path_pattern = str(path(file_key, file_vars=re_vars, default=".*")).replace("\\", "\\\\").format(pattern=pattern)
-    re_pattern = re.compile(path_pattern)
+    re_vars = {**file_vars, variable: f"(?P<{variable}>__pattern__)"}
+    path_pattern = str(path(file_key, file_vars=re_vars, default=".*")).replace("\\", "\\\\")
+    for i in itertools.count():
+        # Give unique names to each occurance of variable
+        path_pattern = path_pattern.replace(f"<{variable}>", f"<{variable}__{i}>", 1)
+        if f"<{variable}>" not in path_pattern:
+            break
+    re_pattern = re.compile(path_pattern.replace("__pattern__", pattern))
 
     # Find each match
     values = set()
     for search_path in search_paths:
         match = re_pattern.search(str(search_path))
-        if match and variable in match.groupdict():
-            values.add(match.groupdict()[variable])
-
+        if match:
+            matches = set(match.groupdict().values())
+            if len(matches) > 1:
+                log.warn(f"Found multiple values for {variable!r} in {search_path}: {', '.join(matches)}")
+            values |= matches
     return values
-
-
-def use_filelist_profiles(*profiles):
-    """Use files with the given suffix in the file list
-
-    Different profiles are specified in the file list as `__profile`.
-
-    Args:
-        Profiles (String):  List of profiles, a leading '__' will be assumed.
-    """
-    config.files.profiles = list(profiles)
-
-
-def get_parser(file_key):
-    """Return name of parser for given file key
-
-    Args:
-        file_key (String):  Looked up in the Where file list.
-
-    Returns:
-        String:  Name of parser to be used to parse file, None if parser is not specified.
-    """
-    if file_key not in config.files.section_names:
-        raise FileNotFoundError(f"File {file_key} not found in file list")
-
-    return config.files[file_key].parser.str
-
-
-def get_timestamp(file_path):
-    """Return a textual timestamp from the modification date of a file
-
-    Args:
-        file_path (Path/String):  Path to file.
-
-    Returns:
-        String representing the modification date of the file.
-    """
-    file_path = pathlib.Path(file_path)
-
-    try:
-        mod_time = file_path.stat().st_mtime
-    except FileNotFoundError:
-        return "File does not exist"
-
-    return datetime.fromtimestamp(mod_time).isoformat()
-
-
-def get_md5(file_path):
-    """Return a md5 checksum based on a file.
-
-    Args:
-        file_path (Path/String):  Path to file.
-
-    Returns:
-        Hex-string representing the contents of the file.
-    """
-    md5 = hashlib.md5()
-    block_size = 128 * md5.block_size  # Chunk file to avoid memory problems
-
-    try:
-        with builtins.open(file_path, mode="rb") as fid:
-            for chunk in iter(lambda: fid.read(block_size), b""):
-                md5.update(chunk)
-        return md5.hexdigest()
-    except FileNotFoundError:
-        return "File does not exist"
 
 
 def _log_file_open(file_path, description="", mode="r"):
@@ -583,4 +588,4 @@ def _log_file_open(file_path, description="", mode="r"):
             mode_text = "Overwrite {}on {}"
     if "a" in mode:
         mode_text = "Append {}to {}"
-    log.debug(mode_text, description, file_path)
+    log.debug(mode_text.format(description, file_path))

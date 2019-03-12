@@ -69,10 +69,12 @@ import pathlib
 import re
 import sys
 
+# Midgard imports
+from midgard.files import dependencies
+
 # Where imports
 from where.lib import cache
 from where.lib import config
-from where.lib import dependencies
 from where.lib import exceptions
 from where.lib import log
 from where.lib.timer import timer
@@ -128,11 +130,14 @@ def register(func, name=None, sort_value=0):
 
     plugin = Plugin("{}.{}".format(plugin_name, name), func, file_path, sort_value)
     plugin_info[name] = plugin
-    log.debug("Registering {} as a {}-plugin from {}", plugin.name, package_name, plugin.file_path)
+    log.debug(f"Registering {plugin.name} as a {package_name}-plugin from {plugin.file_path}")
 
     # Add first registered unnamed part as default
     if "__parts__" in plugin_info:
         plugin_info["__default__"] = plugin_info[plugin_info["__parts__"][0]]
+
+    # Use midgard instead
+    log.dev(f"{package_name}.{plugin_name}: where.lib.plugins is deprecated, use midgard.dev.plugins instead")
 
     return func
 
@@ -230,13 +235,13 @@ def call_one(
         )
 
     # Call plug-in
-    dependencies.add(plugin.file_path)
+    dependencies.add(plugin.file_path, label="plugin")
     if logger:
-        logger("Start {} in {}", plugin.name, package_name)
-        time_logger = log.lowest(logger, log.time) if use_timer else None
+        logger(f"Start {plugin.name} in {package_name}")
+        time_logger = log.time if use_timer else None
     else:
         time_logger = None
-    with timer("Finish {} ({}) in".format(plugin.name, package_name), logger=time_logger):
+    with timer(f"Finish {plugin.name} ({package_name}) in", logger=time_logger):
         return plugin.function(**kwargs)
 
 

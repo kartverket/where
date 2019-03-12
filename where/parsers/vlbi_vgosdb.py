@@ -26,7 +26,7 @@ from scipy import interpolate
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import constant
+from midgard.math.constant import constant
 from where.lib import log
 from where.lib import files
 from where.parsers._parser import Parser
@@ -39,12 +39,12 @@ class VgosDbParser(Parser):
     """
 
     _STATION_FIELDS = {
-        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1},
-        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1},
-        "cable_delay": {"filestub": "Cal-Cable", "variable": "Cal-Cable", "factor": constant.c},
+        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1, "nan_value": -999},
+        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1, "nan_value": -999},
+        "cable_delay": {"filestub": "Cal-Cable", "variable": "Cal-Cable", "factor": constant.c, "nan_value": np.nan},
     }
 
-    def __init__(self, file_path, encoding=None, logger=None):
+    def __init__(self, file_path, encoding=None):
         super().__init__(file_path, encoding=None)
         self.raw = {}
 
@@ -112,24 +112,53 @@ class VgosDbParser(Parser):
 
         # Epoch info
         self.data["time"] = self.raw["Observables"]["TimeUTC"]["time"]
-        self.data["station_1"] = self.raw["Observables"]["Baseline"]["Baseline"][:, 0]
-        self.data["station_2"] = self.raw["Observables"]["Baseline"]["Baseline"][:, 1]
+
+        num_obs = len(self.data["time"])
+        self.data["station_1"] = self.raw["Observables"]["Baseline"]["Baseline"].reshape(num_obs, -1)[:, 0]
+        self.data["station_2"] = self.raw["Observables"]["Baseline"]["Baseline"].reshape(num_obs, -1)[:, 1]
         self.data["source"] = self.raw["Observables"]["Source"]["Source"]
 
         # Obs info
-        self.data["observed_delay_ferr"] = self.raw["Observables"]["GroupDelay"]["X"]["GroupDelaySig"] * constant.c
-        self.data["observed_delay"] = self.raw["ObsEdit"]["GroupDelayFull"]["X"]["GroupDelayFull"] * constant.c
+        try:
+            self.data["observed_delay_ferr"] = self.raw["Observables"]["GroupDelay"]["X"]["GroupDelaySig"] * constant.c
+        except KeyError:
+            self.data["observed_delay_ferr"] = np.zeros(num_obs)
+            log.error("Missing group delay formal error information")
+
         try:
             self.data["data_quality"] = self.raw["ObsEdit"]["Edit"]["DelayFlag"]
         except KeyError:
-            self.data["data_quality"] = np.full(len(self.data["time"]), np.nan)
+            self.data["data_quality"] = np.full(num_obs, np.nan)
             log.warn("Missing data quality information")
-        self.data["iono_delay"] = (
-            self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"]["Cal-SlantPathIonoGroup"][:, 0] * constant.c
-        )
-        self.data["iono_delay_ferr"] = (
-            self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"]["Cal-SlantPathIonoGroupSigma"][:, 0] * constant.c
-        )
+
+        try:
+            self.data["observed_delay"] = self.raw["ObsEdit"]["GroupDelayFull"]["X"]["GroupDelayFull"] * constant.c
+        except KeyError:
+            self.data["observed_delay"] = np.full(num_obs, np.nan)
+            log.error("Missing full group delay information")
+
+        try:
+            self.data["iono_delay"] = (
+                self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"]["Cal-SlantPathIonoGroup"].reshape(num_obs, -1)[
+                    :, 0
+                ]
+                * constant.c
+            )
+        except KeyError:
+            self.data["iono_delay"] = np.full(num_obs, np.nan)
+            log.warn("Missing ionosphere delay information")
+
+        try:
+            self.data["iono_delay_ferr"] = (
+                self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"]["Cal-SlantPathIonoGroupSigma"].reshape(
+                    num_obs, -1
+                )[:, 0]
+                * constant.c
+            )
+        except KeyError:
+            self.data["iono_delay_ferr"] = np.zeros(len(self.data["time"]))
+            log.warn("Missing ionosphere delay formal error information")
+
         try:
             self.data["iono_quality"] = self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"][
                 "Cal-SlantPathIonoGroupDataFlag"
@@ -149,12 +178,25 @@ class VgosDbParser(Parser):
                 sta_time = self.raw[sta_key]["TimeUTC"]["sec_since_ref"]
                 try:
                     sta_data = self.raw[sta_key][params["filestub"]][params["variable"]]
+                    missing_idx = np.isclose(sta_data, params["nan_value"])
+                    sta_data[missing_idx] = np.nan
+                    if missing_idx.any():
+                        log.warn(f"Missing {field} data for {station}")
                 except KeyError:
                     sta_data = np.full(len(sta_time), np.nan)
-                    log.warn("Missing {} data for {}", field, station)
-                func = interpolate.interp1d(
-                    sta_time, sta_data, bounds_error=False, fill_value=(sta_data[0], sta_data[-1]), assume_sorted=True
-                )
+                    log.warn(f"Missing all {field} data for {station}")
+
+                if len(sta_data) == 1:
+                    # Use constant function if there is only one data point
+                    func = lambda _: sta_data[0]
+                else:
+                    func = interpolate.interp1d(
+                        sta_time,
+                        sta_data,
+                        bounds_error=False,
+                        fill_value=(sta_data[0], sta_data[-1]),
+                        assume_sorted=True,
+                    )
                 epochs_1 = self.raw["Observables"]["TimeUTC"]["sec_since_ref"][sta_idx_1]
                 epochs_2 = self.raw["Observables"]["TimeUTC"]["sec_since_ref"][sta_idx_2]
                 self.data[field + "_1"][sta_idx_1] = func(epochs_1) * params["factor"]
