@@ -71,3 +71,12 @@ which is very inconvenient to use.
 
 The `com.dat` file contains the values from this PDF-file in an easier to use
 text file.
+
+### Annual Mean pole time series
+Data table taken from IERS 2010 implementation of the conventional mean pole version 2015
+ftp://maia.usno.navy.mil/conventions/2010/2010_update/chapter7/software/IERS_CMP_2015.F
+
+As described in the source code a data point for 2016.00 collected from 
+http://hpiers.obspm.fr/eoppc/eop/eopc01/mean-pole.tab is added in addition to the values
+from the Fortran code
+
