@@ -28,5 +28,9 @@ htmlcov/
 .spyderproject
 .spyproject
 
+# Eclipse project settings
+.pydevproject
+.project
+
 # mypy
 .mypy_cache/
