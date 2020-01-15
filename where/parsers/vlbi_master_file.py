@@ -14,9 +14,6 @@ import itertools
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import cache
-from where.lib import config
-from where.lib import log
 from where.parsers._parser_chain import ParserDef, ChainParser
 
 
@@ -45,7 +42,7 @@ class VlbiMasterFile(ChainParser):
                         "stations",
                         "scheduler",
                         "correlator",
-                        None,
+                        "status",
                         None,
                         "session",
                         None,

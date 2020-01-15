@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each output format / output destination should be defined in a separate .py-file. The function inside the .py-file that
-should be called need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+should be called need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     def write_as_fancy_format(dset):
@@ -17,6 +17,11 @@ The decorated function will be called with a single parameter, ``dset`` which co
 
 """
 
+# Standard library imports
+import os
+import pathlib
+import shutil
+
 # Midgard imports
 from midgard.dev import plugins
 from midgard import writers as mg_writers
@@ -24,7 +29,8 @@ from midgard.writers import names, write as write_one  # noqa
 
 # Where imports
 from where.lib import config
-from where import data
+from where.lib import log
+from where.data import dataset3 as dataset
 
 # Add Where writers to Midgard writers
 plugins.add_alias(mg_writers.__name__, __name__)
@@ -47,26 +53,68 @@ def write(default_dset):
     Args:
         default_dset (Dataset):    Dataset used by default.
     """
-    dsets = {f"{default_dset.vars['stage']}/{default_dset.vars['dataset_id']}": default_dset}
     prefix = config.analysis.get("analysis", default="").str
     output_list = config.tech.output.list
     writer_and_dset = [o.partition(":")[::2] for o in output_list]
 
-    rundate = config.analysis.rundate.date
-    tech = config.analysis.tech.str
-    session = config.analysis.session.str
+    dset_vars = config.analysis.config.as_dict()
+    dset_vars["rundate"] = config.analysis.rundate.date
+
     for writer, dset_str in writer_and_dset:
-
         # Read the datasets
-        if dset_str not in dsets:
-            stage, _, dset_id = dset_str.partition("/")
-            stage, _, dset_name = stage.partition(":")
+        if dset_str:
+            stage, _, label = dset_str.partition("/")
             stage = stage if stage else default_dset.vars["stage"]
-            dset_name = dset_name if dset_name else session
-            dset_id = int(dset_id) if dset_id else "last"
-            dsets[dset_str] = data.Dataset(
-                rundate, tech=tech, stage=stage, dataset_name=dset_name, dataset_id=dset_id, session=session
-            )
+            label = label if label else "last"
+            dset = dataset.Dataset.read(stage=stage, label=label, **dset_vars)
+            plugins.call(package_name=mg_writers.__name__, plugin_name=writer, prefix=prefix, dset=dset)
+        else:
+            plugins.call(package_name=mg_writers.__name__, plugin_name=writer, prefix=prefix, dset=default_dset)
 
-        # Call the writers
-        plugins.call(package_name=mg_writers.__name__, plugin_name=writer, prefix=prefix, dset=dsets[dset_str])
+    publish_files()
+
+
+def publish_files(publish=None):
+    """Publish files to specified directories
+
+    The publish string should list file_keys specified in files.conf. Each file_key needs to have a field named publish
+    specifying a directory the file should be copied to.
+
+    Args:
+        publish (String):   List of file_keys that will be published.
+    """
+    if not config.where.files.publish.bool:
+        return
+
+    publish_list = config.tech.get("files_to_publish", value=publish).list
+    for file_key in publish_list:
+        try:
+            source = config.files.path(file_key)
+        except KeyError:
+            log.error(f"File key '{file_key}' in publish configuration is unknown. Ignored")
+            continue
+        if not source.exists():
+            try:
+                log.error(f"File '{source}' (file key='{file_key}') does not exist, and can not be published")
+            except KeyError:
+                log.error(f"File key='{file_key}' has incomplete filename information and can not be published")
+            continue
+
+        try:
+            destinations = config.files[file_key].publish.replaced.as_list(convert=pathlib.Path)
+        except AttributeError:
+            log.error(f"File key '{file_key}' does not specify 'publish' directory in file configuration. Ignored")
+            continue
+
+        # Copy file to destinations
+        for destination in destinations:
+            destination_path = destination / source.name
+            try:
+                if destination_path.exists():
+                    os.remove(destination_path)
+                destination.mkdir(parents=True, exist_ok=True)
+                shutil.copy(source, destination)
+            except (OSError, PermissionError, FileNotFoundError) as err:
+                log.error(f"Unable to publish {file_key}-file {source} to {destination} because of {err}")
+            else:
+                log.info(f"Published {file_key}-file {source} to {destination}")

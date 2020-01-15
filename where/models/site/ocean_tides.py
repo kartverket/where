@@ -27,12 +27,17 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
+from where.data import position
 from where.ext import iers_2010 as iers
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
+
+_WARNED_MISSING = set()
 
 
 @plugins.register
@@ -56,18 +61,16 @@ def ocean_tides(dset):
 
     amplitudes = {s: otc[s]["amplitudes"] for s in dset.unique("site_id") if s in otc}
     phases = {s: otc[s]["phases"] for s in dset.unique("site_id") if s in otc}
-    # Warn about missing Ocean Tides Coefficients
-    for site_id in set(dset.unique("site_id")) - set(amplitudes.keys()):
-        log.error(f"Missing ocean loading coefficients for site id {site_id!r}. Correction set to zero.")
 
     data_out = list()
-    for _ in dset.for_each("station"):
-        data_out.append(ocean_tides_station(dset, amplitudes, phases))
+    correction_cache = dict()
+    for _ in dset.for_each_suffix("station"):
+        data_out.append(ocean_tides_station(dset, amplitudes, phases, correction_cache))
 
-    return np.hstack(data_out)
+    return data_out
 
 
-def ocean_tides_station(dset, amplitudes, phases):
+def ocean_tides_station(dset, amplitudes, phases, correction_cache):
     """Calculate the ocean tide corrections for a station
 
     Ocean tide corrections are returned in meters in the Geocentric Celestial Reference System for each observation.
@@ -82,26 +85,55 @@ def ocean_tides_station(dset, amplitudes, phases):
     use_cmc = config.tech.ocean_tides_cmc.bool
 
     # Calculate correction
-    for obs, (site_id,) in enumerate(dset.values("site_id")):
+    for obs, site_id in enumerate(dset.site_id):
         if site_id not in amplitudes:
+            # Warn about missing Ocean Tides Coefficients
+            if site_id in _WARNED_MISSING:
+                continue
+            station = dset.unique("station", site_id=site_id)[0]
+            log.error(
+                f"Missing ocean loading coefficients for site id {site_id!r} ({station}). Correction set to zero."
+            )
+            _WARNED_MISSING.add(site_id)
             continue
 
-        epoch = [float(t) for t in dset.time.utc[obs].yday.split(":")]
-        dup, dsouth, dwest = iers.hardisp(epoch, amplitudes[site_id], phases[site_id], 1, 1.0)
+        cache_key = (dset.station[obs], dset.time.utc.datetime[obs])
+        if cache_key in correction_cache:
+            denu[obs] = correction_cache[cache_key]
+        else:
+            epoch = [float(t) for t in dset.time.utc[obs].yday.split(":")]
+            dup, dsouth, dwest = iers.hardisp(epoch, amplitudes[site_id], phases[site_id], 1, 1.0)
 
-        # Correction in topocentric (east, north, up) coordinates
-        denu[obs] = np.array([-dwest[0], -dsouth[0], dup[0]])
+            # Correction in topocentric (east, north, up) coordinates
+            denu[obs] = np.array([-dwest[0], -dsouth[0], dup[0]])
+            correction_cache[cache_key] = denu[obs]
 
-    dxyz = dset.site_pos.convert_enu_to_itrs(denu)
+    if position.is_position(dset.site_pos):
+        pos_correction = position.PositionDelta(denu, system="enu", ref_pos=dset.site_pos, time=dset.time)
+    elif position.is_posvel(dset.site_pos):
+        # set velocity to zero
+        denu = np.concatenate((denu, np.zeros(denu.shape)), axis=1)
+        pos_correction = position.PosVelDelta(denu, system="enu", ref_pos=dset.site_pos, time=dset.time)
+    else:
+        log.fatal(f"dset.site_pos{dset.default_field_suffix} is not a PositionArray or PosVelArray.")
 
     # Center of mass corrections
     if use_cmc:
         coeff_cmc = apriori.get("ocean_tides_cmc")
         in_phase = coeff_cmc["in_phase"]
         cross_phase = coeff_cmc["cross_phase"]
+        cmc = np.zeros((dset.num_obs, 3))
         for obs, time in enumerate(dset.time.utc):
             year, doy = time.datetime.year, float(time.datetime.strftime("%j")) + time.mjd_frac
             angle = iers.arg2(year, doy)[:, None]
-            dxyz[obs] += np.sum(in_phase * np.cos(angle) + cross_phase * np.sin(angle), axis=0)
+            cmc[obs] += np.sum(in_phase * np.cos(angle) + cross_phase * np.sin(angle), axis=0)
 
-    return dset.site_pos.convert_itrs_to_gcrs(dxyz)
+        if position.is_position(dset.site_pos):
+            cmc_correction = position.PositionDelta(cmc, system="trs", ref_pos=dset.site_pos, time=dset.time)
+        elif position.is_posvel(dset.site_pos):
+            # set velocity to zero
+            cmc = np.concatenate((cmc, np.zeros(cmc.shape)), axis=1)
+            cmc_correction = position.PosVelDelta(cmc, system="trs", ref_pos=dset.site_pos, time=dset.time)
+        pos_correction = pos_correction.trs + cmc_correction
+
+    return pos_correction.gcrs

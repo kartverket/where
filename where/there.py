@@ -3,7 +3,7 @@
 
 Usage::
 
-    {exe:there} [date] [--<pipeline>] [--session=<session>] [options]
+    {exe:there} [date] [--<pipeline>] [pipeline-options] [options]
 
 The following commands are optional:
 
@@ -19,7 +19,6 @@ Furthermore, the following options are recognized:
 Option               Description
 ===================  ===========================================================
 {pipelines_doc:Plot results from}
---session=session    Plot results from the given session.
 
 -S, --showconfig     Show configuration of There and exit.
 --style=style        Set style of plotting. Choose between white, dark,
@@ -55,12 +54,12 @@ Version: {version}
 """
 
 # Standard library imports
-import calendar
-from collections import namedtuple
 from contextlib import contextmanager
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
+import editor
 import itertools
 from pprint import pprint
+import seaborn as sns
 import subprocess
 import sys
 from threading import Thread
@@ -84,20 +83,14 @@ from midgard.dev import console
 # Where imports
 import where
 from where.lib import config
-from where import data
-from where.lib import files
+from where.data import dataset3 as dataset
 from where.lib import log
 from where import pipelines
 from where import setup
-from where.lib.time import Time
+from where.data.time import Time
 from where.lib.unit import Unit
 from where.lib import util
 
-# Optional import of editor and seaborn, add dummy methods in case they are not installed
-from midgard.dev import optional
-
-editor = optional.optional_import("editor", attrs=dict(edit=files.print_file))
-sns = optional.optional_import("seaborn", attrs=dict(set=lambda **_: None))
 
 PLOT_TYPES = dict()  # Dynamically set by plot_type()
 TABS = dict()  # Dynamically set by register_tab()
@@ -142,7 +135,7 @@ def main():
     log.init(log_level=log_cfg.default_level.str, prefix=prefix)
     if log_cfg.log_to_file.bool:
         log.file_init(
-            file_path=files.path("log"),
+            file_path=config.files.path("log"),
             log_level=log_cfg.default_level.str,
             prefix=prefix,
             rotation=log_cfg.number_of_log_backups.int,
@@ -151,10 +144,9 @@ def main():
     # Use options to specify pipeline and session, include pipeline as profile
     pipeline = pipelines.get_from_options()
     config.read_pipeline(pipeline)
-    session = util.read_option_value("--session", default="")  # Not using pipelines.get_session to avoid validation
 
     # Add command line options to config
-    user = config.program_vars(rundate=None, tech_name=None, session=None)["user"]
+    user = config.program_vars(rundate=None, pipeline=None)["user"]
     profile = util.read_option_value("--profile")
     config.there.update_from_options(profile="__opts__", allow_new=True)
     config.there.profiles = [p for p in ("__opts__", profile, pipeline, user) if p]
@@ -183,8 +175,10 @@ def main():
         else:
             cm.get_cmap(colormap)
 
+    args, kwargs = util.options2args(sys.argv[1:])
+
     # Run program
-    there = There(rundate, pipeline, session)
+    there = There(rundate, pipeline, *args, **kwargs)
     there.mainloop()
 
 
@@ -216,26 +210,20 @@ class There(tk.Tk):
     The GUI makes it easy to interactively choose which data are plotted.
     """
 
-    def __init__(self, rundate=None, pipeline=None, session=None, *args, **kwargs):
+    def __init__(self, rundate=None, pipeline=None, *args, **kwargs):
         """Set up the basic structure of the GUI
         """
-        super().__init__(*args, **kwargs)
+        super().__init__()
         super().wm_title(f"{util.get_program_name().title()} - {pipeline.upper()}")
 
-        self._there_icon = tk.PhotoImage(file=files.path("there_icon"))  # Keep reference to icon
+        self._there_icon = tk.PhotoImage(file=config.files.path("there_icon"))  # Keep reference to icon
         self.iconphoto(True, self._there_icon)
 
         # Set up default values for variables
         self.vars = dict(
-            common=dict(
-                config.program_vars(rundate, pipeline, session=session), **config.date_vars(rundate), rundate=rundate
-            )
+            common=dict(config.program_vars(rundate, pipeline, **kwargs), **config.date_vars(rundate), rundate=rundate)
         )
-        if rundate is not None:
-            self.vars["common"].update({"date_session": f"{rundate:%Y%m%d}/{session}"})
-        self.vars["common"]["pipeline"] = self.vars["common"]["tech"]  # TODO: Remove when tech is changed to pipeline
         self.vars["common"]["do_update"] = True
-        self.vars["common"]["id"] = self.vars["common"]["id"].lstrip("-")
 
         # Add tabs
         self.status = Status(self)
@@ -261,7 +249,7 @@ class There(tk.Tk):
 
         # Select tab
         if pipeline and rundate:
-            self.select_tab("session")
+            self.select_tab("analysis")
         elif pipeline:
             self.select_tab("timeseries")
         else:
@@ -391,10 +379,12 @@ class Status(ttk.Frame):
             font = (font_family,) + font[1:]
 
         # Lay out widgets
-        self._previous_icon = tk.PhotoImage(file=files.path("there_button_icon", file_vars=dict(name="previous")))
+        self._previous_icon = tk.PhotoImage(
+            file=config.files.path("there_button_icon", file_vars=dict(name="previous"))
+        )
         self._previous = ttk.Button(self, image=self._previous_icon, command=lambda: self.write("Previous"))
         # self._previous.pack(side=tk.LEFT, fill=tk.Y)
-        self._next_icon = tk.PhotoImage(file=files.path("there_button_icon", file_vars=dict(name="next")))
+        self._next_icon = tk.PhotoImage(file=config.files.path("there_button_icon", file_vars=dict(name="next")))
         self._next = ttk.Button(self, image=self._next_icon, command=lambda: self.write("Next"))
         # self._next.pack(side=tk.RIGHT, fill=tk.Y)
         self._text = scrolledtext.ScrolledText(self, height=cfg.height.int, wrap=tk.WORD, font=font)
@@ -434,10 +424,10 @@ class Tab(ttk.Frame):
 
     name = "updated by subclasses"
 
-    def __init__(self, master, vars):
+    def __init__(self, master, vars_):
         super().__init__(master, name=self.name)
         self.master = master
-        self.vars = vars
+        self.vars = vars_
         self.widgets = dict()
         self.widget_updates = list()
         self._icon = None
@@ -450,7 +440,7 @@ class Tab(ttk.Frame):
     @property
     def icon(self):
         if self._icon is None:
-            self._icon = tk.PhotoImage(file=files.path("there_tab_icon", file_vars=dict(name=self.name)))
+            self._icon = tk.PhotoImage(file=config.files.path("there_tab_icon", file_vars=dict(name=self.name)))
         return self._icon
 
     def add_to(self, master):
@@ -537,15 +527,17 @@ class Tab(ttk.Frame):
     def run_analysis(self):
         """Run the current analysis"""
         exe = where.__executable__
-        cmd = "{exe} {rundate:%Y %m %d} --{pipeline} --session={dataset_name}".format(exe=exe, **self.vars).split()
+        cmd = "{exe} {rundate:%Y %m %d} --{pipeline}".format(exe=exe, **self.vars).split()
         if self.vars["id"]:
-            cmd.append(f"--id={self.vars['id'][1:]}")
+            cmd.append(f"--id={self.vars['id']}")
         if self.vars.get("force_rerun", False):
             cmd.append("-F")
         if self.vars.get("fresh_run", False):
             cmd.append("-N")
         if self.vars.get("traceback", False):
             cmd.append("-T")
+        if self.vars["pipeline"] == "vlbi":  # TODO better solution
+            cmd.append(f"--session={self.vars['session']}")
 
         description = f"Running {self.vars['pipeline'].upper()} analysis: {' '.join(cmd)}"
         self.master.master.run(subprocess.check_call, cmd, description=description)
@@ -645,45 +637,6 @@ class TabFigure(Tab):
 
 
 @register_tab
-class TabRunAnalysis(Tab):
-
-    name = "run_analysis"
-
-    def init_tab(self):
-        cfg = config.there.run_analysis
-        if self.vars["rundate"] is None:
-            self.vars["rundate"] = date.today() - timedelta(days=1)
-
-        # Banner at top of page
-        if cfg.banner.bool:
-            self._banner = tk.PhotoImage(file=files.path("there_banner"))
-            banner_line = ttk.Frame(self)
-            tk.Label(banner_line, image=self._banner).pack(side=tk.TOP, fill=tk.BOTH)
-            banner_line.pack(side=tk.TOP, fill=tk.X, expand=False)
-
-        # Choose necessary options for Where command
-        cmd_line = ttk.Frame(self)
-        for dropdown in cfg.command_dropdowns.list:
-            self.add_dropdown(cmd_line, dropdown)
-        self.add_checkboxes(cmd_line, None, *cfg.checkboxes.list)
-        cmd_line.pack(side=tk.TOP, fill=tk.X, expand=False)
-
-        # Add options
-        config_line = ttk.Frame(self)
-        cfg_tree = ConfigTree(config_line)
-        cfg_tree.update(config.where)  # Should be session config
-        # cfg_tree.pack()  # Show config as tree
-        config_line.pack(side=tk.TOP, fill=tk.X, expand=True)
-
-        # Buttons for running Where
-        button_line = ttk.Frame(self)
-        self.add_buttons(button_line, self, *cfg.buttons.list)
-        button_line.pack(side=tk.BOTTOM, fill=tk.X, expand=False)
-
-        self.update_all()
-
-
-@register_tab
 class TabTimeseries(TabFigure):
 
     name = "timeseries"
@@ -692,16 +645,15 @@ class TabTimeseries(TabFigure):
 
         # Fix date to 1970-01-01
         rundate = date(1970, 1, 1)
-        self.vars.update(dict(rundate=rundate, session="", **config.date_vars(rundate)))
-
+        self.vars.update(dict(rundate=rundate))
         # Initialize tab as usual
         super().init_tab()
 
 
 @register_tab
-class TabSession(TabFigure):
+class TabAnalysis(TabFigure):
 
-    name = "session"
+    name = "analysis"
 
     def update_config(self, config_opts):
         cfg_log = [f"Updating configuration:"] + config_opts
@@ -712,7 +664,7 @@ class TabSession(TabFigure):
             cfg.update_from_options(options=config_opts, source=util.get_program_name())
 
     def show_log(self):
-        log_path = files.path("log", file_vars=self.vars)
+        log_path = config.files.path("log", file_vars=self.vars)
         if not log_path.exists():
             log.warn(f"Log file {log_path} does not exist")
             return
@@ -720,7 +672,7 @@ class TabSession(TabFigure):
         log.print_file(log_path, config.there.log.print_log_level.str)
 
     def show_map(self):
-        map_path = files.path("output_web_map", file_vars=self.vars)
+        map_path = config.files.path("output_web_map", file_vars=self.vars)
         if not map_path.exists():
             from where.writers import web_map
 
@@ -728,13 +680,14 @@ class TabSession(TabFigure):
         webbrowser.open(map_path.as_uri())
 
     def edit_config(self):
-        cfg_path = files.path("config", file_vars=self.vars)
+        cfg_path = config.files.path("config", file_vars=self.vars)
         if not cfg_path.exists():
             log.warn(f"Config file '{cfg_path}' does not exist")
             return
 
         self.master.master.run(editor.edit, str(cfg_path), description=f"Editing config file {cfg_path}")
-        setup.add_timestamp(self.vars["rundate"], self.vars["pipeline"], self.vars["session"], "last update")
+        _vars = self.vars.copy()
+        setup.add_timestamp(_vars.pop("rundate"), _vars.pop("pipeline"), "last update", **_vars)
 
     button_log = show_log
     button_show_map = show_map
@@ -771,7 +724,6 @@ class ConfigTree(ttk.Treeview, UpdateMixin):
         self.column("help", width=700)
 
     def update(self, cfg):
-        # print("Updating ConfigTree")
         for idx, section in enumerate(cfg.sections):
             tree_section = self.insert("", idx, text=section.name)
             for idx_section, (key, entry) in enumerate(section.items()):
@@ -810,17 +762,23 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             return
 
         # Read dataset from disk
-        self.dataset = data.Dataset(use_options=False, **self.vars)
+
+        dset_vars = dict()
+        for var in config.there.general.dataset_variables.list:
+            if var is not None:
+                dset_vars[var] = self.vars[var]
+        self.dataset = dataset.Dataset.read(use_options=False, **dset_vars)
 
         # Add event interval field
-        events = self.dataset.get_events()
+        events = self.dataset.meta.get_events()
         if events and "time" in self.dataset.fields:
             obs_epochs = self.dataset.time.utc.jd
-            event_epochs = np.array([e[0].utc.jd for e in self.dataset.get_events()])
+            event_epochs = np.array([e[0].utc.jd for e in self.dataset.meta.get_events()])
             event, obs = np.meshgrid(event_epochs, obs_epochs)
+            event_interval = np.sum(event - obs < 0, axis=1) + 0.5
             if "event_interval" not in self.dataset.fields:
-                self.dataset.add_float("event_interval")
-            self.dataset.event_interval[:] = np.sum(event - obs < 0, axis=1) + 0.5
+                self.dataset.add_float("event_interval", event_interval)
+            self.dataset.event_interval[:] = event_interval
 
         # Observations that will not be plotted
         self.ignore_obs = np.zeros(self.dataset.num_obs, dtype=bool)
@@ -863,7 +821,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
     @property
     def xlabel(self):
         axis_unit = self.dataset.unit(self.vars["x_axis_name"])
-        unit_str = " [{}]".format(axis_unit) if axis_unit else ""
+        if self.vars["x_axis_columns"]:
+            unit_str = ""
+        else:
+            unit_str = " [{}]".format(axis_unit) if axis_unit else ""
         return self.vars["x_axis_name"].replace("_", " ").replace(".", " - ").title() + unit_str
 
     @property
@@ -873,7 +834,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
     @property
     def ylabel(self):
         axis_unit = self.dataset.unit(self.vars["y_axis_name"])
-        unit_str = " [{}]".format(axis_unit) if axis_unit else ""
+        if self.vars["y_axis_columns"]:
+            unit_str = ""
+        else:
+            unit_str = " [{}]".format(axis_unit) if axis_unit else ""
         return self.vars["y_axis_name"].replace("_", " ").replace(".", " - ").title() + unit_str
 
     @property
@@ -926,8 +890,11 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             )
 
             for ind in self.event2dset(event.ind):
-                texts = [f"{f}: {dset.plot_values(f)[ind]} {dset.unit(f)}" for f in fields if f.startswith("time")]
-                texts += [f"{f}: {dset[f][ind]} {dset.unit(f)}" for f in fields if not f.startswith("time")]
+                xstr = lambda s: s or ""  # print None as empty string
+                texts = [
+                    f"{f}: {dset.plot_values(f)[ind]} {xstr(dset.unit(f))}" for f in fields if f.startswith("time")
+                ]
+                texts += [f"{f}: {dset[f][ind]} {xstr(dset.unit(f))}" for f in fields if not f.startswith("time")]
                 log.out("\n       ".join(texts))
                 self.master.status("  ".join(texts))
 
@@ -994,12 +961,12 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         if self.vars["filter_station"] == "no filter":
             log.error("Choose a station to add a clock break")
         else:
-            time = Time(mouse_event.xdata, format="plot_date", scale="utc")
+            time = Time(mouse_event.xdata, fmt="plot_date", scale="utc")
 
             # Check if there is a suspected clock break nearby
             all_data = self.vars["x_axis_data"]
             threshold = (max(all_data) - min(all_data)).total_seconds() * Unit.seconds2days / 200
-            for suspect_time, _, suspect_station in self.dataset.get_events("suspected_clock_break"):
+            for suspect_time, _, suspect_station in self.dataset.meta.get_events("suspected_clock_break"):
                 if (
                     suspect_station == self.vars["filter_station"]
                     and np.abs(time.utc.jd - suspect_time.utc.jd) < threshold
@@ -1012,15 +979,15 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             log.info(f"Adding clock break: '{clock_break}'")
 
             # Add event on dataset to visualize
-            self.dataset.add_event(time, "unprocessed_clock_break", self.vars["filter_station"])
+            self.dataset.meta.add_event(time, "unprocessed_clock_break", self.vars["filter_station"])
             self.dataset.write()
             self.update_plot()
 
             # Add to config file
             with config.update_tech_config(use_options=False, **self.vars) as cfg:
-                current = cfg.vlbi_clock_correction.clock_breaks.as_list(", *")
+                current = cfg.vlbi_clock_poly.clock_breaks.as_list(", *")
                 updated = ", ".join(sorted(current + [clock_break]))
-                cfg.update("vlbi_clock_correction", "clock_breaks", updated, source=util.get_program_name())
+                cfg.update("vlbi_clock_poly", "clock_breaks", updated, source=util.get_program_name())
 
         return False, dict()
 
@@ -1051,46 +1018,44 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
         return False, dict()
 
-    def dbl_click_go_to_session(self, event, mouse_event):
+    def dbl_click_go_to_analysis(self, event, mouse_event):
         if "ind" not in dir(event) or len(event.ind) == 0:
             return False, dict()
 
         # Figure out info about the observation that was clicked
         idx = self.event2dset(event.ind)[0]  # Use first event index
-        var_names = ["rundate", "session", "pipeline", "id"]
+        var_names = ["rundate", "pipeline", "id"]
         var_names += [f[7:] for f in self.vars.keys() if f.startswith("filter_")]
-
-        session_vars = dict()
+        analysis_vars = dict()
         for var in var_names:
             fvar = var[7:] if var.startswith("filter_") else var
             if fvar in self.dataset.fields:
-                session_vars[var] = self.dataset[fvar][idx]
+                analysis_vars[var] = self.dataset[fvar][idx]
             elif fvar in self.vars:
-                session_vars[var] = self.vars[fvar]
+                analysis_vars[var] = self.vars[fvar]
+            else:
+                print(f"Unknown fvar {fvar} in dbl_click_go_to_analysis")
 
         # Fix date variables
-        if "rundate" in session_vars:
-            session_vars["rundate"] = datetime.strptime(session_vars["rundate"], config.FMT_date)
-            session_vars["date"] = session_vars["rundate"].strftime("%Y%m%d")
-            session_vars["date_session"] = f"{session_vars['date']}/{session_vars['session']}"
-        if "id" in session_vars:
-            session_vars["id"] = session_vars["id"].lstrip("-")
+        if "rundate" in analysis_vars:
+            analysis_vars["rundate"] = datetime.strptime(analysis_vars["rundate"], config.FMT_date)
+            analysis_vars["date"] = analysis_vars["rundate"].strftime("%Y%m%d")
 
         # Update session variables
-        log.info(f"Opening {session_vars['pipeline'].upper()} {session_vars.get('date_session', '')}")
-        self.master.status(f"Opening {session_vars['pipeline'].upper()} {session_vars.get('date_session', '')}")
+        log.info(f"Opening {analysis_vars['pipeline'].upper()} {analysis_vars.get('date', '')}")
+        self.master.status(f"Opening {analysis_vars['pipeline'].upper()} {analysis_vars.get('date', '')}")
 
-        session_tab = self.master.master.master.tabs["session"]
-        with session_tab.figure.no_update():
-            for key, value in session_vars.items():
-                if key in session_tab.widgets:
-                    session_tab.widgets[key].choice.set(value)
-                elif f"filter_{key}" in session_tab.widgets:
-                    session_tab.widgets[f"filter_{key}"].choice.set(value)
+        analysis_tab = self.master.master.master.tabs["analysis"]
+        with analysis_tab.figure.no_update():
+            for key, value in analysis_vars.items():
+                if key in analysis_tab.widgets:
+                    analysis_tab.widgets[key].choice.set(value)
+                elif f"filter_{key}" in analysis_tab.widgets:
+                    analysis_tab.widgets[f"filter_{key}"].choice.set(value)
 
         # Switch to session tab and update
-        session_tab.update_all()
-        session_tab.select()
+        analysis_tab.update_all()
+        analysis_tab.select()
 
         return False, dict()
 
@@ -1205,6 +1170,16 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             # Label subplot
             ax.set_xlim(xlim)
             ax.set_ylim(ylim)
+            if self.vars["x_axis_columns"]:
+                column_field = f"{self.vars['x_axis_name']}.{self.vars['x_axis_columns'][num_x]}"
+                axis_unit = self.dataset.unit_short(column_field)
+                unit_str = " [{}]".format(axis_unit[0]) if axis_unit else ""
+                ax.set_xlabel(self.vars["x_axis_columns"][num_x] + unit_str)
+            if self.vars["y_axis_columns"]:
+                column_field = f"{self.vars['y_axis_name']}.{self.vars['y_axis_columns'][num_y]}"
+                axis_unit = self.dataset.unit_short(column_field)
+                unit_str = " [{}]".format(axis_unit[0]) if axis_unit else ""
+                ax.set_ylabel(self.vars["y_axis_columns"][num_y] + unit_str)
             if num_x > 0:
                 ax.tick_params(left=False, labelleft=False)
             if num_y < nrows - 1:
@@ -1217,7 +1192,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         self.figure.suptitle(self.title)
         self.figure.text(0.5, 0.01, self.xlabel, ha="center")
         self.figure.text(0.01, 0.5, self.ylabel, va="center", rotation="vertical")
-
+        self.figure.align_ylabels()
         # Return indices to surrounding plot functions
         return idx, idx_other
 
@@ -1326,7 +1301,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         return plot_data, plot_range
 
     def _identify_events(self, plot_data):
-        events = self.dataset.get_events()
+        events = self.dataset.meta.get_events()
         for _, event_type, _ in events:
             self.add_event_color(event_type)
 
@@ -1420,107 +1395,6 @@ class Radiobutton(ttk.Radiobutton):
         log.debug(f"Setting {self.group} = {self.vars[self.group]}")
 
 
-class DD_Date(tk.Frame, UpdateMixin):
-
-    name = "no_name"
-    width = 0
-    start_year = 1971
-
-    def __init__(self, master, vars_, figure, init_val=None, **kwargs):
-        super().__init__(master, **kwargs)
-        DateVar = namedtuple("DateVar", ["year", "month", "day"])
-        self.choices = DateVar(tk.StringVar(name="year"), tk.StringVar(name="month"), tk.StringVar(name="day"))
-        self.dropdowns = (
-            ttk.Combobox(self, width=5, textvariable=self.choices.year, state="readonly", **kwargs),
-            ttk.Combobox(self, width=3, textvariable=self.choices.month, state="readonly", **kwargs),
-            ttk.Combobox(self, width=3, textvariable=self.choices.day, state="readonly", **kwargs),
-        )
-        self.vars = vars_
-        self.figure = figure
-        self.next_update_func = None
-
-        init_val = self.vars.get(self.var, init_val)
-        if not init_val:
-            init_strs = ["", "", ""]
-        else:
-            init_strs = [d.lstrip("0") for d in init_val.strftime("%Y-%m-%d").split("-")]
-
-        for dropdown, var, init in zip(self.dropdowns, self.choices, init_strs):
-            dropdown.pack(side=tk.LEFT, padx=3)
-            var.set(init.lstrip("0"))
-            var.trace("w", self.choose)
-
-        self.update_options()  # Seemingly needed to get correct number of days on startup ...
-
-    @property
-    def label(self):
-        return self.name.replace("_", " ").title()
-
-    @property
-    def var(self):
-        return self.name
-
-    def choose(self, name, *_):
-        vars_ = self.parse_var(name)
-        self.vars.update(vars_)
-        if name in ("year", "month"):
-            self.update_options()
-        for key, value in vars_.items():
-            log.debug(f"Setting {key} = {value}")
-        self.update_next()
-
-    def parse_var(self, name):
-        prefix = f"{self.var}_"
-        value = int(getattr(self.choices, name).get())
-        value_date = None
-        date_vars = {k[len(prefix) :]: v for k, v in self.vars.items() if k.startswith(prefix)}
-        date_vars[name] = value
-        if "year" in date_vars and "month" in date_vars and "day" in date_vars:
-            try:
-                value_date = date(date_vars["year"], date_vars["month"], date_vars["day"])
-            except ValueError:
-                log.warn("{year}-{month}-{day} is not a valid date".format(**date_vars))
-
-        if value_date is None:
-            return {f"{prefix}{name}": value}
-        else:
-            return {self.var: value_date, f"{prefix}{name}": value}
-
-    def update_options(self):
-        log.debug(f"Updating {self.name}")
-        values = (self.read_year(), self.read_month(), self.read_day())
-        for dropdown, value, choice in zip(self.dropdowns, values, self.choices):
-            dropdown["values"] = value
-            if dropdown["values"] and choice.get() not in dropdown["values"]:
-                choice.set(dropdown["values"][-1])
-            elif not dropdown["values"]:
-                choice.set("")
-            else:
-                choice.set(choice.get())
-
-    def read_year(self):
-        return list(range(date.today().year, self.start_year - 1, -1))
-
-    def read_month(self):
-        return list(range(1, 12 + 1))
-
-    def read_day(self):
-        num_days = 31
-
-        # Figure out number of days based on year and month
-        prefix = f"{self.var}_"
-        if f"{prefix}year" in self.vars and f"{prefix}month" in self.vars:
-            _, num_days = calendar.monthrange(self.vars[f"{prefix}year"], self.vars[f"{prefix}month"])
-
-        return list(range(1, num_days + 1))
-
-
-@register_dropdown
-class DD_RunDate(DD_Date):
-
-    name = "rundate"
-
-
 class DropdownPicker(ttk.Combobox, UpdateMixin):
 
     name = "no_name"
@@ -1548,7 +1422,7 @@ class DropdownPicker(ttk.Combobox, UpdateMixin):
         vars_ = self.parse_vars()
         self.vars.update(vars_)
         for name, value in vars_.items():
-            log.debug(f"Setting {name} = {value}")
+            log.debug(f"DropdownPicker.choose({self.name}) Setting {name} = {value}")
         self.update_next()
 
     def parse_vars(self):
@@ -1569,84 +1443,27 @@ class DropdownPicker(ttk.Combobox, UpdateMixin):
 
 
 @register_dropdown
-class DD_PipelineAll(DropdownPicker):
-
-    name = "pipeline_all"
-    label = "Pipeline"
-    var = "pipeline"
-    width = 8
-
-    def read_options(self):
-        """Read possible pipelines
-        """
-        return pipelines.names()
-
-    def parse_vars(self):
-        """TODO: This can be removed when tech is renamed pipeline"""
-        pipeline = self.choice.get()
-        return {"tech": pipeline, "pipeline": pipeline}
-
-
-@register_dropdown
-class DD_PipelineDisk(DropdownPicker):
-
-    name = "pipeline"
-    width = 8
-
-    def read_options(self):
-        """Read possible pipelines from disk, so we only show pipelines that have been analyzed
-        """
-        return sorted(p for p in files.glob_variable("directory_work", "tech", r"[_a-z]+") if p in pipelines.names())
-
-    def parse_vars(self):
-        """TODO: This can be removed when tech is renamed pipeline"""
-        pipeline = self.choice.get()
-        return {"tech": pipeline, "pipeline": pipeline}
-
-
-@register_dropdown
-class DD_SessionAll(DropdownPicker):
-
-    name = "session_all"
-    label = "Session"
-    var = "session"
-    width = 8
-
-    def read_options(self):
-        if not self.vars.get("pipeline") or not self.vars.get("rundate"):
-            return list()
-        return sorted(pipelines.list_sessions(self.vars["rundate"], self.vars["pipeline"]))
-
-    def parse_vars(self):
-        return {"session": self.choice.get(), "dataset_name": self.choice.get()}
-
-
-@register_dropdown
-class DD_SessionDate(DropdownPicker):
+class DD_RunDate(DropdownPicker):
 
     name = "date"
     label = "Date"
     width = 10
 
     def read_options(self):
-        """Read dates from filenames
-
-        A session in this case is given by a date and a session name.
-        """
-        file_vars = dict(user=self.vars["user"], tech=self.vars["tech"], id=self.vars["id"])
-        dates = files.glob_variable("dataset_hdf5", "date", r"[0-9]{8}", file_vars=file_vars)
+        """Read dates from filenames"""
+        file_vars = dict(user=self.vars["user"], pipeline=self.vars["pipeline"], id=self.vars["id"])
+        dates = config.files.glob_variable("dataset", "date", r"[0-9]{8}", file_vars=file_vars)
         dates -= {"19700101"}  # Ignore timeseries datasets
         return sorted(dates)
 
     def parse_vars(self):
-        """Construct date variables and split out session name
-        """
+        """Construct date variables"""
         date_value = self.choice.get()
         rundate = datetime.strptime(date_value, "%Y%m%d").date() if date_value else None
-        session_vars = config.date_vars(rundate)
-        session_vars["rundate"] = rundate
-        session_vars["date"] = date_value
-        return session_vars
+        analysis_vars = config.date_vars(rundate)
+        analysis_vars["rundate"] = rundate
+        analysis_vars["date"] = date_value
+        return analysis_vars
 
 
 @register_dropdown
@@ -1659,50 +1476,39 @@ class DD_Session(DropdownPicker):
     def read_options(self):
         """Read sessions from filenames
         """
-        file_vars = {k: v for k, v in self.vars.items() if k not in ("stage", "dataset_name", "dataset_id")}
-        sessions = files.glob_variable("dataset_hdf5", "session", r"[_a-zA-Z0-9]*", file_vars=file_vars)
+        file_vars = {k: v for k, v in self.vars.items() if k not in ("stage", "label")}
+        sessions = config.files.glob_variable("dataset", "session", r"[_a-zA-Z0-9]*", file_vars=file_vars)
         return sorted(sessions)
 
 
 @register_dropdown
-class DD_IdAll(DropdownPicker):
+class DD_Station(DropdownPicker):
 
-    name = "id_all"
-    label = "Id"
-    var = "id"
-    width = 25
+    name = "station"
+    label = "station"
+    width = 10
 
     def read_options(self):
-        """Read ids from config"""
-        ids = [""] + config.there.run_analysis.ids.list
-        return sorted(i.lstrip("_") for i in ids)
-
-    def parse_vars(self):
-        """Add leading underscore to id
+        """Read station from filenames
         """
-        id_ = self.choice.get()
-        return {self.var: f"_{id_}" if id_ else ""}
+        file_vars = dict(user=self.vars["user"], pipeline=self.vars["pipeline"], id=self.vars["id"])
+        stations = config.files.glob_variable("dataset", "station", r"[\w]*", file_vars=file_vars)
+        return sorted(stations)
 
 
 @register_dropdown
 class DD_Id(DropdownPicker):
 
     name = "id"
-    width = 25
+    width = 20
 
     def read_options(self):
         """Read ids from filenames
 
         """
-        file_vars = {k: v for k, v in self.vars.items() if k not in ("id", "stage", "dataset_name", "dataset_id")}
-        ids = files.glob_variable("dataset_hdf5", "id", r"|-[_\w]+", file_vars=file_vars)
-        return sorted(i.lstrip("-") for i in ids)
-
-    def parse_vars(self):
-        """Add leading dash to id
-        """
-        id_ = self.choice.get()
-        return {self.name: f"-{id_}" if id_ else ""}
+        file_vars = {"pipeline": self.vars["pipeline"], "user": self.vars["user"]}
+        ids = config.files.glob_variable("dataset", "id", r"|[_\w]+", file_vars=file_vars)
+        return sorted(ids)
 
 
 @register_dropdown
@@ -1714,24 +1520,24 @@ class DD_Stage(DropdownPicker):
     def read_options(self):
         """Read pipeline and stage from filenames
         """
-        file_vars = {k: v for k, v in self.vars.items() if k not in ("stage",)}
-        stages = files.glob_variable("dataset_hdf5", "stage", r"[a-z_]+", file_vars=file_vars)
+        file_vars = {k: v for k, v in self.vars.items() if k not in ("stage", "label")}
+        stages = config.files.glob_variable("dataset", "stage", r"[a-z_]+", file_vars=file_vars)
         return sorted(stages, key=self._sorter)
 
     def _sorter(self, stage):
         """Return a sort key for the given stage
 
-        Sorts first on tech then on stage such that later stages are sorted first. Unknown stages are sorted
-        alphabetically at the end. Stages can be prioritized by adding them to stages in there.conf.
+        Sorts first on pipeline then on stage such that later stages are sorted first. Unknown stages are sorted
+        alphabetically at the end.
 
         Args:
-            tech_stage:  Tuple with tech and stage.
+            stage:  Tuple with pipeline and stage.
 
         Returns:
             Tuple that can be sorted on.
         """
-        tech = self.vars["tech"]
-        stages = config.there.session.stages.list + pipelines.stages(tech)[::-1]  # Reversed to sort later stages first
+        pipeline = self.vars["pipeline"]
+        stages = pipelines.stages(pipeline)[::-1]  # Reversed to sort later stages first
         try:
             stage_id = stages.index(stage)
         except ValueError:
@@ -1740,23 +1546,33 @@ class DD_Stage(DropdownPicker):
 
 
 @register_dropdown
-class DD_Dataset(DropdownPicker):
+class DD_SatName(DropdownPicker):
 
-    name = "dataset"
+    name = "sat_name"
     width = 14
 
     def read_options(self):
-
-        """Read dataset name and id
+        """Read pipeline and sat_name from filenames
         """
-        return sorted(data.list_datasets(use_options=False, **self.vars), reverse=True)
+        file_vars = {k: v for k, v in self.vars.items() if k not in ("sat_name")}
 
-    def parse_vars(self):
-        dataset_name, _, dataset_id = self.choice.get().partition("/")
-        try:
-            return dict(dataset_name=dataset_name, dataset_id=int(dataset_id))
-        except ValueError:
-            return dict(dataset_name=dataset_name, dataset_id=0)
+        sat_names = config.files.glob_variable("dataset", "sat_name", r"[a-z1-2]+", file_vars=file_vars)
+        return sorted(sat_names)
+
+
+@register_dropdown
+class DD_Label(DropdownPicker):
+
+    name = "label"
+    width = 14
+
+    def read_options(self):
+        """Read label from filenames"""
+        file_vars = self.vars.copy()
+        if "label" in file_vars:
+            file_vars.pop("label")
+        labels = config.files.glob_variable("dataset", "label", ".+", file_vars=file_vars)
+        return sorted(labels)
 
 
 @register_dropdown
@@ -1771,10 +1587,10 @@ class DD_PlotType(DropdownPicker):
 
 class DD_Field(DropdownPicker):
 
-    width = 20
+    width = 35
 
     def read_options(self):
-        return sorted(self.figure.dataset.fields, key=lambda f: ("a" if f.startswith("time") else "z") + f)
+        return sorted(self.figure.dataset.plot_fields, key=lambda f: ("a" if f.startswith("time") else "z") + f)
 
     def parse_vars(self):
         field = self.choice.get()
@@ -1783,9 +1599,21 @@ class DD_Field(DropdownPicker):
             return {self.name + "_data": values, self.name + "_name": ""}
 
         values = self.figure.dataset.plot_values(field)
-        do_3d_plot = values.ndim == 2 and values.shape[1] == 3
+        do_3d_plot = values.ndim == 2 and values.shape[1] >= 3
 
-        return {self.name + "_data": values, self.name + "_name": field, self.name + "_3d": do_3d_plot}
+        try:
+            if values.ndim == 2:
+                column_names = self.figure.dataset[field].column_names
+            else:
+                column_names = None
+        except AttributeError:
+            column_names = None
+        return {
+            self.name + "_data": values,
+            self.name + "_name": field,
+            self.name + "_3d": do_3d_plot,
+            self.name + "_columns": column_names,
+        }
 
 
 @register_dropdown
@@ -1847,13 +1675,13 @@ def filter_factory(filter_name):
         name = f"filter_{filter_name}"
         label = filter_name.replace("_", " ").title()
 
-        def __init__(self, master, file_vars, figure, **kwargs):
-            super().__init__(master, file_vars, figure, init_val="no filter", **kwargs)
+        def __init__(self, master, vars_, figure, **kwargs):
+            super().__init__(master, vars_, figure, init_val="no filter", **kwargs)
             figure.add_filter(self)
 
         def read_options(self):
             try:
-                return ["no filter"] + self.figure.dataset.unique(self.name[7:])
+                return ["no filter"] + sorted((self.figure.dataset.unique(self.name[7:])))
             except KeyError:
                 return ["no filter"]
 

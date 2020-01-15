@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each integrator should be defined in a separate .py-file. The function inside the .py-file that should be called
-needs to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+needs to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midard.dev import plugins
 
     @plugins.register
     def cowell(dset):
@@ -16,9 +16,11 @@ needs to be decorated with the :func:`~where.lib.plugins.register` decorator as 
 
 import importlib
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import log
-from where.lib import plugins
 
 # Do not support * imports
 __all__ = []
@@ -33,7 +35,7 @@ def names():
     Returns:
         List:   Sorted list of names of integrators.
     """
-    return plugins.list_all(package_name=__name__)
+    return plugins.names(package_name=__name__)
 
 
 def call(integrator, **kwargs):

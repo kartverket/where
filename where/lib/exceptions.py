@@ -22,7 +22,7 @@ class InitializationError(WhereException):
     pass
 
 
-class InvalidSessionError(WhereException):
+class InvalidArgsError(WhereException):
     pass
 
 
@@ -43,10 +43,6 @@ class UnknownEnumError(WhereException):
 
 
 class UnknownPipelineError(WhereException):
-    pass
-
-
-class UnknownPluginError(WhereException):
     pass
 
 

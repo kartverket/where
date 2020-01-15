@@ -13,6 +13,7 @@ Dataset.
 """
 # Standard library imports
 from datetime import datetime, timedelta
+from datetime import time as dt_time
 
 # Midgard imports
 from midgard.dev import plugins
@@ -21,7 +22,6 @@ from midgard.dev import plugins
 import where
 from where import apriori
 from where.lib import config
-from where.lib import files
 from where.lib import util
 
 # TODO: SYSTEM_TIME_OFFSET_TO_GPS_SECOND & SYSTEM_TIME_OFFSET_TO_GPS_WEEK should be placed in constans.conf
@@ -37,31 +37,29 @@ SYSTEM_TIME_OFFSET_TO_GPS_WEEK = dict(C=1356, E=0, I=0, J=0)
 
 
 @plugins.register
-def rinex3_nav(dset):
+def rinex3_nav(dset: "Dataset"):
     """Write RINEX navigation file
 
     Args:
-        dset:       Dataset, a dataset containing the data.
+        dset:  Dataset, a dataset containing the data.
     """
 
     # Overwrite Dataset. This is necessary if the writer is called from a analysis (e.g. SISRE) with does not include
     # broadcast ephemeris information.
     # TODO: Is that the best solution?
-    if "rinex_nav/edit" not in dset.description and "rinex_nav/raw" not in dset.description:
+    if dset.vars["pipeline"] != "rinex_nav":
         brdc = apriori.get(
             "orbit",
-            rundate=dset.rundate,
-            time=dset.time,
-            satellite=tuple(dset.satellite),
-            system=tuple(dset.system),
+            rundate=dset.analysis["rundate"],
+            system=tuple(dset.unique("system")),
             station=dset.vars["station"],
             apriori_orbit="broadcast",
         )
-        meta = brdc.dset_edit.meta[dset.rundate.strftime("%Y-%m-%d")]
+        meta = brdc.dset_edit.meta[dset.analysis["rundate"].strftime("%Y-%m-%d")]
         data = brdc.dset_edit  # TODO: Another possibility: brdc.dset_raw
 
     else:
-        meta = dset.meta[dset.rundate.strftime("%Y-%m-%d")]
+        meta = dset.meta[dset.analysis["rundate"].strftime("%Y-%m-%d")]
         data = dset  # TODO: Another possibility: brdc.dset_raw
 
     sat_sys_definition = dict(
@@ -69,7 +67,7 @@ def rinex3_nav(dset):
     )
     rinex_version = "3.03"
 
-    with files.open("output_rinex3_nav", file_vars=dset.vars, mode="wt") as fid:
+    with config.files.open("output_rinex3_nav", file_vars=dset.vars, mode="wt") as fid:
 
         #
         # Write RINEX navigation header
@@ -160,7 +158,7 @@ def rinex3_nav(dset):
 
             # Remove observation epochs, which does not fit in the given time period
             # TODO: Is the time handling ok. Especially for BeiDou from day to day or week to week?
-            rundate = datetime(data.rundate.year, data.rundate.month, data.rundate.day)
+            rundate = datetime.combine(data.analysis["rundate"], dt_time.min)
             if data.time.gps.datetime[idx] < rundate or data.time.gps.datetime[idx] >= (rundate + timedelta(days=1)):
                 continue
 
@@ -264,9 +262,9 @@ def _time_system_correction(data, idx):
 
     for key in ["toe", "transmission_time"]:
         if data.system[idx] == "C":
-            time[key] = data[key].gps.gpssec[idx] - SYSTEM_TIME_OFFSET_TO_GPS_SECOND.get("C", 0)
+            time[key] = data[key].gps.gps_ws.seconds[idx] - SYSTEM_TIME_OFFSET_TO_GPS_SECOND.get("C", 0)
         elif data.system[idx] in "EGIJ":
-            time[key] = data[key].gps.gpssec[idx]
+            time[key] = data[key].gps.gps_ws.seconds[idx]
 
     if data.system[idx] == "C":
         time["week"] = data.gnss_week[idx] - SYSTEM_TIME_OFFSET_TO_GPS_WEEK.get("C", 0)
@@ -326,7 +324,8 @@ def _get_fields_based_on_system(data, idx):
 
     iodc_groupdelay                             Clock issue of data or group delay depending on GNSS:
                            C: tgd_b2_b3           - BeiDou: B2/B3 TGD2
-                           E: bgd_e1_e5b          - Galileo: E1-E5b BGD (see section 5.1.5 in :cite:`os-sis-icd`)
+                           E: bgd_e1_e5b          - Galileo: E1-E5b BGD (see section 5.1.5 in 
+                                                    :cite:`galileo-os-sis-icd`)
                            G: iodc                - GPS: IODC (Clock issue of data indicates changes
                                                     (set equal to IODE))
                            J: iodc                - QZSS: IODC
@@ -343,7 +342,8 @@ def _get_fields_based_on_system(data, idx):
     tgd_bgd                                     Total group delay (TGD) or broadcast group delay (BGD) for
                                                 Galileo:
                            C: tgd_b1_b3           - BeiDou: B1/B3 TGD1
-                           E: bgd_e1_e5a          - Galileo: E1-E5a BGD (see section 5.1.5 in :cite:`os-sis-icd`)
+                           E: bgd_e1_e5a          - Galileo: E1-E5a BGD (see section 5.1.5 in 
+                                                    :cite:`galileo-os-sis-icd`)
                            G: tgd                 - GPS: TGD (:math:`L_1 - L_2` delay correction term. See
                                                     section 20.3.3.3.3.2 in :cite:`is-gps-200h`.)
                            I: tgd                 - IRNSS: TGD

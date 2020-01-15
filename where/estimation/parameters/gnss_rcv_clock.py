@@ -9,9 +9,9 @@ Calculate the partial derivatives of the GNSS receiver clock, e.g. described cit
 # External library imports
 import numpy as np
 
-# Where imports
-# from where.lib import constant
-from where.lib import plugins
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math.constant import constant
 
 
 @plugins.register
@@ -24,10 +24,7 @@ def gnss_rcv_clock(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
-    station = dset.dataset_name
-    # partials = np.full((dset.num_obs, 1), constant.c)
-    partials = np.full((dset.num_obs, 1), 1)
-    column_name = station + "_clock"
+    partials = np.full((dset.num_obs, 1), constant.c)
+    column_name = [""]
 
-    # return partials, column_name, "meter per second"
-    return partials, column_name, "dimensionless"
+    return partials, column_name, "meter per second"

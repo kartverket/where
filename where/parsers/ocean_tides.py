@@ -26,7 +26,6 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser import Parser
-from where.lib import files
 
 
 @plugins.register
@@ -35,7 +34,7 @@ class OceanTidesParser(Parser):
     """
 
     def read_data(self):
-        with files.open_path(self.file_path, mode="rt") as fid:
+        with open(self.file_path, mode="rt") as fid:
             self._parse_file(fid)
 
     def _parse_file(self, fid):

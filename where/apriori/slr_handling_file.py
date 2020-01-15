@@ -14,9 +14,11 @@ References:
 # Standard library imports
 from collections import UserDict
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import parsers
-from where.lib import plugins
 
 
 @plugins.register
@@ -30,8 +32,8 @@ def get_handling_file(time):
 class HandlingFile(UserDict):
     def __init__(self, data, time):
         super().__init__()
-        self.start_time = min(time.utc).datetime
-        self.end_time = max(time.utc).datetime
+        self.start_time = min(time.utc.datetime)
+        self.end_time = max(time.utc.datetime)
         self._pick_data(data)
 
     def _pick_data(self, data):

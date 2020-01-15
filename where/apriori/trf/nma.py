@@ -15,16 +15,19 @@ import json
 import numpy as np
 import requests
 
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math import ellipsoid
+
 # Where imports
-from where.apriori import trf
+from where.data.position import Position
+from where.apriori.trf import TrfFactory
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
-from where.lib.time import Time
 
 
 @plugins.register
-class NmaTrf(trf.TrfFactory):
+class NmaTrf(TrfFactory):
     """A factory for using positions from the custom TRF-config file.
     """
 
@@ -91,7 +94,7 @@ class NmaTrf(trf.TrfFactory):
         """
         return dict()
 
-    def _calculate_pos_itrs(self, site):
+    def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
 
         There are no velocities available, so same position is returned for all time epochs
@@ -127,4 +130,7 @@ class NmaTrf(trf.TrfFactory):
                     continue
                 pos[idx] = site_data["pos"][ep_idx]
 
-        return pos
+        ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
+        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
+
+        return np.squeeze(pos_trs)

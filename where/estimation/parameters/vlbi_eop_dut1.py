@@ -9,13 +9,13 @@ This is done according to equations (2.34) - (2.36) in Teke :cite:`teke2011`.
 
 
 
-
-
 """
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.lib import rotation
-from where.lib import plugins
 
 
 @plugins.register
@@ -31,7 +31,7 @@ def eop_dut1(dset):
     column_name = ["dut1"]
 
     src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
+    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
     dR_dut1 = rotation.dR_dut1(dset.time)
     partials = -(src_dir @ rotation.Q(dset.time) @ dR_dut1 @ rotation.W(dset.time) @ baseline)[:, :, 0]
 

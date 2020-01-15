@@ -15,20 +15,25 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math import ellipsoid
+
 # Where imports
-from where.apriori import trf
-from where.lib import files
+from where.apriori.trf import TrfFactory
+from where.data.position import Position, PositionDelta
+from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where import parsers
-from where.lib import rotation
-from where.ext import sofa_wrapper as sofa
-from where.lib.time import Time
+
+# from where.lib import rotation
+# from where.ext import sofa_wrapper as sofa
+from where.data.time import Time
 from where.lib.unit import Unit
 
 
 @plugins.register
-class Itrf(trf.TrfFactory):
+class Itrf(TrfFactory):
     """A parser for reading data from ITRF files in SNX format
     """
 
@@ -50,7 +55,7 @@ class Itrf(trf.TrfFactory):
         self.solution, _, fmt = version.partition("_")
         self.format = fmt if fmt else "snx"  # Sinex is default format
         if self.solution == "last":
-            candidates = files.glob_variable(self.file_key_pattern.format(self.format), "version", r"[^._]*")
+            candidates = config.files.glob_variable(self.file_key_pattern.format(self.format), "version", r"[^._]*")
             try:
                 self.solution = max(candidates)
             except ValueError:
@@ -65,7 +70,7 @@ class Itrf(trf.TrfFactory):
         """
         file_vars = dict(version=self.solution)
         paths = {
-            self.format: files.path(
+            self.format: config.files.path(
                 self.file_key_pattern.format(self.format), file_vars=file_vars, download_missing=True
             )
         }
@@ -73,12 +78,14 @@ class Itrf(trf.TrfFactory):
             if self.solution >= "2014":
                 paths.update(
                     dict(
-                        soln=files.path("trf-itrf_snx_soln", file_vars=file_vars, download_missing=True),
-                        psd=files.path("trf-itrf_snx_psd", file_vars=file_vars, download_missing=True),
+                        soln=config.files.path("trf-itrf_snx_soln", file_vars=file_vars, download_missing=True),
+                        psd=config.files.path("trf-itrf_snx_psd", file_vars=file_vars, download_missing=True),
                     )
                 )
             else:
-                paths.update(dict(soln=files.path("trf-itrf_snx_soln", file_vars=file_vars, download_missing=True)))
+                paths.update(
+                    dict(soln=config.files.path("trf-itrf_snx_soln", file_vars=file_vars, download_missing=True))
+                )
         return paths
 
     def _read_data(self):
@@ -137,7 +144,7 @@ class Itrf(trf.TrfFactory):
 
         return data_snx
 
-    def _calculate_pos_itrs(self, site):
+    def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
 
         The positions are calculated as simple linear offsets based on the reference epoch. If there is a post-seismic
@@ -151,7 +158,7 @@ class Itrf(trf.TrfFactory):
             Array:  Positions, one 3-vector for each time epoch.
         """
         station_info = self.data[site]
-        ref_epoch = Time(station_info["ref_epoch"], scale="utc")
+        ref_epoch = Time(station_info["ref_epoch"], scale="utc", fmt="datetime")
 
         pos = np.zeros((self.time.size, 3))
         for pv in station_info["pos_vel"].values():
@@ -167,13 +174,15 @@ class Itrf(trf.TrfFactory):
                 interval_years = np.array([interval_years])
             pos[idx, :] = ref_pos + interval_years[idx, None] * ref_vel[None, :]
 
+        ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
+        pos_trs = Position(np.squeeze(pos), system="trs", ellipsoid=ell, time=self.time)
+
         # Post-seismic deformations, see Appendix C in :cite:'itrf2014'
         if "psd" in station_info:
-            llh = sofa.vectorized_llh(pos)
             psd = station_info["psd"]
             denu = dict(H=np.zeros(self.time.size), E=np.zeros(self.time.size), N=np.zeros(self.time.size))
             for param in psd.values():
-                t_0 = Time(param["epoch"], format="datetime", scale="utc")
+                t_0 = Time(param["epoch"], fmt="datetime", scale="utc")
                 delta_t = (self.time - t_0).jd * Unit.day2julian_years
                 if isinstance(delta_t, float):
                     delta_t = np.array([delta_t])
@@ -188,11 +197,9 @@ class Itrf(trf.TrfFactory):
                     for a, t in zip(alog, tlog):
                         denu[L][idx] += a * np.log(1 + delta_t[idx] / t)
 
-            rot = rotation.enu2trs(llh[:, 0], llh[:, 1])
             denu = np.vstack((denu["E"], denu["N"], denu["H"])).T
-            dxyz = (rot @ denu[:, :, None])[:, :, 0]
-            pos += dxyz
 
-        if self.time.size == 1:
-            pos = pos[0, :]
-        return pos
+            pos_delta = PositionDelta(np.squeeze(denu), system="enu", ellipsoid=ell, ref_pos=pos_trs, time=self.time)
+            pos_trs += pos_delta.trs
+
+        return np.squeeze(pos_trs)

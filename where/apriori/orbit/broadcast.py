@@ -8,7 +8,7 @@ Example:
     from where import apriori
 
     # Get broadcast ephemeris object
-    brdc = apriori.get('orbit', rundate=rundate, station=station, apriori_orbit='broadcast')
+    brdc = apriori.get('orbit', rundate=rundate, station=station, , system=system, apriori_orbit='broadcast')
 
     # Write calculated Dataset to file
     brdc.dset.write()
@@ -16,23 +16,25 @@ Example:
 """
 
 # Standard library imports
-from typing import Dict, List
+from datetime import timedelta
+from typing import Dict, List, Union
 
 # External library imports
 import numpy as np
 import pandas as pd
 
 # Midgard imports
+from midgard.collections import enums
+from midgard.dev import plugins
 from midgard.math.constant import constant
+from midgard.parsers import rinex_nav
 
 # Where imports
-from where import data
+from where.data import dataset3 as dataset
 from where import cleaners
-from where import parsers
 from where.apriori import orbit
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where.lib import rotation
 from where.lib.unit import Unit
 
@@ -71,6 +73,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                                 file
         file_key (str):         Key to the broadcast orbit file defined in files.conf file.
         name (str):             Apriori orbit name
+        system (tuple):         GNSS system identifiers
 
     Methods:
         relativistic_clock_correction():  Determine relativistic clock correction due to orbit eccentricity
@@ -84,7 +87,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
     name = "broadcast"
 
-    def __init__(self, rundate, station=None, file_key=None, day_offset=1):
+    def __init__(self, rundate, system, station=None, file_key=None, file_path=None, day_offset=1):
         """Set up a new BroadcastOrbit object, does not parse any data
 
         TODO: Remove dependency on rundate, use time to read correct files. (What to do with dataset?)
@@ -92,12 +95,16 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Args:
             rundate (date):     Date of model run.
             station (str):      4 character station identifier.
+            system (tuple):     List with GNSS system string codes (G, E, R, etc.).
             file_key (str):     Key to the broadcast orbit file defined in files.conf file.
+            file_path (pathlib.PosixPath):  File path to broadcast orbit file.
+            day_offset (int):   Day offset used to calculate the number of days to read.
         """
         super().__init__(rundate=rundate)
+        self.system = system
         self.file_key = "gnss_rinex_nav_{system}" if file_key is None else file_key
-        self.day_offset = day_offset  # TODO: Rewrite rinex_nav parser, that they only read one day (see precise.py).
-        #      Handling how many days are read should be done via broadcast.py.
+        self.file_path = file_path
+        self.day_offset = day_offset
 
         # TODO hjegei: Should it be not enough to 'station' in _dset_raw?
         self._dset_raw.vars["station"] = station.lower()
@@ -107,6 +114,8 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
     def _read(self, dset_raw):
         """Read RINEX navigation file data and save it in a Dataset
+
+        Note that beside the given day also the navigation files from the day before and the day after is read.
 
         One RINEX navigation file is normally written for each GNSS. The navigation file extension depends on the GNSS
         (GPS: *.n, Galileo: *.l, GLONASS: *.g, ...). Therefore we have defined for each GNSS the navigation file
@@ -135,37 +144,62 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Args:
             dset_raw (Dataset):     Dataset representing raw data from RINEX navigation file
         """
+        date_to_read = dset_raw.analysis["rundate"] - timedelta(days=self.day_offset)
         use_mixed_brdc_file = config.tech.get("use_mixed_brdc_file", default=False).bool
-        systems = {"M"} if use_mixed_brdc_file == True else set(self.system)
+        systems = {"M"} if use_mixed_brdc_file == True else self.system
         file_paths = list()
 
-        for sys in systems:
+        # Loop over days to read
+        while date_to_read <= dset_raw.analysis["rundate"] + timedelta(days=self.day_offset):
 
-            # Generate temporary Dataset with orbit file data
-            dset_temp = data.Dataset(dset_raw.rundate, dset_raw.vars["tech"], "temporary", "", 0, empty=True)
-            parser = parsers.parse(
-                file_key=self.file_key.format(system=sys),
-                rundate=dset_raw.rundate,
-                file_vars=dict(dset_raw.vars, file_key=self.file_key.format(system=sys)),
-            )
-            parser.write_to_dataset(dset_temp)
-            file_paths.append(str(parser.file_path))
+            date = date_to_read.strftime("%Y-%m-%d")
+            meta = dict()
 
-            # Extend Dataset dset_raw with temporary Dataset
-            if dset_raw.num_obs:
+            for sys in systems:
+                if self.file_path is None:
+                    file_path = config.files.path(
+                        self.file_key.format(system=sys), file_vars=config.date_vars(date_to_read)
+                    )
+                else:
+                    file_path = self.file_path
 
-                # Merge meta data information
-                # TODO: Handle meta data information correctly. Meta data information based on different GNSS navigation
-                #       message files has to be merged correctly together. What to do with 'sat_sys' and 'leap_seconds'?
-                for date in dset_temp.meta.keys():
-                    for key in ["iono_para", "time_sys_corr"]:
-                        dset_temp.meta[date][key].update(dset_raw.meta[date][key])
+                log.debug(f"Parse broadcast orbit file {file_path}")
 
-                dset_raw.extend(dset_temp)
-            else:
-                dset_raw.copy_from(dset_temp)
-            dset_raw.add_to_meta("parser", "file_path", file_paths)
+                # Generate temporary Dataset with orbit file data
+                dset_temp = dataset.Dataset(
+                    rundate=date_to_read, pipeline=dset_raw.vars["pipeline"], stage="temporary"
+                )
+                parser = rinex_nav.get_rinex2_or_rinex3(file_path)
+                parser.write_to_dataset(dset_temp)
+                file_paths.append(str(parser.file_path))
 
+                # Extend Dataset dset_raw with temporary Dataset
+                if dset_raw.num_obs:
+
+                    # Merge meta data information
+                    # TODO: Handle meta data information correctly. Meta data information based on different GNSS navigation
+                    #       message files has to be merged correctly together. What to do with 'sat_sys' and 'leap_seconds'?
+                    if date in dict(dset_raw.meta).keys():
+                        for key in ["iono_para", "time_sys_corr"]:
+                            dset_temp.meta[key].update(dset_raw.meta[date][key])
+
+                    dset_raw.extend(dset_temp, meta_key=date)
+
+                else:
+                    # Add date key to meta TODO: Better solution?
+                    meta.setdefault(date, dict()).update(dset_temp.meta)
+                    for k in dict(dset_temp["meta"]).keys():
+                        del dset_temp.meta[k]
+                    dset_temp.meta.update(meta)
+
+                    dset_raw.update_from(dset_temp)
+
+            date_to_read += timedelta(days=1)
+
+        dset_raw.meta.add("file_path", file_paths, section="parser")
+
+        if "E" in dset_raw.unique("system"):
+            self._galileo_signal_health_status()
 
     def _edit(self, dset_edit: "Dataset") -> "Dataset":
         """Edit RINEX navigation file data and save it in a Dataset
@@ -198,21 +232,26 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         nav_filtered = nav.sort_values(by=["satellite", "time", "transmission_time"])
 
         # Remove duplicated navigation message entries (IODEs)
-        # TODO: transmission_time should also be used in filtering!!! Maybe it should be a configuration option, how
-        # to filter duplicated epochs. Keep first and last.
-        idx = nav_filtered.duplicated(subset=["satellite", "time", "iode", "nav_type"], keep="first")
+        # TODO: Maybe it should be a configuration option, how to filter duplicated epochs. Keep first and last.
+        idx = nav_filtered.duplicated(
+            subset=["satellite", "time", "iode", "nav_type", "transmission_time"], keep="first"
+        )
         nav_duplicates = nav_filtered[["satellite", "time", "iode", "nav_type"]][idx]
         with pd.option_context("display.max_rows", None, "display.max_columns", 5):
             log.info(f"Remove {len(nav_duplicates)} duplicated navigation message entries.")
             log.debug(f"List of duplicated navigation messages: \n{nav_duplicates}")
 
-        nav_filtered = nav_filtered.drop_duplicates(subset=["satellite", "time", "iode", "nav_type"], keep="first")
+        nav_filtered = nav_filtered.drop_duplicates(
+            subset=["satellite", "time", "iode", "nav_type", "transmission_time"], keep="first"
+        )
 
         # Remove navigation message types, which are not needed
         nav_type = config.tech.get("navigation_message_type", default="").dict
         if nav_type:
             for sys, type_ in nav_type.items():
                 sys = sys[0] if len(sys) > 0 else sys
+
+                # Overwrite message type definition if only 'INAV' or 'FNAV' is specified
                 if type_ == "INAV":
                     type_ = ["INAV_E1", "INAV_E5b", "INAV_E1E5b"]
                 elif type_ == "FNAV":
@@ -224,6 +263,9 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                         f"Remove {', '.join(set(remove_nav_type.nav_type))!r} navigation messages of GNSS {sys!r}"
                     )
                     nav_filtered = pd.concat([nav_filtered, remove_nav_type]).drop_duplicates(keep=False)
+
+        if nav_filtered.empty:
+            log.fatal(f"No navigation messages available for GNSS: {','.join(self.dset_raw.unique('system'))} ")
 
         # TODO hjegei: Possible future ...
         # dset_edit.copy_from(self.dset_raw)
@@ -239,14 +281,13 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         for idx, field in enumerate(fields):
             if field in ["time", "transmission_time", "toe"]:
-                dset_edit.add_time(field, val=nav_np[:, idx], scale="gps", format="datetime")
+                dset_edit.add_time(field, val=nav_np[:, idx], scale="gps", fmt="datetime")
             elif field in ["nav_type", "satellite", "system"]:
                 dset_edit.add_text(field, val=nav_np[:, idx])
             else:
                 dset_edit.add_float(field, val=nav_np[:, idx].astype(float))
 
-
-    def _calculate(self, dset_out: "Dataset", dset_in: "Dataset", time: str='time') -> None:
+    def _calculate(self, dset_out: "Dataset", dset_in: "Dataset", time: str = "time") -> None:
         """Calculate broadcast ephemeris and satellite clock correction for given observation epochs
 
         As a first step observations are removed from unavailable satellites, unhealthy satellites and for exceeding the 
@@ -274,10 +315,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             dset_in:  Input Dataset containing model data for which broadcast ephemeris should be determined.
             time:     Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
                       observation time and 'sat_time' to satellite transmission time.
-        """        
-        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of 
+        """
+        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
         # navigation records
-        cleaners.apply_remover("gnss_clean_orbit", dset_in)
+        cleaners.apply_remover("gnss_clean_orbit", dset_in, orbit_flag="broadcast")
 
         not_implemented_sys = set(dset_in.system) - set("EG")
         if not_implemented_sys:
@@ -292,7 +333,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             f"Calculating satellite position/velocity (broadcast) based on RINEX navigation file "
             f"{', '.join(self.dset_edit.meta['parser']['file_path'])}"
         )
- 
+
         # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
         # Dataset
         dset_brdc_idx = self._get_brdc_block_idx(dset_in, time=time)
@@ -305,7 +346,8 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         sat_pos = np.zeros((dset_in.num_obs, 3))
         sat_vel = np.zeros((dset_in.num_obs, 3))
         for obs_idx, (time_gpsweek, time_gpssec, brdc_idx, sys) in enumerate(
-            zip(dset_in[time].gps.gpsweek, dset_in[time].gps.gpssec, dset_brdc_idx, dset_in.system)
+            # zip(dset_in[time].gps.gpsweek, dset_in[time].gps.gpssec, dset_brdc_idx, dset_in.system)
+            zip(dset_in[time].gps.gps_ws.week, dset_in[time].gps.gps_ws.seconds, dset_brdc_idx, dset_in.system)
         ):
 
             # TODO: get_row() function needed for brdc -> brdc.get_row(kk)
@@ -319,10 +361,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             #      "sat_vel: {:>17.10f} {:>17.10f} {:>17.10f} sat_clk_bias: {:>17.10f}, sat_clk_drft: {:>17.10f} "
             #      ''.format(self.dset_edit.satellite[brdc_idx], obs_idx, brdc_idx,
             #                dset_in[time].gps.jd_frac[obs_idx] * 86400,
-            #                dset_in[time].gps.gpssec[obs_idx],
-            #                self.dset_edit.toe.gps.gpssec[brdc_idx],
-            #                self.dset_edit.transmission_time.gps.gpssec[brdc_idx],
-            #                dset_in[time].gps.jd_frac[obs_idx]-self.dset_edit.toe.gps.gpssec[brdc_idx],
+            #                dset_in[time].gps.gps_ws.seconds[obs_idx],
+            #                self.dset_edit.toe.gps.gps_ws.seconds[brdc_idx],
+            #                self.dset_edit.transmission_time.gps.gps_ws.seconds[brdc_idx],
+            #                dset_in[time].gps.jd_frac[obs_idx]-self.dset_edit.toe.gps.gps_ws.seconds[brdc_idx],
             #                int(self.dset_edit.iode[brdc_idx]),
             #                self.dset_edit.sqrt_a[brdc_idx],
             #                sat_pos[obs_idx][0], sat_pos[obs_idx][1], sat_pos[obs_idx][2],
@@ -331,21 +373,25 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             #                self.dset_edit.sat_clock_drift[brdc_idx],))
             # -DEBUG
 
-
         # Copy fields from model data Dataset
         dset_out.num_obs = dset_in.num_obs
         dset_out.add_text("satellite", val=dset_in.satellite)
         dset_out.add_text("system", val=dset_in.system)
-        dset_out.add_time("time", val=dset_in.time, scale=dset_in.time.scale)
+        # MURKS, TODO: How it works to initialize time field with a Time object?
+        dset_out.add_time("time", val=dset_in.time.datetime, scale=dset_in.time.scale, fmt="datetime")
         dset_out.vars["orbit"] = self.name
 
         # Add time field
+        # MURKS, TODO: How it works to initialize time field with a Time object?
         dset_out.add_time(
             "used_transmission_time",
-            val=self.dset_edit.transmission_time[dset_brdc_idx],
+            val=self.dset_edit.transmission_time.datetime[dset_brdc_idx],
             scale=self.dset_edit.transmission_time.scale,
+            fmt="datetime",
         )
-        dset_out.add_time("used_toe", val=self.dset_edit.toe[dset_brdc_idx], scale=self.dset_edit.toe.scale)
+        dset_out.add_time(
+            "used_toe", val=self.dset_edit.toe.datetime[dset_brdc_idx], scale=self.dset_edit.toe.scale, fmt="datetime"
+        )
 
         # Add float fields
         for field in ["bgd_e1_e5a", "bgd_e1_e5b", "tgd", "tgd_b1_b3", "tgd_b2_b3"]:
@@ -353,19 +399,15 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 dset_out.add_float(field, val=self.dset_edit[field][dset_brdc_idx])
 
         dset_out.add_float(
-                    "gnss_relativistic_clock", 
-                    val=self.relativistic_clock_correction(sat_pos, sat_vel), 
-                    unit="meter"
+            "gnss_relativistic_clock", val=self.relativistic_clock_correction(sat_pos, sat_vel), unit="meter"
         )
         dset_out.add_float(
-                    "gnss_satellite_clock",
-                    val=self.satellite_clock_correction(dset_in, time=time), 
-                    unit="meter"
+            "gnss_satellite_clock", val=self.satellite_clock_correction(dset_in, time=time), unit="meter"
         )
         dset_out.add_float("used_iode", val=self.dset_edit.iode[dset_brdc_idx])
 
         # Add satellite position and velocity to Dataset
-        dset_out.add_posvel("sat_posvel", time="time", itrs=np.hstack((sat_pos, sat_vel)))
+        dset_out.add_posvel("sat_posvel", time=dset_out.time, system="trs", val=np.hstack((sat_pos, sat_vel)))
 
         # +DEBUG
         # for num_obs  in range(0, dset_out.num_obs):
@@ -376,8 +418,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         #                     dset_out.gnss_relativistic_clock[num_obs])
         # -DEBUG
 
-
-    def satellite_clock_correction(self, dset: "Dataset", time: str="time") -> np.ndarray:
+    def satellite_clock_correction(self, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Determine satellite clock correction
 
         The satellite clock correction is based on Section 20.3.3.3.3.1 in :cite:`is-gps-200h`.
@@ -402,8 +443,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         # Elapsed time referred to clock data reference epoch toc in [s]
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
         #     problem is that use of GPSSEC compared to MJD * Unit.day2second() is not consistent!!!!
-        gpsweek_diff = (dset[time].gps.gpsweek - self.dset_edit.time.gps.gpsweek[dset_brdc_idx]) * Unit.week2second
-        tk = dset[time].gps.gpssec - self.dset_edit.time.gps.gpssec[dset_brdc_idx] + gpsweek_diff
+        gpsweek_diff = (
+            dset[time].gps.gps_ws.week - self.dset_edit.time.gps.gps_ws.week[dset_brdc_idx]
+        ) * Unit.week2second
+        tk = dset[time].gps.gps_ws.seconds - self.dset_edit.time.gps.gps_ws.seconds[dset_brdc_idx] + gpsweek_diff
 
         return (
             self.dset_edit.sat_clock_bias[dset_brdc_idx]
@@ -411,26 +454,215 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             + self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk ** 2
         ) * constant.c
 
-    def unhealthy_satellites(self):
-        """Get unhealthy satellites based on RINEX navigation file information
+    def add_satellite_clock_parameter(self, dset: "Dataset") -> np.ndarray:
+        """Add satellite clock parameters to dataset
 
-        A satellite is set to unhealthy, if in one of the given broadcast ephemeris blocks the condition
-        'self.dset_edit.sv_health > 0' is valid. That means, that a satellite is maybe only unhealthy for a certain
-        time period and not the whole day.
+        Args:
+            dset: A Dataset containing model data.
+
+        """
+        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
+        # Dataset
+        dset_brdc_idx = self._get_brdc_block_idx(dset)
+
+        # Add satellite clock parameters to dataset
+        dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx])
+        dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx])
+        dset.add_float("sat_clock_drift_rate", val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx])
+
+    def _galileo_signal_health_status(self):
+        """Determine Galileo signal health status and add sis_status_<signal> fields to Dataset
+       
+        The determination of the signal health status is defined for Galileo in Section 2.3 of :cite:`galileo-os-sdd`.
+
+        The signal health status is indicated by different numbers:
+
+        | Number | Status          | Description                                               |
+        |--------|-----------------|-----------------------------------------------------------|
+        | 0      | Healthy         |                                                           |
+        | 1      | Marginal (SISA) | Marginal status based on signal-in-space accuracy (SISA). |
+        | 2      | Marginal (DVS)  | Marginal status based on data validity status.            |
+        | 3      | Unhealthy       |                                                           |
+
+        Args:
+            dset: A Dataset containing model data.
+        """
+
+        data = dict()
+        idx = self.dset_raw.filter(system="E")
+
+        for signal in ["e1", "e5a", "e5b"]:
+
+            field = "sis_status_" + signal
+            data = np.zeros(self.dset_raw.num_obs)
+            data_tmp = np.zeros(len(self.dset_raw.system[idx]))
+
+            # Check Signal-in-space Accuracy (SISA)
+            idx_obs = np.logical_or(self.dset_raw.sv_accuracy[idx] < 0, self.dset_raw.sv_accuracy[idx] >= 126)
+            data_tmp[idx_obs] = 1
+
+            # Check Data Validity Status (DVS)
+            idx_obs = self.dset_raw["dvs_" + signal][idx] == True
+            data_tmp[idx_obs] = 2
+
+            # Check Signal Health Status (SHS)
+            idx_obs = self.dset_raw["shs_" + signal][idx] == True
+            data_tmp[idx_obs] = 3
+
+            data[idx] = data_tmp
+            self.dset_raw.add_float(field, val=data)
+
+    def signal_health_status(self, dset: "Dataset", frequencies: Union[None, List] = None) -> np.ndarray:
+        """Determine signal health status
+20.3.3.5.1.3
+        How the signal health status has to be handled depends on GNSS, used observation type and navigation message
+        type. The determination of the signal health status is defined for:
+
+        | System   | Type  | Section       | Reference                          |
+        |----------|-------|---------------|------------------------------------|
+        | GPS      | LNAV  | 20.3.3.3.1.4  | :cite:`is-gps-200h`                |
+        |          | CNAV  | 30.3.3.1.1.2  | :cite:`is-gps-200h`                |
+        | Galileo  | all   | 2.3           | :cite:`galileo-os-sdd`             |
+
+        
+        The signal health status is indicated by different numbers:
+
+        | Number | Status          | Description                                                                     |
+        |--------|-----------------|---------------------------------------------------------------------------------|
+        | 0      | Healthy         |                                                                                 |
+        | 1      | Marginal (SISA) | Defined only for Galileo and describes marginal status based on signal-in-space |
+        |        |                 | accuracy (SISA)                                                                 |
+        | 2      | Marginal (DVS)  | Defined only for Galileo and describes marginal status based on data validity   |
+        |        |                 | status.                                                                         |
+        | 3      | Unhealthy       |                                                                                 |
+
+        TODO: Add handling of BeiDou, QZSS and IRNSS signal health status.
+
+        Args:
+            dset: A Dataset containing model data.
 
         Returns:
-            list:    Unhealthy satellites
+            Array with GNSS signal health status for each observation
         """
-        unhealthy_satellites = list()
-        for satellite in self.dset_edit.unique("satellite"):
-            idx = self.dset_edit.filter(satellite=satellite)
-            if np.any(self.dset_edit.sv_health[idx] > 0):
-                unhealthy_satellites.append(satellite)
 
-        return unhealthy_satellites
+        signal_health_status = np.zeros(dset.num_obs, dtype=bool)
+        nav_type = config.tech.get("navigation_message_type", default="").dict
 
+        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
+        # Dataset
+        dset_brdc_idx = self._get_brdc_block_idx(dset)
 
-    def _get_brdc_block_idx(self, dset: "Dataset", time: str="time") -> List[int]:
+        for sys in dset.unique("system"):
+            idx = dset.filter(system=sys)
+            data_tmp = np.zeros(len(dset.system[idx]), dtype=bool)
+
+            # TODO: If several editors are used can it happen, that GNSS is not given in dset.meta["obstypes"], but
+            #      observations still existing.
+            if "obstypes" in dset.meta.keys():
+                if sys not in dset.meta["obstypes"].keys():
+                    continue
+
+            if sys in ["C", "G", "I", "J", "R"]:
+                idx_obs = self.dset_edit.sv_health[dset_brdc_idx][idx] > 0
+                data_tmp[idx_obs] = 3
+
+            elif sys == "E":
+
+                # Get frequencies by keeping a selection of E1 (1), E5a (5) and E5b (7) frequencies
+                # TODO: It has to be checked, if following selection of frequencies is correct?
+                if frequencies is None:
+                    if nav_type["E"] == "FNAV":
+                        frequencies = ["E5a"]
+                    elif nav_type["E"] == "INAV":
+                        keep_freq = {"1", "7"}
+
+                        if dset.vars["pipeline"] == "sisre":
+                            frequencies = config.tech.frequencies.dict["E"].split("_")
+                        elif dset.vars["pipeline"] == "gnss":
+                            freq_numbers = (
+                                set([t[1] for t in dset.meta["obstypes"]["E"]]) & keep_freq
+                            )  # 1: E1, 5: E5a, 7: E5b
+                            frequencies = [enums.gnss_num2freq_E["f" + num] for num in freq_numbers]
+                        else:
+                            frequencies = ["E1", "E5b"]
+
+                for freq in frequencies:
+                    data_tmp = self.dset_edit["sis_status_" + freq.lower()][dset_brdc_idx][idx]
+
+            else:
+                log.fatal(f"GNSS '{sys}' is not defined.")
+            signal_health_status[idx] = data_tmp
+
+        # +DEBUG
+        ## Add signal health status to dataset
+        # if "signal_health_status" in dset.fields:
+        #    dset.signal_health_status[:] = signal_health_status
+        # else:
+        #    dset.add_float("signal_health_status", val=signal_health_status)
+        # -DEBUG
+
+        return signal_health_status
+
+    def total_group_delay(self, dset: "Dataset") -> np.ndarray:
+        """Determine total group delay
+
+        What kind of total group delay has to be applied depends on GNSS, used observation type and navigation message
+        type. The determination of the total group delay is defined for GPS in Section 20.3.3.3.3.2 in 
+        :cite:`is-gps-200h` and for Galileo in Section 5.1.5 in :cite:`galileo-os-sis-icd`. 
+
+        TODO: Add handling of BeiDou, QZSS and IRNSS TGDs.
+
+        Args:
+            dset: A Dataset containing model data.
+
+        Returns:
+            GNSS total group delay for each observation in [m] 
+        """
+        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
+        # Dataset
+        dset_brdc_idx = self._get_brdc_block_idx(dset)
+
+        for sys, obstype in dset.meta["obstypes"].items():
+
+            idx = dset.filter(system=sys)
+
+            if len(obstype) != 1:
+                log.warn("Total group delay can only be applied for single-frequency solutions.")
+                return np.zeros(dset.num_obs)
+
+            freq = obstype[0][1]
+
+            if sys == "G":
+                f_L1 = enums.gnss_freq_G.L1
+                f_L2 = enums.gnss_freq_G.L2
+
+                if freq == "1":
+                    tgd = self.dset_edit.tgd[dset_brdc_idx][idx] * constant.c
+                elif freq == "2":
+                    tgd = f_L1 ** 2 / f_L2 ** 2 * self.dset_edit.tgd[dset_brdc_idx][idx] * constant.c
+
+            elif sys == "E":
+                nav_type = config.tech.navigation_message_type.dict["E"]
+
+                f_E1 = enums.gnss_freq_E.E1
+                f_E5a = enums.gnss_freq_E.E5a
+                f_E5b = enums.gnss_freq_E.E5b
+
+                if nav_type.startswith("FNAV"):
+                    if freq == "1":
+                        tgd = self.dset_edit.bgd_e1_e5a[dset_brdc_idx][idx] * constant.c
+                    elif freq == "5":
+                        tgd = f_E1 ** 2 / f_E5a ** 2 * self.dset_edit.bgd_e1_e5a[dset_brdc_idx][idx] * constant.c
+
+                elif nav_type.startswith("INAV"):
+                    if freq == "1":
+                        tgd = self.dset_edit.bgd_e1_e5b[dset_brdc_idx][idx] * constant.c
+                    elif freq == "7":
+                        tgd = f_E1 ** 2 / f_E5b ** 2 * self.dset_edit.bgd_e1_e5b[dset_brdc_idx][idx] * constant.c
+
+        return tgd
+
+    def _get_brdc_block_idx(self, dset: "Dataset", time: str = "time") -> List[int]:
         """Get GNSS broadcast ephemeris block indices for given observation epochs
 
         The indices relate the observation epoch to the correct set of broadcast ephemeris. First the time difference
@@ -511,15 +743,9 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         return brdc_idx
 
-
-
     def _get_corrected_broadcast_ephemeris(
-                        self, 
-                        t_sat_gpsweek: float, 
-                        t_sat_gpssec: float, 
-                        idx: int, 
-                        sys: str
-        ) -> Dict[str, float]:
+        self, t_sat_gpsweek: float, t_sat_gpssec: float, idx: int, sys: str
+    ) -> Dict[str, float]:
         """Apply correction for broadcast ephemeris for given time tk
 
         Following equations are based on Table 20-IV. in :cite:`is-gps-200h`.
@@ -547,10 +773,12 @@ class BroadcastOrbit(orbit.AprioriOrbit):
          vega             rad     True anomaly
         ===============  ======  =============================================================
         """
-        toe = self.dset_edit.toe.gps.gpssec[idx]  # Ephemeris reference epoch in [s]
+        # toe = self.dset_edit.toe.gps.gpssec[idx]  # Ephemeris reference epoch in [s]
+        toe = self.dset_edit.toe.gps.gps_ws.seconds[idx]  # Ephemeris reference epoch in [s]
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
         #     problem is that use of GPSSEC compared to MJD * Unit.day2second() is not consistent!!!!
-        gpsweek_diff = (t_sat_gpsweek - self.dset_edit.toe.gps.gpsweek[idx]) * Unit.week2second
+        # gpsweek_diff = (t_sat_gpsweek - self.dset_edit.toe.gps.gpsweek[idx]) * Unit.week2second
+        gpsweek_diff = (t_sat_gpsweek - self.dset_edit.toe.gps.gps_ws.week[idx]) * Unit.week2second
         tk = t_sat_gpssec - toe + gpsweek_diff  # Eclapsed time referred to ephemeris reference epoch in [s]
 
         # Determine corrected Keplerian elements

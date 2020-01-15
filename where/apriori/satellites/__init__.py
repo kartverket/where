@@ -4,10 +4,10 @@ Description:
 ------------
 
 To add a new satellite, simply create a new .py-file which defines a class inheriting from satellites.Satellite. The
-class needs to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+class needs to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
     from where.apriori.satellites import satellite
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     class Satellite_1(satellite.Satellite):
@@ -20,27 +20,30 @@ To use a satellite, you will typically use the :func:`get_satellite`-function de
 
 The name used in `get` to call the satellite is the lower case name of the class containing the satellite info.
 """
+# Standard library imports
+from functools import lru_cache
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
-from where.lib import cache
 from where.lib import log
-from where.lib import plugins
 
 # Do not support * imports
 __all__ = []
 
 
-@cache.function
+@lru_cache()
 def satellites():
     """Available satellites and where they are defined
 
     Returns:
         Dict: For each satellite, a tuple describing which satellite plug-in defines the satellite.
     """
-    return {p.lower(): (s, p) for s in plugins.list_all(__name__) for p in plugins.list_parts(__name__, s)}
+    return {p.lower(): (s, p) for s in plugins.names(__name__) for p in plugins.parts(__name__, s)}
 
 
-@cache.function
+@lru_cache()
 def names():
     """List the names of the available satellites
 
@@ -50,7 +53,7 @@ def names():
     return sorted(satellites().keys())
 
 
-@cache.function
+@lru_cache()
 def get_satellite(satellite_name, **kwargs):
     """Get a satellite object by name
 
@@ -66,10 +69,10 @@ def get_satellite(satellite_name, **kwargs):
     except KeyError:
         log.fatal(f"Unknown satellite '{satellite_name}'. Defined satellites are {', '.join(names())}")
 
-    return plugins.call_one(package_name=__name__, plugin_name=plugin, part=part, **kwargs)
+    return plugins.call(package_name=__name__, plugin_name=plugin, part=part, **kwargs)
 
 
-@cache.function
+@lru_cache()
 def get_satellite_vars(satellite_name, **kwargs):
     """Construct a dict of satellite variables
 

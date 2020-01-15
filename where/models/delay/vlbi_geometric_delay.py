@@ -10,11 +10,12 @@ Calculate the geometric propagation delay using the Consensus model as described
 
 
 """
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from midgard.math.constant import constant
 from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register_ordered(1000)
@@ -38,11 +39,5 @@ def geometric_delay(dset):
         log.warn("Missing troposphere data. Correction set to zero")
         datm1 = 0
 
-    return (
-        datm1
-        * (
-            (dset.site_pos_2.gcrs_vel - dset.site_pos_1.gcrs_vel)[:, None, :]
-            @ dset.src_dir.unit_vector[:, :, None]
-            / constant.c
-        )[:, 0, 0]
-    )
+    baseline_gcrs_vel = (dset.site_pos_2.gcrs - dset.site_pos_1.gcrs).vel
+    return datm1 * (baseline_gcrs_vel.val[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c)[:, 0, 0]

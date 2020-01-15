@@ -12,13 +12,15 @@ References:
 # Third party imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import log
-from where.lib import plugins
 from where import parsers
 from where.lib.unit import Unit
 
-DEFAULT_COM = {"lageos": 0.251, "etalon": 0.65}
+DEFAULT_COM = {"lageos": 0.251, "etalon": 0.65, "lares": 0.13}
 
 
 @plugins.register

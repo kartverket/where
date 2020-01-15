@@ -5,20 +5,13 @@ Description:
 
 This model computes the distance between the station and the satellite.
 
-
-
-
-
 """
-# External library imports
-import numpy as np
-
-# Where imports
-from where.lib import plugins
+# Midgard imports
+from midgard.dev import plugins
 
 
 @plugins.register
-def gnss_range(dset):
+def gnss_range(dset: "Dataset"):
     """Calculate distance between station and satellite in GCRS
 
     Args:
@@ -29,5 +22,15 @@ def gnss_range(dset):
     Returns:
         table of corrections for each observation
     """
+    # If the range between the satellite and the receiver is determined in the ITRS, then it has to be taken into
+    # account that the Earth is rotating during the time of flight of the satellite signal. This is not necessary in
+    # the GCRS.
+    correction = (dset.sat_posvel.gcrs.pos - dset.site_pos.gcrs.pos).length
 
-    return np.linalg.norm(dset.sat_posvel.gcrs_pos - dset.site_pos.gcrs, axis=1)
+    # if "gnss_earth_rotation" in dset.fields:
+    #    dset.sat_posvel[:] += dset.gnss_earth_rotation
+    #    correction_itrs = (dset.sat_posvel.trs.pos - dset.site_pos.trs.pos).length
+    #    correction = itrs_result
+    #    print(itrs_result - result)
+
+    return result

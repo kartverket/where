@@ -11,9 +11,9 @@ import itertools
 from collections import namedtuple
 
 # Where imports
-from where.parsers._parser import Parser
-from where.lib import files
+from where.lib import config
 from where.lib import util
+from where.parsers._parser import Parser
 
 
 # A simple structure used to define the necessary fields of a parser
@@ -77,7 +77,7 @@ class ChainParser(Parser):
         parser = next(parsers_chain)  # Pointing to first parser
         cache = dict(line_num=0)
 
-        with files.open_path(self.file_path, mode="rt", encoding=self.file_encoding) as fid:
+        with config.files.open_path(self.file_path, mode="rt", encoding=self.file_encoding) as fid:
             # Get iterators for current and next line
             line_iter, next_line_iter = itertools.tee(fid)
             next(next_line_iter, None)

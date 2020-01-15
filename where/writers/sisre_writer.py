@@ -9,21 +9,19 @@ TODO: Has IGS monitoring group defined a SISRE format?
 # Standard library imports
 from collections import namedtuple
 from datetime import datetime
+from typing import Tuple
 
 # External library imports
-import midgard
 import numpy as np
 
 # Midgard imports
+import midgard
 from midgard.dev import console
 from midgard.dev import plugins
 
 # Where imports
 import where
 from where.lib import config
-from where.lib import enums
-from where.lib import files
-from where.lib.unit import Unit
 from where.lib import util
 from where import pipelines
 from where.writers import sisre_output_buffer
@@ -34,31 +32,35 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
 
     Args:
         field (str):             Dataset field name
+        attrs (Tuple[str]):      Field attributes
         dtype (Numpy dtype):     Type of field
         format (str):            Format string
+        width (int):             Width of header information
+        header (str):            Header information
+        unit (str):              Unit of field
     """
 
 
 @plugins.register
-def sisre_writer(dset):
+def sisre_writer(dset: "Dataset") -> None:
     """Write SISRE analysis results
 
     Args:
-        dset:       Dataset, a dataset containing the data.
+        dset:   A dataset containing the data.
     """
     write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
 
     fields = (
-        WriterField("time_date", (), object, "%21s", 19, "EPOCH"),
+        WriterField("time_date", (), object, "%21s", 19, "EPOCH", "YYYY/MM/DD hh:mm:ss"),
         WriterField("time", ("gps", "mjd"), float, "%14.6f", 14, "", "mjd"),
-        WriterField("time_gpsweek", (), object, "%15s", 15, ""),
-        WriterField("satellite", (), object, "%5s", 5, "SAT"),
-        WriterField("used_iode", (), float, "%6d", 6, "IODE"),
-        WriterField("trans_time_gpsweek", (), object, "%15s", 15, "TRANS_TIME"),
-        WriterField("toe_gpsweek", (), object, "%15s", 15, "TOE"),
+        WriterField("time_gpsweek", (), object, "%15s", 15, "", "wwwwd:ssssss"),
+        WriterField("satellite", (), object, "%5s", 5, "SAT", " "),
+        WriterField("used_iode", (), float, "%6d", 6, "IODE", " "),
+        WriterField("trans_time_gpsweek", (), object, "%15s", 15, "TRANS_TIME", "wwwwd:ssssss"),
+        WriterField("toe_gpsweek", (), object, "%15s", 15, "TOE", "wwwwd:ssssss"),
         WriterField("diff_trans_toe", (), float, "%8d", 8, "TM-TOE"),
         WriterField("age_of_ephemeris", (), float, "%8d", 8, "T-TOE"),
-        # WriterField("diff_time_trans", (), float, "%8d", 8, "T-TM"),
+        # WriterField("diff_time_trans",      (),             float,  "%8d",     8, "T-TM",  ),
         WriterField("clk_diff", (), float, "%16.4f", 16, "ΔCLOCK"),
         WriterField("clk_diff_with_dt_mean", (), float, "%16.4f", 16, "ΔCLOCK_MEAN"),
         WriterField("dalong_track", (), float, "%16.4f", 16, "ΔALONG_TRACK"),
@@ -70,28 +72,24 @@ def sisre_writer(dset):
     )
 
     # Add additional fields used by the writer
+    dset.add_text("time_date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
     dset.add_text(
-        "time_date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], unit="YYYY/MM/DD hh:mm:ss"
-    )
-    dset.add_text(
-        "time_gpsweek",
-        val=[f"{t.gpsweek:04.0f}{t.gpsday:1.0f}:{t.gpssec:06.0f}" for t in dset.time],
-        unit="wwwwd:ssssss",
+        "time_gpsweek", val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.time]
     )
     dset.add_text(
         "trans_time_gpsweek",
-        val=[f"{t.gpsweek:04.0f}{t.gpsday:1.0f}:{t.gpssec:06.0f}" for t in dset.used_transmission_time],
-        unit="wwwwd:ssssss",
+        val=[
+            f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_transmission_time
+        ],
     )
     dset.add_text(
         "toe_gpsweek",
-        val=[f"{t.gpsweek:04.0f}{t.gpsday:1.0f}:{t.gpssec:06.0f}" for t in dset.used_toe],
-        unit="wwwwd:ssssss",
+        val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_toe],
     )
     # dset.add_float("diff_time_trans", val=(dset.time.mjd - dset.used_transmission_time.mjd) * Unit.day2second, Unit="second")
-    dset.add_float("dalong_track", val=dset.orb_diff_acr.itrs[:, 0], unit=dset.unit("orb_diff_acr.itrs"))
-    dset.add_float("dcross_track", val=dset.orb_diff_acr.itrs[:, 1], unit=dset.unit("orb_diff_acr.itrs"))
-    dset.add_float("dradial", val=dset.orb_diff_acr.itrs[:, 2], unit=dset.unit("orb_diff_acr.itrs"))
+    dset.add_float("dalong_track", val=dset.orb_diff.acr.along, unit=dset.unit("orb_diff.acr.along"))
+    dset.add_float("dcross_track", val=dset.orb_diff.acr.cross, unit=dset.unit("orb_diff.acr.cross"))
+    dset.add_float("dradial", val=dset.orb_diff.acr.radial, unit=dset.unit("orb_diff.acr.radial"))
 
     ## Add 'detail' fields used by the writer
     # if write_level <= enums.get_value("write_level", "detail"):
@@ -114,11 +112,11 @@ def sisre_writer(dset):
 
     # Write to disk
     # NOTE: np.savetxt is used instead of having a loop over all observation epochs, because the performance is better.
-    file_path = files.path(f"output_sisre_{dset.dataset_id}", file_vars=dset.vars)
+    file_path = config.files.path(f"output_sisre_{dset.vars['label']}", file_vars=dset.vars)
     header = [
         _get_header(dset),
         "".join(f"{f.header:>{f.width}s}" for f in fields),
-        "".join(f"{f.unit if f.unit else dset.unit(f.field):>{f.width}s}" for f in fields),
+        "".join(f"{f.unit if f.unit else dset.unit(f.field)[0]:>{f.width}s}" for f in fields),
         "_" * sum([f.width for f in fields]),
     ]
     np.savetxt(
@@ -135,16 +133,16 @@ def sisre_writer(dset):
         sisre_output_buffer.sisre_output_buffer(dset)
 
 
-def _get_field(dset, field, attrs):
+def _get_field(dset: "Dataset", field: "str", attrs: Tuple[str]) -> np.ndarray:
     """Get field values of a Dataset specified by the field attributes
 
     Args:
-        dset (Dataset):     Dataset, a dataset containing the data.
-        field (str):        Field name.
-        attrs (tuple):      Field attributes (e.g. for Time object: (<scale>, <time format>)).
+        dset:     Dataset, a dataset containing the data.
+        field:    Field name.
+        attrs:    Field attributes (e.g. for Time object: (<scale>, <time format>)).
 
     Returns:
-        numpy.ndarray:      Array with Dataset field values
+        Array with Dataset field values
     """
     f = dset[field]
     for attr in attrs:
@@ -152,14 +150,14 @@ def _get_field(dset, field, attrs):
     return f
 
 
-def _get_header(dset):
+def _get_header(dset: "Dataset") -> str:
     """Get header
 
     Args:
-        dset (Dataset):       Dataset, a dataset containing the data.
+        dset:   A dataset containing the data.
 
     Returns:
-        str:                  Header lines
+        Header lines
     """
 
     pgm = "where " + where.__version__ + "/midgard " + midgard.__version__
@@ -191,11 +189,11 @@ def _get_header(dset):
     return header + "\n\n"
 
 
-def _get_paths():
+def _get_paths() -> str:
     """Get file paths of used files
 
     Returns:
-        str:  Header file path lines
+        Header file path lines
     """
     lines = "[file_paths]\n"
     key_width = 25

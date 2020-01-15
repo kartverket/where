@@ -8,8 +8,10 @@ Reads ocean tidal loading coefficients from file.
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where import parsers
 from where.lib import config
 

@@ -227,17 +227,23 @@ wget ftp://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/ngs/2018/18JAN02XA_N004.gz
 <p>You can then analyse this file by running:</p>
 <pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=ngs
 </code></pre>
+<blockquote>
+<p><strong>Note:</strong> New NGS files are no longer produced and the recommended file format for observations files is vgosDB.</p>
+</blockquote>
 <h3 id="analyzing-vgosdb-format">Analyzing vgosDB Format</h3>
-<p>~~The following downloads the observation file for January 2nd 2018:~~</p>
-<p>Unfortunately, the download server for vgosDB data seems to be unavailable. The
-following shows how to set up a vgosDB analysis if data are available:</p>
+<p>The following downloads the observation file for January 2nd 2018:</p>
 <pre><code>mkdir -p ~/where_data/vlbi/obs/vgosdb/2018 
 cd ~/where_data/vlbi/obs/vgosdb/2018 
-wget (missing url)
+wget ftp://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/vgosdb/2018/18JAN02XA.tgz
+tar -xvf 18JAN02XA.tgz
 </code></pre>
 <p>You can then analyse this file by running:</p>
 <pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=vgosdb
 </code></pre>
+<h3 id="other-files">Other files</h3>
+<p>Where will automatically download a version of all other files needed to do an analysis. This is to facilitate an easy
+setup for beginners. However, Where does not keep these files updated. The user needs to manage and update these files 
+as needed. See <code>config/files.conf</code> and <code>config/files_pipeline_vlbi.conf</code> for information about files used by Where. </p>
 <h2 id="external-libraries">External libraries</h2>
 <p>Where depends on three external libraries that are not included in the
 download. These are all available online and have already been downloaded
@@ -276,6 +282,15 @@ implemented using the
 stored in the <code>external/gpt2w/</code> directory. This can be done automatically by
 running</p>
 <pre><code>python download.py gpt2w
+</code></pre>
+<h3 id="high-frequency-eop-software">High Frequency EOP software</h3>
+<p>A IERS working group on Diurnal and Semi-dirunal EOP Variations has made some software and models available at
+https://ivscc.gsfc.nasa.gov/hfeop_wg/.</p>
+<p>The latest version of the Fortran library should be downloaded from
+<a href="https://ivscc.gsfc.nasa.gov/hfeop_wg/">the working group web page</a> and
+stored in the <code>external/hf_eop/</code> directory. This can be done automatically by
+running</p>
+<pre><code>python download.py hf_eop
 </code></pre>
             </div>
             <!-- /.entry-content -->

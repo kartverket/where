@@ -9,9 +9,11 @@ Identifies observations from the dataset with elevation angle lower than a confi
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -38,7 +40,7 @@ def elevation(dset):
         return keep_idx
 
     # Check elevation for each station in an observation
-    for _ in dset.for_each("site_pos"):
+    for _ in dset.for_each_suffix("site_pos"):
         keep_idx = np.logical_and(keep_idx, dset.site_pos.elevation >= np.radians(elev_threshold))
 
     return keep_idx

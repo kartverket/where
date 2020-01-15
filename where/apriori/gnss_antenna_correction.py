@@ -9,17 +9,21 @@ The module includes a class for handling apriori GNSS antenna corrections. Read 
 """
 # Standard library imports
 import datetime
+from typing import Dict, Optional, Union
 
 # External library imports
 from collections import UserDict
 import numpy as np
 
+# Migard imports
+from midgard.collections import enums
+from midgard.dev import plugins
+
 # Where imports
 from where import data
 from where import parsers
-from midgard.math.constant import constant
 from where.lib import log
-from where.lib import plugins
+from where.data import position
 
 
 @plugins.register
@@ -47,36 +51,34 @@ class AntennaCorrection(UserDict):
 
     with following entries:
 
-    =================== =================== ========================================================================
-     Value               Type                Description
-    =================== =================== ========================================================================
-     azi                 numpy.ndarray       Array with azimuth-elevation dependent antenna correction in [mm] with
-                                             the shape: number of azimuth values x number of elevation values.
-     azimuth             numpy.ndarray       List with azimuth values in [rad] corresponding to antenna corrections
-                                             given in `azi`.
-     cospar_id           str                 COSPAR ID <yyyy-xxxa>: yyyy -> year when the satellite was put in
-                                             orbit, xxx -> sequential satellite number for that year, a -> alpha
-                                             numeric sequence number within a launch
-     elevation           numpy.ndarray       List with elevation values in [rad] corresponding to antenna
-                                             corrections given in `azi` or `noazi`.
-     <frequency>         str                 Frequency identifier (e.g. G01 - GPS L1)
-     neu                 list                North, East and Up eccentricities in [m]. The eccentricities of the
-                                             mean antenna phase center is given relative to the antenna reference
-                                             point (ARP) for receiver antennas or to the center of mass of the
-                                             satellite in X-, Y- and Z-direction.
-     noazi               numpy.ndarray       List with elevation dependent (non-azimuth-dependent) antenna
-                                             correction in [mm].
-     <prn>               str                 Satellite code e.g. GPS PRN, GLONASS slot or Galileo SVID number
-     <receiver antenna>  str                 Receiver antenna name together with radome code
-     sat_code            str                 Satellite code e.g. GPS SVN, GLONASS number or Galileo GSAT number
-     sat_type            str                 Satellite type (e.g. BLOCK IIA)
-     valid_from          datetime.datetime   Start of validity period of satellite in GPS time
-     valid_until         datetime.datetime   End of validity period of satellite in GPS time
-    =================== =================== ========================================================================
+    | Value              | Type              | Description                                                             |
+    |--------------------|---------------------------------------------------------------------------------------------|
+    | azi                | numpy.ndarray     | Array with azimuth-elevation dependent antenna correction in [mm] with  |
+    |                    |                   | the shape: number of azimuth values x number of elevation values.       |
+    | azimuth            | numpy.ndarray     | List with azimuth values in [rad] corresponding to antenna corrections  |
+    |                    |                   | given in `azi`.                                                         |
+    | cospar_id          | str               | COSPAR ID <yyyy-xxxa>: yyyy -> year when the satellite was put in       |
+    |                    |                   | orbit, xxx -> sequential satellite number for that year, a -> alpha     |
+    |                    |                   | numeric sequence number within a launch                                 |
+    | elevation          | numpy.ndarray     | List with elevation values in [rad] corresponding to antenna            |
+    |                    |                   | corrections given in `azi` or `noazi`.                                  |
+    | <frequency>        | str               | Frequency identifier (e.g. G01 - GPS L1)                                |
+    | neu                | list              | North, East and Up eccentricities in [m]. The eccentricities of the     |
+    |                    |                   | mean antenna phase center is given relative to the antenna reference    |
+    |                    |                   | point (ARP) for receiver antennas or to the center of mass of the       |
+    |                    |                   | satellite in X-, Y- and Z-direction.                                    |
+    | noazi              | numpy.ndarray     | List with elevation dependent (non-azimuth-dependent) antenna           |
+    |                    |                   | correction in [mm].                                                     |
+    | <prn>              | str               | Satellite code e.g. GPS PRN, GLONASS slot or Galileo SVID number        |
+    | <receiver antenna> | str               | Receiver antenna name together with radome code                         |
+    | sat_code           | str               | Satellite code e.g. GPS SVN, GLONASS number or Galileo GSAT number      |
+    | sat_type           | str               | Satellite type (e.g. BLOCK IIA)                                         |
+    | valid_from         | datetime.datetime | Start of validity period of satellite in GPS time                       |
+    | valid_until        | datetime.datetime | End of validity period of satellite in GPS time                         |
 
 
     Attributes:
-        data (dict):            Data read from GNSS Antenna Exchange (ANTEX) file
+        data (dict):           Data read from GNSS Antenna Exchange (ANTEX) file
         file_path (str):       ANTEX file path
 
     Methods:
@@ -86,7 +88,7 @@ class AntennaCorrection(UserDict):
         _used_date(): Choose correct date for use of satellite antenna corrections
     """
 
-    def __init__(self, file_key="gnss_antex"):
+    def __init__(self, file_key: Optional[str] = "gnss_antex") -> None:
         """Set up a new GNSS antenna correction object by parsing ANTEX file
 
         The parsing is done by :mod:`where.parsers.gnss_antex`.
@@ -95,7 +97,9 @@ class AntennaCorrection(UserDict):
         self.data = parser.as_dict()
         self.file_path = parser.file_path
 
-    def satellite_phase_center_offset(self, dset, sys_freq=None):
+    def satellite_phase_center_offset(
+        self, dset: "Dataset", sys_freq: Union[None, Dict[str, Dict[str, str]]] = None
+    ) -> "PosVelDeltaArray":
         """Determine satellite phase center offset correction vectors given in ITRS
 
         Satellite phase center offset (PCO) corrections are frequency dependent. The argument 'sys_freq' defines, which
@@ -104,13 +108,12 @@ class AntennaCorrection(UserDict):
         'sys_freq' is generated based on the given observation types in dataset 'dset'.
 
         Args:
-            dset (Dataset):   Model data.
-            sys_freq (dict):  Dictionary with frequency or frequency combination given for GNSS
-                              identifier:
-                                sys_freq = { <sys_id>: <freq> }  (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
+            dset:      Model data.
+            sys_freq:  Dictionary with frequency or frequency combination given for GNSS identifier:
+                         sys_freq = { <sys_id>: <freq> }  (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
 
         Returns:
-            numpy.ndarray: Satellite phase center offset correction vectors given in ITRS in meter
+            Satellite phase center offset correction vectors given in ITRS in meter
 
         """
         # GNSS          Freq number      GNSS freq
@@ -148,7 +151,9 @@ class AntennaCorrection(UserDict):
             "S": {"1": "L1", "5": "L5"},
         }
 
-        correction = np.zeros((dset.num_obs, 3))
+        correction = position.PosVelDelta(
+            val=np.zeros((dset.num_obs, 6)), system="yaw", ref_pos=dset.sat_posvel, time=dset.time
+        )
         used_date = None
 
         # Get GNSS frequency based on observation type
@@ -163,13 +168,10 @@ class AntennaCorrection(UserDict):
         for sat in dset.unique("satellite"):
 
             # Skip satellites, which are not given in ANTEX file
-            if sat not in self.data:  # antex:
+            if sat not in self.data:
                 log.warn(
-                    "Satellite {} is not given in ANTEX file {}. That means no satellite antenna phase center offset "
-                    "correction can be applied for satellite {}.",
-                    sat,
-                    self.file_path,
-                    sat,
+                    f"Satellite {sat} is not given in ANTEX file {self.file_path}. That means no satellite antenna "
+                    f"phase center offset correction can be applied for satellite {sat}."
                 )
                 continue
 
@@ -177,40 +179,34 @@ class AntennaCorrection(UserDict):
             idx = dset.filter(satellite=sat)
 
             # Get used date
-            used_date = self._used_date(sat, dset.rundate)
+            used_date = self._used_date(sat, dset.analysis["rundate"])
             if used_date is None:
                 continue
 
             # Add PCO to Dataset meta
-            system = sat[0]
-            pco_sat = self._get_pco_sat(sat, sys_freq, used_date)
-            dset.meta.setdefault("pco_sat", dict()).update({sat: pco_sat.tolist()[0]})
+            pco_sat = self.get_pco_sat(sat, sys_freq, used_date)
+            dset.meta.setdefault("pco_sat", dict()).update({sat: pco_sat.tolist()})
+            correction[idx] = np.repeat(np.append(pco_sat, np.zeros(3))[None, :], np.sum(idx), axis=0)
 
-            # Transform PCO given in satellite body-fixed reference frame (for GPS and Galileo assumed to be aligned
-            # to yaw-steering reference frame) to ITRS
-            pco_itrs = dset.sat_posvel.convert_yaw_to_itrs(pco_sat)
-            # pco_itrs = dset.sat_posvel._yaw2itrs[idx][0] @ np.array(pco_sat)
+        # Transform PCO given in satellite body-fixed reference frame (for GPS and Galileo assumed to be aligned
+        # to yaw-steering reference frame) to ITRS
+        return correction.trs
 
-            correction[idx] = pco_itrs[idx]
-
-        return correction
-
-    def _get_pco_sat(self, sat, sys_freq, used_date):
+    def get_pco_sat(self, sat: str, sys_freq: Dict[str, Dict[str, str]], used_date: datetime.datetime) -> np.ndarray:
         """Get satellite PCO in satellite reference system
 
         If two frequencies are given over the 'sys_freq' argument, then the PCOs are determined as an ionospheric linear
         combination.
 
         Args:
-            sat (str):                      Satellite identifier.
-            sys_freq (dict):                Dictionary with frequency or frequency combination given for GNSS
-                                            identifier:
-                                                sys_freq = { <sys_id>: <freq> }
-                                                (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
-            used_date (datetime.datetime):  Correct date for use of satellite antenna corrections
+            sat:        Satellite identifier.
+            sys_freq:   Dictionary with frequency or frequency combination given for GNSS identifier:
+                            sys_freq = { <sys_id>: <freq> }  (e.g. sys_freq = {'E': 'E1',  'G': 'L1_L2'} )
+
+            used_date:  Correct date for use of satellite antenna corrections
 
         Returns:
-            numpy.ndarray: Satellite PCO in satellite reference system
+            Satellite PCO in satellite reference system
         """
         # GNSS          GNSS freq        ANTEX freq
         # ___________________________________________
@@ -257,7 +253,7 @@ class AntennaCorrection(UserDict):
         if len(freq) == 1:
 
             # Get satellite phase center offset (PCO) given in satellite reference system
-            pco_sat = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"]])
+            pco_sat = np.array(self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"])
 
             log.debug(f"PCO of satellite {sat} for frequency {sys}:{sys_freq[sys]}: {pco_sat.tolist()[0]}.")
 
@@ -265,42 +261,42 @@ class AntennaCorrection(UserDict):
         elif len(freq) == 2:
 
             # Coefficient of ionospheric-free linear combination
-            f1 = constant.get("gnss_freq_" + sys, source=freq[0])  # Frequency of 1st band
-            f2 = constant.get("gnss_freq_" + sys, source=freq[1])  # Frequency of 2nd band
+            f1 = getattr(enums, "gnss_freq_" + sys)[freq[0]]  # Frequency of 1st band
+            f2 = getattr(enums, "gnss_freq_" + sys)[freq[1]]  # Frequency of 2nd band
             n = f1 ** 2 / (f1 ** 2 - f2 ** 2)
             m = -f2 ** 2 / (f1 ** 2 - f2 ** 2)
 
             # Get satellite phase center offset (PCO) given in satellite reference system
-            pco_sat_f1 = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"]])
-            pco_sat_f2 = np.array([self.data[sat][used_date][gnss_to_antex_freq[sys][freq[1]]]["neu"]])
+            pco_sat_f1 = np.array(self.data[sat][used_date][gnss_to_antex_freq[sys][freq[0]]]["neu"])
+            pco_sat_f2 = np.array(self.data[sat][used_date][gnss_to_antex_freq[sys][freq[1]]]["neu"])
 
             # Generate ionospheric-free linear combination
             pco_sat = n * pco_sat_f1 + m * pco_sat_f2
 
             log.debug(
-                f"Ionospheric-free linear combination PCOs of satellite {sat} for"
-                f" frequency combination {sys}:{sys_freq[sys]}:  {pco_sat.tolist()[0]}."
+                f"Ionospheric-free linear combination PCOs of satellite {sat} for frequency combination "
+                f"{sys}:{sys_freq[sys]}:  {pco_sat.tolist()[0]}."
             )
 
         else:
             log.fatal(
-                f"Wrong frequency type '{sys}:{'_'.join(freq)}'. Note: 'signals' configuration option"
-                f" should represent one- or two-frequencies (e.g. E:E1 or E:E1_E5a)."
+                f"Wrong frequency type '{sys}:{'_'.join(freq)}'. Note: 'signals' configuration option should represent "
+                f"one- or two-frequencies (e.g. E:E1 or E:E1_E5a)."
             )
 
         return pco_sat
 
-    def satellite_type(self, dset):
+    def satellite_type(self, dset: "Dataset") -> np.core.defchararray.chararray:
         """Get satellite type from ANTEX file (e.g. BLOCK IIF, GALILEO-1, GALILEO-2, GLONASS-M, BEIDOU-2G, ...)
 
         Args:
-            dset (Dataset):   Model data.
+            dset:   Model data.
 
         Returns:
-            numpy.core.defchararray.chararray: Satellite type information
+            Satellite type information
 
         """
-        sat_types = data.text_table.TextList([""]) * dset.num_obs
+        sat_types = np.zeros(dset.num_obs, dtype=object)
         used_date = None
 
         # Loop over all satellites given in RINEX observation file and configuration file
@@ -309,19 +305,17 @@ class AntennaCorrection(UserDict):
             # Skip satellites, which are not given in ANTEX file
             if sat not in self.data:
                 log.warn(
-                    "Satellite {} is not given in ANTEX file {}. That means no satellite antenna phase center offset "
-                    "correction can be applied for satellite {}.",
-                    sat,
-                    self.file_path,
-                    sat,
+                    f"Satellite {sat} is not given in ANTEX file {self.file_path}. That means no satellite antenna "
+                    f"phase center offset correction can be applied for satellite {sat}."
                 )
                 continue
 
-            # Get array with information about, when observation are available for the given satellite (indicated by True)
+            # Get array with information about, when observation are available for the given satellite (indicated
+            # by True)
             idx = dset.filter(satellite=sat)
 
             # Get used date
-            used_date = self._used_date(sat, dset.rundate)
+            used_date = self._used_date(sat, dset.analysis["rundate"])
             if used_date is None:
                 continue
 
@@ -329,9 +323,9 @@ class AntennaCorrection(UserDict):
             sat_type = self.data[sat][used_date]["sat_type"]
             sat_types[idx] = sat_type
 
-        return sat_types
+        return sat_types.astype(np.str_)
 
-    def _used_date(self, satellite, given_date):
+    def _used_date(self, satellite: str, given_date: datetime.date) -> Union[datetime.datetime, None]:
         """Choose correct date for use of satellite antenna corrections
 
         Satellite antenna correction are time dependent.
@@ -339,6 +333,9 @@ class AntennaCorrection(UserDict):
         Args:
             satellite (str):              Satellite identifier.
             given_date (datetime.date):   Given date used for finding corresponding time period in ANTEX file
+
+        Returns:
+            Date for getting correct satellite antenna corrections related to given date
         """
         used_date = None
         # TODO: Would it be not better to define rundate as datetime.datetime instead datetime.date?
@@ -349,11 +346,6 @@ class AntennaCorrection(UserDict):
                 used_date = date
 
         if (used_date is None) or (given_date > self.data[satellite][used_date]["valid_until"]):
-            log.warn(
-                "No satellite phase center offset is given for satellite {} and date {}.",
-                satellite,
-                given_date,
-                satellite,
-            )
+            log.warn(f"No satellite phase center offset is given for satellite {satellite} and date {given_date}.")
 
         return used_date

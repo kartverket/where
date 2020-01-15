@@ -4,7 +4,7 @@ Description:
 
 This module contains functions and classes for parsing datafiles in Where.
 
-
+TODO: THIS FILE WILL BE DELETED
 
 """
 
@@ -13,13 +13,13 @@ from collections import UserDict
 import itertools
 
 # Midgard imports
+from midgard.dev.timer import Timer
 from midgard.files import dependencies
+
 
 # Where imports
 from where.lib import config
-from where.lib import files
 from where.lib import log
-from where.lib.timer import timer
 from where.lib import util
 
 
@@ -115,11 +115,13 @@ class Parser(object):
         Returns:
             Parser: The parsed data
         """
+        log.dev(f"where.parsers.parser is deprecated. Use where.parsers._parser or one of it's subclasses instead.")
+
         if self.file_path is None:
-            self.file_path = files.path(self.file_key, file_vars=self.vars, download_missing=True)
+            self.file_path = config.files.path(self.file_key, file_vars=self.vars, download_missing=True)
 
         parser_package, parser_name = self.__module__.rsplit(".", maxsplit=1)
-        with timer("Finish {} ({}) - {} in".format(parser_name, parser_package, self.file_key)):
+        with Timer("Finish {} ({}) - {} in".format(parser_name, parser_package, self.file_key)):
             if self.data_available:
                 self.read_data()
 
@@ -154,10 +156,10 @@ class Parser(object):
 
         """
         self.dependencies.append(self.file_path)
-        is_zipped = files.is_path_zipped(self.file_path)
-        if files.empty_file(self.file_path):
+        is_zipped = config.files.is_path_zipped(self.file_path)
+        if config.files.empty_file(self.file_path):
             log.warn(f"File {self.file_path} is empty.")
-        with files.open_path(self.file_path, mode="rt", is_zipped=is_zipped) as fid:
+        with config.files.open_path(self.file_path, mode="rt", is_zipped=is_zipped) as fid:
             self.parse_file(fid)
 
     def calculate_data(self):
@@ -166,7 +168,7 @@ class Parser(object):
         """
         for calculator in self.setup_calculators():
             log.debug(f"Start calculator {calculator.__name__} in {self.__module__}")
-            with timer(f"Finish calculator {calculator.__name__} ({self.__module__}) in", logger=log.debug):
+            with Timer(f"Finish calculator {calculator.__name__} ({self.__module__}) in", logger=log.debug):
                 calculator()
 
     def write_to_dataset(self, data_out):

@@ -21,7 +21,6 @@ from midgard.files import dependencies
 # Where imports
 from where.writers import _sinex_blocks_202 as sinex_blocks
 from where.lib import config
-from where.lib import files
 from where.lib import log
 
 WRITER = __name__.split(".")[-1]
@@ -40,7 +39,7 @@ def write_sinex(dset):
     if config.tech.analysis_status.status.str == "bad":
         log.info("Bad session. Not producing SINEX.")
         return
-    with files.open("output_sinex", file_vars=dset.vars, mode="wt") as fid:
+    with config.files.open("output_sinex", file_vars=dset.vars, mode="wt") as fid:
         sinex = sinex_blocks.SinexBlocks(dset, fid)
         sinex.header_line()
         for block in config.tech[WRITER].blocks.list:

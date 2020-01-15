@@ -3,23 +3,28 @@
 """
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math.constant import constant
+from midgard.math import ellipsoid
+
+# where imports
 from where import apriori
 from where import parsers
 from where.lib import log
-from where.lib import plugins
 from where.lib import config
 from where.lib import exceptions
 from where.ext import sofa
 
-TECH = __name__.split(".")[-1]
+pipeline = __name__.split(".")[-1]
 
 
 @plugins.register
 def write_to_dataset(dset, rundate=None, session=None, obs_format=None, **obs_args):
-    obs_format = config.tech.get("obs_format", section=TECH, value=obs_format).str
+    obs_format = config.tech.get("obs_format", section=pipeline, value=obs_format).str
     log.info(f"Reading observation file in {obs_format} format")
 
-    file_vars = config.create_file_vars(rundate, TECH, session=session, **obs_args)
+    file_vars = config.create_file_vars(rundate, pipeline, session=session, **obs_args)
     parser = parsers.parse_key(f"vlbi_obs_{obs_format}", file_vars)
 
     if parser.data_available:
@@ -34,9 +39,9 @@ def _write_to_dataset(parser, dset, rundate, session):
     # TODO: units on fields
 
     # Session meta
-    dset.meta["tech"] = "vlbi"
-    dset.add_to_meta("input", "file", parser.file_path.stem)
-    dset.add_to_meta("input", "type", config.tech.obs_format.str.upper())
+    dset.meta.add("tech", "vlbi")
+    dset.meta.add("file", parser.file_path.stem, section="input")
+    dset.meta.add("type", config.tech.obs_format.str.upper(), section="input")
 
     if "meta" not in data:
         # Only read master file if session_code is not available in data["meta"]
@@ -44,13 +49,12 @@ def _write_to_dataset(parser, dset, rundate, session):
         master = apriori.get("vlbi_master_schedule", rundate=rundate)
         master_data = master.get((rundate.timetuple().tm_yday, session), {})
         session_code = master_data.get("session_code", "")
-        dset.add_to_meta("input", "session_code", session_code)
     else:
         master = apriori.get("vlbi_master_schedule")
         session_code = data["meta"].get("session_code", "")
-        dset.add_to_meta("input", "session_code", session_code)
 
-    dset.add_to_meta("input", "session_type", master.session_type(session_code))
+    dset.meta.add("session_code", session_code, section="input")
+    dset.meta.add("session_type", master.session_type(session_code), section="input")
 
     log.info(f"Session code: {session_code}")
 
@@ -64,24 +68,30 @@ def _write_to_dataset(parser, dset, rundate, session):
     data["station_2"] = np.char.replace(data["station_2"], " ", "_")
 
     dset.num_obs = len(data["time"])
-    dset.add_time("time", val=data.pop("time"), scale="utc", format="isot", write_level="operational")
+
+    dset.add_time("time", val=data.pop("time"), scale="utc", fmt="isot", write_level="operational")
+
     for field, values in data.items():
         values = np.array(values)
         if values.dtype.kind in {"U", "S"}:
-            dset.add_text(field, val=values, write_level="operational")
+            multiplier = -1 if field.endswith("_1") else 1
+            dset.add_text(field, val=values, multiplier=multiplier, write_level="operational")
         elif values.dtype.kind in {"f", "i"}:
-            dset.add_float(field, val=values, write_level="operational")
+            if getattr(dset, "version", None) is not None:
+                multiplier = -1 if field.endswith("_1") else 1
+                dset.add_float(field, val=values, multiplier=multiplier, write_level="operational")
+            else:
+                dset.add_float(field, val=values, write_level="operational")
         elif values.dtype.kind in {"O"}:
             continue
         else:
             log.warn(f"Unknown datatype {values.dtype} for field {field}")
 
     # Source directions
-    crf = apriori.get("crf", time=dset.time.mean.utc)
-    ra = np.array([crf[s].pos.crs[0] if s in crf else 0 for s in data["source"]])
-    dec = np.array([crf[s].pos.crs[1] if s in crf else 0 for s in data["source"]])
-
-    dset.add_direction("src_dir", ra=ra, dec=dec, write_level="operational")
+    crf = apriori.get("crf", time=dset.time)
+    ra = np.array([crf[s].pos.right_ascension if s in crf else 0 for s in data["source"]])
+    dec = np.array([crf[s].pos.declination if s in crf else 0 for s in data["source"]])
+    dset.add_direction("src_dir", ra=ra, dec=dec, time=dset.time, write_level="operational")
 
     # Station information
     log.info(f"Found stations: {', '.join(dset.unique('station'))}")
@@ -104,7 +114,7 @@ def _write_to_dataset(parser, dset, rundate, session):
             logger = log.info if site in ignore_stations else log.warn
             logger(f"Undefined station name {site}. Assuming station is {trf_site.name}.")
 
-        data["pos_" + site] = trf_site.pos.itrs
+        data["pos_" + site] = trf_site.pos.trs.val
         _site_pos = np.mean(data[f"pos_{site}"], axis=0)
         log.debug(f"Using position {_site_pos} for {site} from {trf_site.source}")
 
@@ -116,29 +126,54 @@ def _write_to_dataset(parser, dset, rundate, session):
     itrs_vel_1 = np.zeros((dset.num_obs, 3))
     dset.add_posvel(
         "site_pos_1",
-        time="time",
-        other="src_dir",
-        itrs=np.concatenate((itrs_pos_1, itrs_vel_1), axis=1),
+        val=np.concatenate((itrs_pos_1, itrs_vel_1), axis=1),
+        ellipsoid=ellipsoid.get(config.tech.reference_ellipsoid.str.upper()),
+        system="trs",
+        time=dset.time,
+        # other=dset.src_dir,
         write_level="operational",
     )
+
     itrs_pos_2 = np.array([data["pos_" + s][i, :] for i, s in enumerate(data["station_2"])])
     itrs_vel_2 = np.zeros((dset.num_obs, 3))
     dset.add_posvel(
         "site_pos_2",
-        time="time",
-        other="src_dir",
-        itrs=np.concatenate((itrs_pos_2, itrs_vel_2), axis=1),
+        val=np.concatenate((itrs_pos_2, itrs_vel_2), axis=1),
+        ellipsoid=ellipsoid.get(config.tech.reference_ellipsoid.str.upper()),
+        system="trs",
+        time=dset.time,
+        # other=dset.src_dir,
         write_level="operational",
     )
+
+    # Compute aberrated source directions
+    def aberrated_src_dir(site_pos):
+        """See IERS2010 Conventions, equation 11.15"""
+        site_vel_gcrs = site_pos.gcrs.vel.val
+        eph = apriori.get("ephemerides", time=dset.time)
+        vel = eph.vel_bcrs("earth") + site_vel_gcrs
+        return (
+            dset.src_dir.unit_vector
+            + vel / constant.c
+            - dset.src_dir.unit_vector * (dset.src_dir.unit_vector[:, None, :] @ vel[:, :, None])[:, :, 0] / constant.c
+        )
+
+    k_1 = aberrated_src_dir(dset.site_pos_1)
+    dset.add_direction("abr_src_dir_1", val=k_1, system="gcrs", time=dset.time)
+    dset.site_pos_1.other = dset.abr_src_dir_1
+
+    k_2 = aberrated_src_dir(dset.site_pos_2)
+    dset.add_direction("abr_src_dir_2", val=k_2, system="gcrs", time=dset.time)
+    dset.site_pos_2.other = dset.abr_src_dir_2
 
     # Station data
     sta_fields = set().union(*[v.keys() for k, v in data.items() if k.startswith("sta_")])
     for field in sta_fields:
         dset.add_text(
-            field + "_1", val=[data["sta_" + s][field] for s in data["station_1"]]
+            field + "_1", val=[data["sta_" + s][field] for s in data["station_1"]], multiplier=-1
         )  # write_level='analysis')
         dset.add_text(
-            field + "_2", val=[data["sta_" + s][field] for s in data["station_2"]]
+            field + "_2", val=[data["sta_" + s][field] for s in data["station_2"]], multiplier=1
         )  # write_level='analysis')
 
     # Station meta
@@ -150,23 +185,24 @@ def _write_to_dataset(parser, dset, rundate, session):
         cdp = data[sta_key]["cdp"]
         ivsname = station_codes[cdp]["name"]
         longitude, latitude, height, _ = sofa.iau_gc2gd(2, data[pos_key][0, :])  # TODO: Reference ellipsoid
-        dset.add_to_meta(ivsname, "cdp", cdp)
-        dset.add_to_meta(ivsname, "site_id", cdp)
-        dset.add_to_meta(ivsname, "domes", station_codes[cdp]["domes"])
-        dset.add_to_meta(ivsname, "marker", station_codes[cdp]["marker"])
-        dset.add_to_meta(ivsname, "description", station_codes[cdp]["description"])
-        dset.add_to_meta(ivsname, "longitude", longitude)
-        dset.add_to_meta(ivsname, "latitude", latitude)
-        dset.add_to_meta(ivsname, "height", height)
+
+        dset.meta.add("cdp", cdp, section=ivsname)
+        dset.meta.add("site_id", cdp, section=ivsname)
+        dset.meta.add("domes", station_codes[cdp]["domes"], section=ivsname)
+        dset.meta.add("marker", station_codes[cdp]["marker"], section=ivsname)
+        dset.meta.add("description", station_codes[cdp]["description"], section=ivsname)
+        dset.meta.add("longitude", longitude, section=ivsname)
+        dset.meta.add("latitude", latitude, section=ivsname)
+        dset.meta.add("height", height, section=ivsname)
         if sta_name != ivsname:
-            dset.add_to_meta(sta_name, "cdp", cdp)
-            dset.add_to_meta(sta_name, "site_id", cdp)
-            dset.add_to_meta(sta_name, "domes", station_codes[cdp]["domes"])
-            dset.add_to_meta(sta_name, "marker", station_codes[cdp]["marker"])
-            dset.add_to_meta(sta_name, "description", station_codes[cdp]["description"])
-            dset.add_to_meta(sta_name, "longitude", longitude)
-            dset.add_to_meta(sta_name, "latitude", latitude)
-            dset.add_to_meta(sta_name, "height", height)
+            dset.meta.add("cdp", cdp, section=sta_name)
+            dset.meta.add("site_id", cdp, section=sta_name)
+            dset.meta.add("domes", station_codes[cdp]["domes"], section=sta_name)
+            dset.meta.add("marker", station_codes[cdp]["marker"], section=sta_name)
+            dset.meta.add("description", station_codes[cdp]["description"], section=sta_name)
+            dset.meta.add("longitude", longitude, section=sta_name)
+            dset.meta.add("latitude", latitude, section=sta_name)
+            dset.meta.add("height", height, section=sta_name)
 
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish

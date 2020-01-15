@@ -5,24 +5,29 @@ Description:
 
 Config should use the following format
 
-    ignore_epochs = station1 start_epoch1 end_epoch1, station1 start_epoch2 end_epoch2, ...
+    ignore_epochs = identifier1 start_epoch1 end_epoch1, identifier2 start_epoch2 end_epoch2, ...
 
-If the station name is omitted data will be discarded from all stations in the given time interval
+If the identifier is omitted data will be discarded from all stations in the given time interval.
+An identifier may be either a station name or a baseline
 
 
 Example:
 --------
 
     ignore_epochs = NYALES20 2013-11-20 17:30:00 2013-11-20 18:24:00
+    ignore_epochs = 2013-11-20 17:30:00 2013-11-20 18:24:00
+    ignore_epochs = NYALES20/WETTZELL 2013-11-20 17:30:00 2013-11-20 18:24:00
 
 """
 
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
-from where.lib.time import Time
+from where.data.time import Time
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -43,14 +48,17 @@ def ignore_epochs(dset):
     keep_idx = np.ones(dset.num_obs, dtype=bool)
     for interval in intervals:
         interval = interval.split()
-        start_time = Time(" ".join(interval[-4:-2]), scale="utc", format="iso")
-        end_time = Time(" ".join(interval[-2:]), scale="utc", format="iso")
+        start_time = Time(" ".join(interval[-4:-2]), scale="utc", fmt="iso")
+        end_time = Time(" ".join(interval[-2:]), scale="utc", fmt="iso")
         # station name may contain spaces
         station = " ".join(interval[:-4])
 
         remove_idx = np.logical_and(start_time < dset.time, dset.time < end_time)
         if len(interval) == 5:
-            remove_idx = dset.filter(station=station, idx=remove_idx)
+            if "/" in station:
+                remove_idx = dset.filter(baseline=station, idx=remove_idx)
+            else:
+                remove_idx = dset.filter(station=station, idx=remove_idx)
         keep_idx = np.logical_and(keep_idx, np.logical_not(remove_idx))
 
     return keep_idx

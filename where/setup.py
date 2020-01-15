@@ -1,87 +1,8 @@
 #!/usr/bin/env python3
-"""Set up the Where program to do analysis of space geodetic data
-
-Usage:
-
-    {exe:setup} <date> <pipeline> [--session=<session>] [options]
-
-The program requires a date. Typically, the date is given in the format
-`<year month day>` (for example 2015 8 4). However, it is also possible to
-specify the date as `<year day-of-year>` (for example 2015 216) by also adding
-the option `--doy`.
-
-In addition, one pipeline must be specified. See below for available pipelines.
-
-===================  ===========================================================
-Pipeline             Description
-===================  ===========================================================
-{pipelines_doc:Set up}
-===================  ===========================================================
-
-Furthermore, the following options are recognized:
-
-===================  ===========================================================
-Option               Description
-===================  ===========================================================
--D, --delete         Delete existing analysis results.
-    --doy            Specify date as <year day-of-year>.
--E, --edit           Edit the configuration of an analysis.
--N, --new            Start an analysis with a new config.
--T, --showtb         Show traceback if the program crashes.
---id=analysisid      Add a special analysis id (to run several versions of the
-                     same analysis simultaneously).
---profile=name       Use config settings specfied for a given profile, for
-                     instance --profile=vascc for a VLBI analysis.
---session=session    Set up analysis for the given session.
---user=username      Run as username. Does not need to be an existing username
-                     on the system.
---debug, ...         Show additional debug information. Other flags such as
-                     --all, --debug, --time, --dev, --info, --out, --warn,
-                     --check, --error, --fatal, --none are also allowed, and
-                     shows differing amounts of information as the program runs.
---version            Show version information and exit.
--h, --help           Show this help message and exit.
-===================  ===========================================================
-
-
-Description:
-------------
-
-This program is used to set up a Where analysis. The program will create a
-configuration file for the model run and display it. This configuration can be
-changed, either by editing the given configuration file or by rerunning
-{exe:setup} with different configuration options.
-
-See :doc:`user_guide_where` for more information.
-
-
-Examples:
----------
-
-Here are some concrete examples of how to run the program:
-
-Set up a VLBI analysis for August 4 2015:
-
-    {exe:setup} 2015 8 4 -v
-
-Set up an SLR analysis for September 1 2015 using day-of-year:
-
-    {exe:setup} 2015 242 --slr --doy
-
-Change the spam option of the GNSS analysis:
-
-    {exe:setup} 2016 3 1 -g --spam=ham
-
-
-Current Maintainers:
---------------------
-
-{maintainers}
-
-Version: {version}
-
+""" Utility functions used during start up
 """
 # Standard library imports
+import editor
 from datetime import datetime
 import sys
 
@@ -90,57 +11,25 @@ from midgard.config import config as mg_config
 from midgard.dev import console
 
 # Where imports
-from where import pipelines
 from where.lib import config
-from where.lib import files
 from where.lib import log
-from where.lib.timer import timer
 from where.lib import util
 
-# Optional import of editor and seaborn, add dummy methods in case they are not installed
-from midgard.dev import optional
-
-editor = optional.optional_import("editor")
+_RESERVED_OPTS = {"id", "profile", "user", "line_profile"}
 
 
-@timer(f"Finish {util.get_program_name()} in")
-@util.no_traceback
-def main():
-    """Parse command line options and set up an Where analysis
-
-    Do simple parsing of command line arguments. Set up config-files and show the configuration.
-    """
-    util.check_help_and_version(doc_module=__name__)
-
-    # Start logging
-    log.init()
-
-    # Read command line options
-    pipeline = pipelines.get_from_options()
-    config.read_pipeline(pipeline)
-    if util.check_options("--doy"):
-        rundate = util.parse_args("doy", doc_module=__name__)
-    else:
-        rundate = util.parse_args("date", doc_module=__name__)
-    session = pipelines.get_session(rundate, pipeline)
-
-    # Set up the configuration for the analysis
-    setup_config(rundate, pipeline, session)
-
-    # Show current configuration
-    show_config(rundate, pipeline, session)
-
-    # Store configuration in library
-    store_config_to_library(rundate, pipeline, session)
-
-
-def setup_config(rundate, pipeline, session):
-    """Set up configuration for a Where analysis
-
-    """
+def set_profile(pipeline):
     # Set the correct profile
     profile = util.read_option_value("--profile", default="")
     config.where.profiles = profile.split() + [pipeline]
+    config.files.profiles = profile.split() + [pipeline]
+
+
+def setup_config(rundate, pipeline, *args, **kwargs):
+    """Set up configuration for a Where analysis
+
+    """
+    set_profile(pipeline)
 
     # Should a new analysis be started?
     start_new = util.check_options("-N", "--new")
@@ -149,50 +38,53 @@ def setup_config(rundate, pipeline, session):
     if util.check_options("-D", "--delete"):
         from where.tools import delete
 
-        delete.delete_analysis(rundate, pipeline, session)
+        delete.delete_analysis(rundate, pipeline, **kwargs)
         if not start_new:
             raise SystemExit
 
     # Create configuration of a new analysis
-    if start_new or not has_config(rundate, pipeline, session):
-        create_config(rundate, pipeline, session)
+    if start_new or not has_config(rundate, pipeline, *args, **kwargs):
+        create_config(rundate, pipeline, *args, **kwargs)
     elif util.check_options("--profile"):  # Warning if --profile option is ignored
         profile_opt = f"--profile={util.read_option_value('--profile', default='')}"
         log.warn(f"Configuration already exists, option '{profile_opt}' ignored")
 
     # Update configuration based on command line options
-    update_config(rundate, pipeline, session)
+    unused_options = update_config(rundate, pipeline, *args, **kwargs)
 
     # Edit configuration manually
     if util.check_options("-E", "--edit"):
-        edit_config(rundate, pipeline, session)
+        edit_config(rundate, pipeline, *args, **kwargs)
+        unused_options = [opt for opt in unused_options if opt not in ("-E, --edit")]
 
     # Show current configuration
     if util.check_options("-S", "--show-config"):
-        show_config(rundate, pipeline, session)
+        show_config(rundate, pipeline, *args, **kwargs)
         raise SystemExit
 
+    return unused_options
 
-def has_config(rundate, pipeline, session):
+
+def has_config(rundate, pipeline, *args, **kwargs):
     """Test whether the configuration of a Where analysis exists
 
     """
-    return _config_path(rundate, pipeline, session).exists()
+    return _config_path(rundate, pipeline, *args, **kwargs).exists()
 
 
-def create_config(rundate, pipeline, session):
+def create_config(rundate, pipeline, *args, **kwargs):
     """Create the configuration of a Where analysis
 
     """
     # Create a new configuration and copy all and pipeline sections
-    cfg_path = _config_path(rundate, pipeline, session)
+    cfg_path = _config_path(rundate, pipeline, *args, **kwargs)
     cfg = mg_config.Configuration(pipeline)
     cfg.update_from_config_section(config.where.all, section=pipeline)
     cfg.update_from_config_section(config.where[pipeline], section=pipeline)
     cfg.write_to_file(cfg_path, metadata=False)
 
     # Update configuration settings from library
-    for section in read_from_library(rundate, pipeline, session):
+    for section in read_from_library(rundate, pipeline, *args, **kwargs):
         cfg.update_from_config_section(section, section.name)
 
     # Write updated configuration to file
@@ -200,37 +92,43 @@ def create_config(rundate, pipeline, session):
     log.info(f"Creating new configuration at '{cfg_path}' based on {', '.join(cfg.sources)}")
 
     # Add new dependent sections from newly created config
-    add_sections(rundate, pipeline, session)
+    add_sections(rundate, pipeline, *args, **kwargs)
 
     # Add timestamp and creation note
-    add_timestamp(rundate, pipeline, session, "created")
+    add_timestamp(rundate, pipeline, "created", **kwargs)
 
 
-def update_config(rundate, pipeline, session):
+def update_config(rundate, pipeline, *args, **kwargs):
     """Update the configuration of a Where analysis
 
     """
-    cfg_path = _config_path(rundate, pipeline, session)
+    cfg_path = _config_path(rundate, pipeline, *args, **kwargs)
     ts_before = cfg_path.stat().st_mtime
 
     # Update with command line options
-    with mg_config.Configuration.update_on_file(_config_path(rundate, pipeline, session)) as cfg:
+    with mg_config.Configuration.update_on_file(_config_path(rundate, pipeline, *args, **kwargs)) as cfg:
         cfg.master_section = pipeline
-        cfg.update_from_options(_clean_sys_argv())
+        unused_options = cfg.update_from_options(_clean_sys_argv())
+
+    for opt in _RESERVED_OPTS:
+        if opt in kwargs:
+            unused_options.append(f"--{opt}={kwargs[opt]}")
 
     # Add timestamp and updated note
     if cfg_path.stat().st_mtime != ts_before:
-        add_timestamp(rundate, pipeline, session, "last update")
+        add_timestamp(rundate, pipeline, "last update", **kwargs)
 
     # Add new dependent sections from command line options
-    add_sections(rundate, pipeline, session)
+    add_sections(rundate, pipeline, *args, **kwargs)
+
+    return unused_options
 
 
-def edit_config(rundate, pipeline, session):
+def edit_config(rundate, pipeline, *args, **kwargs):
     """Update the configuration of a Where analysis
 
     """
-    cfg_path = _config_path(rundate, pipeline, session)
+    cfg_path = _config_path(rundate, pipeline, *args, **kwargs)
     ts_before = cfg_path.stat().st_mtime
 
     # Open config file in an editor
@@ -238,19 +136,19 @@ def edit_config(rundate, pipeline, session):
 
     if cfg_path.stat().st_mtime != ts_before:
         # Add timestamp and edited note
-        add_timestamp(rundate, pipeline, session, "last update")
+        add_timestamp(rundate, pipeline, "last update", **kwargs)
 
         # Add new dependent sections from manual edit
-        add_sections(rundate, pipeline, session)
+        add_sections(rundate, pipeline, *args, **kwargs)
 
 
-def add_sections(rundate, pipeline, session):
+def add_sections(rundate, pipeline, *args, **kwargs):
     """Update the configuration with sections with settings for models, cleaners etc
 
     Todo: Figure out how to work with metadata across profiles
 
     """
-    cfg_path = _config_path(rundate, pipeline, session)
+    cfg_path = _config_path(rundate, pipeline, *args, **kwargs)
     ts_before = cfg_path.stat().st_mtime
 
     # Add dependent sections that are not already included
@@ -265,39 +163,31 @@ def add_sections(rundate, pipeline, session):
 
     # Add timestamp and updated note
     if cfg_path.stat().st_mtime != ts_before:
-        add_timestamp(rundate, pipeline, session, "last update")
+        add_timestamp(rundate, pipeline, "last update", **kwargs)
 
 
-def show_config(rundate, pipeline, session):
+def show_config(rundate, pipeline, *args, **kwargs):
     """Show the configuration of a Where analysis
 
     """
     line = "=" * console.columns()
 
     # Warn about missing session
-    if not has_config(rundate, pipeline, session):
-        log.warn(f"No configuration found for {pipeline.upper()} {session} {rundate.strftime(config.FMT_date)}")
+    if not has_config(rundate, pipeline, *args, **kwargs):
+        log.warn(f"No configuration found for {pipeline.upper()} {rundate.strftime(config.FMT_date)}")
 
     # Read configuration from file
     else:
-        cfg = _read_config(rundate, pipeline, session)
+        cfg = _read_config(rundate, pipeline, *args, **kwargs)
 
         # Print configuration to console
         print(line)
-        print(f"{pipeline.upper()} {session} {rundate.strftime(config.FMT_date)}\n")
+        print(f"{pipeline.upper()} {rundate.strftime(config.FMT_date)}\n")
         print(cfg)
         print(f"\nConfig file at {', '.join(cfg.sources)}")
 
-    # Add instructions about how to update configuration
-    print(line)
-    pipeline_opt = [o for o, p in pipelines.options().items() if p == pipeline and o.startswith("--")][0]
-    cmd = f"{util.get_program_name()} {rundate.year} {rundate.month} {rundate.day} {pipeline_opt} --session={session}"
-    print(f"Use '{cmd} --edit' to edit configuration manually")
-    print(f"    '{cmd} --<key>=<value>' to update an entry in the [{pipeline}] section")
-    print(f"    '{cmd} --<section>:<key>=<value>' to update an entry in a specific section")
 
-
-def add_timestamp(rundate, pipeline, session, timestamp_key):
+def add_timestamp(rundate, pipeline, timestamp_key, **kwargs):
     """Write or update a timestamp to file
 
     Args:
@@ -307,8 +197,8 @@ def add_timestamp(rundate, pipeline, session, timestamp_key):
         timestamp_key:  Key denoting timestamp.
     """
     # Find timestamp file
-    file_vars = config.create_file_vars(rundate, pipeline, session)
-    ts_path = files.path("timestamp", file_vars=file_vars)
+    file_vars = config.create_file_vars(rundate, pipeline, **kwargs)
+    ts_path = config.files.path("timestamp", file_vars=file_vars)
 
     # Add timestamp with update note to timestamp file
     with mg_config.Configuration.update_on_file(ts_path) as ts_cfg:
@@ -316,27 +206,27 @@ def add_timestamp(rundate, pipeline, session, timestamp_key):
         ts_cfg.update("timestamps", timestamp_key, timestamp, source=__file__)
 
 
-def read_from_library(rundate, pipeline, session):
-    cfg = _read_config(rundate, pipeline, session)
+def read_from_library(rundate, pipeline, *args, **kwargs):
+    cfg = _read_config(rundate, pipeline, *args, **kwargs)
     cfg.update_from_options(allow_new=True)
     if not cfg.read_from_library.bool:
-        raise StopIteration
+        return
 
-    file_vars = config.create_file_vars(rundate, pipeline, session)
-    lib_path = files.path("config_library", file_vars=file_vars)
+    file_vars = config.create_file_vars(rundate, pipeline, **kwargs)
+    lib_path = config.files.path("config_library", file_vars=file_vars)
     lib_cfg = mg_config.Configuration.read_from_file("library", lib_path)
 
     for section in lib_cfg.sections:
         yield section
 
 
-def store_config_to_library(rundate, pipeline, session):
-    cfg = _read_config(rundate, pipeline, session)
+def store_config_to_library(rundate, pipeline, **kwargs):
+    cfg = _read_config(rundate, pipeline, **kwargs)
     if not cfg.write_to_library.bool:
         return
 
-    file_vars = config.create_file_vars(rundate, pipeline, session)
-    lib_path = files.path("config_library", file_vars=file_vars)
+    file_vars = config.create_file_vars(rundate, pipeline, **kwargs)
+    lib_path = config.files.path("config_library", file_vars=file_vars)
     lib_cfg = mg_config.Configuration("library")
 
     for section in cfg.sections:
@@ -348,7 +238,7 @@ def store_config_to_library(rundate, pipeline, session):
     lib_cfg.write_to_file(lib_path)
 
 
-def _read_config(rundate, pipeline, session):
+def _read_config(rundate, pipeline, *args, **kwargs):
     """Read the configuration of a Where analysis from file
 
     Todo: Add this as a classmethod on Configuration
@@ -361,18 +251,16 @@ def _read_config(rundate, pipeline, session):
     Returns:
         Configuration of Where analysis.
     """
-    if not has_config(rundate, pipeline, session):
-        raise FileNotFoundError(
-            f"No configuration found for {pipeline.upper()} {session} {rundate.strftime(config.FMT_date)}"
-        )
+    if not has_config(rundate, pipeline, *args, **kwargs):
+        raise FileNotFoundError(f"No configuration found for {pipeline.upper()} {rundate.strftime(config.FMT_date)}")
 
-    cfg = mg_config.Configuration.read_from_file(pipeline, _config_path(rundate, pipeline, session))
+    cfg = mg_config.Configuration.read_from_file(pipeline, _config_path(rundate, pipeline, *args, **kwargs))
     cfg.master_section = pipeline
 
     return cfg
 
 
-def _config_path(rundate, pipeline, session):
+def _config_path(rundate, pipeline, *args, **kwargs):
     """The path to the configuration of a Where analysis
 
     Todo: Move this to lib.config
@@ -385,8 +273,8 @@ def _config_path(rundate, pipeline, session):
     Returns:
         Path to configuration file.
     """
-    file_vars = config.create_file_vars(rundate, pipeline, session)
-    return files.path("config", file_vars=file_vars)
+    file_vars = config.create_file_vars(rundate, pipeline, **kwargs)
+    return config.files.path("config", file_vars=file_vars)
 
 
 def _dependent_sections(cfg_section, master_cfg=config.where):
@@ -418,10 +306,4 @@ def _dependent_sections(cfg_section, master_cfg=config.where):
 def _clean_sys_argv():
     """Values in sys.argv that are not valid option values in Where
     """
-    reserved_opts = {"id", "session", "profile", "user", "line_profile"}
-    return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]
-
-
-# Run main function only when running as script
-if __name__ == "__main__":
-    sys.exit(main())
+    return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in _RESERVED_OPTS]

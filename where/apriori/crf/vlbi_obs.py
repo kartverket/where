@@ -12,12 +12,15 @@ Reads source positions from the VLBI observation files in either NGS or vgosdb f
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
+from where.data.direction import Direction
 from where import apriori
 from where.apriori import crf
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where import parsers
 
 
@@ -85,4 +88,6 @@ class VlbiObsCrf(crf.CrfFactory):
         Returns:
             Array:  Positions, one 2-vector.
         """
-        return np.array([self.data[source]["ra"], self.data[source]["dec"]])
+        vector = Direction(ra=self.data[source]["ra"], dec=self.data[source]["dec"], time=self.time)
+        return np.squeeze(vector)
+        # return np.array([self.data[source]["ra"], self.data[source]["dec"]])

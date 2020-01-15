@@ -18,14 +18,14 @@ import numpy as np
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import files
+from where.lib import config
 from where.lib import log
 from where.lib.unit import Unit
 
 
 @plugins.register
 def web_map_writer(dset):
-    file_path = files.path("output_web_map", file_vars=dset.vars)
+    file_path = config.files.path("output_web_map", file_vars=dset.vars)
     log.info(f"Storing a web map at '{file_path}'. Open in a browser to look at it")
 
     sites = read_site_latlons(dset)
@@ -36,7 +36,7 @@ def web_map_writer(dset):
 def read_site_latlons(dset):
     sites = dict()
     for station in dset.unique("station"):
-        for _ in dset.for_each("station"):
+        for _ in dset.for_each_suffix("station"):
             llh = dset.first("site_pos.llh", station=station)
             if llh is not None:
                 sites[station] = (llh[0] * Unit.rad2degree, llh[1] * Unit.rad2degree)

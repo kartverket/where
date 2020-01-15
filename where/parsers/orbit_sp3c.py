@@ -25,8 +25,8 @@ TODO:
 Important: Bad satellites has to be removed from observation Dataset!!!! E.g. indicated by bad satellite clock values.
 
 
-$Revision: 17313 $
-$Date: 2019-02-15 09:36:36 +0100 (Fri, 15 Feb 2019) $
+$Revision: 18780 $
+$Date: 2019-12-17 12:16:46 +0100 (Tue, 17 Dec 2019) $
 $LastChangedBy: dahmic $
 
 """
@@ -389,14 +389,26 @@ class OrbitSp3cParser(ChainParser):
         """
         dset.num_obs = len(self.data["time"])
         dset.meta.update(self.meta)
+
+        # TODO workaround: "isot" does not work for initialization of time field (only 5 decimals for seconds are
+        #                  allowed). Therefore self.data["time"] is converted to datetime object.
+        from datetime import datetime, timedelta
+
+        date = []
+        millisec = []
+        for v in self.data["time"]:
+            val, val2 = v.split(".")
+            date.append(datetime.strptime(val, "%Y-%m-%dT%H:%M:%S"))
+            millisec.append(timedelta(milliseconds=int(val2)))
+
         if dset.meta["time_sys"] == "GPS":
-            dset.add_time("time", val=self.data["time"], scale="gps")
+            dset.add_time("time", val=date, val2=millisec, scale="gps", fmt="datetime")
         elif dset.meta["time_sys"] == "UTC":
-            dset.add_time("time", val=self.data["time"], scale="utc")
+            dset.add_time("time", val=date, val2=millisec, scale="utc", fmt="datetime")
         else:
-            log.fatal(f"Time system {dset.meta['time_sys']} is not handled so far in Where")
+            log.fatal(f"Time system {dset.meta['time_sys']} is not handled so far in Where.")
 
         dset.add_text("satellite", val=self.data["satellite"])
         dset.add_text("system", val=self.data["system"])
-        dset.add_position("sat_pos", time="time", itrs=np.array(self.data["sat_pos"]), unit="meter")
-        dset.add_float("sat_clock_bias", val=np.array(self.data["sat_clock_bias"]), unit="meter")
+        dset.add_position("sat_pos", time=dset.time, system="trs", val=np.array(self.data["sat_pos"]))
+        dset.add_float("sat_clock_bias", val=np.array(self.data["sat_clock_bias"]))

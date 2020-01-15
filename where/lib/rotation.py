@@ -9,12 +9,14 @@ their derivatives.
 Contains the rotation matrices (and angles) for the transition from a terrestrial reference system to a 
 geocentric celestial reference system according to the IERS 2010 Conventions.
 """
+# Standard library imports
+from functools import lru_cache
+
 # Include all rotation matrices defined in Midgard
 from midgard.math.constant import constant
 from midgard.math.rotation import *  # noqa
 
 from where import apriori
-from where.lib import cache
 from where.lib.unit import Unit
 from where.ext import sofa_wrapper as sofa
 
@@ -23,19 +25,19 @@ from where.ext import sofa_wrapper as sofa
 #
 
 
-@cache.function
+@lru_cache()
 def gcrs2trs(time):
     """Transformation from space fixed to earth fixed coordinate system
 
     According to IERS 2010 Conventions
     """
-    if time.isscalar:
+    if time.size == 1:
         return (Q(time) @ R(time) @ W(time)).transpose()
     else:
         return (Q(time) @ R(time) @ W(time)).transpose(0, 2, 1)
 
 
-@cache.function
+@lru_cache()
 def trs2gcrs(time):
     """Transformation from earth fixed to space fixed coordinate system
 
@@ -43,7 +45,8 @@ def trs2gcrs(time):
     """
     return Q(time) @ R(time) @ W(time)
 
-@cache.function
+
+@lru_cache()
 def dtrs2gcrs_dt(time):
     """Derivative of transformation from earth fixed to space fixed coordinate system with regards to time
 
@@ -51,22 +54,47 @@ def dtrs2gcrs_dt(time):
     """
     return Q(time) @ dR_dut1(time) @ W(time)
 
-@cache.function
+
+@lru_cache()
 def dgcrs2trs_dt(time):
     """Transformation from space fixed to earth fixed coordinate system
 
     dQ/dt and dW/dt is approximated to zero since these matrices change slowly compared to dR/dt
     """
-    if time.isscalar:
+    if time.size == 1:
         return (Q(time) @ dR_dut1(time) @ W(time)).transpose()
     else:
         return (Q(time) @ dR_dut1(time) @ W(time)).transpose(0, 2, 1)
 
 
+# @lru_cache() # TODO sat_pos unhashable
+def yaw2trs(sat_pos, time):
+    """Transformation matrix from yaw-steering reference system to ITRS."""
+    return trs2yaw(sat_pos, time).transpose(0, 2, 1)
+
+
+# @lru_cache() # TODO sat_pos unhashable
+def trs2yaw(sat_pos, time):
+    """Transformation matrix from ITRS to yaw-steering reference system
+
+    The yaw-steering reference system given with x-axis lying in the Earth-Satellite-Sun plane, y-axis as the
+    normal vector of the Earth-Satellite-Sun plane and the z-axis pointing to the Earth's center.
+    """
+    eph = apriori.get("ephemerides", time=time.tdb)
+    z_unit = -sat_pos.trs.pos.unit_vector  # unit vector of z-axis
+    sat_sun = eph.pos_itrs("sun") - sat_pos.trs.pos  # vector pointing from satellite position to Sun
+    y = np.cross(z_unit, sat_sun)
+    y_unit = y / np.linalg.norm(y, axis=1)[:, None]  # unit vector of y-axis
+    x = np.cross(y_unit, z_unit)
+    x_unit = x / np.linalg.norm(x, axis=1)[:, None]  # unit vector of z-axis
+
+    return np.stack((x_unit, y_unit, z_unit), axis=1)
+
+
 #
 # Rotation matrices
 #
-@cache.function
+@lru_cache()
 def Q(time):
     """Transformation matrix for the celestial motion of the CIP
 
@@ -82,7 +110,7 @@ def Q(time):
     return R3(-E(time)) @ R2(-d(time)) @ R3(E(time)) @ R3(s(time))
 
 
-@cache.function
+@lru_cache()
 def R(time):
     """Transformation matrix for the Earth rotation
 
@@ -107,7 +135,7 @@ def R(time):
     return R3(-ERA(time))
 
 
-@cache.function
+@lru_cache()
 def W(time):
     """Transformation matrix for the polar motion
 
@@ -126,28 +154,28 @@ def W(time):
 #
 # Rotation angles
 #
-@cache.function
+@lru_cache()
 def s(time):
     """CIO locator
     """
     return sofa.vectorized_s06(time)
 
 
-@cache.function
+@lru_cache()
 def s_prime(time):
     """TIO locator
     """
     return sofa.vectorized_sp00(time)
 
 
-@cache.function
+@lru_cache()
 def ERA(time):
     """Earth rotation angle
     """
     return sofa.vectorized_era00(time)
 
 
-@cache.function
+@lru_cache()
 def d(time):
     """Polar angle of CIP from positive z-axis
 
@@ -156,7 +184,7 @@ def d(time):
     return np.arccos(Z(time))
 
 
-@cache.function
+@lru_cache()
 def E(time):
     """Azimuth angle of CIP in xy-plane
 
@@ -165,7 +193,7 @@ def E(time):
     return np.arctan2(Y(time), X(time))
 
 
-@cache.function
+@lru_cache()
 def xp(time):
     """X coordinate of the CIP in ITRS
     """
@@ -173,7 +201,7 @@ def xp(time):
     return eop.x * Unit.arcsec2rad
 
 
-@cache.function
+@lru_cache()
 def yp(time):
     """Y coordinate of the CIP in ITRS
     """
@@ -181,7 +209,7 @@ def yp(time):
     return eop.y * Unit.arcsec2rad
 
 
-@cache.function
+@lru_cache()
 def X(time):
     """Total X coordinate of CIP
 
@@ -192,7 +220,7 @@ def X(time):
     return sofa.X_model(time) + eop.dx * Unit.arcsec2rad
 
 
-@cache.function
+@lru_cache()
 def Y(time):
     """Total Y coordinate of CIP
 
@@ -203,7 +231,7 @@ def Y(time):
     return sofa.Y_model(time) + eop.dy * Unit.arcsec2rad
 
 
-@cache.function
+@lru_cache()
 def Z(time):
     """Total Z coordinate of CIP
 
@@ -220,7 +248,7 @@ def Z(time):
 #
 
 
-@cache.function
+@lru_cache()
 def dW_dxp(time):
     """Derivative of transformation matrix for the polar motion with regards to the CIP (Celestial Intermediate Pole)
     in TRF along the Greenwich meridian x_p.
@@ -231,7 +259,7 @@ def dW_dxp(time):
     return R3(-s_prime(time)) @ dR2(xp(time)) @ R1(yp(time))
 
 
-@cache.function
+@lru_cache()
 def dW_dyp(time):
     """Derivative of transformation matrix for the polar motion with regards to the CIP in ITRS.
 
@@ -240,7 +268,7 @@ def dW_dyp(time):
     return R3(-s_prime(time)) @ R2(xp(time)) @ dR1(yp(time))
 
 
-@cache.function
+@lru_cache()
 def dR_dut1(time):
     """Derivative of transformation matrix for the Earth rotation with respect to time (UT1??)
 
@@ -260,7 +288,7 @@ def dR_dut1(time):
     return -dR3(-ERA(time)) * constant.omega
 
 
-@cache.function
+@lru_cache()
 def dQ_dX(time):
     """Derivative of transformation matrix for nutation/presession with regards to the X coordinate of CIP in GCRS
     """
@@ -282,7 +310,7 @@ def dQ_dX(time):
     )
 
 
-@cache.function
+@lru_cache()
 def dQ_dY(time):
     """Derivative of transformation matrix for nutation/presession with regards to the Y coordinate of CIP in GCRS
     """
@@ -309,42 +337,42 @@ def dQ_dY(time):
 #
 
 
-@cache.function
+@lru_cache()
 def dE_dX(time):
     """Derivative of azimuth angle of CIP in GCRS with regards to the X coordinate of CIP in GCRS
     """
     return (-Y(time) / (X(time) ** 2 + Y(time) ** 2))[:, None, None]
 
 
-@cache.function
+@lru_cache()
 def ds_dX(time):
     """Derivative of CIO locator with regards the X coordinate of CIP in GCRS
     """
     return (-Y(time) / 2)[:, None, None]
 
 
-@cache.function
+@lru_cache()
 def dd_dX(time):
     """Derivative of polar angle of CIP in GCRS with regards to the X coordinate of CIP in GCRS
     """
     return (X(time) / (Z(time) * np.sqrt(X(time) ** 2 + Y(time) ** 2)))[:, None, None]
 
 
-@cache.function
+@lru_cache()
 def dE_dY(time):
     """Derivative of azimuth angle of CIP in GCRS with regards to the Y coordinate of CIP in GCRS
     """
     return (X(time) / (X(time) ** 2 + Y(time) ** 2))[:, None, None]
 
 
-@cache.function
+@lru_cache()
 def ds_dY(time):
     """Derivative of CIO locator with regards the X coordinate of CIP in GCRS
     """
     return (-X(time) / 2)[:, None, None]
 
 
-@cache.function
+@lru_cache()
 def dd_dY(time):
     """Derivative of polar angle of CIP in GCRS with regards to the Y coordinate of CIP in GCRS
     """

@@ -46,7 +46,7 @@ from midgard.dev import plugins
 
 # Where imports
 from midgard.math.constant import constant
-from where.lib import files
+from where.lib import config
 
 
 @plugins.register
@@ -56,7 +56,9 @@ def vascc_calc(dset):
     Args:
         dset:  Dataset, data for a model run.
     """
-    with files.open("output_vascc_calc", file_vars=dict(session=dset.dataset_name, **dset.vars), mode="wt") as fid:
+    with config.files.open(
+        "output_vascc_calc", file_vars=dict(session=dset.dataset_name, **dset.vars), mode="wt"
+    ) as fid:
         for obs, (time, src, sta_1, sta_2, calc) in enumerate(
             dset.values("time", "source", "station_1", "station_2", "calc"), start=1
         ):

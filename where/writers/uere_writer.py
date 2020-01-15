@@ -11,7 +11,7 @@ Description:
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import files
+from where.lib import config
 
 
 @plugins.register
@@ -22,7 +22,7 @@ def uere_writer(dset):
         dset:       Dataset, a dataset containing the data.
     """
 
-    with files.open("output_uere", file_vars=dset.vars, mode="wt") as fid:
+    with config.files.open("output_uere", file_vars=dset.vars, mode="wt") as fid:
 
         # Write header
         fid.write(

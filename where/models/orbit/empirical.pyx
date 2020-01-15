@@ -17,15 +17,12 @@ import math
 # External library imports
 import numpy as np
 
-# Where imports
-from where import apriori
+# Midgard imports
+from midgard.dev import log
+from midgard.dev import plugins
 from midgard.math.constant import constant
-from where.lib import log
-from where.lib import plugins
 
-cdef double GM = constant.GM
 cdef double[:] a0, a1, a2
-
 
 def register_entry_point():
     """Register entry points for setup and later calls."""
@@ -39,7 +36,7 @@ def empirical_setup(
 
     Args:
         rundate:           Time of integration start
-        force_parameters:  Dict of parameters to be estimated
+        force_parameters:  Ordered dict of parameters to be estimated
         sat_name:          Name of satellite
         time_grid:         Table of times in seconds since rundate, in utc.
         epochs:            time_grid converted to Time objects, in utc.
@@ -47,19 +44,34 @@ def empirical_setup(
         bodies:            List of bodies
         gcrs2itrs:         List of transformation matrices, one for each time in epochs.
     """
-    global GM, a0, a1, a2
-    cdef double[:, :] a = np.zeros((3,3))
-    cdef int i, j
+    global a0, a1, a2
+    global empirical_parameter_names
 
-    for i in range(0, 3):
-        for j in range(0, 3):
-            key = "a"+str(i)+str(j)
-            if key in force_parameters:
-                a[i, j] = force_parameters[key]
+    a0 = np.zeros(3)
+    a1 = np.zeros(3)
+    a2 = np.zeros(3)
+    a = np.zeros(9)
 
-    a0 = a[0, :]
-    a1 = a[1, :]
-    a2 = a[2, :]
+    # Could estimate any subset of these 9 parameters.
+    empirical_parameter_names = ["const_radial",
+                                 "const_cross",
+                                 "const_along",
+                                 "1cpr_sin_radial",
+                                 "1cpr_sin_cross",
+                                 "1cpr_sin_along",
+                                 "1cpr_cos_radial",
+                                 "1cpr_cos_cross",
+                                 "1cpr_cos_along"]
+
+    # Some bookkeeping in order to place the estimated parameters at the right place in the equations.
+    # The empirical parameters not estimated are set to zero. 
+    for idx, key in enumerate(empirical_parameter_names):
+        if key in force_parameters: 
+           a[idx] = force_parameters[key]
+    
+    a0 = a[0: 3]
+    a1 = a[3: 6]
+    a2 = a[6: 9]
 
 
 def empirical(double[:] sat_pos_gcrs, double[:] sat_vel_gcrs, force_parameters, **_not_used):
@@ -85,6 +97,7 @@ def empirical(double[:] sat_pos_gcrs, double[:] sat_vel_gcrs, force_parameters, 
     cdef double[:, :] trans, sens
     cdef double r, v
     cdef int i, j
+    cdef int idx1, idx2 
 
     # In radial, cross-track and along-track system.
     acc = np.zeros(3)
@@ -162,19 +175,11 @@ def empirical(double[:] sat_pos_gcrs, double[:] sat_vel_gcrs, force_parameters, 
     dacc_dp[:, 8] = vel_cos
 
     # Bookkeeping
-    keys = list(force_parameters.keys())
-    for i in range(0, len(keys)):
-        if keys[i].startswith("a"):
+    for idx1, (key, value) in enumerate(force_parameters.items()):
+        if key in empirical_parameter_names:
+            idx2 = empirical_parameter_names.index(key)
             for j in range(0, 3):
-                k1 = int(keys[i][1: 2])
-                k2 = int(keys[i][2: 3])
-                if k1 == 0:
-                    k = k2
-                if k1 == 1:
-                    k = k2 + 3
-                if k1 == 2:
-                    k = k2 + 6
-                sens[j, i] = dacc_dp[j, k]
+                sens[j, idx1] = dacc_dp[j, idx2]
 
     return (acc_gcrs, trans, sens)
 
@@ -191,6 +196,7 @@ def orbital_elements(double[:] sat_pos, double[:] sat_vel):
 
     References: Section 2.2.4 in Montenbruck and Gill [1].
     """
+    cdef double GM = constant.GM
     cdef double[:] h = np.cross(sat_pos, sat_vel)
     cdef double r = np.linalg.norm(sat_pos)
     cdef double sat_vel_squared = 0

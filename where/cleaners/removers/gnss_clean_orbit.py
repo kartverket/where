@@ -16,19 +16,18 @@ and only for precise orbits:
     - removing of GNSS observations which exceeds the interpolation boundaries
 """
 
-# Standard library imports
-from datetime import datetime
-
 # External library imports
 import numpy as np
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where import apriori
 from where import cleaners
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
-from where.lib.time import Time, TimeDelta
+from where.data.time import Time, TimeDelta
 from where.lib.unit import Unit
 
 # Name of section in configuration
@@ -36,36 +35,38 @@ _SECTION = "_".join(__name__.split(".")[-1:])
 
 
 @plugins.register
-def gnss_clean_orbit(dset):
+def gnss_clean_orbit(dset: "Dataset", orbit_flag: str) -> None:
     """Remove GNSS observations with unavailable apriori satellite orbits or which does not fulfill requirements
 
     Args:
-        dset (Dataset):  A Dataset containing model data.
+        dset:           A Dataset containing model data.
+        orbit_flag:    Specification of which apriori orbit is used ("broadcast" or "precise")
 
     Returns:
         numpy.ndarray:   Array containing False for observations to throw away.
     """
-    clean_orbit = config.tech.clean_orbit.str
-    orb_flag = config.tech.apriori_orbit.list
-
-    if clean_orbit not in ["sat", "sat_fit"]:
-        return np.ones(dset.num_obs, dtype=bool)
+    check_nav_validity_length = config.tech[_SECTION].check_nav_validity_length.bool
+    ignore_unhealthy_satellite = config.tech[_SECTION].ignore_unhealthy_satellite.bool
 
     # GNSS observations are rejected from Dataset 'dset', if apriori satellite orbits are not given
-    _ignore_satellites(dset, orb_flag)
+    _ignore_satellites(dset, orbit_flag)
+
+    # Remove unhealthy satellites
+    if (orbit_flag == "broadcast") and ignore_unhealthy_satellite:
+        cleaners.apply_remover("gnss_ignore_unhealthy_satellite", dset)
+
+    # Remove GNSS observations which exceeds the validity length of broadcast ephemeris
+    if (orbit_flag == "broadcast") and check_nav_validity_length:
+        keep_idx = _ignore_epochs_exceeding_validity(dset)
 
     # Remove GNSS observations which exceeds the interpolation boundaries
-    if "precise" in orb_flag:
+    if orbit_flag == "precise":
         keep_idx = _ignore_epochs_exceeding_interpolation_boundaries(dset)
-
-    # Remove GNSS observations which exceeds the broadcast ephemeris fit interval
-    if ("broadcast" in orb_flag) and (clean_orbit == "sat_fit"):
-        keep_idx = _ignore_epochs_exceeding_validity_and_unhealthy_satellites(dset)
 
     return keep_idx
 
 
-def _ignore_satellites(dset: "Dataset", orb_flag: list) -> None:
+def _ignore_satellites(dset: "Dataset", orbit_flag: str) -> None:
     """Remove GNSS observations with unavailable apriori satellite orbits from Dataset
 
     The remover can be used for precise and broadcast ephemeris and also for the GNSS and SISRE technique/analysis.
@@ -77,32 +78,31 @@ def _ignore_satellites(dset: "Dataset", orb_flag: list) -> None:
              the configuration file.
 
     Args:
-        dset:      A Dataset containing model data, which is decimated by unavailable satellite observations.
-        orb_flag:  List with used orbit types (e.g. 'broadcast' and/or 'precise' orbit)
+        dset:        A Dataset containing model data, which is decimated by unavailable satellite observations.
+        orbit_flag:  Specification of which apriori orbit is used ("broadcast" or "precise")
     """
-    for orb in orb_flag:
-        orbit = apriori.get(
-            "orbit",
-            apriori_orbit=orb,
-            rundate=dset.rundate,
-            station=dset.vars["station"],
-            day_offset=0,  # check satellite availability only for current rundate and not for the days before/after
-            # rundate in addition. TODO: This does not work for broadcast ephemeris at the moment.
+    orbit = apriori.get(
+        "orbit",
+        apriori_orbit=orbit_flag,
+        rundate=dset.analysis["rundate"],
+        station=dset.vars["station"],
+        system=tuple(dset.unique("system")),
+        day_offset=0,  # check satellite availability only for current rundate and not for the days before/after
+        # rundate in addition. TODO: This does not work for broadcast ephemeris at the moment.
+    )
+    not_available_sat = set(dset.satellite) - set(orbit.dset_raw.satellite)
+    file_paths = orbit.dset_raw.meta["parser"]["file_path"]
+
+    if not_available_sat:
+        log.warn(
+            f"The following satellites are not given in apriori {orbit_flag} orbit file {', '.join(file_paths)}: "
+            f"{', '.join(sorted(not_available_sat))}"
         )
-        not_available_sat = set(dset.satellite) - set(orbit.dset_raw.satellite)
-        file_paths = orbit.dset_raw.meta["parser"]["file_path"]
-
-        if not_available_sat:
-            log.warn(
-                f"The following satellites are not given in apriori {orb} orbit file {', '.join(file_paths)}: "
-                f"{', '.join(sorted(not_available_sat))}"
-            )
-            cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
+        cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
 
 
-def _ignore_epochs_exceeding_validity_and_unhealthy_satellites(dset: "Dataset") -> np.ndarray:
-    """Remove GNSS observations which exceeds the validity length of a broadcast navigation record and unhealthy
-       satellites
+def _ignore_epochs_exceeding_validity(dset: "Dataset") -> np.ndarray:
+    """Remove GNSS observations which exceeds the validity length of a broadcast navigation record 
 
     How long a broadcast ephemeris block is valid depends on the GNSS:
 
@@ -117,41 +117,27 @@ def _ignore_epochs_exceeding_validity_and_unhealthy_satellites(dset: "Dataset") 
                          0 - 2 hours
                          1 - more than 2 hours
                          blank - not known
-
-    Method 'brdc.unhealthy_satellites' declares satellite as unhealhty, if at least one satellite ephemeris epoch is set
-    to unhealthy. But it can happen that a satellite is only unhealthy for a certain period of the day. This is not 
-    handled via 'brdc.unhealthy_satellites' method. Therefore this routine checks every epoch, if a satellite ephemeris
-    epoch is healthy or not. If the option 'ignore_unhealthy_satellites' is set to 'True', than satellite observation
-    are removed, which are flagged as unhealthy.
-
     Args:
         dset:   A Dataset containing model data.
     """
     brdc = apriori.get(
         "orbit",
-        rundate=dset.rundate,
+        rundate=dset.analysis["rundate"],
         station=dset.vars["station"],
+        system=tuple(dset.unique("system")),
         apriori_orbit="broadcast",
     )
 
     brdc_block_idx = brdc._get_brdc_block_idx(dset)
     keep_idx = np.ones(dset.num_obs, dtype=bool)
 
-    ignore_unhealthy_satellites = config.tech.get("ignore_unhealthy_satellites", default=True).bool
-    log.info(f"The following satellites are unhealthy: {', '.join(brdc.unhealthy_satellites())}")
-
     # Loop over subset of Dataset, which includes only observations from available satellites
     for obs, (idx, time) in enumerate(zip(brdc_block_idx, dset.time.gps.mjd)):
-
-        # Remove unhealthy satellites epochwise
-        if ignore_unhealthy_satellites:
-            if brdc.dset_edit.sv_health[idx] > 0:
-                keep_idx[obs] = False
-                continue
 
         tk = (time - brdc.dset_edit.toe.gps.mjd[idx]) * Unit.day2second
         sys = np.array(dset.system)[obs]
 
+        # Check validity length of navigation record
         if sys == "C":
             # TODO: :cite:`bds-sis-icd-2.1` does not define validity length of navigation record
             fit_interval = 1.0  # Assumption due to update rate of ephemeris of 1 hours
@@ -183,7 +169,7 @@ def _ignore_epochs_exceeding_validity_and_unhealthy_satellites(dset: "Dataset") 
 
         elif sys == "I":
             # TODO: :cite:`irnss-icd-sps` does not define validity length of navigation record
-            fit_interval = 2.0 # Assumption due to update rate of ephemeris of 2 hours
+            fit_interval = 2.0  # Assumption due to update rate of ephemeris of 2 hours
             toe_limit = fit_interval * 3600.0
 
         elif sys == "J":
@@ -206,19 +192,17 @@ def _ignore_epochs_exceeding_validity_and_unhealthy_satellites(dset: "Dataset") 
             keep_idx[obs] = False
 
         ##+DEBUG
-        #    print('DEBUG: {:6s} {:8d} {:4s} {}  TOE({})  abs({:7.0f}) > {:6.0f}'.format('REJECT', obs,
-        #          np.array(dset.satellite)[obs], dset.time.gps.datetime[obs],
-        #          brdc.dset_edit.toe.gps.datetime[idx], tk, toe_limit))
+        #        print('DEBUG: {:6s} {:8d} {:4s} {:4.0f} {}  TOE({})  abs({:7.0f}) > {:6.0f}'.format('REJECT', obs,
+        #              np.array(dset.satellite)[obs], brdc.dset_edit.iode[idx], dset.time.gps.datetime[obs],
+        #              brdc.dset_edit.toe.gps.datetime[idx], tk, toe_limit))
         # else:
-        #    print('DEBUG: {:6s} {:8d} {:4s} {}  TOE({})  abs({:7.0f}) <={:6.0f}'.format('KEEP', obs,
-        #          np.array(dset.satellite)[obs], dset.time.gps.datetime[obs],
-        #          brdc.dset_edit.toe.gps.datetime[idx], tk, toe_limit))
+        #        print('DEBUG: {:6s} {:8d} {:4s} {:4.0f} {}  TOE({})  abs({:7.0f}) <={:6.0f}'.format('KEEP', obs,
+        #              np.array(dset.satellite)[obs], brdc.dset_edit.iode[idx], dset.time.gps.datetime[obs],
+        #              brdc.dset_edit.toe.gps.datetime[idx], tk, toe_limit))
         ##-DEBUG
 
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
-    log.info(
-        f"Removing {num_removed_obs} observations based on _ignore_epochs_exceeding_validity_and_unhealthy_satellites"
-    )
+    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_exceeding_validity")
 
     # log.debug('Following entries are removed: {}\n', 'DEBUG:  \n'.join([s+t.strftime('  %Y-%m-%d %H:%M:%S (GPS)')
     #                                                              for s, t in zip(np.array(dset.satellite)[keep_idx],
@@ -237,13 +221,10 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset") -> None:
         dset (Dataset):            A Dataset containing model data.
     """
     precise = apriori.get(
-        "orbit",
-        rundate=dset.rundate,
-        station=dset.vars["station"],
-        apriori_orbit="precise",
+        "orbit", rundate=dset.analysis["rundate"], station=dset.vars["station"], apriori_orbit="precise"
     )
 
-    epoch_interval = float(precise.dset_edit.meta[dset.rundate.strftime("%Y-%m-%d")]["epoch_interval"])
+    epoch_interval = float(precise.dset_edit.meta[dset.analysis["rundate"].strftime("%Y-%m-%d")]["epoch_interval"])
     precise_idx = precise._get_nearest_sample_point(dset.satellite, dset.time)
     keep_idx = np.ones(dset.num_obs, dtype=bool)
 
@@ -303,10 +284,10 @@ def _check_first_epoch_sample_point(dset: "Dataset", precise, epoch_interval):
 
     # Get set with satellite and time entries for getting corresponding precise orbit sample points
     satellites = dset.satellite[first_epoch_idx]
-    time = Time(
-        val=dset.time.gps.datetime[first_epoch_idx], format="datetime", scale=dset.time.data.scale
-    ) - TimeDelta(epoch_interval, format="sec")
-    precise_idx = precise._get_nearest_sample_point(satellites, np.full(len(satellites), time))
+    time = Time(val=dset.time.gps.datetime[first_epoch_idx], fmt="datetime", scale=dset.time.scale) - TimeDelta(
+        epoch_interval, fmt="seconds", scale=dset.time.scale
+    )
+    precise_idx = precise._get_nearest_sample_point(satellites, time)
 
     # Keep observations epochs, where a precise orbit sample point exists before the first observation epoch
     diff_time = (dset.time.gps.mjd[first_epoch_idx] - precise.dset_edit.time.gps.mjd[precise_idx]) * Unit.day2second
@@ -358,18 +339,17 @@ def _check_last_epoch_sample_point(dset, precise, epoch_interval):
     last_idx = -1
     last_epoch_idx = np.ones(dset.num_obs, dtype=bool)
     last_epoch_idx = (
-        dset.time.gps.mjd
-        >= dset.time.gps.mjd[last_idx] - (epoch_interval - sampling_rate) * Unit.second2day
+        dset.time.gps.mjd >= dset.time.gps.mjd[last_idx] - (epoch_interval - sampling_rate) * Unit.second2day
     )
 
     # Get set with satellite and time entries for getting corresponding precise orbit sample points
     # Note: Sample point reference time is 'last observation epoch' + 'sampling rate', which corresponds normally to
     #       0:00 GPS time.
     satellites = dset.satellite[last_epoch_idx]
-    time = Time(val=dset.time.gps.datetime[last_idx], format="datetime", scale=dset.time.data.scale) + TimeDelta(
-        sampling_rate, format="sec"
+    time = Time(val=dset.time.gps.datetime[last_idx], fmt="datetime", scale=dset.time.scale) + TimeDelta(
+        sampling_rate, fmt="seconds", scale=dset.time.scale
     )
-    precise_idx = precise._get_nearest_sample_point(satellites, np.full(len(satellites), time))
+    precise_idx = precise._get_nearest_sample_point(satellites, time)
 
     # Keep observations epochs, where a precise orbit sample point exists after the last observation epoch
     diff_time = (dset.time.gps.mjd[last_epoch_idx] - precise.dset_edit.time.gps.mjd[precise_idx]) * Unit.day2second

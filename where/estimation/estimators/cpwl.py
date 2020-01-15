@@ -9,12 +9,14 @@ Description:
 import numpy as np
 import scipy.sparse
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from where.estimation.estimators._kalman import KalmanFilter
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import Unit
 
 
@@ -52,12 +54,12 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
     # Constant parameters are simply copied from the partial fields
     for idx, name in enumerate(partial_vectors["estimate_constant"]):
-        h[:, idx, 0] = dset["partial_" + name][:]
+        h[:, idx, 0] = dset["partial." + name][:]
         param_names.append(name)
 
     # Stochastic parameters are estimated as CPWL functions by adding a rate parameter
     for idx, name in enumerate(partial_vectors["estimate_stochastic"]):
-        h[:, n_constant + idx * 2, 0] = dset["partial_" + name][:]
+        h[:, n_constant + idx * 2, 0] = dset["partial." + name][:]
         param_names.extend([name, name + "_rate_"])  # Trailing underscore in rate_ means field is not added to dset
 
     # Read information about parameters from config files
@@ -132,7 +134,7 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
             station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
             key = dset.meta[station]["site_id"]
             if key in trf:
-                x0, y0, z0 = trf[key].pos.itrs  # TODO: Take units into account
+                x0, y0, z0 = trf[key].pos.trs  # TODO: Take units into account
                 if column.endswith("_x"):
                     d[idx, :] = np.array([1, 0, 0, 0, z0, -y0])
                 if column.endswith("_y"):
@@ -165,7 +167,7 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
         if "nnr_crf" in constraints and "vlbi_src_dir" in constant_params:
             celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-            crf = apriori.get("crf", time=dset.time.mean.utc, celestial_reference_frames=celestial_reference_frame)
+            crf = apriori.get("crf", time=dset.time, celestial_reference_frames=celestial_reference_frame)
             # NNR to CRF
             log.info(f"Applying NNR constraint to {celestial_reference_frame.upper()}")
             H2 = np.zeros((3, n))
@@ -174,8 +176,8 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
                     continue
                 source = column.split("-", maxsplit=1)[-1].split("_")[0]
                 if source in crf:
-                    ra = crf[source].pos.crs[0]
-                    dec = crf[source].pos.crs[1]
+                    ra = crf[source].pos.right_ascension
+                    dec = crf[source].pos.declination
                     if column.endswith("_ra"):
                         H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
                         H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)

@@ -7,17 +7,24 @@ Reads station positions and velocities from the VLBI observation files in either
 are available in the observation files, so the same position is used for all time epochs.
 """
 
+# Third party imports
+import numpy as np
+
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math import ellipsoid
+
 # Where imports
+from where.data.position import Position
 from where import apriori
-from where.apriori import trf
+from where.apriori.trf import TrfFactory
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where import parsers
 
 
 @plugins.register
-class VlbiObsTrf(trf.TrfFactory):
+class VlbiObsTrf(TrfFactory):
     """A factory for using positions from VLBI observation files
     """
 
@@ -71,7 +78,7 @@ class VlbiObsTrf(trf.TrfFactory):
         # Add info from station codes file to each site
         return {c: dict(name=n, pos=pos_ngs[n], **station_codes[n]) for n, c in keys.items()}
 
-    def _calculate_pos_itrs(self, site):
+    def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
 
         There are no velocities available, so same position is returned for all time epochs
@@ -82,7 +89,9 @@ class VlbiObsTrf(trf.TrfFactory):
         Returns:
             Array:  Positions, one 3-vector for each time epoch.
         """
-        if self.time.size > 1:
-            return self.data[site]["pos"][None, :].repeat(self.time.size, axis=0)
-        else:
-            return self.data[site]["pos"]
+
+        pos = self.data[site].pop("pos")[None, :].repeat(self.time.size, axis=0)
+        ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
+        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
+
+        return np.squeeze(pos_trs)

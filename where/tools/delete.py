@@ -49,19 +49,18 @@ from midgard.dev import plugins
 
 # Where imports
 from where.lib import config
-from where.lib import files
 from where.lib import log
 
 
 @plugins.register
-def delete_analysis(rundate: "date", pipeline: "pipeline", session: "option" = ""):  # typing: ignore
+def delete_analysis(rundate: "date", pipeline: "pipeline", **kwargs):  # typing: ignore
     """Delete working directory for a given model run date
 
     Args:
         rundate: The model run date.
     """
-    file_vars = config.create_file_vars(rundate, pipeline, session=session)
-    work_directory = files.path("directory_work", file_vars=file_vars)
+    file_vars = config.create_file_vars(rundate, pipeline, **kwargs)
+    work_directory = config.files.path("directory_work", file_vars=file_vars)
     log.info(f"Deleting '{work_directory}'")
     _warn_about_cwd_deleted(work_directory)
     try:

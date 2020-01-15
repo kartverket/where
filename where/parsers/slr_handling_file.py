@@ -25,6 +25,19 @@ class SlrHandlingFileParser(SinexParser):
     """A parser for reading SLR handling file
     """
 
+    def __init__(self, file_path, encoding=None, header=None):
+        """Set up the basic information needed by the parser
+
+        Turn off parsing of header by default, as the header contains a mistake
+
+        Args:
+            file_path (String/Path):    Path to file that will be read.
+            encoding (String):          Encoding of file that will be read.
+            header (Boolean):           Whether to parse the header.
+        """
+        super().__init__(file_path, encoding)
+        self._header = False if header is None else header
+
     def setup_parser(self):
         return (self.solution_data_handling,)
 

@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each data source should be defined in a separate .py-file. The function inside the .py-file that
-should be called need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+should be called need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     def read_fun_datasource(rundate):
@@ -19,11 +19,15 @@ as named keyword arguments.
 
 
 """
+# Standard library imports
+from functools import lru_cache
+
+# Midgard imports
+from midgard.dev import plugins
+from midgard.dev import exceptions
+
 # Where imports (more imports are done locally to avoid circular imports)
-from where.lib import cache
-from where.lib import exceptions
 from where.lib import log
-from where.lib import plugins
 
 # Make functions in subpackages available as apriori-plugins
 from where.apriori.orbit import get_orbit  # noqa
@@ -43,10 +47,10 @@ def names():
     Returns:
         List: List of strings with the names of the available parsers
     """
-    return plugins.list_all(package_name=__name__)
+    return plugins.names(package_name=__name__)
 
 
-@cache.function
+@lru_cache()
 def get(datasource_name, **kwargs):
     """Read data from the given data source
 
@@ -63,7 +67,7 @@ def get(datasource_name, **kwargs):
         The data from the data source (data type depends on source)
     """
     try:
-        return plugins.call_one(package_name=__name__, plugin_name=datasource_name, **kwargs)
+        return plugins.call(package_name=__name__, plugin_name=datasource_name, **kwargs)
     except exceptions.UnknownPluginError as apriori_err:
         from where import parsers
 
@@ -71,7 +75,7 @@ def get(datasource_name, **kwargs):
             data = parsers.parse_key(file_key=datasource_name, **kwargs).as_dict()
             log.dev(f"Called parsers.parse_key({datasource_name}) in apriori.get()")
             return data
-        except (AttributeError) as att:
+        except AttributeError:
             try:
                 data = parsers.parse(datasource_name, **kwargs)
                 log.dev(f"Called parsers.parse({datasource_name}) in apriori.get()")

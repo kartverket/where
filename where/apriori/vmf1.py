@@ -33,9 +33,11 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from datetime import timedelta
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
 from where import parsers
 
 DATATYPE = ("ah", "aw", "zh", "zw")
@@ -52,8 +54,8 @@ def get_vmf1(time):
         A dictionary of functions that can interpolate in the VMF1 dataset.
     """
     data = dict()
-    min_time = min(time.utc).datetime
-    max_time = max(time.utc).datetime
+    min_time = min(time.utc.datetime)
+    max_time = max(time.utc.datetime)
     start_hour = 6 * (min_time.hour // 6)
     start = min_time.replace(hour=start_hour, minute=0, second=0, microsecond=0)
     end_hour = 6 * (max_time.hour // 6)

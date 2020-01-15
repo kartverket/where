@@ -10,10 +10,12 @@ GNSS satellite clock data are read from RINEX clock file.
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import data
 from where import parsers
-from where.lib import plugins
 
 
 @plugins.register

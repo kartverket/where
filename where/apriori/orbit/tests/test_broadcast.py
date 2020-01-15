@@ -3,9 +3,9 @@
 -------
 
 
-$Revision: 17313 $
-$Date: 2019-02-15 09:36:36 +0100 (Fri, 15 Feb 2019) $
-$LastChangedBy: dahmic $
+$Revision: 18265 $
+$Date: 2019-09-20 12:52:36 +0200 (Fri, 20 Sep 2019) $
+$LastChangedBy: kirann $
 
 """
 # Standard library imports
@@ -18,7 +18,7 @@ import pytest
 
 # Where imports
 from where import apriori
-from where.lib.time import Time
+from where.data.time import Time
 
 TEST = "test_2"
 
@@ -124,6 +124,7 @@ class TestBroadcast(unittest.TestCase):
                     "".format(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
                 )
             ],
+            fmt="isot",
             scale="gps",
         )
 

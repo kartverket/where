@@ -30,9 +30,11 @@ References:
 # Standard library imports
 from datetime import datetime
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import log
-from where.lib import plugins
 from where import parsers
 
 

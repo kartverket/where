@@ -4,10 +4,10 @@ Description:
 ------------
 
 To add a new parser, simply create a new .py-file which defines a class inheriting from parsers.Parser. The class needs
-to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.parsers import parser
-    from where.lib import plugins
+    from where.parsers import _parser
+    from midgard.dev import plugins
 
     @plugins.register
     class MyNewParser(parser.Parser):
@@ -31,7 +31,6 @@ from midgard.files import dependencies
 
 # Where imports
 from where.lib import config
-from where.lib import files
 from where.lib import log
 
 # Add Where parsers to Midgard parsers
@@ -121,9 +120,9 @@ def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, **pars
 
     # Figure out the file path
     file_vars = dict() if file_vars is None else file_vars
-    file_path = files.path(file_key, file_vars=file_vars, download_missing=True, use_aliases=True)
+    file_path = config.files.path(file_key, file_vars=file_vars, download_missing=True, use_aliases=True)
     dependencies.add(file_path, label=file_key)
-    parser_args.setdefault("encoding", files.encoding(file_key))
+    parser_args.setdefault("encoding", config.files.encoding(file_key))
 
     # Use the Midgard parser function to create parser and parse data
     return parse_file(parser_name, file_path, use_cache=use_cache, timer_logger=log.time, **parser_args)

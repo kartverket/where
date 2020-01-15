@@ -46,8 +46,8 @@ follows::
 
     > import numpy as np
     > from where import apriori
-    > from where.lib.time import Time
-    > time = Time(np.arange(55000, 55002, 1e-3), format='mjd')
+    > from where.data.time import Time
+    > time = Time(np.arange(55000, 55002, 1e-3), fmt="mjd", scale="utc")
 
     > eop = apriori.get('eop', time=time)
     > eop.x
@@ -58,21 +58,24 @@ follows::
 
 """
 # Standard library imports
-import math
+from functools import lru_cache
 
 # External library imports
 from scipy import interpolate
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math import nputil
+
 # Where imports
-from where.lib import cache
-from where.lib import config
-from where.lib import files
-from where.ext import iers_2010 as iers
 from where import parsers
-from where.lib import plugins
-from where.lib.exceptions import MissingDataError
-from where.lib.time import Time
+from where.data.time import Time
+from where.ext import iers_2010_wrapper as iers
+from where.ext import hf_eop_wrapper as hf_eop
+from where.lib import config
+from where.lib import exceptions
+from where.lib import log
 from where.lib.unit import Unit
 
 # Cache for EOP data read from file
@@ -105,6 +108,9 @@ class Eop:
 
     One instance of the `Eop`-class calculates corrections for a given set of time epochs (specified when the instance
     is created). However, all instances share a cache of results from the various functions calculating corrections.
+
+    The class properties are also cached and since the data content of each Eop instance is static there is no need to
+    reset the cache at any point.
     """
 
     _correction_cache = dict()
@@ -120,6 +126,8 @@ class Eop:
             models (Tuple):  Optional tuple of EOP correction models. If not given, the config setting is used.
             window (Int):    Number of days to use as interpolation window.
         """
+        if time.scale == "ut1":
+            raise ValueError(f"Time scale of 'time' cannot be 'ut1'")
         self.window = window
         self.time = time
         self.sources = sources
@@ -127,7 +135,7 @@ class Eop:
         self.calculate_leap_second_offset()
 
         # Figure out which correction models to use
-        self.models = config.tech.get("eop_models", value=models, default="").list
+        self.models = config.tech.eop_models.tuple if models is None else models
 
         if "rg_zont2" in self.models:
             self.remove_low_frequency_tides()
@@ -163,23 +171,26 @@ class Eop:
         Returns:
             Dict: EOP data subset to the time period needed.
         """
-        if time.isscalar:
+        if time.size == 1:
             start_time = np.floor(time.utc.mjd) - window // 2
             end_time = np.ceil(time.utc.mjd) + window // 2
         else:
-            start_time = np.floor(time.min().utc.mjd) - window // 2
-            end_time = np.ceil(time.max().utc.mjd) + window // 2
+            start_time = np.floor(time.utc.mjd.min()) - window // 2
+            end_time = np.ceil(time.utc.mjd.max()) + window // 2
 
         sources = config.tech.get("eop_sources", value=sources).list
         for source in sources:
             try:
-                return {d: eop_data[source][d].copy() for d in np.arange(start_time, end_time + 1)}
+                picked_data = {d: eop_data[source][d].copy() for d in np.arange(start_time, end_time + 1)}
+                eop_path = config.files.path(f"eop_{source}")
+                log.debug(f"Using a priori EOP values from {eop_path} ")
+                return picked_data
             except KeyError:
                 pass
 
         # No data found if we reached this point
-        paths = [str(files.path(f"eop_{k}")) for k in sources]
-        raise MissingDataError(
+        paths = [str(config.files.path(f"eop_{k}")) for k in sources]
+        raise exceptions.MissingDataError(
             "Not all days in the time period {:.0f} - {:.0f} MJD were found in EOP-files {}"
             "".format(start_time, end_time, ", ".join(paths))
         )
@@ -191,7 +202,7 @@ class Eop:
         calculated and stored to the EOP data-dictionary. This is used to correct for the leap second jumps when
         interpolating the UT1 - UTC values.
         """
-        days = Time(np.array(list(self.data.keys())), format="mjd", scale="utc")
+        days = Time(np.array(list(self.data.keys())), fmt="mjd", scale="utc")
         leap_offset = np.round((days.utc.mjd - days.tai.mjd) * Unit.day2seconds)
         daily_offset = {int(d): lo for d, lo in zip(days.mjd, leap_offset)}
 
@@ -207,13 +218,11 @@ class Eop:
         values.
         """
         for mjd in self.data.keys():
-            # Julian centuries since J2000
-            t = Time(mjd, format="mjd")
-            t_julian_centuries = (t.tt.jd - 2_451_545.0) / 36525
-            dut1_corr = iers.rg_zont2(t_julian_centuries)[0]
-            self.data[mjd]["ut1_utc"] -= dut1_corr
+            t = Time(mjd, fmt="mjd", scale="utc")
+            self.data[mjd]["ut1_utc"] -= iers.rg_zont2(t)[0]
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds")
     def x(self):
         """X-motion of the Celestial Intermediate Pole
@@ -224,10 +233,15 @@ class Eop:
             Array: X-motion of the CIP, one value for each time epoch [arcseconds].
         """
         values = self._interpolate_table("x")
-        values += self._corrections(("ortho_eop", iers.ortho_eop, 0, 1e-6), ("pmsdnut2", iers.pmsdnut2, 0, 1e-6))
+        values += self._corrections(
+            ("ortho_eop", iers.ortho_eop, 0, 1e-6),
+            ("pmsdnut2", iers.pmsdnut2, 0, 1e-6),
+            ("hf_eop_xyu", hf_eop.hf_eop_xyu, 0, 1e-6),
+        )
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds per day")
     def x_rate(self):
         """X-motion of the Celestial Intermediate Pole
@@ -242,7 +256,8 @@ class Eop:
         #                            ('pmsdnut2', iers.pmsdnut2, 0, 1e-6))
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds")
     def x_pole(self):
         return getattr(self, f"x_{self.pole_model}")()
@@ -250,6 +265,7 @@ class Eop:
     #
     # x-pole models
     #
+    @Unit.register("arcseconds")
     def x_secular(self):
         """Returns the x-coordinate of the secular pole
 
@@ -261,6 +277,7 @@ class Eop:
         # IERS conventions 2010 v.1.2.0 (chapter 7, equation 21)
         return (55.0 + 1.677 * (self.time.jyear - 2000)) * Unit.milliarcsec2arcsec
 
+    @Unit.register("arcseconds")
     def x_mean_2015(self):
         """x-coordindate of Conventional mean pole model version 2015
 
@@ -285,6 +302,7 @@ class Eop:
         )
         return x
 
+    @Unit.register("arcseconds")
     def x_mean_2010(self):
         """x-coordindate of Conventional mean pole model version 2010
 
@@ -301,6 +319,7 @@ class Eop:
         x[~idx] = 0.23513 + 0.007_614_1 * dt[~idx]
         return x
 
+    @Unit.register("arcseconds")
     def x_mean_2003(self):
         """x-coordindate of Conventional mean pole model version 2003
 
@@ -311,7 +330,8 @@ class Eop:
         """
         return 0.054 + 0.00083 * (self.time.jyear - 2000.0)
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds")
     def y_pole(self):
         return getattr(self, f"y_{self.pole_model}")()
@@ -319,6 +339,7 @@ class Eop:
     #
     # y-pole models
     #
+    @Unit.register("arcseconds")
     def y_secular(self):
         """Returns the x-coordinate of the secular pole
 
@@ -330,6 +351,7 @@ class Eop:
         # IERS conventions 2010 v.1.2.0 (chapter 7, equation 21)
         return (320.5 + 3.460 * (self.time.jyear - 2000)) * Unit.milliarcsec2arcsec
 
+    @Unit.register("arcseconds")
     def y_mean_2015(self):
         """y-coordindate of Conventional mean pole model version 2015
 
@@ -354,6 +376,7 @@ class Eop:
         )
         return y
 
+    @Unit.register("arcseconds")
     def y_mean_2010(self):
         """y-coordindate of Conventional mean pole model version 2010
 
@@ -370,6 +393,7 @@ class Eop:
         y[~idx] = 0.358_891 - 0.000_628_7 * dt[~idx]
         return y
 
+    @Unit.register("arcseconds")
     def y_mean_2003(self):
         """y-coordindate of Conventional mean pole model version 2003
 
@@ -380,7 +404,8 @@ class Eop:
         """
         return 0.357 + 0.00395 * (self.time.jyear - 2000.0)
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds")
     def y(self):
         """Y-motion of the Celestial Intermediate Pole
@@ -391,10 +416,15 @@ class Eop:
             Array: Y-motion of the CIP, one value for each time epoch [arcseconds].
         """
         values = self._interpolate_table("y")
-        values += self._corrections(("ortho_eop", iers.ortho_eop, 1, 1e-6), ("pmsdnut2", iers.pmsdnut2, 1, 1e-6))
+        values += self._corrections(
+            ("ortho_eop", iers.ortho_eop, 1, 1e-6),
+            ("pmsdnut2", iers.pmsdnut2, 1, 1e-6),
+            ("hf_eop_xyu", hf_eop.hf_eop_xyu, 1, 1e-6),
+        )
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds per day")
     def y_rate(self):
         """X-motion of the Celestial Intermediate Pole
@@ -409,7 +439,8 @@ class Eop:
         #                            ('pmsdnut2', iers.pmsdnut2, 0, 1e-6))
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("seconds")
     def ut1_utc(self):
         """Delta between UT1 and UTC
@@ -423,31 +454,20 @@ class Eop:
             Array: UT1 - UTC, one value for each time epoch [seconds].
         """
         values = self._interpolate_table("ut1_utc", leap_second_correction=True)
-        values += self._corrections(("ortho_eop", iers.ortho_eop, 2, 1e-6), ("utlibr", iers.utlibr, 0, 1e-6))
+        values += self._corrections(
+            ("ortho_eop", iers.ortho_eop, 2, 1e-6),
+            ("utlibr", iers.utlibr, 0, 1e-6),
+            ("hf_eop_xyu", hf_eop.hf_eop_xyu, 2, 1e-6),
+            ("rg_zont2", iers.rg_zont2, 0, 1),
+        )
 
         # low frequency tides
-        if "rg_zont2" in self.models:
-            correction_cache = self._correction_cache.setdefault("rg_zont2", dict())
-            # Julian centuries since J2000
-            t_julian_centuries = (self.time.tt.jd - 2_451_545.0) / 36525
-
-            if self.time.isscalar:
-                mjd = self.time.tt.mjd
-                if mjd not in correction_cache:
-                    correction_cache[mjd] = iers.rg_zont2(t_julian_centuries)[0]
-                dut1_corr = correction_cache[mjd]
-            else:
-                dut1_corr = list()
-                for t in self.time.tt:
-                    if t.mjd not in correction_cache:
-                        t_julian_centuries = (t.tt.jd - 2_451_545.0) / 36525
-                        correction_cache[t.mjd] = iers.rg_zont2(t_julian_centuries)[0]
-                    dut1_corr.append(correction_cache[t.mjd])
-
-            values += dut1_corr
+        # if "rg_zont2" in self.models:
+        #    values += nputil.take(iers.rg_zont2(self.time), 0) # Column 0 contains ut1_utc corrections
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("seconds per day")
     def ut1_utc_rate(self):
         """Delta between UT1 and UTC
@@ -466,30 +486,10 @@ class Eop:
         values = self._interpolate_table("ut1_utc", leap_second_correction=True, derivative_order=1)
         # values += self._corrections(("ortho_eop", iers.ortho_eop, 2, 1e-6), ("utlibr", iers.utlibr, 0, 1e-6))
 
-        # Low frequency tides
-        #         if "rg_zont2" in self.models:
-        #             correction_cache = self._correction_cache.setdefault("rg_zont2", dict())
-        #             # Julian centuries since J2000
-        #             t_julian_centuries = (self.time.tt.jd - 2451545.0) / 36525
-        #
-        #             if self.time.isscalar:
-        #                 mjd = self.time.tt.mjd
-        #                 if mjd not in correction_cache:
-        #                     correction_cache[mjd] = iers.rg_zont2(t_julian_centuries)[0]
-        #                 dut1_corr = correction_cache[mjd]
-        #             else:
-        #                 dut1_corr = list()
-        #                 for t in self.time.tt:
-        #                     if t.mjd not in correction_cache:
-        #                         t_julian_centuries = (t.tt.jd - 2451545.0) / 36525
-        #                         correction_cache[t.mjd] = iers.rg_zont2(t_julian_centuries)[0]
-        #                     dut1_corr.append(correction_cache[t.mjd])
-        #
-        #             values += dut1_corr
-        #         return values
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("seconds")
     def lod(self):
         """Length of day
@@ -505,7 +505,8 @@ class Eop:
         values = self._interpolate_table("lod")
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds")
     def dx(self):
         """X-offset of the Celestial Intermediate Pole
@@ -518,7 +519,8 @@ class Eop:
         values = self._interpolate_table("dx")
         return values
 
-    @cache.property
+    @property
+    @lru_cache()
     @Unit.register("arcseconds")
     def dy(self):
         """Y-offset of the Celestial Intermediate Pole
@@ -548,7 +550,7 @@ class Eop:
             Array: Interpolated values, one value for each time epoch.
         """
         days = np.unique(self.time.utc.mjd_int)
-        offsets = range(-math.ceil(self.window / 2) + 1, math.floor(self.window / 2) + 1)
+        offsets = range(int(-np.ceil(self.window / 2) + 1), int(np.floor(self.window / 2) + 1))
 
         if leap_second_correction:
             leap = {
@@ -574,7 +576,7 @@ class Eop:
         else:
             interp_values = {d: ip(self.time.utc.mjd_frac) for d, ip in interpolators.items()}
 
-        if self.time.isscalar:
+        if self.time.size == 1:
             return interp_values[self.time.utc.mjd_int]
 
         values = np.empty(self.time.size)
@@ -596,24 +598,12 @@ class Eop:
         Returns:
             Array: Corrections to tabular values, one value for each time epoch.
         """
-        corrections = 0 if self.time.isscalar else np.zeros(self.time.size)
+        corrections = 0 if self.time.size == 1 else np.zeros(self.time.size)
         for name, correction_func, out_idx, factor in correction_models:
             if name not in self.models:
                 continue
 
-            correction_cache = self._correction_cache.setdefault(name, dict())
-            if self.time.isscalar:
-                mjd = self.time.tt.mjd
-                if mjd not in correction_cache:
-                    correction_cache[mjd] = correction_func(mjd)
-                corrections += factor * correction_cache[mjd][out_idx]
-            else:
-                for idx, mjd in enumerate(self.time.tt.mjd):
-                    if mjd not in correction_cache:
-                        correction_cache[mjd] = correction_func(mjd)
-
-                    corrections[idx] += factor * correction_cache[mjd][out_idx]
-
+            corrections += factor * nputil.take(correction_func(self.time), out_idx)
         return corrections
 
     # Add methods to deal with units for Eop-properties (set by @Unit.register)

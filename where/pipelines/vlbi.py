@@ -3,7 +3,6 @@
 Description:
 ------------
 
-TODO
 
 """
 import itertools
@@ -21,14 +20,13 @@ from where import cleaners
 from where import estimation
 from where.lib import config
 from where.lib import exceptions
-from where.lib import files
 from where.lib import log
 from where.lib import util
-from where import models
+from where.models import site, delay
 from where import writers
 
 # The name of this technique
-TECH = __name__.split(".")[-1]
+pipeline = __name__.split(".")[-1]
 
 
 @plugins.register_named("options")
@@ -41,9 +39,9 @@ def options():
     return "-v", "--vlbi"
 
 
-@plugins.register_named("list_sessions")
-def list_sessions(rundate):
-    """Sessions available for the given rundate
+@plugins.register_named("get_args")
+def get_args(rundate, input_args=None):
+    """Convert where_runner arguments to where arguments for given date
 
     Args:
         rundate (date):   The model run date.
@@ -51,12 +49,25 @@ def list_sessions(rundate):
     Returns:
         List:   Strings with names of available sessions.
     """
-    if config.where.get(
+    keyword = "--session"
+    session_list = set()
+    input_args = list(input_args) if input_args is not None else list()
+    for idx in range(len(input_args)):
+        key, _, value = input_args[idx].partition("=")
+        if key == keyword:
+            session_list = set(value.split(","))
+            input_args.pop(idx)
+            break
+    args = " ".join(input_args)
+
+    get_session_from_master = config.where.get(
         "get_session_from_master",
-        section=TECH,
+        section=pipeline,
         value=util.read_option_value("--get_session_from_master", default=None),  # TODO: add this to mg_config
         default=False,
-    ).bool:
+    ).bool
+
+    if get_session_from_master:
         skip_sessions = set(
             config.where.get(
                 "skip_sessions",
@@ -65,6 +76,7 @@ def list_sessions(rundate):
                 default="",
             ).list
         )
+
         session_types = config.where.get(
             "session_types",
             section="runner",
@@ -73,21 +85,42 @@ def list_sessions(rundate):
         ).list
         master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
         sessions = set(master_schedule.list_sessions(rundate, session_types=session_types))
-        sessions = sessions - skip_sessions
 
-        return sessions
+        check_master_status = config.where.get(
+            "check_master_status",
+            section=pipeline,
+            value=util.read_option_value("--check_master_status", default=None),
+            default=False,
+        ).bool
+
+        not_ready_sessions = set()
+        if check_master_status:
+            for session in sessions:
+                if not master_schedule.ready(rundate, session):
+                    status = master_schedule.status(rundate, session)
+                    log.warn(
+                        f"{rundate} {session} is not ready for processing. Master file status: '{status}'. Skipping session."
+                    )
+                    not_ready_sessions.add(session)
+
+        sessions = set(sessions) - skip_sessions - not_ready_sessions
+        sessions = sessions & session_list if session_list else sessions
+        return [keyword + "=" + s + " " + args for s in sessions]
     else:
-        obs_format = config.tech.get("obs_format", section=TECH).str  # TODO: This always falls back on config.where ..
-        file_vars = config.create_file_vars(rundate, TECH, session=None)
+        obs_format = config.tech.get(
+            "obs_format", section=pipeline
+        ).str  # TODO: This always falls back on config.where ..
+        file_vars = config.create_file_vars(rundate, pipeline, session=None)
         del file_vars["session"]  # TODO: Do not add None variables to file_vars?
-        found_sessions = files.glob_variable(
+        sessions = config.files.glob_variable(
             f"vlbi_obs_{obs_format}", variable="session", pattern=r"\w{2}", file_vars=file_vars
         )
-        return found_sessions
+        sessions = sessions & session_list
+        return [keyword + "=" + s + " " + args for s in sessions]
 
 
-@plugins.register_named("validate_session")
-def validate_session(rundate, session):
+@plugins.register_named("validate_args")
+def validate_args(rundate, session=None, **kwargs):
     """Validate a session for the given rundate
 
     If session is not a valid VLBI session for the given rundate, an InvalidSessionError is raised.
@@ -99,12 +132,9 @@ def validate_session(rundate, session):
     Return:
         String:  Name of validated session.
     """
-    if not session:
-        if util.check_options("--session"):
-            return session  # Explicitly specified blank session, typically to open timeseries interactively
-        raise exceptions.InvalidSessionError("You must specify '--session=<...>' to run a VLBI analysis")
+    if session is None:
+        raise exceptions.InvalidArgsError("You must specify '--session=<...>' to run a VLBI analysis")
 
-    # TODO: Can we use master files to validate sessions? What about intensives?
     master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
     master_sessions = master_schedule.list_sessions(rundate)
     if session not in master_sessions:
@@ -112,7 +142,10 @@ def validate_session(rundate, session):
             f"Session '{session}' is not listed in master file for {rundate:{config.FMT_date}}. "
             f"Available sessions are {', '.join(master_sessions)}."
         )
-    return session
+    else:
+        if not master_schedule.ready(rundate, session):
+            status = master_schedule.status(rundate, session)
+            log.warn(f"Session '{session}' is not ready for processing. Master file status: '{status}'")
 
 
 @plugins.register_named("file_vars")
@@ -124,37 +157,39 @@ def file_vars():
     Returns:
         Dict:  File variables special for this technique.
     """
-    file_vars = dict()
+    _file_vars = dict()
 
     # Add obs_version for ngs
     if config.tech.get("obs_format").str == "ngs":
-        versions = files.glob_variable("vlbi_obs_ngs", "obs_version", r"\d{3}")
+        versions = config.files.glob_variable("vlbi_obs_ngs", "obs_version", r"\d{3}")
         if versions:
-            file_vars["obs_version"] = max(versions)
+            _file_vars["obs_version"] = max(versions)
         elif config.where.files.download_missing.bool:
             # Look online for a candidate
             log.info("No NGS observation file found on disk: Looking for one online.")
             obs_versions = [f"{v:03d}" for v in reversed(range(4, 10))]
             for obs_version in obs_versions:
-                url = files.url(
+                url = config.files.url(
                     "vlbi_obs_ngs", file_vars=dict(obs_version=obs_version), is_zipped=True, use_aliases=False
                 )
                 log.info(f"Looking for {url} ...")
                 if url.exists():
-                    file_vars["obs_version"] = obs_version
+                    _file_vars["obs_version"] = obs_version
                     break
 
-        if not file_vars:
+        if not _file_vars:
             log.fatal("No NGS observation file found")
 
     # Add obs_version for vgosdb
     if config.tech.get("obs_format").str == "vgosdb":
-        versions = files.glob_variable("vlbi_obs_vgosdb", "obs_version", r"\d{3}")
+        versions = config.files.glob_variable("vlbi_obs_vgosdb", "obs_version", r"\d{3}")
         if versions:
-            file_vars["obs_version"] = max(versions)
+            _file_vars["obs_version"] = max(versions)
         elif config.where.files.download_missing.bool:
             # Look online for a candidate
-            log.warn("No VGOSDB wrapper file found. Not attempting to download. TODO")
+            log.warn(
+                f"No VGOSDB wrapper file found ({config.files.path('vlbi_obs_vgosdb')}). Not attempting to download."
+            )
             # log.info("No NGS wrapper file found on disk: Looking for one online.")
             # obs_versions = [f"{v:03d}" for v in reversed(range(4, 10))]
             # for obs_version in obs_versions:
@@ -166,15 +201,20 @@ def file_vars():
             #        file_vars["obs_version"] = obs_version
             #        break
 
-        if not file_vars:
+        if not _file_vars:
             log.fatal("No VGOSDB observation file found")
 
     # Sinex file vars
     if "sinex" in config.tech.section_names:
-        file_vars["solution"] = config.tech.sinex.solution.str
-        file_vars["file_agency"] = config.tech.sinex.file_agency.str.lower()
+        _file_vars["solution"] = config.tech.sinex.solution.str
+        _file_vars["file_agency"] = config.tech.sinex.file_agency.str.lower()
 
-    return file_vars
+    return _file_vars
+
+
+@plugins.register_named("log_prefix")
+def log_prefix(rundate, session="", **kwargs):
+    return f"{pipeline.upper()} {session} {rundate:%Y-%m-%d}"
 
 
 @plugins.register
@@ -186,9 +226,7 @@ def read(stage, dset):
     """
     obs.get(dset)
     log.info(f"Parsed {dset.num_obs} observations")
-
-    dset.write_as(stage=stage, dataset_id=0)
-    dset.read()
+    dset.write_as(stage=stage, label=0)
 
 
 @plugins.register
@@ -203,8 +241,8 @@ def edit(stage, dset):
     """
     cleaners.apply_editors("editors", dset)
     cleaners.apply_removers("removers", dset)
-    dset.write_as(stage=stage, dataset_id=0)
-    dset.read()
+
+    dset.write_as(stage=stage, label=0)
 
 
 @plugins.register
@@ -219,21 +257,20 @@ def calculate(stage, dset):
     """
     # Run models adjusting station positions
     log.info(f"Calculating station displacements")
-    models.calculate_site("pos_models", dset, shape=(6,))
-    delta_pos = np.sum(dset.get_table("pos_models").reshape((dset.num_obs, -1, 6)), axis=1)
-    gcrs_dpos_1 = delta_pos[:, :3]
-    gcrs_dvel_1 = (dset.time.itrs2gcrs_dot @ dset.site_pos_1.convert_gcrs_to_itrs(gcrs_dpos_1)[:, :, None])[:, :, 0]
-    dset.site_pos_1.add_to_gcrs(np.concatenate((gcrs_dpos_1, gcrs_dvel_1), axis=1))
-    gcrs_dpos_2 = delta_pos[:, 3:]
-    gcrs_dvel_2 = (dset.time.itrs2gcrs_dot @ dset.site_pos_2.convert_gcrs_to_itrs(gcrs_dpos_2)[:, :, None])[:, :, 0]
-    dset.site_pos_2.add_to_gcrs(np.concatenate((gcrs_dpos_2, gcrs_dvel_2), axis=1))
+    site.calculate_site("site", dset)
+    delta_pos = site.add("site", dset)
+
+    dset.site_pos_1[:] = (dset.site_pos_1.gcrs + delta_pos[0].gcrs).trs
+    dset.site_pos_2[:] = (dset.site_pos_2.gcrs + delta_pos[1].gcrs).trs
     log.blank()
 
     # Run models for each term of the observation equation
     log.info(f"Calculating theoretical delays")
-    models.calculate_delay("calc_models", dset)
+    delay.calculate_delay("delay", dset)
+
+    delta_delay = delay.add("delay", dset)
     dset.add_float("obs", val=dset.observed_delay, unit="meter", write_level="operational")
-    dset.add_float("calc", val=np.sum(dset.get_table("calc_models"), axis=1), unit="meter", write_level="operational")
+    dset.add_float("calc", val=delta_delay, unit="meter", write_level="operational")
     dset.add_float("residual", val=dset.obs - dset.calc, unit="meter", write_level="operational")
     log.blank()
 
@@ -244,15 +281,16 @@ def calculate(stage, dset):
     store_outliers = config.tech.store_outliers.bool
 
     for iter_num in itertools.count(start=1):
-        models.calculate_delay("correction_models", dset, dset)
-        dset.calc[:] = np.sum(np.hstack((dset.get_table("calc_models"), dset.get_table("correction_models"))), axis=1)
+        delay.calculate_delay("delay_corr", dset, dset)
+        delta_correction = delay.add("delay_corr", dset)
+
+        dset.calc[:] = dset.calc + delta_correction
         dset.residual[:] = dset.obs - dset.calc
         rms = dset.rms("residual")
         log.info(f"{dset.num_obs} observations, residual = {rms:.4f}")
 
         # Store results
-        dset.write_as(stage=stage, dataset_id=iter_num - 1)
-        dset.read()
+        dset.write_as(stage=stage, label=iter_num - 1)
 
         # Detect and remove extreme outliers
         idx = np.abs(dset.residual) < outlier_limit * rms
@@ -263,7 +301,7 @@ def calculate(stage, dset):
             bad_idx = np.logical_not(idx)
             log.info(f"Adding {np.sum(bad_idx)} observations to ignore_observation")
             bad_obs = np.char.add(np.char.add(dset.time.utc.iso[bad_idx], " "), dset.baseline[bad_idx]).tolist()
-            with config.update_tech_config(dset.rundate, TECH, dset.vars["session"]) as cfg:
+            with config.update_tech_config(dset.analysis["rundate"], pipeline, session=dset.vars["session"]) as cfg:
                 current = cfg.ignore_observation.observations.as_list(", *")
                 updated = ", ".join(sorted(current + bad_obs))
                 cfg.update("ignore_observation", "observations", updated, source=util.get_program_name())
@@ -301,13 +339,12 @@ def estimate(stage, dset):
         )
         rms = dset.rms("residual")
         log.info(f"{dset.num_obs} observations, postfit residual = {rms:.4f}")
-        dset.write_as(stage=stage, dataset_id=iter_num - 1)
-        dset.read()
+        dset.write_as(stage=stage, label=iter_num - 1)
         if iter_num >= max_iterations:
             break
 
         # Detect and remove outliers
-        keep_idx = estimation.detect_outliers("estimate_outlier_detection", dset)
+        keep_idx = estimation.apply_outlier_detectors("estimate_outlier_detection", dset)
         if keep_idx.all():
             break
         dset.subset(keep_idx)

@@ -18,10 +18,14 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
+from where.data import position
 from where.ext import iers_2010 as iers
-from where.lib import plugins
+from where.lib import log
 
 
 @plugins.register
@@ -42,13 +46,14 @@ def solid_tides(dset):
 
     """
     data_out = list()
-    for _ in dset.for_each("station"):
-        data_out.append(solid_tides_station(dset))
+    correction_cache = dict()
+    for _ in dset.for_each_suffix("station"):
+        data_out.append(solid_tides_station(dset, correction_cache))
 
-    return np.hstack(data_out)
+    return data_out
 
 
-def solid_tides_station(dset):
+def solid_tides_station(dset, correction_cache):
     """Calculate the solid tide corrections for a station
 
     Solid tide corrections are returned in meters in the Geocentric Celestial Reference System for each observation.
@@ -68,16 +73,29 @@ def solid_tides_station(dset):
     moon_itrs = eph.pos_itrs("moon")
 
     # Calculate correction
-    for obs, _ in enumerate(dset.values()):
-        dxyz[obs] = iers.dehanttideinel(
-            dset.site_pos.itrs_pos[obs],
-            obs_dt[obs].year,
-            obs_dt[obs].month,
-            obs_dt[obs].day,
-            hour_of_day[obs],
-            sun_itrs[obs],
-            moon_itrs[obs],
-        )
+    for obs in range(dset.num_obs):
+        cache_key = (dset.station[obs], obs_dt[obs])
+        if cache_key in correction_cache:
+            dxyz[obs] = correction_cache[cache_key]
+        else:
+            dxyz[obs] = iers.dehanttideinel(
+                dset.site_pos.pos[obs],
+                obs_dt[obs].year,
+                obs_dt[obs].month,
+                obs_dt[obs].day,
+                hour_of_day[obs],
+                sun_itrs[obs],
+                moon_itrs[obs],
+            )
+            correction_cache[cache_key] = dxyz[obs]
 
-    # Transform from terrestial to celestial
-    return dset.site_pos.convert_itrs_to_gcrs(dxyz)
+    if position.is_position(dset.site_pos):
+        pos_correction = position.PositionDelta(dxyz, system="trs", ref_pos=dset.site_pos, time=dset.time)
+    elif position.is_posvel(dset.site_pos):
+        # set velocity to zero
+        dxyz = np.concatenate((dxyz, np.zeros(dxyz.shape)), axis=1)
+        pos_correction = position.PosVelDelta(dxyz, system="trs", ref_pos=dset.site_pos, time=dset.time)
+    else:
+        log.fatal(f"dset.site_pos{dset.default_field_suffix} is not a PositionArray or PosVelArray.")
+
+    return pos_correction.gcrs

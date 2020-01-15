@@ -6,13 +6,12 @@ Description:
 """
 import numpy as np
 
-# Where imports
-from where.lib import config
-from where.lib import plugins
+# Midgard imports
+from midgard.dev import plugins
 
 
 @plugins.register
-def ignore_nan(dset):
+def vlbi_ignore_nan(dset):
     """Edits data based on nan
 
     Args:

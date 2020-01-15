@@ -14,16 +14,20 @@ based on the reference epoch.
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math import ellipsoid
+
 # Where imports
-from where.apriori import trf
-from where.lib import plugins
-from where.lib.time import Time
+from where.data.position import Position
+from where.apriori.trf import TrfFactory
+from where.data.time import Time
 from where.lib.unit import Unit
 from where import parsers
 
 
 @plugins.register
-class Vascc(trf.TrfFactory):
+class Vascc(TrfFactory):
     """A class for representing apriori station positions and velocities from SSC
     """
 
@@ -33,7 +37,7 @@ class Vascc(trf.TrfFactory):
     #
     # Velocity model
     #
-    def _calculate_pos_itrs(self, site):
+    def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
 
         The positions are calculated as simple linear offsets based on the reference epoch. Makes sure to pick out the
@@ -46,7 +50,7 @@ class Vascc(trf.TrfFactory):
             Array:  Positions, one 3-vector for each time epoch.
         """
         station_info = self.data[site]
-        ref_epoch = Time(float(station_info["ref_epoch"]), format="decimalyear", scale="utc")
+        ref_epoch = Time(float(station_info["ref_epoch"]), fmt="decimalyear", scale="utc")
         pos = np.full((self.time.size, 3), fill_value=np.nan)
 
         ref_pos = np.array(station_info["pos"])
@@ -54,4 +58,7 @@ class Vascc(trf.TrfFactory):
         interval_years = (self.time - ref_epoch).jd * Unit.day2julian_years
         pos[:, :] = ref_pos + interval_years[:, None] * ref_vel[None, :]
 
-        return pos
+        ell = ellipsoid.get("GRS80")
+        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
+
+        return np.squeeze(pos_trs)

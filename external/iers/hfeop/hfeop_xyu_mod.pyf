@@ -1,0 +1,47 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module hf_eop ! in 
+    interface  ! in :hf_eop
+        module hfeop_xyu ! in :hf_eop:hfeop_xyu_mod.f90
+            logical :: khfeop_xyu
+            integer, parameter,optional :: max_tide=200
+            integer :: num_tide
+            integer*2 dimension(6,200) :: itide_arg
+            character dimension(200,8),intent(c) :: ctide
+            character dimension(200,8),intent(c) :: cdoodson
+            real*8 dimension(200) :: tide_period
+            real*8 dimension(2,4,200) :: tide_coef
+            subroutine import_tides_xyu(lhfeop_file) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
+                character*80, intent(in) :: lhfeop_file
+            end subroutine import_tides_xyu
+            subroutine calc_hf_eop_xyu(rmjd_tt,delta_t,eop) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
+                real*8, intent(in) :: rmjd_tt
+                real*8, intent(in) :: delta_t
+                real*8 dimension(4,2), intent(out) :: eop
+            end subroutine calc_hf_eop_xyu
+            subroutine tide_angles(rmjd_tt,delta_t,knew_order,fund_arg) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
+                real*8 :: rmjd_tt
+                real*8 :: delta_t
+                logical :: knew_order
+                real*8 dimension(6,2) :: fund_arg
+            end subroutine tide_angles
+            subroutine calc_gmst(rmjd_ut,gmst) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
+                real*8 :: rmjd_ut
+                real*8 dimension(2) :: gmst
+            end subroutine calc_gmst
+            subroutine calc_nut_arg(rmjd_tt,arg) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
+                real*8 :: rmjd_tt
+                real*8 dimension(5,2) :: arg
+            end subroutine calc_nut_arg
+            function dotarg(iarg,angles) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
+                integer*2 dimension(6) :: iarg
+                real*8 dimension(6) :: angles
+                real*8 :: dotarg
+            end function dotarg
+        end module hfeop_xyu
+    end interface 
+end python module hf_eop
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/

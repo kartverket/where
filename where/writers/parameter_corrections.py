@@ -27,9 +27,7 @@ def parameter_corrections(dset):
     Args:
         dset:   Dataset, information about model run.
     """
-    state_vector_fields = sorted(
-        [field for field in dset.fields if field.startswith("state_") and not field.endswith("_sigma")]
-    )
+    state_vector_fields = sorted(["state." + field for field in dset["state"].fields if not field.endswith("_sigma")])
 
     print_data = OrderedDict()
     for field in state_vector_fields:
@@ -40,12 +38,15 @@ def parameter_corrections(dset):
         if len(name) == 1:
             print_data[key] = (np.mean(dset[field]), np.mean(dset[field_sigma]), 0)
         else:
-            print_data.setdefault(key, dict())
-            print_data[key][name[1]] = (
-                np.mean(dset[field]),
-                np.mean(dset[field_sigma]),
-                np.sum(dset.filter(source=name[0])),
-            )
+            try:
+                print_data.setdefault(key, dict())
+                print_data[key][name[1]] = (
+                    np.mean(dset[field]),
+                    np.mean(dset[field_sigma]),
+                    np.sum(dset.filter(source=name[0])),
+                )
+            except AttributeError:
+                print_data[key][name[1]] = (np.mean(dset[field]), np.mean(dset[field_sigma]), 0)
 
     correction_str = ""
     for key, values in print_data.items():

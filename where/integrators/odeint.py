@@ -12,12 +12,12 @@ with initial value integrand(0) = initial_state
 
 """
 
-# Where imports
-from where.lib import plugins
-
 # Standard imports
 import numpy as np
 from scipy import integrate
+
+# Midgard imports
+from midgard.dev import plugins
 
 
 @plugins.register

@@ -9,10 +9,8 @@ Custom enumerations used by Where for structured names.
 """
 
 # Standard library imports
+import colorama
 import enum
-
-# Midgard imports
-from midgard.dev.console import color
 
 # Make Midgard-enums functions available
 from midgard.collections.enums import get_enum, get_value, register_enum  # noqa
@@ -51,10 +49,10 @@ class LogLevel(int, enum.Enum):
 class LogColor(str, enum.Enum):
     """Colors used when logging"""
 
-    dev = (color.Fore.BLUE,)
-    time = (color.Fore.WHITE,)
-    out = (color.Style.BRIGHT,)
-    check = (color.Style.BRIGHT + color.Fore.YELLOW,)
-    warn = color.Fore.YELLOW
-    error = color.Fore.RED
-    fatal = color.Style.BRIGHT + color.Fore.RED
+    dev = (colorama.Fore.BLUE,)
+    time = (colorama.Fore.WHITE,)
+    out = (colorama.Style.BRIGHT,)
+    check = (colorama.Style.BRIGHT + colorama.Fore.YELLOW,)
+    warn = colorama.Fore.YELLOW
+    error = colorama.Fore.RED
+    fatal = colorama.Style.BRIGHT + colorama.Fore.RED

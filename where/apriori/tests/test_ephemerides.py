@@ -1,4 +1,4 @@
-""" Test :mod:`where.models.delay.ephemerides`.
+""" Test :mod:`where.apriori.ephemerides`.
 
 
 """
@@ -11,14 +11,14 @@ import numpy as np
 
 # Where imports
 from where import apriori
-from where.lib.time import Time
+from where.data.time import Time
 
 
 class TestEphemerides(unittest.TestCase):
     def setUp(self):
 
         # TODO: Configuration has to be defined? How? where.set_config(2016, 3, 1, 'gps')?
-        time = Time(2457448.5, format="jd", scale="tdb")  # Julian Day in TDB time scale
+        time = Time(2457448.5, fmt="jd", scale="tdb")  # Julian Day in TDB time scale
         self.eph = apriori.get("ephemerides", time=time, ephemerides="de430")
 
     def test_ephemerides(self):

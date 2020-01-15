@@ -8,9 +8,6 @@ Description:
 # Standard library imports
 import collections
 
-# External library imports
-import numpy as np
-
 # Where imports
 from where.lib import config
 from where.lib import exceptions
@@ -20,7 +17,7 @@ from where.lib import util
 
 # Position-object, TODO: replace with proper Position class
 # First element right ascension, second element declination
-Position = collections.namedtuple("Position", ("crs",))
+# Position = collections.namedtuple("Position", ("crs",))
 
 
 class Crf(collections.UserDict):
@@ -137,7 +134,7 @@ class CrfFactory:
         pos_crs = self._calculate_pos_crs(key)
         source_info = self.data[key]
 
-        crf_source = CrfSource(key, crs=pos_crs, source=str(self), **source_info)
+        crf_source = CrfSource(key, pos_crs, source=str(self), **source_info)
         log.debug(f"Found source {crf_source}")
         return crf_source
 
@@ -176,9 +173,9 @@ class CrfFactory:
 
 
 class CrfSource:
-    def __init__(self, key, crs, source, **meta_args):
+    def __init__(self, key, direction, source, **meta_args):
         self.key = key
-        self.pos = Position(crs=crs)
+        self.pos = direction
         self.source = source
         self.meta = meta_args
 
@@ -190,5 +187,5 @@ class CrfSource:
     #
     def __repr__(self):
         return "{}('{}', ({:.2f}, {:.2f}), '{}')" "".format(
-            self.__class__.__name__, self.name, *self.pos.crs, self.source
+            self.__class__.__name__, self.name, *self.pos.gcrs, self.source
         )

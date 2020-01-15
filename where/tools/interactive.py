@@ -10,40 +10,43 @@ them available in an interactive IPython session.
 # External library imports
 import IPython
 
+# Standard library imports
+import sys
+
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.constant import constant  # noqa
 
 # Where imports
-from where import data
+from where.data import dataset3 as dataset
 from where.lib import config
-from where.lib import files
 
 # Other imports useful for the interactive session
 import numpy as np  # noqa
 import pandas as pd  # noqa
 import matplotlib.pyplot as plt  # noqa
 from where import apriori  # noqa
-from midgard.math.constant import constant  # noqa
-from where.lib.time import Time, TimeDelta  # noqa
+from where.data.time import Time, TimeDelta  # noqa
 from where.lib.unit import Unit  # noqa
 
 
 @plugins.register
-def interactive(rundate: "date", pipeline: "pipeline", session: "option" = ""):  # typing: ignore
+def interactive(rundate: "date", pipeline: "pipeline", **kwargs):  # typing: ignore
     """Read model run data and start an interactive session
 
     Read all datasets for the given rundate and pipelines, and start an interactive IPython session.
 
     Args:
-        rundate: The model run date.
-        pipeline:    String with the name of pipelinenique.
+        rundate:     The model run date.
+        pipeline:    String with the name of pipeline
     """
     # Read data for all pipelines
     vars_dict = dict()
-    list_of_vars = list()
-    config.init(rundate, pipeline, session=session)
+    datasets = list()
+    config.init(rundate, pipeline, **kwargs)
     vars_dict[pipeline] = config.files.vars.copy()
     del vars_dict[pipeline]["rundate"]
+    del vars_dict[pipeline]["pipeline"]
 
     # Register filekey suffix
     filekey_suffix = config.tech.get("filekey_suffix", default="").list
@@ -51,17 +54,20 @@ def interactive(rundate: "date", pipeline: "pipeline", session: "option" = ""): 
         config.files.profiles = filekey_suffix
 
     # Read data for all available sessions and stages, add them to the global namespace
-    stages = files.glob_variable("dataset_hdf5", "stage", ".+")
+    stages = config.files.glob_variable("dataset", "stage", ".+")
     for stage in sorted(stages):
-        names, dset_ids = data.list_dataset_names_and_ids(rundate, stage=stage, **vars_dict[pipeline])
-        for name, dset_id in zip(names, dset_ids):
-            var_name = "_".join([pipeline, stage, name, str(dset_id)])
-            short_var_name = pipeline[0] + str(len([v for v in list_of_vars if v.lstrip().startswith(pipeline[0])]))
-            globals()[var_name] = data.Dataset(
-                rundate, stage=stage, dataset_name=name, dataset_id=dset_id, **vars_dict[pipeline]
+        file_vars = vars_dict[pipeline].copy()
+        file_vars.update(stage=stage)
+        labels = config.files.glob_variable("dataset", "label", ".+", file_vars)
+        for label in labels:
+            file_vars["label"] = label
+            var_name = config.files.path("dataset", file_vars=file_vars)
+            short_var_name = pipeline[0] + str(len([v for v in datasets if v.lstrip().startswith(pipeline[0])]))
+            globals()[var_name] = dataset.Dataset.read(
+                rundate=rundate, pipeline=pipeline, stage=stage, label=label, **vars_dict[pipeline]
             )
             globals()[short_var_name] = globals()[var_name]
-            list_of_vars.append("{:>6s}, {}".format(short_var_name, var_name))
+            datasets.append("{:>6s}, {}".format(short_var_name, var_name))
 
     # Start an interactive IPython session
-    IPython.embed(header="Available datasets:\n" + "\n".join(list_of_vars))
+    IPython.embed(header="Available datasets:\n" + "\n".join(datasets))

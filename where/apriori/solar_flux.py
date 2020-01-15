@@ -20,10 +20,12 @@ TODO: All these files from the link above are merged to F10.7CM (leftovers from 
 from datetime import timedelta
 from scipy import interpolate
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import parsers
 from where.lib import config
-from where.lib import plugins
 
 
 @plugins.register

@@ -31,10 +31,10 @@ setup(
     url="https://github.com/kartverket/where",
     # Author details
     author="Norwegian Mapping Authority",
-    author_email="geir.arne.hjelle@kartverket.no",
+    author_email="ann-silje.kirkvik@kartverket.no",
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
@@ -45,7 +45,7 @@ setup(
         "Topic :: Scientific/Engineering",
     ],
     # What does your project relate to?
-    keywords="referenceframe vlbi slr gnss doris",
+    keywords="referenceframe vlbi slr gnss",
     # Using find_packages to find all subpackages in where. This is done explicitly because find_packages uses a VERY
     # long time to traverse the directory tree of data (and the exclude option to find_packages only excludes after
     # doing a full traverse).
@@ -59,7 +59,7 @@ setup(
         "IPython",
         "jplephem",
         "matplotlib",
-        "midgard>=0.3.0",
+        "midgard>=1.0.0",
         "numpy",
         "pandas",
         "pint",
@@ -90,7 +90,6 @@ setup(
             f"{exe:profiler}=where.tools.profiler:profiler",
             f"{exe:release}=where_release:main",
             f"{exe:runner}=where.runner:main",
-            f"{exe:setup}=where.setup:main",
             f"{exe:there}=where.there:main",
             f"{exe:tools}=where.tools:main",
         ],

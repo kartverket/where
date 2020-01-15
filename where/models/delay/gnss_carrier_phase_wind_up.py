@@ -8,9 +8,11 @@ TODO: replace get_yaw_coord_sys() by functions given in posvel_table.py
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
-from where.lib import plugins
 
 
 @plugins.register
@@ -86,7 +88,7 @@ def get_yaw_coord_sys(time, sat_pos):
     """
 
     Args:
-        time (where.lib.time.Time):   Where Time object.
+        time (where.data.time.Time):   Where Time object.
         sat_pos (numpy.ndarray):      Satellite position in ITRS.
 
     Returns:
@@ -125,7 +127,7 @@ def get_satellite_sun_vector(time, sat_pos):
     The determination of the vector pointing from satellite to Sun is based on Eq. 5.77 in :cite:`subirana2013`.
 
     Args:
-        time (where.lib.time.Time):     Where Time object.
+        time (where.data.time.Time):     Where Time object.
         sat_pos (numpy.ndarray):        Satellite position in ITRS.
 
     Returns:

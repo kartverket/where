@@ -21,12 +21,14 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from midgard.math.constant import constant
 from where.lib import log
-from where.lib import plugins
-from where.lib.time import TimeDelta
+from where.data.time import TimeDelta
 from where.lib.unit import Unit
 
 
@@ -61,12 +63,13 @@ def vlbi_grav_delay(dset):
     ]
 
     bcrs_vel_earth = eph.vel_bcrs("earth")
-    baseline_gcrs = dset.site_pos_2.gcrs_pos - dset.site_pos_1.gcrs_pos
-    src_dot_baseline = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs[:, :, None])[:, 0, 0]
+
+    baseline_gcrs = dset.site_pos_2.gcrs.pos - dset.site_pos_1.gcrs.pos
+    src_dot_baseline = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs.mat)[:, 0, 0]
 
     # Equation 11.6
-    bcrs_site1 = eph.pos_bcrs("earth") + dset.site_pos_1.gcrs_pos
-    bcrs_site2 = eph.pos_bcrs("earth") + dset.site_pos_2.gcrs_pos
+    bcrs_site1 = eph.pos_bcrs("earth") + dset.site_pos_1.gcrs.pos.val
+    bcrs_site2 = eph.pos_bcrs("earth") + dset.site_pos_2.gcrs.pos.val
 
     for body in bodies:
         try:
@@ -85,7 +88,7 @@ def vlbi_grav_delay(dset):
             np.maximum(0, dset.src_dir.unit_vector[:, None, :] @ (bcrs_body_t1 - bcrs_site1)[:, :, None])[:, 0, 0]
             * Unit.second2day
             / constant.c,
-            format="jd",
+            fmt="jd",
             scale="tdb",
         )
         time_1J = dset.time.tdb - delta_t
@@ -110,7 +113,7 @@ def vlbi_grav_delay(dset):
         grav_delay += 2 * GM_body / constant.c ** 2 * np.log(nomJ / denomJ)
 
         # Higher order correction  (equation 11.14)
-        baseline_dot_vector_body_site1 = (baseline_gcrs[:, None, :] @ vector_body_site1[:, :, None])[:, 0, 0]
+        baseline_dot_vector_body_site1 = (baseline_gcrs.val[:, None, :] @ vector_body_site1[:, :, None])[:, 0, 0]
         grav_delay += (
             4
             * GM_body ** 2
@@ -123,7 +126,9 @@ def vlbi_grav_delay(dset):
     denominator = (
         1
         + (
-            (bcrs_vel_earth + dset.site_pos_2.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c
+            (bcrs_vel_earth + dset.site_pos_2.gcrs.vel.val)[:, None, :]
+            @ dset.src_dir.unit_vector[:, :, None]
+            / constant.c
         )[:, 0, 0]
     )
 

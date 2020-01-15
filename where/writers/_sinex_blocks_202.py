@@ -20,16 +20,16 @@ References:
 """
 # Standard library imports
 from datetime import datetime
+from functools import lru_cache
 
 import numpy as np
 
 # Where imports
 import where
 from where import apriori
-from where.lib import cache
 from where.lib import config
 from where.lib import log
-from where.lib import time
+from where.data import time
 from where.lib.unit import Unit
 from where.lib import util
 
@@ -55,12 +55,20 @@ class SinexBlocks:
         self._create_state_vector()
 
     def _create_state_vector(self):
-        self.ids = {sta: self.dset.meta[sta].get("site_id", "----") for sta in self.dset.unique("station")}
-        self.ids.update({src: "{:0>4}".format(i) for i, src in enumerate(self.dset.unique("source"), start=1)})
+        stations = self.dset.unique("station")
+        parameters = self.dset.meta["normal equation"]["names"]
+        self.ids = {sta: self.dset.meta[sta].get("site_id", "----") for sta in stations}
+        try:
+            sources1 = set(self.dset.unique("source"))
+            sources2 = {param[13:21] for param in parameters if param.startswith("vlbi_src_dir")}
+            self.sources = sources1 | sources2
+            self.ids.update({src: "{:0>4}".format(i) for i, src in enumerate(self.sources, start=1)})
+        except AttributeError:
+            pass
         self.ids.update({"----": "----"})
 
         self.state_vector = list()
-        for parameter in self.dset.meta["normal equation"]["names"]:
+        for parameter in parameters:
             partial_type, name = parameter.split("-", 1)
             partial_type = partial_type.replace(self.tech_prefix, "")
             name = name.split("_")
@@ -77,7 +85,8 @@ class SinexBlocks:
             if e["type"] == "trop_wet":
                 _PARAMS["trop_wet"][e["partial"]] = "TROWET"
 
-    @cache.property
+    @property
+    @lru_cache()
     def _analyst_info(self):
         """Information about analyst
 
@@ -92,9 +101,9 @@ class SinexBlocks:
     def header_line(self):
         """Mandatory header line
         """
-        now = time.Time(datetime.now(), scale="utc").yydddsssss
-        start = min(self.dset.time).yydddsssss
-        end = max(self.dset.time).yydddsssss
+        now = time.Time(datetime.now(), scale="utc", fmt="datetime").yydddsssss
+        start = self.dset.time.min.yydddsssss
+        end = self.dset.time.max.yydddsssss
 
         file_agency = config.tech.sinex.file_agency.str.upper()
         data_agency = config.tech.sinex.data_agency.str.upper()
@@ -113,9 +122,12 @@ class SinexBlocks:
     def write_block(self, block_name, *args):
         """Call the given block so it writes itself"""
         try:
-            getattr(self, block_name)(*args)
+            block_func = getattr(self, block_name)
         except AttributeError:
-            log.fatal(f"Sinex block '{block_name}' is unknown")
+            log.error(f"Sinex block '{block_name}' is unknown")
+            return
+
+        block_func(*args)
 
     def file_reference(self):
         """Mandatory block
@@ -202,10 +214,11 @@ class SinexBlocks:
         """
         crf = apriori.get("crf", time=self.dset.time)
         self.fid.write("+SOURCE/ID\n")
-        self.fid.write("*Code IERS nam ICRF designator \n")
-        for iers_name in self.dset.unique("source"):
+        self.fid.write("*Code IERS nam ICRF designator  number of observations per source \n")
+        for iers_name in self.sources:
             icrf_name = crf[iers_name].meta["icrf_name"] if "icrf_name" in crf[iers_name].meta else ""
-            self.fid.write(" {:0>4} {:<8} {:<16}\n".format(self.ids[iers_name], iers_name, icrf_name))
+            num_obs = self.dset.num(source=iers_name)
+            self.fid.write(" {:0>4} {:<8} {:<16} {:04}\n".format(self.ids[iers_name], iers_name, icrf_name, num_obs))
         self.fid.write("-SOURCE/ID\n")
 
     def site_id(self):
@@ -278,7 +291,7 @@ class SinexBlocks:
     def site_eccentricity(self):
         """Mandatory
         """
-        ecc = apriori.get("eccentricity", rundate=self.dset.rundate)
+        ecc = apriori.get("eccentricity", rundate=self.dset.analysis["rundate"])
         self.fid.write("+SITE/ECCENTRICITY\n")
         self.fid.write("*Code PT SBIN T Data_Start__ Data_End____ typ Apr --> Benchmark (m)_____\n")
         for sta in self.dset.unique("station"):
@@ -532,16 +545,16 @@ class SinexBlocks:
     def _get_apriori_value(self, param, param_unit):
         if param["type"] == "site_pos":
             trf = apriori.get("trf", time=self.dset.time.utc.mean)
-            col_idx = "xyz".index(param["partial"])
-            return trf[self.ids[param["id"]]].pos.itrs[col_idx]
+            pos = trf[self.ids[param["id"]]].pos.trs
+            return getattr(pos, param["partial"])
 
         if param["type"] == "src_dir":
             crf = apriori.get("crf", time=self.dset.time)
             src = crf[param["id"]]
             if param["partial"] == "ra":
-                pos = src.pos.crs[0]
+                pos = src.pos.right_ascension
             elif param["partial"] == "dec":
-                pos = src.pos.crs[1]
+                pos = src.pos.declination
             return pos
 
         if param["type"] == "eop_nut":

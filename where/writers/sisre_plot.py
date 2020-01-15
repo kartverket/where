@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Union
 
 # Midgard imports
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import get_statistic, plot_scatter_subplot_row
+from midgard.plot.matplotlib_extension import get_statistic, plot_subplot_row
 
 # External library imports
 import matplotlib.pyplot as plt
@@ -22,7 +22,6 @@ import numpy as np
 
 # Where imports
 from where.lib import config
-from where.lib import files
 from where.lib import log
 from where.lib.unit import Unit
 from where.lib import util
@@ -58,7 +57,7 @@ PLOTCONFIG = {
     "sisre_orb": PlotConfig("orbit-only SISE", True, ".2f"),
     "orb_diff_3d": PlotConfig("3D orbit error", True, ".2f"),
     "clk_diff": PlotConfig("Satellite clock correction difference \n without mean", True, ".2f"),
-    "clk_diff_with_dt_mean": PlotConfig("Satellite clock correction difference", True, ".2f"),
+    "clk_diff_with_dt_mean": PlotConfig("Satellite clock correction \ndifference", True, ".2f"),
     "bias_brdc": PlotConfig("Satellite bias of broadcast clocks", True, ".0f"),
     "bias_precise": PlotConfig("Satellite bias of precise clocks", True, ".0f"),
     "used_iode": PlotConfig("IODE", False, ".0f"),
@@ -155,16 +154,15 @@ def _get_figure_path(
     Returns:
        Figure path
     """
-    if satellite:
-        if len(satellite) == 1:
-            satellite = satellite[0]
-        else:
-            satellite = ""
+    if len(satellite) == 1:
+        satellite = satellite[0]
+    else:
+        satellite = ""
     dset.vars.update(
         {"field": field, "format": FIGURE_FORMAT, "system": GNSS_NAME[sys].lower(), "satellite": satellite.lower()}
     )
     file_key = "output_sisre_subplot" if subplot else "output_sisre_plot"
-    figure_path = files.path(file_key, file_vars=dset.vars)
+    figure_path = config.files.path(file_key, file_vars=dset.vars)
     if not figure_path.parent.exists():
         figure_path.parent.mkdir(parents=True, exist_ok=True)
     log.info(f"Plot figure: {figure_path}")
@@ -206,10 +204,11 @@ def _plot_scatter_subplots(
        field:      Dataset field.
        options:    Dictionary with options, which overwrite default plot configuration.
     """
-
     # Generate plot for each GNSS
     for sys in systems:
         idx = dset.filter(system=sys)
+        xlim_min = None
+        xlim_max = None
 
         # Define colormap
         colormap = getattr(cm, options["colormap"])
@@ -220,17 +219,39 @@ def _plot_scatter_subplots(
 
         for ax, field in zip(axes, fields):
 
+            if field == "age_of_ephemeris":
+                dset[field][:] = dset[field] * Unit.second2minute
+                dset.set_unit(field, "minute")
+
             # Plot all satellites or only defined ones
-            for sat, color in zip(dset.unique("satellite", idx=idx), colors):
+            for sat, color in zip(sorted(dset.unique("satellite", idx=idx)), colors):
                 if sat not in satellites:
                     continue
                 idx_sat = dset.filter(satellite=sat)
+
+                # Note: Normally for each satellite the correct x-limit range is chosen, but it is not the case that
+                #      the range is the same for all satellites.
+                if xlim_min is None:
+                    xlim_min = min(dset.time.gps.datetime[idx_sat])
+                    xlim_max = max(dset.time.gps.datetime[idx_sat])
+                else:
+                    xlim_min = (
+                        min(dset.time.gps.datetime[idx_sat])
+                        if xlim_min > min(dset.time.gps.datetime[idx_sat])
+                        else xlim_min
+                    )
+                    xlim_max = (
+                        max(dset.time.gps.datetime[idx_sat])
+                        if xlim_max < max(dset.time.gps.datetime[idx_sat])
+                        else xlim_max
+                    )
+                options.update({"xlim": [xlim_min, xlim_max]})
 
                 # Overwrite colormap color selection
                 color = options["color"] if options["color"] else color
 
                 if np.sum(dset[field][idx_sat]) != 0:
-                    plot_scatter_subplot_row(
+                    plot_subplot_row(
                         ax,
                         x_array=dset.time.gps.datetime[idx_sat],
                         y_array=dset[field][idx_sat],
@@ -300,7 +321,7 @@ def _plot_scatter_field(
         # TODO: does not work _insert_kartverket_logo(fig)
 
         # Plot all satellites or only defined ones
-        for sat, color in zip(dset.unique("satellite", idx=idx), colors):
+        for sat, color in zip(sorted(dset.unique("satellite", idx=idx)), colors):
             if sat not in satellites:
                 continue
             idx_sat = dset.filter(system=sys, satellite=sat)
@@ -321,7 +342,8 @@ def _plot_scatter_field(
             sat_statistic = _get_statistic_text(dset[field][idx_sat], unit=dset.unit(field))
 
         if options["legend"]:
-            plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
+            # plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
+            plt.legend(bbox_to_anchor=(1.04, 1), borderaxespad=0.0, loc="upper left", ncol=1)
 
         plt.ylabel(f"{PLOTCONFIG[field].label} {UNIT_YLABEL[dset.unit(field)]}")
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])

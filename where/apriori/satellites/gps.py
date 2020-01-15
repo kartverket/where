@@ -11,9 +11,11 @@ import math
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
-from where.lib import plugins
 from where.apriori.satellites import satellite
 
 

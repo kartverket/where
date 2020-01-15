@@ -12,17 +12,18 @@ import numpy as np
 
 # Midgard imports
 from midgard.config.config import Configuration
+from midgard.dev import plugins
 from midgard.files import dependencies
+from midgard.math import ellipsoid
 
 # Where imports
-from where.apriori import trf
+from where.data.position import Position
+from where.apriori.trf import TrfFactory
 from where.lib import config
-from where.lib import files
-from where.lib import plugins
 
 
 @plugins.register
-class CustomTrf(trf.TrfFactory):
+class CustomTrf(TrfFactory):
     """A factory for using positions from the custom TRF-config file.
     """
 
@@ -35,9 +36,9 @@ class CustomTrf(trf.TrfFactory):
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
         trf = Configuration("trf_custom")
-        trf.profiles = config.analysis.get("tech", value=self.version, default="").list
-        trf_path = files.path("trf-custom")
-        trf_local_path = files.path("trf-custom_local")
+        trf.profiles = config.analysis.get("pipeline", value=self.version, default="").list
+        trf_path = config.files.path("trf-custom")
+        trf_local_path = config.files.path("trf-custom_local")
 
         trf.update_from_file(trf_path)
         dependencies.add(trf_path, label="trf")
@@ -53,7 +54,7 @@ class CustomTrf(trf.TrfFactory):
 
         return data
 
-    def _calculate_pos_itrs(self, site):
+    def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
 
         There are no velocities available, so same position is returned for all time epochs
@@ -64,6 +65,8 @@ class CustomTrf(trf.TrfFactory):
         Returns:
             Array:  Positions, one 3-vector for each time epoch.
         """
-        if self.time.size == 1:
-            return self.data[site]["pos"]
-        return self.data[site]["pos"][None, :].repeat(self.time.size, axis=0)
+        pos = self.data[site].pop("pos")[None, :].repeat(self.time.size, axis=0)
+        ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
+        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
+
+        return np.squeeze(pos_trs)

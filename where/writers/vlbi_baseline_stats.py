@@ -42,7 +42,8 @@ import numpy as np
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import files
+from where import apriori
+from where.lib import config
 from where.lib import log
 
 MAX_NUM_STARS = 15
@@ -69,7 +70,7 @@ def baseline_stats(dset):
         idx = np.logical_and(dset.filter(station=sta_1), dset.filter(station=sta_2))
         stats_str.append(_write_line(sta_1, sta_2, dset, idx))
 
-    with files.open("output_baseline_stats", file_vars=dset.vars, mode="wt") as fid:
+    with config.files.open("output_baseline_stats", file_vars=dset.vars, mode="wt") as fid:
         fid.write("\n".join(stats_str))
     log.out("\n  ".join(stats_str))
 
@@ -91,6 +92,15 @@ def _write_line(sta_1, sta_2, dset, idx):
     rms = dset.rms("residual", idx=idx) if any(idx) else 0
     bias = dset.mean("residual", idx=idx) if any(idx) else 0
     stars = "" if rms < STAR_THRESHOLD else "*" * min(MAX_NUM_STARS, math.ceil(math.log2(rms / STAR_THRESHOLD)))
-    bl_len = np.linalg.norm(dset.site_pos_2.itrs[idx][0] - dset.site_pos_1.itrs[idx][0]) if (sta_2 and any(idx)) else 0
+
+    if sta_2 and any(idx):
+        trf = apriori.get("trf", time=dset.time.utc.mean)
+        site_id_1 = dset.meta[sta_1]["site_id"]
+        site_id_2 = dset.meta[sta_2]["site_id"]
+        pos_1 = trf[site_id_1].pos.trs
+        pos_2 = trf[site_id_2].pos.trs
+        bl_len = (pos_2 - pos_1).length
+    else:
+        bl_len = 0
 
     return f"{sta_1:<9s} {sta_2:<9s} {np.sum(idx):>5d} {bl_len:>11.1f} {bias:>11.6f} {rms:>11.6f} {stars}"

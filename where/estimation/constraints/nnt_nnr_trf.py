@@ -1,8 +1,11 @@
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
+# Where imports
 from where import apriori
 from where.lib import config
-from where.lib import plugins
 from where.lib import log
 
 
@@ -25,7 +28,7 @@ def nnt_nnr_trf(dset, param_names):
         station = column.split("-", maxsplit=1)[-1].split("_")[0]
         site_id = dset.meta[station]["site_id"]
         if site_id in trf:
-            x0, y0, z0 = trf[site_id].pos.itrs
+            x0, y0, z0 = trf[site_id].pos.trs
             if column.endswith("_x"):
                 d[idx, :] = np.array([1, 0, 0, 0, z0, -y0])
             if column.endswith("_y"):

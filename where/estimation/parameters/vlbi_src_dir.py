@@ -25,8 +25,10 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.lib import config
 from where import apriori
 from where.lib import log
@@ -64,7 +66,7 @@ def src_dir(dset):
     # Remove sources with few observations
     # TODO redo this type of test after outlier elimination, maybe this should be done in the estimator?
     # Similar test might be useful for stations
-    limit = 5
+    limit = config.tech[PARAMETER].num_obs_limit.int
     for idx, src in enumerate(sources):
         src_idx = dset.filter(source=src)
         if np.sum(src_idx) < limit:
@@ -75,16 +77,9 @@ def src_dir(dset):
 
     # Calculate partials
     partials = np.zeros((dset.num_obs, len(sources) * 2))
-    zero = np.zeros(dset.num_obs)
-
-    cos_ra = np.cos(dset.src_dir.right_ascension)
-    sin_ra = np.sin(dset.src_dir.right_ascension)
-    cos_dec = np.cos(dset.src_dir.declination)
-    sin_dec = np.sin(dset.src_dir.declination)
-
-    baseline = (dset.site_pos_2.gcrs_pos - dset.site_pos_1.gcrs_pos)[:, :, None]
-    dK_dra = np.array([-cos_dec * sin_ra, cos_dec * cos_ra, zero]).T[:, None, :]
-    dK_ddec = np.array([-sin_dec * cos_ra, -sin_dec * sin_ra, cos_dec]).T[:, None, :]
+    baseline = (dset.site_pos_2.gcrs.pos - dset.site_pos_1.gcrs.pos).mat
+    dK_dra = dset.src_dir.dsrc_dra[:, None, :]
+    dK_ddec = dset.src_dir.dsrc_ddec[:, None, :]
     all_partials = np.hstack((-dK_dra @ baseline, -dK_ddec @ baseline))[:, :, 0]
 
     for idx, src in enumerate(sources):

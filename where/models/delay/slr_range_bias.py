@@ -6,11 +6,9 @@ Description:
 This model applies the station range bias
 Unit: meters
 
-
-
 """
-# Where imports
-from where.lib import plugins
+# Midgard imports
+from midgard.dev import plugins
 
 
 @plugins.register

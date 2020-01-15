@@ -5,10 +5,12 @@ Description:
 
 Correct satellite clock either based on precise or broadcast orbits.
 """
+
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
-from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register
@@ -22,16 +24,14 @@ def gnss_satellite_clock(dset):
         numpy.ndarray:    GNSS satellite clock corrections for each observation
 
     """
-    if "gnss_satellite_clock" in dset.fields:
-        return -dset.gnss_satellite_clock
+    if "delay.gnss_satellite_clock" in dset.fields:
+        return dset.delay.gnss_satellite_clock
     else:
         orbit = apriori.get(
             "orbit",
             apriori_orbit=dset.vars["orbit"],
-            rundate=dset.rundate,
-            time=dset.sat_time,
-            satellite=tuple(dset.satellite),
-            system=tuple(dset.system),
+            rundate=dset.analysis["rundate"],
+            system=tuple(dset.unique("system")),
             station=dset.vars["station"],
         )
 

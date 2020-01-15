@@ -113,11 +113,10 @@ class SlrCrdParser(ChainParser):
         cache["station"] = line.pop("cdp")
         if "station_{}".format(cache["station"]) in self.data:
             return
-
         self.data["station_{}".format(cache["station"])] = line
 
     def parse_satellite(self, line, cache):
-        cache["satellite"] = line.pop("satellite_id")
+        cache["satellite"] = line.pop("satellite_id").lstrip("0")
         self.data["satellite_{}".format(cache["satellite"])] = line
 
     def parse_session(self, line, cache):
@@ -135,6 +134,9 @@ class SlrCrdParser(ChainParser):
         )
         cache["session"] = "{station}/{satellite}/{obs_date_first}".format(**cache)
         cache["data_type"] = line.pop("data_type")
+        if "data_release" in cache:
+            if not cache["data_release"] == 0:
+                log.dev("TODO: Replacement release of data, do something")
 
     def parse_config(self, line, cache):
         cache["wavelength"] = line.pop("wavelength")
@@ -146,15 +148,18 @@ class SlrCrdParser(ChainParser):
         """Parse the observation line, normal point data
         """
         obs_sec = float(line["second"])
-        obs_time = cache["obs_date"] + timedelta(seconds=obs_sec)
+        obs_date = cache["obs_date"]
+
         if obs_sec < 43000.0 and cache["starting_hour"] > 12:
             # Suspect day-shift in session:
-            obs_time = obs_time + timedelta(days=1)
+            obs_date = obs_date + timedelta(days=1)
+
+        obs_time = obs_date + timedelta(seconds=obs_sec)
 
         # Meta information about observation
         obs_meta = {
             "obs_time": obs_time,
-            "obs_date": cache["obs_date"],
+            "obs_date": obs_date,
             "obs_sec": obs_sec,
             "station": cache["station"],
             "satellite": cache["satellite"],

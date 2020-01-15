@@ -22,8 +22,10 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.lib import config
 
 # Name of parameter
@@ -51,7 +53,7 @@ def trop_wet(dset):
         stations = stations[np.logical_not(skip_idx)]
 
     partials = np.zeros((dset.num_obs, len(stations)))
-    for multiplier in dset.for_each("station"):
+    for multiplier in dset.for_each_suffix("station"):
         for site_idx, station in enumerate(stations):
             idx = dset.filter(station=station)
             partials[idx, site_idx] = dset.troposphere_mw[idx] * multiplier

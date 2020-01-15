@@ -33,7 +33,7 @@ from midgard.dev import plugins
 from midgard.files import dependencies
 
 # Where imports
-from where.lib import files
+from where.lib import config
 from where.lib import log
 from where.parsers import orbit_sp3c, orbit_sp3d
 
@@ -69,8 +69,10 @@ def _get_sp3_file_version(file_path):
     Returns:
         str:            SP3 file version number
     """
-    with files.open_path(file_path, mode="rt") as infile:
-        version = infile.readline().split()[0]
+    if config.files.empty_file(file_path):
+        log.warn(f"File {file_path} is empty.")
+    with config.files.open_path(file_path, mode="rt") as fid:
+        version = fid.readline().split()[0]
 
     if len(version) < 2 or version[1] not in "acd":
         log.fatal(f"Unknown SP3 format {version!r} is used in file {file_path}")

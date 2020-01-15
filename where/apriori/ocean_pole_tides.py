@@ -15,9 +15,11 @@ point coordinates for the interpolator functions.
 from scipy.interpolate import RectBivariateSpline
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import parsers
-from where.lib import plugins
 
 
 @plugins.register

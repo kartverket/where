@@ -20,13 +20,14 @@ Example:
 # External imports
 from datetime import timedelta
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.apriori import orbit
 from where import data
 from where.lib import config
-from where.lib import files
 from where.lib import log
-from where.lib import plugins
 from where import parsers
 
 
@@ -87,7 +88,7 @@ class Slr(orbit.AprioriOrbit):
         file_vars["version"] = version
 
         if self.file_path is None:
-            file_path = files.path(self.file_key, file_vars)
+            file_path = config.files.path(self.file_key, file_vars)
         else:
             file_path = self.file_path
 

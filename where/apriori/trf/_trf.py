@@ -7,6 +7,7 @@ Description:
 
 # Standard library imports
 import collections
+import abc
 
 # External library imports
 import numpy as np
@@ -16,10 +17,6 @@ from where.lib import config
 from where.lib import exceptions
 from where.lib import log
 from where.apriori import trf
-from where.lib import util
-
-# Position-object, TODO: replace with proper Position class
-Position = collections.namedtuple("Position", ("itrs",))
 
 
 class Trf(collections.UserDict):
@@ -127,7 +124,7 @@ class Trf(collections.UserDict):
             yield self[site]
 
 
-class TrfFactory:
+class TrfFactory(abc.ABC):
     def __init__(self, time, version=None):
         self.name = self.__class__.__module__.split(".")[-1]
         self.time = time
@@ -161,24 +158,25 @@ class TrfFactory:
         if key not in self.data:
             raise exceptions.UnknownSiteError(f"Unknown site {key} in reference frame '{self}'")
 
-        pos_itrs = self._calculate_pos_itrs(key)
+        pos_trs = self._calculate_pos_trs(key)
         site_info = self.data[key]
-        trf_site = TrfSite(key, time=self.time, itrs=pos_itrs, source=str(self), **site_info)
+        trf_site = TrfSite(key, time=self.time, pos=pos_trs, source=str(self), **site_info)
         log.debug(f"Found site {trf_site}")
         return trf_site
 
     #
     # Abstract methods, must be implemented by subclasses
     #
+    @abc.abstractmethod
     def _read_data(self):
         """Read data needed by this Reference Frame for calculating positions of sites
 
         Returns:
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
-        util.not_implemented()
 
-    def _calculate_pos_itrs(self, site):
+    @abc.abstractmethod
+    def _calculate_pos_trs(self, site):
         """Calculate ITRS position of one site
 
         Args:
@@ -187,7 +185,6 @@ class TrfFactory:
         Returns:
             Array:  Positions, one 3-vector for each time epoch.
         """
-        util.not_implemented()
 
     #
     # Dunder methods
@@ -205,7 +202,7 @@ class TrfFactory:
 
 
 class TrfSite:
-    def __init__(self, key, time, itrs, source, real=True, name=None, **meta_args):
+    def __init__(self, key, time, pos, source, real=True, name=None, **meta_args):
         """Constructor
 
         Args:
@@ -218,7 +215,7 @@ class TrfSite:
         """
         self.key = key
         self.time = time
-        self.pos = Position(itrs=itrs)
+        self.pos = pos
         self.source = source
         self.real = real
         self.name = name
@@ -237,16 +234,16 @@ class TrfSite:
             Array:  1 or self.time.size distances.
         """
         if self.time.size == 1:
-            return np.linalg.norm(self.pos.itrs - other_pos)
-        return np.linalg.norm(self.pos.itrs - other_pos, axis=1).mean()
+            return np.linalg.norm(self.pos.trs - other_pos)
+        return np.linalg.norm(self.pos.trs - other_pos, axis=1).mean()
 
     #
     # Dunder methods
     #
     def __repr__(self):
-        if self.pos.itrs.ndim == 1:
-            pos = self.pos.itrs
+        if self.pos.trs.ndim == 1:
+            pos = self.pos.trs
         else:
-            pos = self.pos.itrs.mean(axis=0)
+            pos = self.pos.trs.mean(axis=0)
         pos_str = "({:.2f}, {:.2f}, {:.2f})".format(*pos)
         return f"{type(self).__name__}({self.name!r}, {pos_str}, {self.source!r})"

@@ -11,8 +11,8 @@ For now this is just a SILLY model just for testing.
 # External library imports
 import numpy as np
 
-# Where imports
-from where.lib import plugins
+# Midgard imports
+from midgard.dev import plugins
 
 
 @plugins.register

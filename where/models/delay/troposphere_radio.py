@@ -25,14 +25,15 @@ TODO:
 import numpy as np
 import os
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from where.ext import iers_2010 as iers
 from where.ext import gpt2w as ext_gpt2w
 from where.lib import config
-from where.lib import files
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import Unit
 
 # Name of model
@@ -75,7 +76,7 @@ def troposphere_for_all_stations(dset):
         numpy.ndarray: Corrections in meters for each observation.
     """
     dset_out = np.zeros(dset.num_obs)
-    for multiplier in dset.for_each("station"):
+    for multiplier in dset.for_each_suffix("station"):
         dset_out += multiplier * troposphere(dset)
 
     return dset_out
@@ -104,7 +105,7 @@ def troposphere(dset):
     Returns:
         numpy.ndarray:  Total tropospheric delay for each observation and one station in [m].
     """
-    latitude, _, height = dset.site_pos.llh.T
+    latitude, _, height = dset.site_pos.pos.llh.T
     pressure, temperature, e, tm, lambd = meteorological_data(dset)
     mh, mw = mapping_function(dset)
     mg, gn, ge = gradient_model(dset)
@@ -115,21 +116,22 @@ def troposphere(dset):
     dT = mh * zhd + mw * zwd + mg * (gn * np.cos(dset.site_pos.azimuth) + ge * np.sin(dset.site_pos.azimuth))
 
     terms_and_levels = dict(
-        dT="detail",
-        mh="detail",
-        zhd="detail",
-        mw="operational",
-        zwd="operational",  # If estimated, apriori value must be reported in Sinex
-        mg="operational",
-        gn="operational",  # If estimated, apriori value must be reported in Sinex
-        ge="operational",  # If estimated, apriori value must be reported in Sinex
+        dT=("operational", "meter"),
+        mh=("operational", "dimensionless"),
+        zhd=("operational", "meter"),
+        mw=("operational", "dimensionless"),
+        zwd=("operational", "meter"),
+        mg=("operational", "dimensionless"),
+        gn=("operational", "meter"),
+        ge=("operational", "meter"),
     )
-    for term, write_level in terms_and_levels.items():
+    for term, (write_level, unit) in terms_and_levels.items():
         field = "troposphere_{}{}".format(term, (dset.default_field_suffix or ""))
         if field in dset.fields:
             dset[field][:] = locals()[term]
         else:
-            dset.add_float(field, table="troposphere", val=locals()[term], write_level=write_level)
+            # dset.add_float(field, table="troposphere", val=locals()[term], write_level=write_level)
+            dset.add_float(field, val=locals()[term], write_level=write_level, unit=unit)
 
     # +DEBUG
     # if True:
@@ -338,11 +340,11 @@ def zenith_wet_delay(dset, temperature, e, tm, lambd):
         #                 "Nordius zenith wet delay model. Use 'gpt2w' model")
 
     elif model == "davis":
-        latitude, _, height = dset.site_pos.llh.T
+        latitude, _, height = dset.site_pos.pos.llh.T
         zwd = davis_zenith_wet_delay(latitude, height, temperature, e)
 
     elif model == "saastamoinen":
-        latitude, _, height = dset.site_pos.llh.T
+        latitude, _, height = dset.site_pos.pos.llh.T
         zwd = saastamoinen_zenith_wet_delay(latitude, height, temperature, e)
         # TODO: log.fatal(f"Meteorological model {met_model} does not provide input parameters for using Saastamoinen "
         #                 "zenith wet delay model. Use 'gpt2' or 'gpt2w' model")
@@ -381,12 +383,13 @@ def apg_gradient_model(dset):
     ============  ===========  =====================================================================================
     """
     gn = ge = np.empty(dset.num_obs)
+    lat, lon, _ = dset.site_pos.pos.llh.T
+    az = dset.site_pos.azimuth
+    el = dset.site_pos.elevation
 
-    for obs, _ in enumerate(dset.values()):
-        lat, lon, _ = dset.site_pos.llh[obs]
-
+    for obs in range(dset.num_obs):
         # Get horizontal gradients G_N and G_E
-        _, gn[obs], ge[obs] = iers.apg(lat, lon, dset.site_pos.azimuth[obs], dset.site_pos.elevation[obs])
+        _, gn[obs], ge[obs] = iers.apg(lat[obs], lon[obs], az[obs], el[obs])
 
     return gn * Unit.mm2m, ge * Unit.mm2m
 
@@ -485,12 +488,11 @@ def gmf_mapping_function(dset):
     """
     mh = np.empty(dset.num_obs)
     mw = np.empty(dset.num_obs)
-
-    for obs, _ in enumerate(dset.values()):
-        mjd = dset.time.utc.mjd[obs]
-        lat, lon, height = dset.site_pos.llh[obs]
-        zd = dset.site_pos.zenith_distance[obs]
-        mh[obs], mw[obs] = iers.gmf(mjd, lat, lon, height, zd)
+    lat, lon, height = dset.site_pos.pos.llh.T
+    zd = dset.site_pos.zenith_distance
+    mjd = dset.time.utc.mjd
+    for obs in range(dset.num_obs):
+        mh[obs], mw[obs] = iers.gmf(mjd[obs], lat[obs], lon[obs], height[obs], zd[obs])
 
     return mh, mw
 
@@ -522,11 +524,10 @@ def gpt(dset):
     # Note: For GPT2 and GPT2w linear interpolation is done between daily solutions. Here
     #      it does not seem to be necessary, because the performance of GPT Fortran routine
     #      is not so worse than for GPT2 and GPT2w.
-
-    for obs, _ in enumerate(dset.values()):
-        mjd = dset.time.utc.mjd[obs]
-        lat, lon, height = dset.site_pos.llh[obs]
-        pressure[obs], temperature[obs], geoid_undu[obs] = iers.gpt(mjd, lat, lon, height)
+    mjd = dset.time.utc.mjd
+    lat, lon, height = dset.site_pos.pos.llh.T
+    for obs in range(dset.num_obs):
+        pressure[obs], temperature[obs], geoid_undu[obs] = iers.gpt(mjd[obs], lat[obs], lon[obs], height[obs])
 
     return pressure, temperature, geoid_undu
 
@@ -566,17 +567,19 @@ def gpt2(dset):
 
     # Determine GPT2 values for each observation by interpolating between two unique
     # daily solutions
-    for obs, _ in enumerate(dset.values()):
-        mjd = dset.time.utc.mjd[obs]
-        lat, lon, height = dset.site_pos.llh[obs]
-        zd = dset.site_pos.zenith_distance[obs]
+    mjd = dset.time.utc.mjd
+    lat, lon, height = dset.site_pos.pos.llh.T
+    zd = dset.site_pos.zenith_distance
 
+    for obs in range(dset.num_obs):
         # Start 'gpt2.f' day-by-day in folder where 'gpt2_5.grd' is placed and carry out
         # linear interpolation
-        press[obs], temp[obs], dt[obs], e[obs], ah[obs], aw[obs], undu[obs] = gpt2_wrapper(mjd, [lat], [lon], [height])
+        press[obs], temp[obs], dt[obs], e[obs], ah[obs], aw[obs], undu[obs] = gpt2_wrapper(
+            mjd[obs], [lat[obs]], [lon[obs]], [height[obs]]
+        )
 
         # Determine mapping function values based on coefficients 'ah' and 'aw'
-        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd, lat, height, zd)
+        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], lat[obs], height[obs], zd[obs])
 
     return press, temp, dt, e, mh, mw, undu
 
@@ -627,7 +630,7 @@ def gpt2_wrapper(mjd, lat, lon, hell):
 
     # Change directory so that gpt2.f can read the gpt2_5.grd-file in the IERS source directory
     current_dir = os.getcwd()
-    os.chdir(files.path(iers.__name__))
+    os.chdir(config.files.path(iers.__name__))
 
     # Loop over all unique dates (rounded to integer value)
     for date in _rounded_dates(mjd):
@@ -681,21 +684,21 @@ def gpt2w(dset):
     la = np.empty(dset.num_obs)
     undu = np.empty(dset.num_obs)
 
+    mjd = dset.time.utc.mjd
+    lat, lon, height = dset.site_pos.pos.llh.T
+    zd = dset.site_pos.zenith_distance
+
     # Determine GPT2W values for each observation by interpolating between two unique
     # daily solutions
-    for obs, _ in enumerate(dset.values()):
-        mjd = dset.time.utc.mjd[obs]
-        lat, lon, height = dset.site_pos.llh[obs]
-        zd = dset.site_pos.zenith_distance[obs]
-
+    for obs in range(dset.num_obs):
         # Start 'gpt2.f' day-by-day in folder where 'gpt2_5.grd' is placed and carry out
         # linear interpolation
         (press[obs], temp[obs], dt[obs], tm[obs], e[obs], ah[obs], aw[obs], la[obs], undu[obs]) = gpt2w_wrapper(
-            mjd, [lat], [lon], [height]
+            mjd[obs], [lat[obs]], [lon[obs]], [height[obs]]
         )
 
         # Determine mapping function values based on coefficients 'ah' and 'aw'
-        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd, lat, height, zd)
+        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], lat[obs], height[obs], zd[obs])
 
     return press, temp, dt, tm, e, mh, mw, la, undu
 
@@ -748,7 +751,7 @@ def gpt2w_wrapper(mjd, lat, lon, hell):
 
     # Change directory so that gpt2w.f can read the gpt2_5.grd-file in the GPT2w source directory
     current_dir = os.getcwd()
-    os.chdir(files.path(ext_gpt2w.__name__))
+    os.chdir(config.files.path(ext_gpt2w.__name__))
 
     # Loop over all unique dates (rounded to integer value)
     for date in _rounded_dates(mjd):
@@ -992,7 +995,7 @@ def vmf1_gridded_pressure(dset):
     # Get gridded VMF1 data
     vmf1 = apriori.get("vmf1", time=dset.time)
 
-    lat, lon, height = dset.site_pos.llh.T
+    lat, lon, height = dset.site_pos.pos.llh.T
     grid_zhd = vmf1["zh"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
     grid_height = vmf1["ell"](lon, lat, grid=False)
     grid_pressure = pressure_zhd(grid_zhd, lat, grid_height)
@@ -1031,10 +1034,13 @@ def vmf1_mapping_function(dset):
     mh = np.empty(dset.num_obs)
     mw = np.empty(dset.num_obs)
 
-    for obs, _ in enumerate(dset.values()):
-        lat, lon, height = dset.site_pos.llh[obs]
+    lat, lon, height = dset.site_pos.pos.llh.T
+    zd = dset.site_pos.zenith_distance
+
+    for obs in range(dset.num_obs):
+
         # Interpolation in time and space in VMF1 grid
-        t = dset.time[obs]
+        # t = dset.time[obs]
         # TODO vlbi t_2
         # if dset._default_field_suffix == '_2':
         # baseline_gcrs = dset.site_pos_2.gcrs - dset.site_pos_1.gcrs
@@ -1042,12 +1048,12 @@ def vmf1_mapping_function(dset):
 
         # t -= timedelta(seconds=delta_t[obs])
         mh[obs], mw[obs] = iers.vmf1_ht(
-            vmf1["ah"](t, lon, lat) * 1e-8,
-            vmf1["aw"](t, lon, lat) * 1e-8,
+            vmf1["ah"](dset.time[obs], lon[obs], lat[obs]) * 1e-8,
+            vmf1["aw"](dset.time[obs], lon[obs], lat[obs]) * 1e-8,
             dset.time.utc.mjd_int[obs],
-            lat,
-            height,
-            dset.site_pos.zenith_distance[obs],
+            lat[obs],
+            height[obs],
+            zd[obs],
         )
 
     return mh, mw
@@ -1068,7 +1074,7 @@ def vmf1_zenith_wet_delay(dset):
     # Get gridded VMF1 data
     vmf1 = apriori.get("vmf1", time=dset.time)
 
-    lat, lon, height = dset.site_pos.llh.T
+    lat, lon, height = dset.site_pos.pos.llh.T
     grid_zwd = vmf1["zw"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
     grid_height = vmf1["ell"](lon, lat, grid=False)
 

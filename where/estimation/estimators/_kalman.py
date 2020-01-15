@@ -13,11 +13,13 @@ algorithm is listed in :cite:`gibbs2011`.
 import numpy as np
 import h5py
 
+# Standard library import
+import os
+
 # Where imports
 from where.lib.unit import Unit
 from where.lib import log
 from where.lib import config
-from where.lib import files
 
 
 class KalmanFilter(object):
@@ -69,10 +71,11 @@ class KalmanFilter(object):
         self.x_hat_ferr = np.zeros((self.num_obs, self.n))
         self.x_smooth = np.zeros((self.num_obs, self.n, 1))
         self.param_names = param_names if param_names else []
-        self.p_hat_file_path = files.path("output_covariance_matrix")
 
-        with h5py.File(self.p_hat_file_path, "w") as p_hat_file:
-            p_hat_file.attrs["labels"] = ", ".join(self.param_names)
+        self.p_hat_file_path = config.files.path("output_covariance_matrix")
+        self.p_hat_file = h5py.File(self.p_hat_file_path, "w")
+        self.p_hat_file.attrs["labels"] = ", ".join(self.param_names)
+        self.p_hat_file.close()
 
     def filter(self):
         """Run the Kalman filter forward and backward
@@ -132,7 +135,7 @@ class KalmanFilter(object):
         """
         # Update dataset with state and estimation fields and calculate new residuals
         self._add_fields(dset, param_names)
-        dset.residual[:] = dset.estimate - (dset.obs - dset.calc)
+        dset.residual[:] = dset.est - (dset.obs - dset.calc)
         num_unknowns += dset.meta.get("num_clock_coeff", 0)
 
         # Calculate normal equations, and add statistics about estimation to dataset
@@ -152,43 +155,38 @@ class KalmanFilter(object):
             if dset.meta.get("analysis_status") == "unchecked":
                 dset.meta["analysis_status"] = "too few degrees of freedom"
 
-                # Update config
-                # with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
-                # cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
         else:
             if dset.meta.get("analysis_status") == "too few degrees of freedom":
                 dset.meta["analysis_status"] = "unchecked"
 
-                # Update config
-                # with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
-                # cfg.update("analysis_status", "status", dset.meta["analysis_status"], source=__file__)
-
         # Report and set analysis status if there are too few stations
         # TODO: if vlbi_site_pos in state_vector and num_stations < 3
-        estimate_site_pos = np.char.startswith(np.array(param_names), "vlbi_site_pos").any()
+        estimate_site_pos = np.char.startswith(np.array(param_names, dtype=str), "vlbi_site_pos").any()
         if len(dset.unique("station")) < 3 and estimate_site_pos:
-            log.error(f"Too few stations {len(dset.unique('station'))} < 3. Do not estimate station positions.")
-            if dset.meta.get("analysis_status") == "unchecked":
-                dset.meta["analysis_status"] = "needs custom state vector"
+            log.warn(f"Too few stations {len(dset.unique('station'))} < 3. Do not estimate station positions.")
+            # if dset.meta.get("analysis_status") == "unchecked":
+            # dset.meta["analysis_status"] = "needs custom state vector"
         elif len(dset.unique("station")) < 3 and estimate_site_pos:
             if dset.meta.get("analysis_status") == "needs custom state vector":
                 dset.meta["analysis_status"] = "unchecked"
         # Update config
-        with config.update_tech_config(dset.rundate, dset.vars["tech"], dset.vars["session"]) as cfg:
+        cfg_vars = dset.vars.copy()
+        cfg_vars.pop("rundate")
+        with config.update_tech_config(dset.analysis["rundate"], cfg_vars.pop("pipeline"), **cfg_vars) as cfg:
             cfg.update("analysis_status", "status", dset.meta.get("analysis_status", ""), source=__file__)
 
         # Add information to dset.meta
-        dset.add_to_meta("statistics", "number of observations", dset.num_obs)
-        dset.add_to_meta("statistics", "number of unknowns", num_unknowns)
-        dset.add_to_meta("statistics", "square sum of residuals", sq_sum_residuals)
-        dset.add_to_meta("statistics", "degrees of freedom", deg_freedom)
-        dset.add_to_meta("statistics", "variance factor", variance_factor)
-        dset.add_to_meta("statistics", "weighted square sum of o-c", sq_sum_residuals + sq_sum_omc_terms)
-        dset.add_to_meta("normal equation", "matrix", N.tolist())
-        dset.add_to_meta("normal equation", "vector", b[:, 0].tolist())
-        dset.add_to_meta("normal equation", "names", param_names[normal_idx])
-        dset.add_to_meta(
-            "normal equation", "unit", [config.tech[f.split("-")[0]].unit.str for f in param_names[normal_idx]]
+        dset.meta.add("number of observations", dset.num_obs, section="statistics")
+        dset.meta.add("number of unknowns", num_unknowns, section="statistics")
+        dset.meta.add("square sum of residuals", sq_sum_residuals, section="statistics")
+        dset.meta.add("degrees of freedom", deg_freedom, section="statistics")
+        dset.meta.add("variance factor", variance_factor, section="statistics")
+        dset.meta.add("weighted square sum of o-c", sq_sum_residuals + sq_sum_omc_terms, section="statistics")
+        dset.meta.add("matrix", N.tolist(), section="normal equation")
+        dset.meta.add("vector", b[:, 0].tolist(), section="normal equation")
+        dset.meta.add("names", param_names[normal_idx], section="normal equation")
+        dset.meta.add(
+            "unit", [config.tech[f.split("-")[0]].unit.str for f in param_names[normal_idx]], section="normal equation"
         )
 
         # TODO should this be here?
@@ -196,13 +194,13 @@ class KalmanFilter(object):
         names = dset.meta["normal equation"]["names"]
         n = len(names)
         d = np.zeros((n, 6))
+        fix_param_weight = np.zeros(n)
+        H = np.zeros((6, n))
         stations = set()
-        reference_frame = config.tech.reference_frames.list[0]
-
         from where import apriori
 
+        reference_frame = config.tech.reference_frames.list[0]
         trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
-
         # thaller2008: eq 2.51 (skipping scale factor)
         for idx, column in enumerate(names):
             if "_site_pos-" not in column:
@@ -210,7 +208,7 @@ class KalmanFilter(object):
             station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
             site_id = dset.meta[station]["site_id"]
             if site_id in trf:
-                x0, y0, z0 = trf[site_id].pos.itrs  # TODO: Take units into account
+                x0, y0, z0 = trf[site_id].pos.trs
                 if column.endswith("_x"):
                     d[idx, :] = np.array([1, 0, 0, 0, z0, -y0])
                 if column.endswith("_y"):
@@ -219,27 +217,46 @@ class KalmanFilter(object):
                     d[idx, :] = np.array([0, 0, 1, y0, -x0, 0])
                 stations.add(station)
 
-        log.info(f"Applying NNT/NNR with {', '.join(stations)} from {reference_frame.upper()}")
-        # thaller2008: eq 2.57
-        try:
-            H = np.linalg.inv(d.T @ d) @ d.T
-        except np.linalg.LinAlgError:
-            H = np.zeros((6, n))
+        if len(stations) >= 3:
+            try:
+                # thaller2008: eq 2.57
+                H = np.linalg.inv(d.T @ d) @ d.T
+                log.info(f"Applying NNT/NNR with {', '.join(stations)} from {reference_frame.upper()}")
+            except np.linalg.LinAlgError:
+                log.warn(f"Unable to invert matrix for NNR/NNT constraints")
+        else:
+            log.info(
+                f"Too few stations to use NNR/NNT contraints from {reference_frame.upper()}. Using absolute constraints for station positions."
+            )
+            # Too few stations to use NNT/NNR?
+            for idx, column in enumerate(names):
+                if "_site_pos-" not in column:
+                    continue
+                station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
+                fix_param_weight[idx] = 1 / (1e-6) ** 2  # 1/meters**2
 
         sigmas = [0.0001] * 3 + [1.5e-11] * 3
 
         # NNR to CRF
         if "celestial_reference_frames" in config.tech.master_section:
             celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-            crf = apriori.get("crf", time=dset.time.mean.utc, celestial_reference_frames=celestial_reference_frame)
+            crf = apriori.get("crf", time=dset.time, celestial_reference_frames=celestial_reference_frame)
             H2 = np.zeros((3, n))
             for idx, column in enumerate(names):
                 if "_src_dir-" not in column:
                     continue
                 source = column.split("-", maxsplit=1)[-1].split("_")[0]
                 if source in crf:
-                    ra = crf[source].pos.crs[0]
-                    dec = crf[source].pos.crs[1]
+                    ra = crf[source].pos.right_ascension
+                    dec = crf[source].pos.declination
+                    if dset.num(source=source) < 5:
+                        fix_param_weight[idx] = 1 / (1e-12) ** 2  # 1/radians**2
+                        if column.endswith("_ra"):
+                            log.info(
+                                f"Too few observations for source {source}. Using absolute constraints for source positions."
+                            )
+                        continue
+
                     if column.endswith("_ra"):
                         H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
                         H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
@@ -257,8 +274,21 @@ class KalmanFilter(object):
         # thaller2008: eq 2.45
         P_h = np.diag(1 / np.array(sigmas) ** 2)
 
-        # thaller2008: eq 2.58
+        # Free network constraints: thaller2008: eq 2.58
         N_h = N + H.T @ P_h @ H
+
+        # Baselines with too few obs?
+        for idx, column in enumerate(names):
+            if "_baseline-" not in column:
+                continue
+            baseline = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
+            if dset.num(baseline=baseline) < 5:
+                fix_param_weight[idx] = 1 / (1e-6) ** 2  # 1/meters**2
+                log.info(f"Too few observations for baseline {baseline}. Constrained to a priori value")
+                continue
+
+        # Absolute constraints (on sources with too few observations): thaller2008: eq.2.49
+        N_h += np.diag(fix_param_weight)
 
         # solve neq
         N_h_inv = np.linalg.inv(N_h)
@@ -267,12 +297,12 @@ class KalmanFilter(object):
         # Covariance: thaller2008: eq 2.16
         Q_xx = variance_factor ** 2 * N_h_inv
 
-        dset.add_to_meta("normal equation", "solution", x[:, 0].tolist())
-        dset.add_to_meta("normal equation", "covariance", Q_xx.tolist())
+        dset.meta.add("solution", x[:, 0].tolist(), section="normal equation")
+        dset.meta.add("covariance", Q_xx.tolist(), section="normal equation")
 
     def cleanup(self):
         if not config.tech.keep_covariance_file.bool:
-            files.delete_file(self.p_hat_file_path)
+            os.remove(self.p_hat_file_path)
 
     def _add_fields(self, dset, param_names):
         """Add fields to the given dataset
@@ -290,7 +320,7 @@ class KalmanFilter(object):
                 continue
 
             # State vectors
-            fieldname = "{}_{}".format("state", param_name)
+            fieldname = f"state.{param_name}"
             fieldname_sigma = fieldname + "_sigma"
             value = self.x_smooth[: dset.num_obs, idx, 0]
             value_sigma = np.sqrt(self.x_hat_ferr[: dset.num_obs, idx])
@@ -299,43 +329,38 @@ class KalmanFilter(object):
                 dset[fieldname][:] = value * dset.meta["display_factors"][param_name]
             else:
                 # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
-                partial_unit = dset.unit("partial_{}".format(param_name))
-                display_unit = dset.meta["display_units"][param_name]
-                factor = Unit("meter / ({})".format(partial_unit), display_unit)
-                dset.add_to_meta("display_factors", param_name, factor)
-                dset.add_float(
-                    fieldname, table="state", val=value * factor, unit=display_unit, write_level="operational"
-                )
+                partial_unit = dset.unit("partial.{}".format(param_name))
+                to_unit = dset.meta["display_units"][param_name]
+                from_unit = f"meter/({partial_unit[0]})"
+                factor = Unit(from_unit, to_unit)
+                dset.meta.add(param_name, factor, section="display_factors")
+                dset.add_float(fieldname, val=value * factor, unit=to_unit, write_level="operational")
 
             if fieldname_sigma in dset.fields:
                 dset[fieldname_sigma][:] = value_sigma * dset.meta["display_factors"][param_name]
             else:
                 # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
-                partial_unit = dset.unit("partial_{}".format(param_name))
-                display_unit = dset.meta["display_units"][param_name]
-                factor = Unit("meter / ({})".format(partial_unit), display_unit)
-                dset.add_to_meta("display_factors", param_name, factor)
-                dset.add_float(
-                    fieldname_sigma,
-                    table="state",
-                    val=value_sigma * factor,
-                    unit=display_unit,
-                    write_level="operational",
-                )
+                partial_unit = dset.unit("partial.{}".format(param_name))
+                to_unit = dset.meta["display_units"][param_name]
+                from_unit = f"meter/({partial_unit[0]})"
+                factor = Unit(from_unit, to_unit)
+                dset.meta.add(param_name, factor, section="display_factors")
+                dset.add_float(fieldname_sigma, val=value_sigma * factor, unit=to_unit, write_level="operational")
 
             # Estimate vectors
-            fieldname = "{}_{}".format("estimate", param_name)
+            fieldname = f"estimate.{param_name}"
             value = self.h[: dset.num_obs, idx, 0] * self.x_smooth[: dset.num_obs, idx, 0]
             if fieldname in dset.fields:
                 dset[fieldname][:] = value
             else:
-                dset.add_float(fieldname, table="estimate", val=value, unit="meter", write_level="analysis")
+                dset.add_float(fieldname, val=value, unit="meter", write_level="analysis")
 
         value = (self.x_smooth.transpose(0, 2, 1) @ self.h)[: dset.num_obs, 0, 0]
-        if "estimate" in dset.fields:
-            dset.estimate[:] = value
+        fieldname = "est"
+        if fieldname in dset.fields:
+            dset[fieldname][:] = value
         else:
-            dset.add_float("estimate", val=value, unit="meter", write_level="operational")
+            dset.add_float(fieldname, val=value, unit="meter", write_level="operational")
 
     def _normal_equations(self, normal_idx, last_obs):
         """Calculate normal equations corresponding to the filter results
@@ -372,21 +397,17 @@ class KalmanFilter(object):
 
             NN = H_g.T @ R_tilde_inv @ H_g
             bb = H_g.T @ R_tilde_inv @ self.z[: last_obs + 1]
-            print("Normal matrix all close:", np.allclose(NN, N, atol=0.01), "Max diff:", np.max(np.abs(NN - N)))
-            print(
-                "Normal vector all close:",
-                np.allclose(bb, b[:, 0], atol=0.01),
-                "Max diff:",
-                np.max(np.abs(bb - b[:, 0])),
-            )
+
+            print("Normal matrix allclose:", np.allclose(NN, N), "Max diff:", np.max(np.abs(NN - N)))
+            print("Normal vector allclose:", np.allclose(bb, b[:, 0]), "Max diff:", np.max(np.abs(bb - b[:, 0])))
             # import IPython; IPython.embed()
         # end test
         return N, b
 
     def _set_p_hat(self, epoch, data):
-        with h5py.File(self.p_hat_file_path) as p_hat_file:
-            p_hat_file.create_dataset(str(epoch), data=data)
+        with h5py.File(self.p_hat_file_path, "a") as fid:
+            fid.create_dataset(str(epoch), data=data)
 
     def _get_p_hat(self, epoch):
-        with h5py.File(self.p_hat_file_path) as p_hat_file:
-            return p_hat_file[str(epoch)][...]
+        with h5py.File(self.p_hat_file_path, "r") as fid:
+            return fid[str(epoch)][...]

@@ -35,9 +35,9 @@ with Fortran, and the Fortran library is what has been used in the GEOSAT legacy
 as follows:
 
     from where.ext import sofa
-    from where.lib.time import Time
+    from where.data.time import Time
 
-    obsdate = Time('2015-08-07')
+    obsdate = Time(datetime(2015, 8, 7), scale="utc", fmt="datetime")
     earth_rotation_angle = sofa.iau_era00(obsdate.jd, 0)
 
 Documentation and tutorials on how to use the SOFA library can be found at the SOFA webpage,

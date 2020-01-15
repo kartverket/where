@@ -17,18 +17,22 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+from midgard.math import ellipsoid
+
 # Where imports
-from where.apriori import trf
+from where.data.position import Position
+from where.apriori.trf import TrfFactory
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 from where import parsers
-from where.lib.time import Time
+from where.data.time import Time
 from where.lib.unit import Unit
 
 
 @plugins.register
-class Slrf(trf.TrfFactory):
+class Slrf(TrfFactory):
     """A parser for reading data from ITRF files in SNX format
     """
 
@@ -99,7 +103,7 @@ class Slrf(trf.TrfFactory):
         """
         return parsers.parse_file("trf_snx", file_path=self.file_paths["snx"]).as_dict()
 
-    def _calculate_pos_itrs(self, site):
+    def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
 
         The positions are calculated as simple linear offsets based on the reference epoch.
@@ -111,7 +115,7 @@ class Slrf(trf.TrfFactory):
             Array:  Positions, one 3-vector for each time epoch.
         """
         station_info = self.data[site]
-        ref_epoch = Time(station_info["ref_epoch"], scale="utc")
+        ref_epoch = Time(station_info["ref_epoch"], scale="utc", fmt="datetime")
 
         pos = np.zeros((self.time.size, 3))
         for pv in station_info["pos_vel"].values():
@@ -127,6 +131,7 @@ class Slrf(trf.TrfFactory):
                 interval_years = np.array([interval_years])
             pos[idx, :] = ref_pos + interval_years[idx, None] * ref_vel[None, :]
 
-        if self.time.size == 1:
-            pos = pos[0, :]
-        return pos
+        ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
+        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
+
+        return np.squeeze(pos_trs)

@@ -6,17 +6,6 @@ Example:
     >>> from where.lib import config
     >>> config.where.path.work.path
     PosixPath('/opt/result/where/work')
-    >>> config.analysis.rundate
-    ConfigurationEntry('rundate', '2009-11-02')
-    >>> config.analysis.rundate.str
-    '2009-11-02'
-    >>> config.analysis.rundate.date
-    datetime.date(2009, 11, 2)
-    >>> config.session.pos_models
-    ConfigurationEntry('pos_models', 'ocean_tides, solid_tides, solid_pole_tides')
-    >>> config.session.pos_models.tuple
-    ('ocean_tides', 'solid_tides', 'solid_pole_tides')
-
 
 Description:
 ------------
@@ -69,13 +58,16 @@ descriptive string and/or indications of how the value has been modified. Some e
 
 # Standard library imports
 from contextlib import contextmanager
+from functools import lru_cache
 import getpass
 import pathlib
 import sys
 
-# Where imports
+# Midgard imports
 from midgard.config.config import Configuration
 from midgard.config.files import FileConfiguration
+
+# Where imports
 from where.lib import enums  # noqa  # Register Where enums
 
 
@@ -102,25 +94,19 @@ FMT_datetime = "%Y-%m-%d %H:%M:%S"
 FMT_dt_file = "%Y%m%d-%H%M%S"
 
 
-def init(rundate, tech_name, session, **cfg_vars):
+def init(rundate, pipeline, **cfg_vars):
     # Update Analysis-configuration
-    set_analysis(rundate, tech=tech_name, session=session, **cfg_vars)
-
-    # Temporarily keep analysis variables in program config
-    prg_vars = program_vars(rundate, tech_name, session=session, **cfg_vars)
-    program.update_from_dict(prg_vars, section="program", source="config.init", allow_new=True)
-    program.master_section = "program"
+    set_analysis(rundate, pipeline=pipeline, **cfg_vars)
 
     # Add variables to Files-configuration
-    set_file_vars(create_file_vars(rundate, tech_name, session=session, **cfg_vars))
+    set_file_vars(create_file_vars(rundate, pipeline, **cfg_vars))
 
     # Read Tech-configuration, and set Where-configuration as parent
-    # TODO: Rename to analysis?
     tech.clear()
     cfg_path = files.config.directory.replaced.path / files.config.filename.replaced.path
     tech.update_from_file(cfg_path)
-    if tech_name in tech.section_names:
-        tech.master_section = tech_name
+    if pipeline in tech.section_names:
+        tech.master_section = pipeline
 
 
 def read_pipeline(pipeline):
@@ -132,18 +118,16 @@ def read_pipeline(pipeline):
 
 def set_analysis(rundate, **cfg_vars):
     """Set analysis configuration
-
-    TODO: The analysis config should eventually replace the program config
     """
-    analysis_vars = program_vars(rundate, cfg_vars["tech"], **cfg_vars)
+    analysis_vars = program_vars(rundate, **cfg_vars)
     analysis.update_from_dict(analysis_vars, section="config", source="config.set_analysis", allow_new=True)
     analysis.master_section = "config"
 
 
-def create_file_vars(rundate, pipeline, session, **cfg_vars):
+def create_file_vars(rundate, pipeline, **cfg_vars):
     """Create variables that can be used with the Files-configuration
     """
-    return dict(program_vars(rundate, pipeline, session=session, **cfg_vars), **date_vars(rundate))
+    return dict(program_vars(rundate, pipeline, **cfg_vars), **date_vars(rundate))
 
 
 def set_file_vars(file_vars=None):
@@ -159,8 +143,8 @@ def set_file_vars(file_vars=None):
         files.update_vars(file_vars)
 
 
-def program_vars(rundate, tech_name, session, use_options=True, **other_vars):
-    prg_vars = dict(rundate="" if rundate is None else rundate.strftime(FMT_date), tech=tech_name, session=session)
+def program_vars(rundate, pipeline, use_options=True, **other_vars):
+    prg_vars = dict(rundate="" if rundate is None else rundate.strftime(FMT_date), pipeline=pipeline)
     prg_vars.setdefault("user", getpass.getuser().lower())
     prg_vars.setdefault("id", "")
 
@@ -178,13 +162,10 @@ def program_vars(rundate, tech_name, session, use_options=True, **other_vars):
             if opt_key in prg_vars:
                 prg_vars[opt_key] = opt_value
 
-    # Update id to make sure it starts with a dash, `-`
-    if prg_vars["id"] and not prg_vars["id"].startswith("-"):
-        prg_vars["id"] = "-{}".format(prg_vars["id"])
-
     return prg_vars
 
 
+@lru_cache()
 def date_vars(date):
     """Construct a dict of date variables
 
@@ -208,11 +189,16 @@ def date_vars(date):
         return dict()
 
     # Import Time locally to avoid circular imports
-    from where.lib.time import Time
+    from where.data.time import Time
 
     month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 
     # Create the dict of date variables
+    try:
+        gpsweek = str(int(Time(date.strftime("%Y-%m-%d %H:%M:%S"), fmt="iso", scale="utc").gps.gps_ws.week))
+    except ValueError:
+        # gps-scale is not defined for 1970-01-01, which is used by timeseries
+        gpsweek = ""
     return dict(
         date=date.strftime("%Y%m%d"),
         yyyy=date.strftime("%Y"),
@@ -227,7 +213,7 @@ def date_vars(date):
         hh=date.strftime("%H"),
         doy=date.strftime("%j"),
         dow=date.strftime("%w"),
-        gpsweek=str(int(Time(date.strftime("%Y-%m-%d %H:%M:%S"), format="iso").gpsweek)),
+        gpsweek=gpsweek,
     )
 
 
@@ -245,8 +231,8 @@ def config_paths(cfg_name, **path_vars):
 
 
 @contextmanager
-def update_tech_config(rundate, pipeline, session, **kwargs):
-    file_vars = create_file_vars(rundate, pipeline, session, **kwargs)
+def update_tech_config(rundate, pipeline, **kwargs):
+    file_vars = create_file_vars(rundate, pipeline, **kwargs)
     cfg_path = files.config.directory.replace(**file_vars).path / files.config.filename.replace(**file_vars).path
 
     with Configuration.update_on_file(cfg_path) as cfg:
@@ -255,8 +241,8 @@ def update_tech_config(rundate, pipeline, session, **kwargs):
     # Todo: Update timestamp file
 
 
-def timestamps(rundate, pipeline, session, **kwargs):
-    file_vars = create_file_vars(rundate, pipeline, session, **kwargs)
+def timestamps(rundate, pipeline, **kwargs):
+    file_vars = create_file_vars(rundate, pipeline, **kwargs)
     ts_path = files.timestamp.directory.replace(**file_vars).path / files.timestamp.filename.replace(**file_vars).path
 
     cfg = Configuration.read_from_file("timestamps", ts_path)
@@ -301,8 +287,6 @@ read_files_config()
 there = Configuration("there")
 read_there_config()
 
-program = Configuration("program")  # Initialized by config.init later
 analysis = Configuration("analysis")  # Initialized by config.init later
 tech = Configuration("tech")  # Initialized by config.init later
 tech.fallback_config = where
-session = Configuration("session")

@@ -10,9 +10,11 @@ gravity field of the Earth.
 
 
 """
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from midgard.math.constant import constant
-from where.lib import plugins
 
 
 @plugins.register

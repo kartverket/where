@@ -21,7 +21,7 @@ import numpy as np
 from where import apriori
 from midgard.math.constant import constant
 from where.ext import sofa
-from where.lib.time import Time, TimeDelta
+from where.data.time import Time, TimeDelta
 
 cdef double c, earth_radius, AU
 cdef double area, mass
@@ -70,12 +70,16 @@ def knocke_setup(
     earth_radius = constant.get("a", source="egm_2008")
     AU = constant.get("AU", source="web")
     c = constant.get("c")
+    flux = constant.get("S")
     area = sat.area
     mass = sat.mass
 
-    flux_table = apriori.get("solar_flux", rundate=rundate)
-    sun_flux = flux_table(time_grid)
+    # Code for using flux data, not in use. 
+    # Using only constant value at the moment.
+    # flux_table = apriori.get("solar_flux", rundate=rundate)
+    # sun_flux = flux_table(time_grid)
 
+    sun_flux = np.repeat(flux, len(epochs))
     if "radiation_pressure_coefficient" in force_parameters:
         radiation_pressure_coefficient = force_parameters["radiation_pressure_coefficient"]
     else:
@@ -88,7 +92,7 @@ def knocke_setup(
 
     for i in range(0, len(epochs)):
         # Days since reference epoch Dec 22 1981
-        days = (epochs.tt[i] - Time("1981-12-22", scale="tt")).jd
+        days = (epochs.tt[i] - Time("1981-12-22", scale="tt", fmt="date")).jd
         omega[i] = 2 * math.pi * days / 365.25
 
         # This is E_S/c in equation 27 in Knocke:

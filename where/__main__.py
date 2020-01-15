@@ -89,16 +89,18 @@ Version: {version}
 # Standard library imports
 import sys
 
+# Midgard imports
+from midgard.dev.timer import Timer
+
 # Where imports
 from where import pipelines
 from where import setup
 from where.lib import config
 from where.lib import log
-from where.lib.timer import timer
 from where.lib import util
 
 
-@timer(f"Finish {util.get_program_name()} in")
+@Timer(f"Finish {util.get_program_name()} in")
 @util.no_traceback
 def main():
     """Parse command line options and run the Where analysis
@@ -119,35 +121,25 @@ def main():
         rundate = util.parse_args("doy", doc_module=__name__)
     else:
         rundate = util.parse_args("date", doc_module=__name__)
-    session = pipelines.get_session(rundate, pipeline)
 
-    # Pretend to empty mailbox
-    pretend_to_empty_mailbox()
+    args, kwargs = util.options2args(sys.argv[1:])
 
     # Start an interactive session
     if util.check_options("-I", "--interactive"):
         from where.tools import interactive  # Local import because interactive imports many external packages
 
-        interactive.interactive(rundate, pipeline, session)
+        interactive.interactive(rundate, pipeline, **kwargs)
         return
 
     # Set up the configuration for a new analysis or update an existing one
-    setup.setup_config(rundate, pipeline, session)
+    unused_options = setup.setup_config(rundate, pipeline, *args, **kwargs)
+
+    pipeline_args, pipeline_kwargs = util.options2args(unused_options)
 
     # Run the analysis
-    setup.add_timestamp(rundate, pipeline, session, "last run")
-    with timer(f"Finish pipeline {pipeline.upper()} in"):
-        pipelines.run(rundate, pipeline, session)
-
-
-def pretend_to_empty_mailbox():
-    """Pretend to try to empty a mailbox
-
-    This function simply prints an error message to stderr. No actual attempt to empty a mailbox is done. This is
-    included purely for nostalgic (and possibly some misunderstood backwards compatibility) reasons :P
-    """
-    if util.check_options("-M", "--mailbox"):
-        print("/var/spool/mail/pha: Permission denied.", file=sys.stderr)
+    setup.add_timestamp(rundate, pipeline, "last run", **kwargs)
+    with Timer(f"Finish pipeline {pipeline.upper()} in"):
+        pipelines.run(rundate, pipeline, *pipeline_args, **pipeline_kwargs)
 
 
 # Run main function only when running as script

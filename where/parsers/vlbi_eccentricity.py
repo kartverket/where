@@ -43,16 +43,15 @@ class VlbiEccentricityParser(LineParser):
 
     def structure_data(self):
         for item in self._array:
-            if not item["site_id"]:
-                # Skip stations without cdp numbers (they all have 0 vector anyway)
-                continue
+            key = (str(item["name"]).strip().replace(" ", "_"), str(item["site_id"]).strip())
+
             if item["coord_type"] == "NEU":
                 # Swap NEU to ENU
-                self.data.setdefault(item["site_id"], {}).setdefault((item["start"], item["end"]), {}).update(
+                self.data.setdefault(key, {}).setdefault((item["start"], item["end"]), {}).update(
                     dict(vector=(item["v2"], item["v1"], item["v3"]), coord_type="ENU")
                 )
             else:
-                self.data.setdefault(item["site_id"], {}).setdefault((item["start"], item["end"]), {}).update(
+                self.data.setdefault(key, {}).setdefault((item["start"], item["end"]), {}).update(
                     dict(vector=(item["v1"], item["v2"], item["v3"]), coord_type=item["coord_type"])
                 )
-            self.data[item["site_id"]]["name"] = item["name"]
+            self.data[key]["name"] = item["name"]

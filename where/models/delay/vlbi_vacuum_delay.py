@@ -16,10 +16,12 @@ potential. Apriori Earth Orientation Parameters are interpolated and corrected f
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from midgard.math.constant import constant
-from where.lib import plugins
 
 
 @plugins.register
@@ -71,25 +73,26 @@ def vlbi_vacuum_delay(dset):
 
     # Calculate each term of the geometric vacuum delay
     vel_earth = eph.vel_bcrs("earth")
-    baseline_gcrs = dset.site_pos_2.gcrs_pos - dset.site_pos_1.gcrs_pos
+    baseline_gcrs = dset.site_pos_2.gcrs.pos - dset.site_pos_1.gcrs.pos
     denominator = (
         1
-        + ((vel_earth + dset.site_pos_2.gcrs_vel)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c)[
+        + ((vel_earth + dset.site_pos_2.gcrs.vel.val)[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c)[
             :, 0, 0
         ]
     )
-    proj_Kb = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs[:, :, None])[:, 0, 0] / denominator
-    proj_Vb = (vel_earth[:, None, :] @ baseline_gcrs[:, :, None] / constant.c)[:, 0, 0] / denominator
+    proj_Kb = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs.mat)[:, 0, 0] / denominator
+    proj_Vb = (vel_earth[:, None, :] @ baseline_gcrs.mat / constant.c)[:, 0, 0] / denominator
 
+    delay = np.zeros(dset.num_obs)
     for term_func in terms:
         field = "vlbi_vacuum_delay_" + term_func.__name__
         values = term_func(dset, proj_Kb, proj_Vb, vel_earth)
         if field in dset.fields:
             dset[field][:] = values
         else:
-            dset.add_float(field, table="vlbi_vacuum_delay", val=values, write_level="detail")
-
-    return np.sum(dset.get_table("vlbi_vacuum_delay"), axis=1)
+            dset.add_float(field, values, write_level="detail", unit="meter")
+        delay += values
+    return delay
 
 
 def term_1(dset, proj_Kb, _, _ve):
@@ -167,7 +170,7 @@ def term_4(dset, proj_Kb, _, vel_earth):
     Returns:
         Numpy array: Part of vacuum delay.
     """
-    return proj_Kb * (vel_earth[:, None, :] @ dset.site_pos_2.gcrs_vel[:, :, None] / constant.c ** 2)[:, 0, 0]
+    return proj_Kb * (vel_earth[:, None, :] @ dset.site_pos_2.gcrs.vel.mat / constant.c ** 2)[:, 0, 0]
 
 
 def term_5(dset, _, proj_Vb, _ve):

@@ -120,7 +120,7 @@ class RinexClkParser(parser.Parser):
 
         for k, v in self.data.items():
             if k == "time":
-                dset.add_time(k, val=v, scale="gps")
+                dset.add_time(k, val=v, scale="gps", fmt="datetime")
             elif k == "satellite":
                 dset.add_text(k, val=v)
             else:

@@ -12,9 +12,12 @@ Description:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
+from where.data.direction import Direction
 from where.apriori import crf
-from where.lib import plugins
 from where import parsers
 
 
@@ -43,4 +46,5 @@ class Vascc(crf.CrfFactory):
             Array:  Positions, one 2-vector
         """
         source_info = self.data[source]
-        return np.array([source_info["ra"], source_info["dec"]])
+        vector = Direction(ra=source_info["ra"], dec=source_info["dec"], time=self.time)
+        return np.squeeze(vector)

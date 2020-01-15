@@ -20,8 +20,10 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.lib import config
 
 # Name of parameter
@@ -41,7 +43,7 @@ def clock(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
-    stations = dset.unique("station")
+    stations = list(dset.unique("station"))
     stations.remove(dset.meta["ref_clock"])
     stations = np.asarray(stations)
 

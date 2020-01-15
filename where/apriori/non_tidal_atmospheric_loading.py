@@ -12,9 +12,11 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from datetime import timedelta
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
 from where import parsers
 
 

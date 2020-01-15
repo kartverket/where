@@ -20,8 +20,8 @@ This script starts a wizard for creating a local configuration file.
 """
 import sys
 import pathlib
+import colorama
 
-from midgard.dev.console import color
 from midgard.dev.exceptions import MissingConfigurationError
 from where.lib import config
 
@@ -100,7 +100,7 @@ def config_wizard(cfg: config.Configuration) -> config.Configuration:
                 continue
 
             description = entry.meta["wizard"] if entry.meta["wizard"] else entry.meta.get("help", "")
-            print(f"\n+ Enter value for {color.Style.BRIGHT}{section}:{key}{color.Style.NORMAL} ({description})")
+            print(f"\n+ Enter value for {colorama.Style.BRIGHT}{section}:{key}{colorama.Style.NORMAL} ({description})")
             value = input(f"  [{entry.str}] ")
             if value:
                 cfg_local.update(section=section, key=key, value=value, source=__name__)
@@ -115,7 +115,7 @@ def help(error_msg: str = "") -> None:
     """
     print(__doc__)
     if error_msg:
-        print(f"\n{color.Fore.RED}Error: {error_msg}")
+        print(f"\n{colorama.Fore.RED}Error: {error_msg}")
 
     raise SystemExit
 

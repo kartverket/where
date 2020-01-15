@@ -13,7 +13,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where.lib import log
-from where.lib import files
+from where.lib import config
 
 
 @plugins.register
@@ -23,7 +23,7 @@ def sisre_output_buffer(dset):
     Args:
         dset:       Dataset, a dataset containing the data.
     """
-    with files.open("output_sisre_buffer", file_vars=dset.vars, mode="at") as fid:
+    with config.files.open("output_sisre_buffer", file_vars=dset.vars, mode="at") as fid:
 
         # Allow only one process to hold an exclusive lock for a given file at a given time
         try:
@@ -32,7 +32,7 @@ def sisre_output_buffer(dset):
             log.fatal("flock() failed to hold an exclusive lock.")
 
         # Append SISRE output file pathes SISRE buffer file
-        file_path = files.path(f"output_sisre_2", file_vars=dset.vars)
+        file_path = config.files.path(f"output_sisre_2", file_vars=dset.vars)
         fid.write(f"{file_path}\n")
 
         # Unlock file

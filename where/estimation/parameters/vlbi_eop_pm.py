@@ -5,18 +5,17 @@ Description:
 
 Calculate the partial derivatives of the :math:`x_p` and :math:`y_p` Earth orientation parameters.
 
-This is done according to equations (2.30) and (2.32) in Teke :cite:`teke2011`.
-
-
 
 
 """
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import rotation
-from where.lib import plugins
 
 
 @plugins.register
@@ -33,7 +32,7 @@ def eop_pm(dset):
     partials = np.zeros((dset.num_obs, 2))
 
     src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
+    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
 
     # x-pole
     partials[:, 0] = -(

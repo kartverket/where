@@ -310,7 +310,7 @@ class DorisRinex3Parser(parser.Parser):
         trf = apriori.get("trf", time=dset.time)
         for site in dset.unique("station"):
             idx = dset.filter(station=site)
-            site_pos[idx, :] = trf[site].pos.itrs[idx, :]
+            site_pos[idx, :] = trf[site].pos.trs[idx, :]
             log.debug(f"Using position {np.mean(site_pos[idx, :], axis=0)} for {site!r}")
         dset.add_position("site_pos", time="time", itrs=site_pos)
 

@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each orbit model should be defined in a separate .py-file. The function inside the .py-file that should be called need
-to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     def gravity_earth(...):
@@ -15,7 +15,7 @@ to be decorated with the :func:`~where.lib.plugins.register` decorator as follow
 The decorated function will be called with several parameters::
 
     TODO: Document parameters
-
+    TODO: Plugins does not work with cython
 
 References:
 -----------
@@ -26,3 +26,5 @@ References:
 
 
 """
+
+from where.models.orbit._orbit import calculate as calculate_orbit, update_orbit  # noqa

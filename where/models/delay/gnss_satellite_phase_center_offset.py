@@ -14,10 +14,12 @@ In this case the satellite antenna phase offset of the first frequency is used a
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from where.lib import gnss
-from where.lib import plugins
 
 
 @plugins.register

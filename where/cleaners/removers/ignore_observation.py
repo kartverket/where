@@ -28,10 +28,12 @@ Example:
 
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
-from where.lib.time import Time
+from where.data.time import Time
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -52,7 +54,7 @@ def ignore_observation(dset):
 
     for observation in observations:
         date, time, *stations = observation.split()
-        epoch = Time(f"{date} {time}", scale="utc", format="iso")
+        epoch = Time(f"{date} {time}", scale="utc", fmt="iso")
         stations = (" ".join(stations)).split("/")  # station names may contain spaces, split at slash instead
 
         remove_idx = dset.time.utc.iso == epoch.utc.iso

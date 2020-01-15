@@ -24,7 +24,6 @@ import sys
 # Where imports
 import where
 from where.lib import config
-from where.lib import files
 from where.lib import log
 
 # Source code cache, used by trace_source
@@ -159,6 +158,19 @@ def parse_args(*param_types, doc_module=None):
         return arguments[0]
 
 
+def options2args(options):
+    """Convert a list of command line options to a args and kwargs """
+    args = list()
+    kwargs = dict()
+    for a in options:
+        if "=" in a:
+            a = a.split("=", maxsplit=1)
+            kwargs[a[0].lstrip("-")] = a[1]
+        else:
+            args.append(a)
+    return args, kwargs
+
+
 def not_implemented():
     """A placeholder for functions that are not implemented yet
 
@@ -231,7 +243,7 @@ def get_user_info(user=None):
     Returns:
         Dict:  Information about user
     """
-    user = config.program.get("user", value=user, default=getpass.getuser().lower()).str
+    user = user if user else getpass.getuser().lower()
     user_info = config.where.get(section="user_info", key=user, default="").as_tuple(", *")
 
     info_dict = dict(user=user, **dict(zip(("name", "email", "inst_abbreviation"), user_info)))
@@ -293,7 +305,7 @@ def write_requirements():
     reqs_str = "\n".join(sorted("{}=={}".format(m, v.strip()) for m, v in reqs.items() if isinstance(v, str)))
 
     # Write to requirements-file
-    with files.open("requirements", mode="w") as fid:
+    with config.files.open("requirements", mode="w") as fid:
         fid.write(reqs_str + "\n")
 
 

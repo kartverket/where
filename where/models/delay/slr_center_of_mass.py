@@ -6,10 +6,11 @@ Description:
 asdf
 
 """
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where import apriori
-from where.lib import plugins
 
 
 @plugins.register
@@ -22,5 +23,5 @@ def center_of_mass(dset):
     Returns:
         Numpy array:     Corrections in meters for each observation.
     """
-    com = apriori.get("slr_center_of_mass", sat_name=dset.dataset_name)
+    com = apriori.get("slr_center_of_mass", sat_name=dset.vars["sat_name"])
     return -com.get(dset.station, dset.time)

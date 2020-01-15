@@ -22,15 +22,15 @@ import numpy as np
 from where import apriori
 from where.lib import config
 from midgard.math.constant import constant
-from where.ext import sofa
+from where.ext import sofa, sofa_wrapper
 
+# Global variables
 cdef double GM_earth, R_earth, GM_moon, GM_sun
 cdef int truncation_level
 cdef double[:, :] sun_pos, moon_pos
 cdef double[:] sun_distance, moon_distance
 cdef Cp, Cm, Sp, Sm
-cdef epoch_list
-cdef double[:] GMST
+cdef epoch_list, delaunay_variables
 cdef double[:, :, :] g2i
 
 
@@ -68,8 +68,9 @@ def tides_setup(
     global truncation_level
     global moon_pos, sun_pos, moon_distance, sun_distance
     global Cp, Cm, Sp, Sm
-    global epoch_list, GMST
+    global epoch_list
     global g2i
+    global delaunay_variables
     epoch_list = epochs
 
     GM_earth = constant.get("GM", source="egm_2008")
@@ -99,8 +100,11 @@ def tides_setup(
     sun_pos = body_pos_itrs[idx_sun, :, :]
     sun_distance = np.linalg.norm(sun_pos, axis=1)
 
-    GMST = epochs.sidereal_time("mean", longitude="greenwich").to("radian").value
+    # Transformation matrix
     g2i = gcrs2itrs
+
+    # Delaunay variables
+    delaunay_variables = delaunay()
 
 
 def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
@@ -141,12 +145,7 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     V, W = compute_VW(sat_pos_itrs)
 
     cdef double[:] acc = np.zeros(3)
-    cdef double[:] delaunay_variables
     gcrs2itrs = g2i[current_step]
-
-    # Need Greenwich mean sidereal time
-    time_now = epoch_list[current_step]
-    delaunay_variables = delaunay(time_now.tt.jd)
 
     cdef double [:, :] C, S
     cdef double[:, :] trans, trans_gcrs, sens_itrs, sens_gcrs
@@ -157,9 +156,9 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     dyz = 0
     dzz = 0
 
-    C, S = solid_earth_tides(gcrs2itrs, delaunay_variables, current_step)
+    C, S = solid_earth_tides(gcrs2itrs, current_step)
     # The ocean tides model does not seem to improve RMS on Lageos, but increases computation time.
-    # C, S = ocean_tides(C, S, GMST[current_step], delaunay_variables)
+    # C, S = ocean_tides(C, S, current_step)
 
     for n in range(0, truncation_level):
         for m in range(0, n + 1):
@@ -281,13 +280,12 @@ cdef compute_VW(double[:] pos_xyz):
     return V, W
 
 
-cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int current_step):
+cdef solid_earth_tides(double[:, :] gcrs2itrs, int current_step):
     """Computing the time variable part of the gravity coefficients of the Earth, following chapter 6 in
     IERS Conventions [2].
 
     Args:
         gcrs2itrs:           Matrix for transforming from gcrs to itrs.
-        delaunay_variables:  Variables for use in tidal model, described in Section 5.7 in IERS Conventions [2].
         current_step:        Current step number of the integrator
 
     Returns:
@@ -299,18 +297,12 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
 
     cdef int n, m
     cdef double[:, :] C, S
-    cdef double longitude_moon, latitude_moon, longitude_sun, latitude_sun
     cdef complex factor_sun, factor_moon, correction
     V_sun, W_sun = compute_VW(sun_pos[current_step])
     V_moon, W_moon = compute_VW(moon_pos[current_step])
 
     C = np.zeros((truncation_level, truncation_level))
     S = np.zeros((truncation_level, truncation_level))
-    # Earth-fixed geodetic coordinates of the Moon.
-    longitude_moon, latitude_moon, _, _ = sofa.iau_gc2gd(1, moon_pos[current_step])
-
-    # Earth-fixed geodetic coordinates of the Sun.
-    longitude_sun, latitude_sun, _, _ = sofa.iau_gc2gd(1, sun_pos[current_step])
 
     sun_distance_now = sun_distance[current_step]
     moon_distance_now = moon_distance[current_step]
@@ -339,30 +331,29 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, double[:] delaunay_variables, int
             S[4, m] = correction.imag * normalization_factor(2, m) * normalization_factor(4, m)
 
     # Eqation (6.8a)
-    C[2, 0] += normalization_factor(2, 0) * equation_68a(delaunay_variables)
+    C[2, 0] += normalization_factor(2, 0) * equation_68a(current_step)
 
     # Equation (6.8b) with m=1.
-    correction1, correction2 = equation_68b_m1(GMST[current_step], delaunay_variables)
+    correction1, correction2 = equation_68b_m1(current_step)
     C[2, 1] += normalization_factor(2, 1) * correction1
     S[2, 1] += normalization_factor(2, 1) * correction2
 
     # Equation (6.8b) with m=2.
-    correction3, correction4 = equation_68b_m2(GMST[current_step], delaunay_variables)
+    correction3, correction4 = equation_68b_m2(current_step)
     C[2, 2] += normalization_factor(2, 2) * correction3
     S[2, 2] += normalization_factor(2, 2) * correction4
 
     return C, S
 
 
-def ocean_tides(C, S, GMST, delaunay_variables):
+def ocean_tides(C, S, int current_step):
     """Computing the time variable part of the gravity coefficients of the Earth due to ocean tides
 
     Following chapter 6.3 in [2].
 
     Args:
         C,S:                 Gravity coefficients without ocean tides.
-        GMST:                Greenwich mean sidereal times.
-        delaunay_variables:  Variables for use in tidal model, described in Section 5.7 in IERS Conventions [2].
+        current_step:        Int, Current step of the integrator
 
     Returns:
         C, S:                Time variable part of gravity coefficients with ocean tides at time t.
@@ -370,6 +361,10 @@ def ocean_tides(C, S, GMST, delaunay_variables):
     delaunay_multipliers_a, _, _, doodson_a = table_65a()
     delaunay_multipliers_b, _, _, doodson_b = table_65b()
     delaunay_multipliers_c, _, doodson_c = table_65c()
+
+
+    # Greenwich mean sidereal time in radians
+    cdef double GMST = epoch_list.ut1.gmst[current_step]
 
     # Equation 6.15
     for n in range(0, C.shape[0]):
@@ -392,8 +387,8 @@ def ocean_tides(C, S, GMST, delaunay_variables):
                 if delaunay_multipliers == []:
                     break
 
-                sin_theta_f = math.sin(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables))
-                cos_theta_f = math.cos(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables))
+                sin_theta_f = math.sin(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
+                cos_theta_f = math.cos(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
 
                 C[n, m] += normalization_factor(n, m)**2 * (Cp[n, m][doodson] * cos_theta_f
                                 + Sp[n, m][doodson] * sin_theta_f + Cm[n, m][doodson] * cos_theta_f
@@ -476,12 +471,12 @@ cdef k_anelastic(int n, int m):
     return k
 
 
-cdef equation_68a(double[:] delaunay_variables):
+cdef equation_68a(current_step):
     """
     Equation (6.8a) in IERS Conventions [2].
 
     Args:
-        delaunay_variables:  Variables for use in tidal model, described in Section 5.7 in IERS Conventions [2].
+    
     Returns:
         float:               Contribution to the gravity coefficient C20 from equation 6.8a.
     """
@@ -495,7 +490,7 @@ cdef equation_68a(double[:] delaunay_variables):
     cos_theta_f = np.zeros(delaunay_multipliers.shape[0])
 
     for i in range(0, delaunay_multipliers.shape[0]):
-        argument = np.dot(delaunay_multipliers[i], delaunay_variables)
+        argument = np.dot(delaunay_multipliers[i], delaunay_variables[current_step])
         sin_theta_f[i] = math.sin(argument)
         cos_theta_f[i] = math.cos(argument)
 
@@ -548,7 +543,7 @@ cdef table_65b():
     return delaunay_multipliers, ip, op, doodson
 
 
-cdef equation_68b_m1(double GMST, double[:] delaunay_variables):
+cdef equation_68b_m1(int current_step):
     """
     Equation (6.8b) (with m=1) in the reference below.
 
@@ -557,18 +552,22 @@ cdef equation_68b_m1(double GMST, double[:] delaunay_variables):
     """
     cdef long[:, :] delaunay_multipliers
     cdef double[:] ip, op, sin_theta_f, cos_theta_f
+    # Greenwich mean sidereal time in radians
+    cdef double GMST = epoch_list.ut1.gmst[current_step]
+
+ 
     delaunay_multipliers, ip, op, _ = table_65a()
 
     sin_theta_f = np.zeros(delaunay_multipliers.shape[0])
     cos_theta_f = np.zeros(delaunay_multipliers.shape[0])
 
     for i in range(0, delaunay_multipliers.shape[0]):
-        sin_theta_f[i] = math.sin(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables))
-        cos_theta_f[i] = math.cos(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables))
+        sin_theta_f[i] = math.sin(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        cos_theta_f[i] = math.cos(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
 
     return (
-        math.sqrt(5 / 3) * (np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip)),
-        -math.sqrt(5 / 3) * (-np.dot(cos_theta_f, ip) + np.dot(sin_theta_f, op))
+        np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip),
+        -np.dot(cos_theta_f, ip) + np.dot(sin_theta_f, op)
     )
 
 
@@ -626,23 +625,24 @@ cdef table_65a():
     return delaunay_multipliers, ip, op, doodson
 
 
-cdef equation_68b_m2(double GMST, double[:] delaunay_variables):
+cdef equation_68b_m2(int current_step):
     """
     Equation (6.8b) (with m=2) in IERS Conventions [2].
     """
+    # Greenwich mean sidereal time in radians
+    cdef double GMST = epoch_list.ut1.gmst[current_step]
 
     delaunay_multipliers, ip, _ = table_65c()
-    normalization_factor = math.sqrt(5/12)
 
     sin_theta_f = np.zeros(delaunay_multipliers.shape[0])
     cos_theta_f = np.zeros(delaunay_multipliers.shape[0])
 
     for i in range(0, delaunay_multipliers.shape[0]):
-        sin_theta_f[i] = math.sin(2*(GMST + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables))
-        cos_theta_f[i] = math.cos(2*(GMST + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables))
+        sin_theta_f[i] = math.sin(2*(GMST + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        cos_theta_f[i] = math.cos(2*(GMST + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
 
-    C_correction = normalization_factor*np.dot(cos_theta_f, ip)
-    S_correction = -normalization_factor*np.dot(sin_theta_f, ip)
+    C_correction = np.dot(cos_theta_f, ip) 
+    S_correction = -np.dot(sin_theta_f, ip) 
 
     return C_correction, S_correction
 
@@ -696,31 +696,25 @@ cdef equation_69(n):
     return k210
 
 
-cdef delaunay(double tt):
+cdef delaunay():
     """
-    The Delaunay variables as function of time.
+    The Delaunay variables in all the relevant epochs for the integrator
 
     Input:
-        tt:  Time, in tt
+        
 
     Returns:
         Five Delaunay variables, l, lprime, F, D, Omega, see section 5.7 in IERS Conventions [2] for their definition.
+        One for each time in epoch_list
     """
-    # Julian day for January 2000 1d 12h
-    cdef double tt_2000 = 2451545.0
 
-    # Time to be given in Julian centuries.
-    cdef double t = (tt - tt_2000) / 36525
-
-    cdef double l, lprime, F, D, Omega
-
-    l = 134.96340251 + 1 / 3600 * (1717915923.2178 * t + 31.8792 * t**2 + 0.051635 * t**3 - 0.00024470 * t**4)
-    lprime = 357.52910918 + 1 / 3600 * (129596581.0481 * t - 0.5532 * t**2 + 0.000136 * t**3 - 0.00001149 * t**4)
-    F = 93.27209062 + 1 / 3600 * (1739527262.8478 * t - 12.7512 * t**2 - 0.001037 * t**3 + 0.00000417 * t**4)
-    D = 297.85019547 + 1 / 3600 * (1602961601.2090 * t - 6.3706 * t**2 + 0.006593 * t**3 - 0.00003169 * t**4)
-    Omega = 125.04455501 + 1 / 3600 * (-6962890.5431 * t + 7.4722 * t**2 + 0.007702 * t**3 - 0.00005939 * t**4)
-
-    return np.array([math.radians(l), math.radians(lprime), math.radians(F), math.radians(D), math.radians(Omega)])
+    fundamental_arguments = np.vstack((sofa_wrapper.vectorized_iau_fal03(epoch_list), 
+                                       sofa_wrapper.vectorized_iau_falp03(epoch_list), 
+                                       sofa_wrapper.vectorized_iau_faf03(epoch_list), 
+                                       sofa_wrapper.vectorized_iau_fad03(epoch_list), 
+                                       sofa_wrapper.vectorized_iau_faom03(epoch_list)))
+    
+    return fundamental_arguments.T
 
 
 cdef normalization_factor(int n, int m):
@@ -733,4 +727,4 @@ cdef normalization_factor(int n, int m):
     Returns
        integer
     """
-    return np.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m ==0)) / math.factorial(n + m))
+    return np.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m == 0)) / math.factorial(n + m))

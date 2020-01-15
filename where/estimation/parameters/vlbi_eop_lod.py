@@ -11,9 +11,11 @@ Calculate the partial derivatives of the Earth orientation parameter Length of D
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import rotation
-from where.lib import plugins
 
 
 @plugins.register
@@ -29,7 +31,7 @@ def eop_lod(dset):
     column_name = ["lod"]
 
     src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
+    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
     dR_dut1 = rotation.dR_dut1(dset.time)
     dt = (dset.time.jd - dset.time.mean.jd)[:, None, None]
     # lod = - ut1_rate * 1 day -> lod_partial = - ut1_rate_partial / 1 day

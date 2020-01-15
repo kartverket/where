@@ -60,10 +60,3 @@ each compiled to its own python module. The correct one can then be imported
 using something like
 
     from where.ext import iers_2010 as iers
-
-
-Contact:
---------
-
-+ Geir Arne Hjelle <geir.arne.hjelle@kartverket.no>
-

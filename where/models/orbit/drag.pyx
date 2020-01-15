@@ -16,7 +16,6 @@ import math
 
 # Where imports
 from where import apriori
-from where.lib import plugins
 
 cdef double drag_coefficient
 cdef double area

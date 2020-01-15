@@ -16,7 +16,6 @@ from midgard.dev import plugins
 # Where imports
 from where import apriori
 from where.lib import config
-from where.lib import files
 
 
 @plugins.register
@@ -27,7 +26,7 @@ def rinex2_nav(dset):
         dset:       Dataset, a dataset containing the data.
     """
     for date_offset in range(-1, 2):
-        write_one_day(dset, dset.rundate + timedelta(days=date_offset))
+        write_one_day(dset, dset.analysis["rundate"] + timedelta(days=date_offset))
 
 
 def write_one_day(dset, date):
@@ -39,10 +38,8 @@ def write_one_day(dset, date):
     """
     brdc = apriori.get(
         "orbit",
-        rundate=dset.rundate,
-        time=dset.time,
-        satellite=tuple(dset.satellite),
-        system=tuple(dset.system),
+        rundate=dset.analysis["rundate"],
+        system=tuple(dset.unique("system")),
         station=dset.vars["station"],
         apriori_orbit="broadcast",
     )
@@ -54,7 +51,7 @@ def write_one_day(dset, date):
         "doy"
     ]  # TODO: workaround, so that all files are written in the same working directory -> does not work if year is changed.
 
-    with files.open("output_rinex2_nav", file_vars=file_vars, mode="wt") as fid:
+    with config.files.open("output_rinex2_nav", file_vars=file_vars, mode="wt") as fid:
 
         #
         # Write RINEX navigation header

@@ -18,10 +18,12 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
 from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register
@@ -35,7 +37,7 @@ def vlbi_axis_offset(dset):
         Numpy array: Corrections in meters for each observation
     """
     data_out = np.zeros(dset.num_obs)
-    for multiplier in dset.for_each("station"):
+    for multiplier in dset.for_each_suffix("station"):
         data_out += multiplier * axis_offset_station(dset)
 
     return data_out
@@ -54,13 +56,15 @@ def axis_offset_station(dset):
     delays = np.zeros(dset.num_obs)
 
     sin_a = np.sin(dset.site_pos.azimuth)
+    sin_e = np.sin(dset.site_pos.elevation)
     cos_a = np.cos(dset.site_pos.azimuth)
     cos_e = np.cos(dset.site_pos.elevation)
     cos_d = np.cos(dset.src_dir.declination)
 
     for ivsname in dset.unique("ivsname"):
+        site_id = dset.meta[ivsname]["site_id"] if ivsname in dset.meta else ""
         if ivsname not in antenna_info:
-            log.warn(f"Missing antenna axis offset for ivsname {ivsname!r}. Correction set to zero.")
+            log.warn(f"Missing antenna axis offset for ivsname {ivsname!r} ({site_id}). Correction set to zero.")
             continue
 
         idx = dset.filter(ivsname=ivsname)
@@ -75,8 +79,20 @@ def axis_offset_station(dset):
             delays[idx] = -ao * np.sqrt(1 - (cos_e[idx] * cos_a[idx]) ** 2)
         elif axis_type == "MO_XYEA":
             delays[idx] = -ao * np.sqrt(1 - (cos_e[idx] * sin_a[idx]) ** 2)
+        elif axis_type == "MO_RICH":
+            # Special case for RICHMOND station
+            phi = np.radians(39.06)
+            dlam = np.radians(-0.12)
+            delays[idx] = -ao * np.sqrt(
+                1
+                - (
+                    sin_e[idx] * np.sin(phi)
+                    + cos_e[idx] * np.cos(phi) * (cos_a[idx] * np.cos(dlam) + sin_a[idx] * np.sin(dlam))
+                )
+                ** 2
+            )
         else:
-            log.warn(f"Unknown antenna axis type {axis_type!r} for {ivsname}. Correction set to zero")
+            log.warn(f"Unknown antenna axis type {axis_type!r} for {ivsname} ({site_id}). Correction set to zero")
             continue
 
     return delays

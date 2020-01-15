@@ -8,9 +8,9 @@ precise orbit dataset with 5 min data interval. The comparison follows the examp
 
 -------
 
-$Revision: 15011 $
-$Date: 2018-05-04 16:19:35 +0200 (fr., 04 mai 2018) $
-$LastChangedBy: hjegei $
+$Revision: 18000 $
+$Date: 2019-06-28 14:20:19 +0200 (Fri, 28 Jun 2019) $
+$LastChangedBy: kirann $
 """
 
 
@@ -26,7 +26,6 @@ import pytest
 from where import parsers
 from where import data
 from where.lib import config
-from where.lib import files
 from where.lib import mathp
 
 
@@ -62,7 +61,7 @@ rundate = datetime(year, month, day, hour, minute, second)
 file_vars = config.date_vars(rundate)
 
 # Define 15 min dataset
-file_path = files.path(file_key="test_gnss_orbit_interpolation_15min", file_vars=file_vars)
+file_path = config.files.path(file_key="test_gnss_orbit_interpolation_15min", file_vars=file_vars)
 orb_15min = data.Dataset(
     rundate, tech=None, stage=None, dataset_name="gnss_precise_orbit_15min", dataset_id=0, empty=True
 )
@@ -70,7 +69,7 @@ parser = parsers.parse(parser_name="orbit_sp3c", file_path=file_path, rundate=ru
 parser.write_to_dataset(orb_15min)
 
 # Define 5 min control dataset
-file_path = files.path(file_key="test_gnss_orbit_interpolation_5min", file_vars=file_vars)
+file_path = config.files.path(file_key="test_gnss_orbit_interpolation_5min", file_vars=file_vars)
 orb_5min = data.Dataset(
     rundate, tech=None, stage=None, dataset_name="gnss_precise_orbit_15min", dataset_id=0, empty=True
 )

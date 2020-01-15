@@ -4,7 +4,6 @@ This test simply compares the result of a SISRE analysis with the result obtaine
 guarantee that the results are correct. It will however test that the results have not changed.
 
 """
-
 # System library imports
 from datetime import date
 

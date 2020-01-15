@@ -13,9 +13,11 @@ Calculate the partial derivatives of the rate of the :math:`x_p` and :math:`y_p`
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import rotation
-from where.lib import plugins
 
 
 @plugins.register
@@ -33,7 +35,7 @@ def eop_pm_rate(dset):
 
     time = dset.time
     src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.itrs_pos - dset.site_pos_1.itrs_pos)[:, :, None]
+    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
     dt = (time.jd - time.mean.jd)[:, None, None]
 
     # x-pole

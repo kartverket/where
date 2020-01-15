@@ -3,17 +3,18 @@
 Description:
 ------------
 
-Asdf.
+
 
 """
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where import apriori
-from where.lib import config
 from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register
@@ -41,7 +42,9 @@ def data_handling(dset):
             intervals = handling.get(station, {}).get(key, [])
             for interval in intervals:
                 start_x, end_x = interval[0]
-                int_idx = dset.filter(station=station) & (dset.time >= start_x) & (dset.time <= end_x)
+                int_idx = (
+                    dset.filter(station=station) & (dset.time.datetime >= start_x) & (dset.time.datetime <= end_x)
+                )
                 if np.any(int_idx):
                     log.debug(f"Removed data for station {station} in interval {start_x}-{end_x}, marked with {key}")
                     remove_idx |= int_idx

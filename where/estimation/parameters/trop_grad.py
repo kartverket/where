@@ -19,8 +19,10 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.lib import config
 
 # Name of parameter
@@ -49,7 +51,7 @@ def trop_grad(dset):
         stations = stations[np.logical_not(skip_idx)]
 
     partials = np.zeros((dset.num_obs, len(stations) * 2))
-    for multiplier in dset.for_each("station"):
+    for multiplier in dset.for_each_suffix("station"):
         gn = dset.troposphere_mg * np.cos(dset.site_pos.azimuth)
         ge = dset.troposphere_mg * np.sin(dset.site_pos.azimuth)
         for site_idx, station in enumerate(stations):

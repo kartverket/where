@@ -21,37 +21,40 @@ gsdtime_sun(time)                              -> Midgard: planetary_motion?
 get_earth_rotation(dset)                       -> Midgard: PosVel (see function)
 get_code_observation(dset)                     -> Midgard: gnss
 get_flight_time(dset)                          -> Midgard: PosVel (see function)
-get_gnss_freq(sys, obstype)                    -> Midgard: gnss
+obstype_to_freq(sys, obstype)                  -> Midgard: gnss
 get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None)  -> Midgard: gnss
 get_line_of_sight(dset)                        -> Midgard: Position library
 get_rinex_file_version(file_key, file_vars)    -> Is that needed in the future?
 gpssec2jd(wwww, sec)                           -> in time.gps_ws
 Example:
-    from where.lib import time
-    t = time.Time([2000, 2000, 2000, 2004], [0, 100000, 200000, 86400], format="gps_ws", scale="gps")
+    from where.data import time
+    t = time.Time([2000, 2000, 2000, 2004], [0, 100000, 200000, 86400], fmt="gps_ws", scale="gps")
     t.gps_ws
 jd2gps(jd)                                     -> in time
-ionosphere_free_combination(dset)              -> Midgard: gnss
+linear_combination(dset)                       -> Midgard: gnss
 llh2xyz(lat, lon, h)                           -> midgard.math.transformation.llh2trs
 plot_skyplot(dset)                             -> Midgard: plot
 
 Should we more specific in using arguments, that instead of using 'dset'? -> Maybe
 
 """
+# Standard library imports
+from typing import Tuple
 
 # External library imports
 import numpy as np
 import matplotlib.pyplot as plt
 
-# WHERE imports
-from where import apriori
-from where.lib import config
+# Migard imports
+from midgard.collections import enums
 from midgard.math.constant import constant
-from where.lib import files
+
+# Where imports
+from where.lib import config
 from where.lib import log
 from where.lib import mathp
 from where.lib import rotation
-from where.lib.time import TimeDelta
+from where.data.time import TimeDelta
 
 
 def check_satellite_eclipse(dset):
@@ -170,15 +173,14 @@ def get_earth_rotation(dset):
     flight_time = get_flight_time(dset)
     rotation_angle = flight_time * constant.omega
 
-    for idx in range(0, dset.num_obs):  # TODO: Vectorize
-        sat_pos[idx] = (
-            rotation.R3(rotation_angle[idx]).dot(dset.sat_posvel.itrs_pos[idx]) - dset.sat_posvel.itrs_pos[idx]
-        )
-        sat_vel[idx] = (
-            rotation.R3(rotation_angle[idx]).dot(dset.sat_posvel.itrs_vel[idx]) - dset.sat_posvel.itrs_vel[idx]
-        )
+    sat_pos = (
+        rotation.R3(rotation_angle) @ dset.sat_posvel.trs.pos.val[:, :, None] - dset.sat_posvel.trs.pos.val[:, :, None]
+    )
+    sat_vel = (
+        rotation.R3(rotation_angle) @ dset.sat_posvel.trs.vel.val[:, :, None] - dset.sat_posvel.trs.vel.val[:, :, None]
+    )
 
-    return sat_pos, sat_vel
+    return sat_pos[:, :, 0], sat_vel[:, :, 0]
 
 
 def get_code_observation(dset):
@@ -205,10 +207,10 @@ def get_code_observation(dset):
         for sys in dset.unique("system"):
             idx = dset.filter(system=sys)
             obstype = dset.meta["obstypes"][sys][0]
-            code_obs = dset[obstype][idx]
+            code_obs = dset.obs[obstype][idx]
 
     elif freq_type == "dual":
-        code_obs, _ = ionosphere_free_combination(dset)
+        code_obs, _ = linear_combination("ionosphere-free", dset)
     else:
         log.fatal(
             "Configuration option 'freq_type = {}' is not valid (Note: Triple frequency solution is not " "in use.).",
@@ -237,7 +239,31 @@ def get_flight_time(dset):
     return geometric_range / constant.c
 
 
-def get_gnss_freq(sys, obstype):
+def get_number_of_satellites(dset: "Dataset") -> np.ndarray:
+    """Get number of satellites per epoch
+
+    Args:
+        dset:  A dataset containing the data.
+
+    Returns:
+        Number of satellites per epoch
+    """
+    num_satellite = np.zeros((dset.num_obs))
+
+    for sys in dset.unique("system"):
+        idx_sys = dset.filter(system=sys)
+        num_satellite_epoch = np.zeros((len(dset.system[idx_sys])))
+
+        for time in dset.unique("time"):
+            idx = dset.time.datetime[idx_sys] == time.datetime
+            num_satellite_epoch[idx] = len(dset.satellite[idx_sys][idx])
+
+        num_satellite[idx_sys] = num_satellite_epoch
+
+    return num_satellite
+
+
+def obstype_to_freq(sys, obstype):
     """Get GNSS frequency based on given GNSS observation type
 
     Args:
@@ -247,44 +273,8 @@ def get_gnss_freq(sys, obstype):
     Return:
         float:    GNSS frequency in [Hz]
     """
-
-    # GNSS          Freq number      GNSS freq
-    #               L<num>/C<num>
-    # ___________________________________________
-    # C (BeiDou):   2                'B1'
-    #               7                'B2'
-    #               6                'B3'
-    # G (GPS):      1                'L1'
-    #               2                'L2'
-    #               5                'L5'
-    # R (GLONASS):  1                'G1'
-    #               2                'G2'
-    #               3                'G3'
-    # E (Galileo):  1                'E1'
-    #               8                'E5 (E5a+E5b)'
-    #               5                'E5a'
-    #               7                'E5b'
-    #               6                'E6'
-    # I (IRNSS):    5                'L5'
-    #               9                'S'
-    # J (QZSS):     1                'L1'
-    #               2                'L2'
-    #               5                'L5'
-    #               6                'LEX'
-    # S (SBAS):     1                'L1'
-    #               5                'L5'
-    obstype_to_gnss_freq = {
-        "C": {"2": "B1", "7": "B2", "6": "B3"},
-        "E": {"1": "E1", "8": "E5", "5": "E5a", "7": "E5b", "6": "E6"},
-        "G": {"1": "L1", "2": "L2", "5": "L5"},
-        "I": {"5": "L5", "9": "S"},
-        "J": {"1": "L1", "2": "L2", "5": "L5", "6": "LEX"},
-        "R": {"1": "G1", "2": "G2", "3": "G3"},
-        "S": {"1": "L1", "5": "L5"},
-    }
-
     try:
-        freq = constant.get("gnss_freq_" + sys, source=obstype_to_gnss_freq[sys][obstype[1]])
+        freq = getattr(enums, "gnss_freq_" + sys)[getattr(enums, "gnss_num2freq_" + sys)["f" + obstype[1]]]
     except KeyError:
         log.fatal(f"Frequency for GNSS '{sys}' and observation type '{obstype}' is not defined.")
 
@@ -334,7 +324,7 @@ def get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None):
     #       are not corrected for time of flight determined based on pseudorange observations. Instead the given
     #       Dataset time entries are directly used.
     flight_time = np.zeros(dset.num_obs)
-    if "obs" in dset.tables:
+    if "obs" in dset.fields:
         for sys in dset.unique("system"):
 
             # Get code observation type defined by given observation and observation type priority list
@@ -345,7 +335,7 @@ def get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None):
             )
 
             idx = dset.filter(system=sys)
-            flight_time[idx] = dset[obstype][idx] / constant.c
+            flight_time[idx] = dset.obs[obstype][idx] / constant.c
 
     if sat_clock_corr is not None:
         flight_time += sat_clock_corr / constant.c
@@ -353,7 +343,7 @@ def get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None):
     if rel_clock_corr is not None:
         flight_time += rel_clock_corr / constant.c
 
-    return TimeDelta(flight_time, format="sec")
+    return TimeDelta(flight_time, fmt="seconds", scale="gps")
 
 
 # TODO: already in Position via 'direction'
@@ -364,13 +354,14 @@ def get_line_of_sight(dset):
     return mathp.unit_vector(dset.sat_posvel.itrs_pos - dset.site_pos.itrs)
 
 
-def get_rinex_file_version(file_key, file_vars=None):
+def get_rinex_file_version(file_key=None, file_vars=None, file_path=None):
     """ Get RINEX file version for a given file key
 
     Args:
         file_key:       File key defined in files.conf file (e.g. given for RINEX navigation or observation file)
-        vars:           Variables needed to identify RINEX file based on definition in files.conf file.
-
+        file_vars:      Variables needed to identify RINEX file based on definition in files.conf file.
+        file_path (pathlib.PosixPath):  File path to broadcast orbit file.
+        
     Returns:
         tuple:         with following elements
 
@@ -382,8 +373,10 @@ def get_rinex_file_version(file_key, file_vars=None):
     ===============  ==================================================================================
     """
     file_vars = dict() if file_vars is None else file_vars
-    file_path = files.path(file_key, file_vars=file_vars)
-    with files.open(file_key, file_vars=file_vars, mode="rt") as infile:
+    if file_path is None:
+        file_path = config.files.path(file_key, file_vars=file_vars)
+
+    with config.files.open_path(file_path, mode="rt") as infile:
         try:
             version = infile.readline().split()[0]
         except IndexError:
@@ -441,23 +434,25 @@ def jd2gps(jd):
     return wwww, wd, frac, gpssec
 
 
-def ionosphere_free_combination(dset):
-    """Calculate ionosphere-free linear combination of observations.
+def linear_combination(type_: str, dset: "Dataset") -> Tuple[np.ndarray]:
+    """Calculate linear combination of observations for given linear combination type
+
     Args:
         dset:    Dataset
+        type_:   Type of linear combination: 'ionosphere-free'
 
     Returns:
-        tuple:  with following `numpy.ndarray` arrays
+        Tuple  with following `numpy.ndarray` arrays
 
-    ===============  ============================================================================================
-     Elements         Description
-    ===============  ============================================================================================
-     C_IF             Array with ionosphere-free linear combination of pseudorange observations in [m].
-     L_IF             Array with ionosphere-free linear combination of carrier phase observations in [m].
-    ===============  ============================================================================================
+    ===================  ============================================================================================
+     Elements             Description
+    ===================  ============================================================================================
+     code_obs_combined    Array with combined code observations in [m].
+     phase_obs_combined   Array with combined carrier phase observations in [m].
+    ===================  ============================================================================================
     """
-    C_IF = np.zeros(dset.num_obs)
-    L_IF = np.zeros(dset.num_obs)
+    code_obs_combined = np.zeros(dset.num_obs)
+    phase_obs_combined = np.zeros(dset.num_obs)
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
@@ -467,23 +462,53 @@ def ionosphere_free_combination(dset):
         # NOTE: The GNSS observation types defined in meta variable 'obstypes' has a defined order, which is determined
         #       by the given observation types for each GNSS and the priority list.
         #
-        C1 = dset.meta["obstypes"][sys][0]  # Pseudorange observation for 1st frequency
-        L1 = dset.meta["obstypes"][sys][1]  # Carrier phase observation for 1st frequency
-        C2 = dset.meta["obstypes"][sys][2]  # Pseudorange observation for 2nd frequency
-        L2 = dset.meta["obstypes"][sys][3]  # Carrier phase observation for 2nd frequency
+        #
+        observation_code = config.tech.gnss_select_obs.obs_code.str
+        if observation_code == "code":
+            C1 = dset.meta["obstypes"][sys][0]  # Pseudorange observation for 1st frequency
+            C2 = dset.meta["obstypes"][sys][1]  # Pseudorange observation for 2nd frequency
+        elif observation_code == "phase":
+            L1 = dset.meta["obstypes"][sys][0]  # Carrier phase observation for 1st frequency
+            L2 = dset.meta["obstypes"][sys][1]  # Carrier phase observation for 2nd frequency
+        elif observation_code == "code:phase":
+            C1 = dset.meta["obstypes"][sys][0]  # Pseudorange observation for 1st frequency
+            L1 = dset.meta["obstypes"][sys][1]  # Carrier phase observation for 1st frequency
+            C2 = dset.meta["obstypes"][sys][2]  # Pseudorange observation for 2nd frequency
+            L2 = dset.meta["obstypes"][sys][3]  # Carrier phase observation for 2nd frequency
+        else:
+            log.fatal(f"Linear combination determination is not defined for observation code {observation_code}.")
 
-        f1 = constant.get("gnss_freq_" + L1[1], source=sys)  # Frequency of 1st band (C1/L1)
-        f2 = constant.get("gnss_freq_" + L2[1], source=sys)  # Frequency of 2nd band (C2/L2)
+        if type_ == "ionosphere-free":
+            if "code" in observation_code:
+                f1 = getattr(enums, "gnss_freq_" + sys)["f" + C1[1]]  # Frequency of 1st band
+                f2 = getattr(enums, "gnss_freq_" + sys)["f" + C2[1]]  # Frequency of 2nd band
+                code_obs_combined[idx] = ionosphere_free_linear_combination(dset[C1][idx], dset[C2][idx], f1, f2)
+            elif "phase" in observation_code:
+                f1 = getattr(enums, "gnss_freq_" + sys)["f" + L1[1]]  # Frequency of 1st band
+                f2 = getattr(enums, "gnss_freq_" + sys)["f" + L2[1]]  # Frequency of 2nd band
+                phase_obs_combind[idx] = ionosphere_free_linear_combination(dset[L1][idx], dset[L2][idx], f1, f2)
+        else:
+            log.fatal(f"Linear combination type '{type_}' is not defined.")
 
-        # Coefficient of ionospheric-free linear combination
-        n = f1 ** 2 / (f1 ** 2 - f2 ** 2)
-        m = -f2 ** 2 / (f1 ** 2 - f2 ** 2)
+    return code_obs_combined, phase_obs_combined
 
-        # Generate ionospheric-free linear combination
-        C_IF[idx] = n * dset[C1][idx] + m * dset[C2][idx]
-        L_IF[idx] = n * dset[L1][idx] + m * dset[L2][idx]
 
-    return C_IF, L_IF
+def ionosphere_free_linear_combination(obs1: np.ndarray, obs2: np.ndarray, f1: float, f2: float) -> np.ndarray:
+    """Generate ionosphere-free linear combination
+
+    Args:
+        obs1:   1st observation array 
+        obs2:   2nd observation array
+        f1:     frequency of 1st observation
+        f2:     frequency of 2nd observation
+    """
+
+    # Coefficient of ionospheric-free linear combination
+    n = f1 ** 2 / (f1 ** 2 - f2 ** 2)
+    m = -f2 ** 2 / (f1 ** 2 - f2 ** 2)
+
+    # Generate ionospheric-free linear combination
+    return n * obs1 + m * obs2
 
 
 # TODO hjegei: Better solution?

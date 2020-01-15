@@ -7,12 +7,15 @@ Description:
 """
 import re
 from collections import UserDict, defaultdict
+from datetime import datetime
+
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where import parsers
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 
 
 @plugins.register
@@ -73,6 +76,31 @@ class VlbiMasterSchedule(UserDict):
                 if d == doy and self.session_type(v["session_code"]) in session_types
             ]
         return [s for d, s in self.data.keys() if d == doy]
+
+    def ready(self, date, session):
+        # Avoid using %b, %-m and %-d in strptime. Platform specific and weird locale behaviour
+        months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+        key = (date.timetuple().tm_yday, session)
+        status = self.data[key]["status"].strip()
+        if not status:
+            # Status information might be missing
+            return True
+        try:
+            yy = int(status[0:2])
+            century = 2000 if yy < 50 else 1900
+            yyyy = str(yy + century)
+            MMM = status[2:5]
+            dd = status[5:7]
+            mm = str(months.index(MMM) + 1).zfill(2)
+            datetime.strptime(f"{yyyy}{mm}{dd}", "%Y%m%d")
+            # Assumption: successful parsing of status field as date means it's ready for processing
+            return True
+        except (IndexError, ValueError):
+            return False
+
+    def status(self, date, session):
+        key = (date.timetuple().tm_yday, session)
+        return self.data[key]["status"]
 
     @staticmethod
     def session_type(session_code):

@@ -3,7 +3,7 @@
 Description:
 ------------
 
-Calculate the partial derivatives of the measurement with respect to the range bias. 
+Calculate the partial derivatives of the measurement with respect to the range bias.
 
 References:
 -----------
@@ -14,8 +14,9 @@ References:
 # External library imports
 import numpy as np
 
-# Where imports
-from where.lib import plugins
+# Midgard imports
+from midgard.dev import plugins
+
 
 # Name of parameter
 PARAMETER = __name__.split(".")[-1]
@@ -46,5 +47,5 @@ def slr_range_bias(dset):
         idx = dset.filter(station=station)
         partials[idx, site_idx] = 1
 
-    column_names = [s + "_range_bias" for s in stations]
+    column_names = [s for s in stations]
     return partials, column_names, "dimensionless"

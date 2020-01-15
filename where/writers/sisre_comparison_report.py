@@ -21,14 +21,10 @@ Example:
 
 """
 # Standard library imports
-from collections import namedtuple
 from datetime import datetime
 import os
-import re
-import textwrap
 
 # External library imports
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -37,15 +33,10 @@ import pandas as pd
 from midgard.dev import console
 from midgard.dev import plugins
 
-# WHERE imports
+# Where imports
 import where
-from where import apriori
-from where import cleaners
 from where.lib import config
-from where.lib import enums
-from where.lib import files
 from where.lib import log
-from where.lib import gnss
 from where.lib import util
 
 FIGURE_FORMAT = "png"
@@ -56,6 +47,16 @@ FILE_NAME = __name__.split(".")[-1]
 def sisre_comparison_report(dset):
     """Compare SISRE datasets
 
+    The first step is to generate a merged dataframe based on given datasets by selecting certain fields. In the
+    following an example is shown:
+
+                           time.gps satellite system        E1    E1/E5b    E1/E5a
+        0       2019-01-01 00:00:00       E01      E  0.173793  0.123220  0.171849
+        1       2019-01-01 00:00:00       E02      E  0.048395  0.127028  0.108108
+        2       2019-01-01 00:00:00       E03      E  0.089328  0.121884  0.079576
+        3       2019-01-01 00:00:00       E04      E  0.110866  0.088446  0.092292
+        4       2019-01-01 00:00:00       E05      E  0.348935  0.305333  0.258733
+            
     Args:
         dset (list):       List with different SISRE datasets. The datasets contain the data.
     """
@@ -80,7 +81,7 @@ def sisre_comparison_report(dset):
     if df_merged.empty:
         log.fatal(f"All given datasets are empty [{', '.join(dsets.keys())}].")
 
-    with files.open(
+    with config.files.open(
         file_key="output_sisre_comparison_report", file_vars=dsets[next(iter(dsets))].vars, create_dirs=True, mode="wt"
     ) as fid:
         _header(fid)
@@ -91,7 +92,7 @@ def sisre_comparison_report(dset):
         fid.write("\\newpage\n")
 
         # Generate figure directory to save figures generated for SISRE report
-        figure_dir = files.path("output_sisre_comparison_report_figure", file_vars=dset.vars)
+        figure_dir = config.files.path("output_sisre_comparison_report_figure", file_vars=dset.vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
 
         fid.write(f"\n\n##Monthly 95th percentile SISE for satellites\n")
@@ -161,7 +162,7 @@ def _markdown_to_pdf(dset):
     """
 
     if config.where.sisre_report.get("markdown_to_pdf", default=False).bool:
-        md_path = str(files.path("output_sisre_comparison_report", file_vars=dset.vars))
+        md_path = str(config.files.path("output_sisre_comparison_report", file_vars=dset.vars))
         pdf_path = md_path.replace(".md", ".pdf")
         program = "pandoc"
 
@@ -182,6 +183,13 @@ def _markdown_to_pdf(dset):
 def _plot_bar_sisre_signal_combination_percentile(df, fid, figure_dir, threshold=False, write_table=False):
     """Generate bar plot with monthly SISRE 95% percentile for each GNSS signal combination
 
+    The first step is to generate a dataframe with month as indices and SISRE 95% percentile values for each 
+    signal combination as columns. In the following an example is shown:
+
+                            E1    E1/E5b    E1/E5a
+            Jan-2019  0.335688  0.297593  0.326859
+            Feb-2019  0.380575  0.330701  0.352535
+            Mar-2019  0.353586  0.314817  0.344597
     Args:
        df (Dataframe):          Dataframe with time, satellite, system and GNSS signal combinations as columns
        fid (_io.TextIOWrapper): File object.
@@ -194,12 +202,13 @@ def _plot_bar_sisre_signal_combination_percentile(df, fid, figure_dir, threshold
     df_monthly_percentile = df.set_index("time.gps").resample("M", how=lambda x: np.nanpercentile(x, q=95))
     df_monthly_percentile.index = df_monthly_percentile.index.strftime("%b-%Y")
     df_monthly_percentile.transpose().plot(kind="bar")
+    # df_monthly_percentile.transpose().plot(kind="bar", figsize=(5,3))
 
     if write_table:
         _write_dataframe_to_markdown(
             fid,
             df_monthly_percentile.transpose(),
-            float_format="6.3f",
+            float_format="6.2f",
             caption=f"95th percentile SISE results for signal combinations in meter: ",
         )
 
@@ -242,7 +251,7 @@ def _plot_bar_sisre_signal_combination_rms(df, fid, figure_dir, write_table=Fals
         _write_dataframe_to_markdown(
             fid,
             df_monthly_rms.transpose(),
-            float_format="6.3f",
+            float_format="6.2f",
             caption=f"RMS SISE results for signal combinations in meter: ",
         )
 
@@ -309,7 +318,7 @@ def _plot_bar_sisre_satellite_percentile(df, fid, figure_dir, threshold=False, w
             _write_dataframe_to_markdown(
                 fid,
                 df_user_monthly_percentile.transpose(),
-                float_format="6.3f",
+                float_format="6.2f",
                 caption=f"95th percentile SISE results for signal combination **{user}** in meter: ",
             )
             fid.write("\\newpage\n")

@@ -23,9 +23,12 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
-from where.lib import plugins
 from where.lib import config
+from where.lib import rotation
 
 # Name of parameter
 PARAMETER = __name__.split(".")[-1]
@@ -49,7 +52,7 @@ def site_pos(dset):
         stations = stations[np.logical_not(fix_idx)]
 
     # Calculate partials
-    all_partials = -dset.src_dir.unit_vector[:, None, :] @ dset.time.itrs2gcrs
+    all_partials = -dset.src_dir.unit_vector[:, None, :] @ rotation.trs2gcrs(dset.time)
     partials = np.zeros((dset.num_obs, len(stations) * 3))
     for idx, station in enumerate(stations):
         filter_1 = dset.filter(station_1=station)

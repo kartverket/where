@@ -24,11 +24,11 @@ from scipy import interpolate
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.constant import constant
 
 # Where imports
-from midgard.math.constant import constant
 from where.lib import log
-from where.lib import files
+from where.lib.unit import Unit
 from where.parsers._parser import Parser
 from where import parsers
 
@@ -45,7 +45,7 @@ class VgosDbParser(Parser):
     }
 
     def __init__(self, file_path, encoding=None):
-        super().__init__(file_path, encoding=None)
+        super().__init__(file_path, encoding)
         self.raw = {}
 
     def read_data(self):
@@ -53,7 +53,7 @@ class VgosDbParser(Parser):
 
         self.data will be populated with information from the netcdf files
         """
-        with files.open_path(self.file_path, mode="rt") as fid:
+        with open(self.file_path, mode="rt") as fid:
             self._parse_file(fid)
 
         self._organize_data()
@@ -145,8 +145,12 @@ class VgosDbParser(Parser):
                 * constant.c
             )
         except KeyError:
-            self.data["iono_delay"] = np.full(num_obs, np.nan)
-            log.warn("Missing ionosphere delay information")
+            try:
+                self.data["dtec"] = self.raw["Observables"]["DiffTec"]["diffTec"]  # Unit: TECU
+                self.data["ref_freq"] = self.raw["Observables"]["RefFreq"]["X"]["RefFreq"] * Unit.MHz2Hz  # Unit:
+            except KeyError:
+                self.data["iono_delay"] = np.full(num_obs, np.nan)
+                log.warn("Missing ionosphere delay information")
 
         try:
             self.data["iono_delay_ferr"] = (
@@ -156,15 +160,19 @@ class VgosDbParser(Parser):
                 * constant.c
             )
         except KeyError:
-            self.data["iono_delay_ferr"] = np.zeros(len(self.data["time"]))
-            log.warn("Missing ionosphere delay formal error information")
+            try:
+                self.data["dtec_ferr"] = self.raw["Observables"]["DiffTec"]["diffTecStdDev"]  # Unit: TECU
+            except KeyError:
+                self.data["iono_delay_ferr"] = np.full(num_obs, np.nan)
+                if not np.isnan(self.data["iono_delay"]).all():
+                    log.warn("Missing ionosphere delay formal error information")
 
         try:
             self.data["iono_quality"] = self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"][
                 "Cal-SlantPathIonoGroupDataFlag"
             ]
         except KeyError:
-            self.data["iono_quality"] = np.full(len(self.data["time"]), np.nan)
+            self.data["iono_quality"] = np.full(num_obs, np.nan)
             log.warn("Missing ionosphere quality information")
 
         # Station dependent info

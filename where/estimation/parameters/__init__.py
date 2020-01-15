@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each type of partial derivative should be defined in a separate .py-file. The function inside the .py-file that
-should be called need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+should be called need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     def calculate_partial_derivative(dset):
@@ -20,11 +20,13 @@ The decorated function will be called with a single parameter, ``dset`` which co
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where.estimation import estimators
 from where.lib import log
-from where.lib import plugins
 from where.lib.unit import Unit
 
 
@@ -43,11 +45,12 @@ def partial_vectors(dset, estimator_config_key):
         Dict: List of names of the partial derivatives for each partial config key.
     """
     partial_vectors = dict()
-    prefix = config.analysis.get("analysis", default="").str
+    prefix = dset.vars["pipeline"]
 
     for config_key in estimators.partial_config_keys(estimator_config_key):
         partial_vectors[config_key] = list()
-        partial_data = plugins.call_all(package_name=__name__, config_key=config_key, prefix=prefix, dset=dset)
+        partials = config.tech[config_key].list
+        partial_data = plugins.call_all(package_name=__name__, plugins=partials, prefix=prefix, dset=dset)
 
         for param, (data, names, data_unit) in partial_data.items():
             param_unit_cfg = config.tech[param].unit
@@ -56,18 +59,18 @@ def partial_vectors(dset, estimator_config_key):
 
             display_unit = config.tech[param].display_unit.str
             display_unit = param_unit_cfg.str if not display_unit else display_unit
-            partial_unit = str(Unit("{} / ({})".format(dset.unit("calc"), param_unit_cfg.str)).u)
+            partial_unit_str = f"{dset.unit('calc')[0]} / ({param_unit_cfg.str})"
+            partial_unit = str(Unit(partial_unit_str).u)
             factor = Unit(data_unit, partial_unit)
             for values, name in zip(data.T, names):
-                partial_name = "{}-{}".format(param, name)
-                dset.add_float(
-                    "partial_" + partial_name,
-                    table="partial",
-                    val=values * factor,
-                    unit=partial_unit,
-                    write_level="operational",
-                )
-                dset.add_to_meta("display_units", partial_name, display_unit)
+                partial_name = f"{param}-{name}" if name else f"{param}"
                 partial_vectors[config_key].append(partial_name)
+
+                field_name = f"partial.{partial_name}"
+                if field_name in dset.fields:
+                    dset[field_name][:] = values * factor
+                else:
+                    dset.add_float(field_name, val=values * factor, unit=partial_unit, write_level="operational")
+                    dset.meta.add(partial_name, display_unit, section="display_units")
 
     return partial_vectors

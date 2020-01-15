@@ -10,10 +10,12 @@ Edit cable calibration data based on configuration
 # External imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])

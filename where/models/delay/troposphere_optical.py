@@ -21,9 +21,11 @@ References:
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.ext import iers_2010 as iers
-from where.lib import plugins
 from where.lib.unit import Unit
 
 
@@ -41,16 +43,21 @@ def pavlis_mendes(dset):
 
     # Compute WVP = Water Vapour Pressure from temperature and humidity:
     #   https://en.wikipedia.org/wiki/Vapour_pressure_of_water
-    wvp = np.exp(20.386 - 5132 / dset.temperature) * Unit.mmHg2hPa * dset.humidity * Unit.percent2unit
+    lat, _, height = dset.site_pos.llh.T
+    pressure = dset.pressure
+    wavelength = dset.wavelength
+    elevation = dset.site_pos.elevation
+    temperature = dset.temperature
+    humidity = dset.humidity
 
-    for obs, ((lat, _, height), pressure, wavelength, temperature, elevation) in enumerate(
-        dset.values("site_pos.llh", "pressure", "wavelength", "temperature", "site_pos.elevation")
-    ):
+    wvp = np.exp(20.386 - 5132 / temperature) * Unit.mmHg2hPa * humidity * Unit.percent2unit
+
+    for obs in range(dset.num_obs):
         # Compute total zenith delay:
         output[obs] = iers.fculzd_hpa(
-            np.degrees(lat), height, pressure, wvp[obs], wavelength * Unit.nanometer2micrometer
+            np.degrees(lat[obs]), height[obs], pressure[obs], wvp[obs], wavelength[obs] * Unit.nanometer2micrometer
         )[0]
         # Mapping function:
-        output[obs] *= iers.fcul_a(np.degrees(lat), height, temperature, np.degrees(elevation))
+        output[obs] *= iers.fcul_a(np.degrees(lat[obs]), height[obs], temperature[obs], np.degrees(elevation[obs]))
 
     return output

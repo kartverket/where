@@ -17,10 +17,12 @@ import re
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib import plugins
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -39,10 +41,9 @@ def gnss_select_obs(dset):
     """
     remove_obstypes = set()
     edit_dset = np.full(dset.num_obs, True, dtype=bool)
-    obstypes_all = dset.table_fields("obs")
+    obstypes_all = dset.obs.fields
 
-    session = dset.dataset_name
-    cfg_code_phase_obs = config.tech[_SECTION].code_phase_obs.list[0]
+    cfg_obs_code = config.tech[_SECTION].obs_code.str
     cfg_obstypes = config.tech[_SECTION].obs_types.list
     cfg_systems = config.tech.systems.list
 
@@ -62,15 +63,21 @@ def gnss_select_obs(dset):
         remove_obstypes = set(obstypes_all) - set(cfg_obstypes)
 
     # Keep either 'both' code and carrier phase observations or only 'code' observations
-    if cfg_code_phase_obs == "code":
-        search_pattern = "^L|^D|^S"
-    elif cfg_code_phase_obs == "both":
-        search_pattern = "^D|^S"
+    if cfg_obs_code == "code":
+        remove_obs_pattern = "^L|^D|^S"
+    elif cfg_obs_code == "doppler":
+        remove_obs_pattern = "^C|^P|^L|^S"
+    elif cfg_obs_code == "phase":
+        remove_obs_pattern = "^C|^P|^S"
+    elif cfg_obs_code == "snr":
+        remove_obs_pattern = "^C|^P|^L"
+    elif cfg_obs_code == "code:phase":
+        remove_obs_pattern = "^D|^S"
     else:
-        log.fatal(f"Configuration option 'code_phase_obs = {cfg_code_phase_obs}' is not valid.")
+        log.fatal(f"Configuration option 'obs_code = {cfg_obs_code}' is not valid.")
 
     for type_ in obstypes_all:
-        search_obj = re.search(search_pattern, type_)
+        search_obj = re.search(remove_obs_pattern, type_)
         if search_obj is not None:
             remove_obstypes.add(search_obj.string)
 
@@ -100,47 +107,10 @@ def _remove_obstype_from_dset(dset, remove_obstypes):
         for type_ in list(dset.meta["obstypes"][sys]):
             if type_ in remove_obstypes:
                 dset.meta["obstypes"][sys].remove(type_)
-                if type_ in dset.fields:
-                    del dset[type_]
-                    del dset[type_ + "_lli"]
-                    del dset[type_ + "_snr"]
-
-
-def _select_obstype(sys, type_, obstypes):
-    """Select GNSS observation type from priority list, which should be used in the Where processing
-
-    Args:
-        sys (str):          GNSS.
-        type_ (str):        Observation type definition of priority list.
-        obstypes (list):    Observation types defined in RINEX header for given GNSS `sys`.
-
-    Returns:
-        String:   Selected observation type for given GNSS and priority observation type (L1, C1, L2, C2, L3, C3)
-    """
-
-    # TODO: Selection of observations are necessary, for example swisstopo is carrying out following selection:
-    #
-    # Multi-GNSS analysis at swisstopo with Bernese GNSS Software 5.3
-    # Observation code priority list for the assignment on two frequencies
-    #
-    # Sys Obs   RINEX observation codes and their priority
-    # G   L1    L1P L1C L1W L1X
-    # G   L2    L2P L2C L2D L2S L2W L2X
-    # R   L1    L1P L1C L1X
-    # R   L2    L2P L2C L2X
-    # E   L1    L1C L1X
-    # E   L2    L5Q L5X
-    # C   L1    L1I L1X
-    # C   L2    L7I L7X
-    # G   C1    C1P C1C C1W C1X
-    # G   C2    C2P C2C C2D C2S C2W C2X
-
-    # TODO: Priority list has to be improved. After which criteria should the priority be chosen?
-
-    # Loop over observations types defined in priority list
-    for obstype in config.where.gnss_obs_priority["{}_{}".format(sys, type_).lower()].list:
-        if obstype in obstypes:
-            return obstype
+                for partition in ["obs", "lli", "snr"]:
+                    if f"{partition}.{type_}" in dset.fields:
+                        continue  # MURKS
+                        # MURKS del functionality has to be implemented!!! del dset[partition][type_]
 
 
 def _select_observations(obstypes_all, obstypes):
@@ -167,40 +137,110 @@ def _select_observations(obstypes_all, obstypes):
     use_obstypes = dict()
     remove_obstypes = set(obstypes_all)
     freq_type = config.tech.freq_type.list[0]
-    code_phase_obs = config.tech[_SECTION].code_phase_obs.list[0]
+    obs_code = config.tech[_SECTION].obs_code.list[0]
 
     # Loop over GNSSs
     for sys in obstypes:
         use_obstypes.update({sys: list()})
 
         if freq_type == "single":
-            if code_phase_obs == "code":
+            if obs_code == "code":
                 for type_ in ["C1"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
-            else:
+            elif obs_code == "phase":
+                for type_ in ["L1"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "doppler":
+                for type_ in ["D1"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "snr":
+                for type_ in ["S1"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "code:phase":
                 for type_ in ["C1", "L1"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            else:
+                log.fatal(f"Configuration option 'obs_code = {obs_code}' is not valid.")
 
         elif freq_type == "dual":
-            if code_phase_obs == "code":
+            if obs_code == "code":
                 for type_ in ["C1", "C2"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
-            else:
+            elif obs_code == "phase":
+                for type_ in ["L1", "L2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "doppler":
+                for type_ in ["D1", "D2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "snr":
+                for type_ in ["S1", "S2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "code:phase":
                 for type_ in ["C1", "L1", "C2", "L2"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            else:
+                log.fatal(f"Configuration option 'obs_code = {obs_code}' is not valid.")
 
         elif freq_type == "triple":
-            if code_phase_obs == "code":
+            if obs_code == "code":
                 for type_ in ["C1", "C2", "C3"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
-            else:
+            elif obs_code == "phase":
+                for type_ in ["L1", "L2", "L3"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "doppler":
+                for type_ in ["D1", "D2", "D3"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "snr":
+                for type_ in ["S1", "S2", "S3"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "code:phase":
                 for type_ in ["C1", "L1", "C2", "L2"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            else:
+                log.fatal(f"Configuration option 'obs_code = {obs_code}' is not valid.")
 
         else:
-            log.fatal(f"Configuration option 'freq_type = {freq_type}' is not valid")
+            log.fatal(f"Configuration option 'freq_type = {freq_type}' is not valid.")
 
         log.info(f"Selected observation types for GNSS {sys!r}: {', '.join(use_obstypes[sys])}")
         remove_obstypes.difference_update(use_obstypes[sys])
 
     return use_obstypes, remove_obstypes
+
+
+def _select_obstype(sys, type_, obstypes):
+    """Select GNSS observation type from priority list, which should be used in the Where processing
+
+    Args:
+        sys (str):          GNSS.
+        type_ (str):        Observation type definition of priority list.
+        obstypes (list):    Observation types defined in RINEX header for given GNSS `sys`.
+
+    Returns:
+        String:   Selected observation type for given GNSS and priority observation type (L1, C1, L2, C2, L3, C3, ...)
+    """
+
+    # TODO: Selection of observations are necessary, for example swisstopo is carrying out following selection:
+    #
+    # Multi-GNSS analysis at swisstopo with Bernese GNSS Software 5.3
+    # Observation code priority list for the assignment on two frequencies
+    #
+    # Sys Obs   RINEX observation codes and their priority
+    # G   L1    L1P L1C L1W L1X
+    # G   L2    L2P L2C L2D L2S L2W L2X
+    # R   L1    L1P L1C L1X
+    # R   L2    L2P L2C L2X
+    # E   L1    L1C L1X
+    # E   L2    L5Q L5X
+    # C   L1    L1I L1X
+    # C   L2    L7I L7X
+    # G   C1    C1P C1C C1W C1X
+    # G   C2    C2P C2C C2D C2S C2W C2X
+
+    # TODO: Priority list has to be improved. After which criteria should the priority be chosen?
+
+    # Loop over observations types defined in priority list
+    for obstype in config.where.gnss_obs_priority["{}_{}".format(sys, type_).lower()].list:
+        if obstype in obstypes:
+            return obstype

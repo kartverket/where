@@ -3,15 +3,10 @@
 Description:
 ------------
 
-asdf
 
 """
 # Standard library imports
 from collections import namedtuple
-from datetime import datetime
-import os
-
-# import subprocess
 
 # External library imports
 import matplotlib.patches as mpatches
@@ -22,15 +17,13 @@ import pandas as pd
 # Midgard imports
 from midgard.dev import plugins
 
-# WHERE imports
-import where
+# Where imports
 from where import apriori
 from where.lib import config
 from where.lib import enums
-from where.lib import files
 from where.lib import gnss
 from where.lib import log
-from where.lib import util
+from where.writers._report import Report
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
@@ -88,22 +81,24 @@ def sisre_report(dset):
     write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
 
     # TODO: Better solution?
-    if "sampling_rate" not in dset.vars:  # necessary if called for example by where_concatenate.py
+    if "sampling_rate" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
         dset.vars["sampling_rate"] = ""
 
-    with files.open(
-        file_key=f"output_sisre_report_{dset.dataset_id}", file_vars=dset.vars, create_dirs=True, mode="wt"
-    ) as fid:
-        _write_title(fid, dset.rundate)
+    # Generate SISRE report
+    tmp = {"raw": 1, "clean": 2}
+    path = config.files.path(f"output_sisre_report_{tmp[dset.vars['label']]}", file_vars=dset.vars)
+    with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
+        rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="SISRE analysis")
+        rpt.title_page()
         _write_information(fid)
-        _write_config(fid)
+        rpt.write_config()
         fid.write("\n# Satellite status\n\n")
         # _unhealthy_satellites(fid, dset)
         # _eclipse_satellites(fid, dset)
 
         # Generate figure directory to save figures generated for SISRE report
         fid.write("\n# SISRE analysis results\n\n")
-        figure_dir = files.path("output_sisre_report_figure", file_vars=dset.vars)
+        figure_dir = config.files.path("output_sisre_report_figure", file_vars=dset.vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
 
         _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
@@ -112,7 +107,7 @@ def sisre_report(dset):
         # _plot_scatter_field(fid, figure_dir, dset, 'sisre', label=False, legend=False)
         _plot_histogram_sisre(fid, figure_dir, dset)
         _plot_scatter_field(fid, figure_dir, dset, "age_of_ephemeris")
-        _satellite_statistics_and_plot(fid, figure_dir, dset)
+        _satellite_statistics_and_plot(fid, figure_dir, dset, rpt)
 
         # if write_level <= enums.get_value("write_level", "detail"):
         #    fid.write("\n# Analysis of input files\n\n")
@@ -121,7 +116,8 @@ def sisre_report(dset):
         #    _plot_scatter_field(fid, figure_dir, dset, "bias_precise")
 
     # Generate PDF from Markdown file
-    _markdown_to_pdf(dset)
+    if config.where.sisre_report.get("markdown_to_pdf", default=False).bool:
+        rpt.markdown_to_pdf()
 
 
 def _eclipse_satellites(fid, dset):
@@ -135,7 +131,7 @@ def _eclipse_satellites(fid, dset):
     # Get broadcast orbit
     brdc = apriori.get(
         "orbit",
-        rundate=dset.rundate,
+        rundate=dset.analysis["rundate"],
         time=dset.time,
         satellite=tuple(dset.satellite),
         system=tuple(dset.system),
@@ -158,31 +154,6 @@ def _get_satellite_type(dset, satellite):
     """
     idx = dset.filter(satellite=satellite)
     return set(dset.satellite_type[idx]).pop()
-
-
-def _markdown_to_pdf(dset):
-    """Convert markdown SISRE report file to pdf format
-    Args:
-       dset (Dataset):           A dataset containing the data.
-    """
-
-    if config.where.sisre_report.get("markdown_to_pdf", default=False).bool:
-        md_path = str(files.path(f"output_sisre_report_{dset.dataset_id}", file_vars=dset.vars))
-        pdf_path = md_path.replace(".md", ".pdf")
-        program = "pandoc"
-
-        # Convert markdown to pdf with pandoc
-        pandoc_args = ["-f markdown", "-V classoption:twoside", "-N", "-o " + pdf_path, md_path]
-
-        log.info(f"Start: {program} {' '.join(pandoc_args)}")
-        status = os.system(f"{program} {' '.join(pandoc_args)}")
-        if status != 0:
-            log.error(f"{program} failed with error code {status} ({' '.join([program] + pandoc_args)})")
-
-        # TODO: pandoc subprocess call does not work. Why?
-        # process = subprocess.run([program] + pandoc_args)
-        # if process.returncode:
-        #    log.error(f"{program} failed with error code {process.returncode} ({' '.join(process.args)})")
 
 
 #
@@ -478,7 +449,7 @@ def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
 
         fig = plt.figure(figsize=(7, 5))
         if label == True:
-            for sat in dset.unique("satellite", idx=idx):
+            for sat in sorted(dset.unique("satellite", idx=idx)):
                 idx_sat = dset.filter(system=sys, satellite=sat)
                 if np.sum(dset[field][idx_sat]) != 0:
                     plt.scatter(
@@ -559,9 +530,9 @@ def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
 
         # Define configuration of subplots
         subplots = (
-            SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.itrs[:, 0][idx]),
-            SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.itrs[:, 1][idx]),
-            SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.itrs[:, 2][idx]),
+            SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.acr.along[idx]),
+            SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.acr.cross[idx]),
+            SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.acr.radial[idx]),
             SubplotConfig("Δclock [m]", "tomato", dset.clk_diff_with_dt_mean[idx]),
         )
 
@@ -701,13 +672,14 @@ def _generate_satellite_index_dataframe(dset):
     return field_dfs, extra_row_names
 
 
-def _satellite_statistics_and_plot(fid, figure_dir, dset):
+def _satellite_statistics_and_plot(fid, figure_dir, dset, rpt):
     """Generate statistics and plots for each field and satellite
 
     Args:
         fid (_io.TextIOWrapper):    File object
         figure_dir (PosixPath):     Figure directory path
         dset (Dataset):             Dataset
+        rpt (Report):               Report object
     """
 
     field_dfs, extra_row_names = _generate_satellite_index_dataframe(dset)
@@ -727,7 +699,7 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset):
     for field, df in field_dfs.items():
         fid.write(f"\n\n##Statistic for {FIELDS[field]}\n")
         fid.write(f"Unit: {dset.unit(field)}\n")
-        _write_dataframe_to_markdown(fid, df, float_format="6.3f")
+        rpt.write_dataframe_to_markdown(df, format="6.3f")
         fid.write("  ")
 
         # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column, unit=dset.unit(field))
@@ -744,7 +716,7 @@ def _unhealthy_satellites(fid, dset):
     """
     brdc = apriori.get(
         "orbit",
-        rundate=dset.rundate,
+        rundate=dset.analysis["rundate"],
         time=dset.time,
         satellite=tuple(dset.satellite),
         system=tuple(dset.system),
@@ -752,55 +724,6 @@ def _unhealthy_satellites(fid, dset):
         apriori_orbit="broadcast",
     )
     fid.write("{:25s} = {sats:60s}\n" "".format("Unhealthy satellites", sats=" ".join(brdc.unhealthy_satellites())))
-
-
-def _write_config(fid):
-    """Print the configuration options for a given technique and model run date
-
-    Args:
-       fid (_io.TextIOWrapper):  File object.
-    """
-    # Print the individual configuration options
-    fid.write("#Configuration of SISRE analysis\n__Located at {}__\n".format(", ".join(config.tech.sources)))
-    fid.write("```\n")
-    fid.write(str(config.tech.as_str(key_width=25, width=70, only_used=True)))
-    fid.write("\n```\n")
-    fid.write("\\newpage\n")
-
-
-def _write_dataframe_to_markdown(fid, df, float_format=""):
-    """Write Pandas DataFrame to Markdown table
-
-    Args:
-        fid (_io.TextIOWrapper):    File object
-        df (DataFrame):             Pandas DataFrame
-        float_format (str):         Define formatters for float columns
-    """
-    column_length = [len(c) for c in df.columns]
-
-    # Write header
-    if list(df.index):  # Add DataFrame index to header
-        num_space = len(max(df.index))
-        head_line_1 = "\n| {} ".format(" " * num_space)
-        head_line_2 = "|-{}-".format("-" * num_space)
-    else:
-        header_1 = ""
-
-    fid.write(head_line_1 + "| {} |\n".format(" | ".join(list(df.columns))))
-    fid.write(head_line_2 + "|-{}:|\n".format("-|-".join([n * "-" for n in column_length])))
-
-    # Write data
-    for index, row in df.iterrows():
-
-        line = "| {idx:s} |".format(idx=index) if index else ""  # Add DataFrame index column
-
-        for _, v in row.items():
-            if isinstance(v, float):
-                line = line + " {:{fmt}} |".format(v, fmt=float_format)
-            else:
-                line = line + " {} |".format(v)
-        fid.write(line + "\n")
-    fid.write("\n")
 
 
 #
@@ -880,30 +803,4 @@ The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is cacula
 
 
 \\newpage\n """
-    )
-
-
-def _write_title(fid, rundate):
-    """Write title page
-
-    Args:
-       fid (_io.TextIOWrapper):  File object.
-       rundate (date):           Run date.
-    """
-    title = f"SISRE analysis for day {rundate:%Y-%m-%d}"
-    user_info = util.get_user_info()
-
-    fid.write(
-        """---
-title: {title}
-author: Where v{version} [{user}]
-date: {nowdate:%Y-%m-%d}
----
-""".format(
-            # title=title["text"], version=where.__version__, user=config.analysis.user.str, nowdate=datetime.now()
-            title=title,
-            version=where.__version__,
-            user=user_info.get("name", user_info["user"]),
-            nowdate=datetime.now(),  # TODO: Better solution?
-        )
     )

@@ -13,9 +13,11 @@ import pathlib
 # External library imports
 import pandas as pd
 
+# Midgard imports
+from midgard.dev.timer import Timer
+
 # Where imports
 from where.lib import log
-from where.lib.timer import timer
 from where.lib import util
 
 
@@ -98,7 +100,7 @@ class Parser:
         """
         for calculator in self.setup_calculators():
             log.debug(f"Start calculator {calculator.__name__} in {self.__module__}")
-            with timer(f"Finish calculator {calculator.__name__} ({self.__module__}) in", logger=log.debug):
+            with Timer(f"Finish calculator {calculator.__name__} ({self.__module__}) in", logger=log.debug):
                 calculator()
 
     def as_dict(self, include_meta=False):

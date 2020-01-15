@@ -6,10 +6,12 @@ Reads ocean tides coefficients from file.
 
 """
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
 from where import parsers
-from where.lib import plugins
 
 
 @plugins.register

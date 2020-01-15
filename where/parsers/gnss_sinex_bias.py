@@ -23,7 +23,6 @@ from midgard.dev import plugins
 
 # Where imports
 from where.parsers._parser_chain import ChainParser, ParserDef
-from where.lib import time
 from where.lib.unit import Unit
 
 
@@ -127,6 +126,9 @@ class GnssBiasParser(ChainParser):
         start_time = datetime.strptime(line["start_time"][0:8], "%Y:%j") + timedelta(
             seconds=int(line["start_time"][9:14])
         )
+
+        if line["end_time"][0:8] == "0000:000":
+            line["end_time"] = "9999:365:00000"
         end_time = datetime.strptime(line["end_time"][0:8], "%Y:%j") + timedelta(seconds=int(line["end_time"][9:14]))
 
         if line["unit"] == "cyc":  # TODO: Differential phase bias conversion is not handled yet in Where.

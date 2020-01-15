@@ -14,8 +14,8 @@ Note that `pint` has a system for defining new units and constants if necessary,
 from midgard.math.unit import Unit
 
 # Where imports
-from where.lib import files
+from where.lib import config
 
 # Read extra units defined specially for Where
-with files.open("units") as fid:
+with config.files.open("units") as fid:
     Unit._ureg.load_definitions(fid)

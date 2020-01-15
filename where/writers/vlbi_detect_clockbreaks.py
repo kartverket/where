@@ -17,7 +17,7 @@ from midgard.dev import plugins
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib.time import Time
+from where.data.time import Time
 
 
 @plugins.register
@@ -36,7 +36,7 @@ def detect_clockbreaks(dset):
     log.info("Looking for clock breaks")
 
     clock_breaks = list()
-    order_of_polynomial = config.tech.get("order_of_polynomial", section="vlbi_clock_correction", default=2).int
+    order_of_polynomial = config.tech.get("order_of_polynomial", section="vlbi_clock_poly", default=2).int
 
     for station in dset.unique("station"):
         # Merge together data where station is station 1 and station 2
@@ -52,12 +52,12 @@ def detect_clockbreaks(dset):
 
         # Add fields to dset for debug
         idx_site = np.hstack((np.where(idx_1)[0], np.where(idx_2)[0]))[idx_sort]
-        dset.add_float(f"cb_{station}_residual", write_level="operational")
+        dset.add_float(f"cb_{station}_residual", np.zeros(dset.num_obs), write_level="operational")
         dset[f"cb_{station}_residual"][idx_site] = residual
-        dset.add_float(f"cb_{station}_value", write_level="detail")
-        dset.add_float(f"cb_{station}_limit", write_level="detail")
-        dset.add_float(f"cb_{station}_pred", write_level="detail")
-        dset.add_float(f"cb_{station}_ratio", write_level="detail")
+        dset.add_float(f"cb_{station}_value", np.zeros(dset.num_obs), write_level="detail")
+        dset.add_float(f"cb_{station}_limit", np.zeros(dset.num_obs), write_level="detail")
+        dset.add_float(f"cb_{station}_pred", np.zeros(dset.num_obs), write_level="detail")
+        dset.add_float(f"cb_{station}_ratio", np.zeros(dset.num_obs), write_level="detail")
 
         # Test each observation for clock break
         start_obs = 0
@@ -86,14 +86,14 @@ def detect_clockbreaks(dset):
             # Register possible clock break
             if np.all(np.abs(obs_res - model) > std_lim):
                 start_obs = np.min(np.where(time > time[obs])[0])  # Next epoch with observations
-                time_cb = Time(dset.time.utc.mjd[0] + (time[obs] + time[start_obs]) / 2, format="mjd", scale="utc")
+                time_cb = Time(dset.time.utc.mjd[0] + (time[obs] + time[start_obs]) / 2, fmt="mjd", scale="utc")
                 clock_breaks.append((np.min(np.abs(obs_res - model)) / std_lim, time_cb, station))
 
     # Only actually add the biggest clock breaks, because big clock breaks creates smaller false clock breaks
     ratio_lim = max(cb[0] for cb in clock_breaks) / 3 if clock_breaks else 1
     for ratio, time, station in clock_breaks:
         if ratio > ratio_lim:
-            dset.add_event(time, "suspected_clock_break", station)
+            dset.meta.add_event(time, "suspected_clock_break", station)
             cb_time = time.datetime.strftime(config.FMT_datetime)
             stars = "*" * int(np.ceil(np.log2(ratio)))
             log.check(f"Found possible clock break for {station} at {cb_time} ({stars})")

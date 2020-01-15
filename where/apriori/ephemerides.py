@@ -132,20 +132,23 @@ GCRS are not applied. What are the consequences, if we do not consider these cor
 
 """
 
+# Standard library imports
+from functools import lru_cache
+
 # External library imports
 from jplephem.spk import SPK
 from jplephem import names as eph_names
 import numpy as np
 
 # Midgard imports
+from midgard.dev import plugins
 from midgard.files import dependencies
 
+
 # Where imports
-from where.lib import cache
 from where.lib import config
-from where.lib import files
-from where.lib import plugins
 from where.lib.unit import Unit
+from where.data import position
 
 
 @plugins.register
@@ -192,7 +195,7 @@ class Ephemerides:
         self.ephemerides = ephemerides
 
         # Open the SPK-file corresponding to the ephemerides
-        eph_filepath = files.path("ephemerides", file_vars=dict(ephemerides=ephemerides), download_missing=True)
+        eph_filepath = config.files.path("ephemerides", file_vars=dict(ephemerides=ephemerides), download_missing=True)
         self._spk = SPK.open(eph_filepath)  # TODO: Close file in destructor
         dependencies.add(eph_filepath, label="ephemerides")
 
@@ -208,7 +211,7 @@ class Ephemerides:
         """
         return sorted(self._names.keys())
 
-    @cache.function
+    @lru_cache()
     def bcrs(self, from_name, to_name, time=None):
         """Calculate BCRS vectors between two objects.
 
@@ -227,7 +230,7 @@ class Ephemerides:
 
         return vector.T * Unit.kilometer2meter
 
-    @cache.function
+    @lru_cache()
     def gcrs(self, from_name, to_name, time=None):
         """Calculate GCRS vectors between two objects.
 
@@ -246,7 +249,7 @@ class Ephemerides:
         """
         return self.bcrs(from_name, to_name, time)
 
-    @cache.function
+    @lru_cache()
     def itrs(self, from_name, to_name, time=None):
         """Calculate ITRS vectors between two objects.
 
@@ -261,12 +264,17 @@ class Ephemerides:
         gcrs = self.gcrs(from_name, to_name, time)
 
         time = self.time if time is None else time
-        if time.isscalar:
-            return time.gcrs2itrs @ gcrs
-        else:
-            return (time.gcrs2itrs @ gcrs[:, :, None])[:, :, 0]
+        from where.lib import rotation
 
-    @cache.function
+        g2i = rotation.gcrs2trs(time)
+
+        # return position.Position(gcrs, system="gcrs", time=time).trs.val
+        if time.size == 1:
+            return g2i @ gcrs
+        else:
+            return (g2i @ gcrs[:, :, None])[:, :, 0]
+
+    @lru_cache()
     def pos_bcrs(self, name, time=None):
         """Calculate position of object in BCRS.
 
@@ -281,7 +289,7 @@ class Ephemerides:
         """
         return self.bcrs("solar system barycenter", name, time)
 
-    @cache.function
+    @lru_cache()
     def pos_gcrs(self, name, time=None):
         """Calculate position of object in GCRS.
 
@@ -296,7 +304,7 @@ class Ephemerides:
         """
         return self.gcrs("earth", name, time)
 
-    @cache.function
+    @lru_cache()
     def pos_itrs(self, name, time=None):
         """Calculate position of object in ITRS.
 
@@ -311,7 +319,7 @@ class Ephemerides:
         """
         return self.itrs("earth", name, time)
 
-    @cache.function
+    @lru_cache()
     def vel(self, from_name, to_name, time=None):
         """Calculate velocity vectors between two objects.
 
@@ -330,7 +338,7 @@ class Ephemerides:
 
         return vector.T * Unit.kilometer2meter / Unit.day2second
 
-    @cache.function
+    @lru_cache()
     def vel_bcrs(self, name, time=None):
         """Calculate velocity of object in BCRS.
 
@@ -345,7 +353,7 @@ class Ephemerides:
         """
         return self.vel("solar system barycenter", name, time)
 
-    @cache.function
+    @lru_cache()
     def vel_gcrs(self, name, time=None):
         """Calculate velocity of object in GCRS.
 
@@ -360,7 +368,7 @@ class Ephemerides:
         """
         return self.vel("earth", name, time)
 
-    @cache.function
+    @lru_cache()
     def vel_itrs(self, name, time=None):
         """Calculate velocity of object in ITRS.
 

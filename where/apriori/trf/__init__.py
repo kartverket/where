@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each type of reference frame should be defined as a class in a separate .py-file. The class inside the .py-file that
-represents the reference frame need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+represents the reference frame need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     class Itrf(trf.TrfFactory):
@@ -23,9 +23,11 @@ files. See :func:`get_trf` for more information.
 
 
 """
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
 
 # Make Trf-objects available for convenience
 from where.apriori.trf._trf import Trf, TrfFactory, TrfSite  # noqa
@@ -74,4 +76,4 @@ def get_trf_factory(time, reference_frame):
     """
     name, _, version = reference_frame.partition(":")
     kwargs = dict(version=version) if version else dict()
-    return plugins.call_one(package_name=__name__, plugin_name=name, time=time, **kwargs)
+    return plugins.call(package_name=__name__, plugin_name=name, time=time, **kwargs)

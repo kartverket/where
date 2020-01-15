@@ -5,6 +5,8 @@ Description:
 asdf.
 
 """
+# Standard library imports
+import copy
 
 # Where imports
 from midgard.dev import console
@@ -114,7 +116,7 @@ class Table(object):
         Args:
             other_table:  Table-object. Table to copy data from.
         """
-        self._data = other_table._data.copy()
+        self._data = copy.deepcopy(other_table._data)
         self._fields = other_table._fields.copy()
         self._units = other_table._units.copy()
         self._write_levels = other_table._write_levels.copy()

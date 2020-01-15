@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each type of reference frame should be defined as a class in a separate .py-file. The class inside the .py-file that
-represents the reference frame need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+represents the reference frame need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     class Icrf2(crf.CrfFactory):
@@ -24,7 +24,7 @@ is not, the reference frames are looked up in the config files. See :func:`get_c
 """
 # Where imports
 from where.lib import config
-from where.lib import plugins
+from midgard.dev import plugins
 
 # Make Crf-objects available for convenience
 from where.apriori.crf._crf import Crf, CrfFactory, CrfSource  # noqa
@@ -73,4 +73,4 @@ def get_crf_factory(time, celestial_reference_frame):
     """
     name, _, catalog = celestial_reference_frame.partition(":")
     kwargs = dict(catalog=catalog) if catalog else dict()
-    return plugins.call_one(package_name=__name__, plugin_name=name, time=time, **kwargs)
+    return plugins.call(package_name=__name__, plugin_name=name, time=time, **kwargs)

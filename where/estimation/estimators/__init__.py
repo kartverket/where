@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each estimator should be defined in a separate .py-file. The function inside the .py-file that
-should be called need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+should be called need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     def estimate_least_square(dset):
@@ -23,10 +23,11 @@ derivatives it should obtain them by itself calling the :func:`where.estimation.
 
 
 """
+# Midgard imports
+from midgard.dev import plugins
 
 # Where imports
 from where.lib import config
-from where.lib import plugins
 
 
 def call(config_key, dset, partial_vectors, obs_noise):
@@ -40,7 +41,7 @@ def call(config_key, dset, partial_vectors, obs_noise):
     """
     estimator_name = config.tech[config_key].str
     if estimator_name:
-        plugins.call_one(
+        plugins.call(
             package_name=__name__,
             plugin_name=estimator_name,
             dset=dset,
@@ -61,4 +62,4 @@ def partial_config_keys(estimator_config_key):
         Tuple: Strings with names of config keys listing which partial models to run.
     """
     estimator_name = config.tech[estimator_config_key].str
-    return plugins.call_one(package_name=__name__, plugin_name=estimator_name, part="partial_config_keys")
+    return plugins.call(package_name=__name__, plugin_name=estimator_name, part="partial_config_keys")

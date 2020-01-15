@@ -26,6 +26,7 @@ from midgard.dev import plugins
 # Where imports
 from where.parsers import parser
 from where.lib import config
+from where.lib import gnss
 from where.lib import log
 from where.lib.unit import Unit
 
@@ -80,6 +81,7 @@ class Rinex2Parser(parser.ParserDict):
 
         # Sampling rate
         self.sampling_rate = config.tech.get("sampling_rate", sampling_rate).float
+        log.debug(f"Sampling rate for RINEX observations is {self.sampling_rate} second(s).")
 
     #
     # PARSERS
@@ -286,6 +288,7 @@ class Rinex2Parser(parser.ParserDict):
         """
         pos = np.array((float(line["pos_x"]), float(line["pos_y"]), float(line["pos_z"])))
         self.data["pos"] = pos
+        self.parse_float(line, _)
 
     def parse_comment(self, line, _):
         """Parse comment lines in RINEX header to instance variable `meta['comment']`.
@@ -768,7 +771,18 @@ class Rinex2Parser(parser.ParserDict):
         # Time
         # TODO: Handling of different time systems needed!!!
         dset.num_obs = len(self.data["time"])
-        dset.add_time("time", val=self.data["time"], scale=self.time_scale)
+
+        # TODO workaround: "isot" does not work for initialization of time field (only 5 decimals for seconds are
+        #                  allowed). Therefore self.data["time"] is converted to datetime object.
+        from datetime import datetime, timedelta
+
+        date = []
+        millisec = []
+        for v in self.data["time"]:
+            val, val2 = v.split(".")
+            date.append(datetime.strptime(val, "%Y-%m-%dT%H:%M:%S"))
+            millisec.append(timedelta(milliseconds=int(val2)))
+        dset.add_time("time", val=date, val2=millisec, scale=self.time_scale, fmt="datetime")
         dset.add_float("epoch_flag", val=np.array(self.data["epoch_flag"]))
         dset.add_float("rcv_clk_offset", val=np.array(self.data["rcv_clk_offset"]))
 
@@ -779,13 +793,18 @@ class Rinex2Parser(parser.ParserDict):
 
         # Observations
         for obs_type in self.data["obs"]:
-            dset.add_float(obs_type, table="obs", val=np.array(self.data["obs"][obs_type]), unit="meter")
-            dset.add_float(obs_type + "_lli", table="lli", val=np.array(self.data["cycle_slip"][obs_type]))
-            dset.add_float(obs_type + "_snr", table="snr", val=np.array(self.data["signal_strength"][obs_type]))
+            dset.add_float(f"obs.{obs_type}", val=np.array(self.data["obs"][obs_type]), unit="meter")
+            dset.add_float(f"lli.{obs_type}", val=np.array(self.data["cycle_slip"][obs_type]))
+            dset.add_float(f"snr.{obs_type}", val=np.array(self.data["signal_strength"][obs_type]))
 
         # Positions
-        dset.add_position("site_pos", time="time", itrs=np.repeat(self.data["pos"][None, :], dset.num_obs, axis=0))
-        dset.add_to_meta(dset.vars["station"], "site_id", dset.meta["marker_name"].upper())
+        dset.add_position(
+            "site_pos", time=dset.time, system="trs", val=np.repeat(self.data["pos"][None, :], dset.num_obs, axis=0)
+        )
+        dset.meta.add("site_id", dset.meta["marker_name"].upper(), section=dset.vars["station"])
+
+        # Add number of satellites per epoch
+        dset.add_float("num_satellite_available", val=gnss.get_number_of_satellites(dset))
 
 
 def _float(value):

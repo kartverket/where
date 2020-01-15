@@ -157,7 +157,7 @@ of residuals or estimation parameters, as is seen in the following screenshot:</
 </ul>
 <h2 id="running-there">Running There</h2>
 <p>You can start the There program quite simply by issuing the command</p>
-<pre><code>$ there
+<pre><code>$ there --vlbi
 </code></pre>
 <p>on the command line. This will open the There program. Inside There you can then
 explore all the analyses you have already done with Where.</p>
@@ -172,6 +172,30 @@ command very similar to the one you used for running the analysis. For instance,
 to open an analysis of the VLBI XA-session for December 27 2016 you would do:</p>
 <pre><code>$ there 2016 12 27 -v --session=XA
 </code></pre>
+<h3 id="timeseries">Timeseries</h3>
+<p>If you do not specify a specific analysis the default tab will show you the <strong>timeseries</strong> 
+dataset. This dataset is intended to compare some parameters across different analyses.</p>
+<p>Timeseries is a special dataset that is stored with the date 19700101. This
+dataset contains many fields with one value for each processed session. For
+instance by selecting <em>variance_factor</em> for the Y-axis this value can be showed
+for all processed sessions. Clicking on a point in the plot will print some info
+about the point in the command line window used to start There. This way
+sessions with abnormal variance factors can be identified and investigated
+further. By selecting the <em>Go go analysis</em> behaviour for <em>Double click</em>, and double clicking on a 
+data point in the time series plot, There will switch to the <strong>Analysis</strong> tab and plot the dataset
+the selected point was a part of.</p>
+<h3 id="rerunning-single-sessions">Rerunning single sessions</h3>
+<p>A single session may to some extent be manipulated through There. For instance
+by selecting a station in the dropdown menu and then pressing <em>Ignore station</em>
+the station will be added to the ignore_station field in the configuration
+file. By pressing <em>Rerun</em> the session with be analyzed again and all data from
+the station will be removed from the analysis.</p>
+<p>Clock breaks may also be added by selecting the <em>Add clock break</em> behaviour for
+<em>Double click</em>, selecting the station that has the clock break and then double
+clicking on the plot where the clock break should be added. Adding clock breaks or removing observations
+does not change the results. It only edits the configuration file. More complicated changes to the configuration
+can be done by clicking the <em>Edit</em> button and writing directly in the configuration file. To apply the changes,
+the analysis needs to be run again. This is done with the <em>Rerun</em> button.</p>
 <h3 id="customizing-there">Customizing There</h3>
 <p>It is possible to customize much of the look and behavior of There. As with
 Where, you do this through the configuration. To see the current configuration,

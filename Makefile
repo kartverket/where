@@ -12,10 +12,11 @@ F2PYEXTENSION = .cpython-36m-x86_64-linux-gnu.so
 EXTDIR = $(CURDIR)/where/ext
 SOFADIR = $(CURDIR)/external/sofa/src
 IERSDIR = $(CURDIR)/external/iers/src
+HFEOPDIR = $(CURDIR)/external/iers/hfeop
 GPT2WDIR = $(CURDIR)/external/gpt2w/src
 
 # Define phony targets (targets that are not files)
-.PHONY: all develop install cython doc test typing format external sofa iers_2010 gpt2w
+.PHONY: all develop install cython doc test typing format external sofa iers_2010 hf_eop gpt2w
 
 # Everything needed for installation
 all:	external cython develop local_config
@@ -70,7 +71,7 @@ black:
 ######################################################################
 
 # External libraries
-external:	sofa iers_2010 gpt2w
+external:	sofa iers_2010 gpt2w hf_eop
 
 # SOFA
 sofa:	$(EXTDIR)/sofa$(F2PYEXTENSION)
@@ -97,6 +98,18 @@ $(IERSDIR)_2010/libiers-dehant/libiers-dehant.a:	$(shell find $(IERSDIR)_2010/li
 
 $(IERSDIR)_2010/libiers-hardisp/libiers-hardisp.a:	$(shell find $(IERSDIR)_2010/libiers-hardisp -type f -name *.F)
 	( cd $(IERSDIR)_2010/libiers-hardisp && make && make clean )
+
+
+# HF EOP
+hf_eop:         $(EXTDIR)/hf_eop$(F2PYEXTENSION)
+
+$(HFEOPDIR)/hfeop_xyu_mod.pyf:
+	python download.py hf_eop
+
+$(EXTDIR)/hf_eop$(F2PYEXTENSION): $(HFEOPDIR)/hfeop_xyu_mod.pyf   $(shell find $(HFEOPDIR) -type f -name *.f90) 
+	( cd $(EXTDIR) && \
+           $(F2PY) -c $(HFEOPDIR)/hfeop_xyu_mod.pyf $(HFEOPDIR)/hfeop_xyu_mod.f90 ) 
+
 
 # GPT2w
 gpt2w:	$(EXTDIR)/gpt2w$(F2PYEXTENSION)

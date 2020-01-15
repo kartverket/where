@@ -11,7 +11,6 @@ import pytest
 # Where imports
 import where
 from where.lib import config
-from where.lib import files
 
 
 @pytest.fixture
@@ -53,7 +52,7 @@ def _parameters(rundate, pipeline, stage, session, **options):
         ),
         file_vars=dict(
             rundate=rundate.strftime(config.FMT_date),
-            tech=pipeline,
+            pipeline=pipeline,
             stage=stage,
             user=user,
             id="",
@@ -85,7 +84,7 @@ def system_test(backup_test_file):
         parameters = _parameters(rundate, pipeline, stage, session, **options)
 
         # File containing output result
-        file_path = files.path("output_system_test", file_vars=parameters["file_vars"])
+        file_path = config.files.path("output_system_test", file_vars=parameters["file_vars"])
 
         # Read previous result
         try:

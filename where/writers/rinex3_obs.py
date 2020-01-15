@@ -16,7 +16,6 @@ from midgard.dev import plugins
 # Where imports
 import where
 from where.lib import config
-from where.lib import files
 from where.lib import log
 
 
@@ -52,7 +51,7 @@ def rinex3_obs(dset):
         sampling_rate = meta["interval"]
     dset.vars["sampling_rate"] = str(int(sampling_rate))  # Used as placeholder for determination of output file name
 
-    with files.open("output_rinex3_obs", file_vars=dset.vars, mode="wt") as fid:
+    with config.files.open("output_rinex3_obs", file_vars=dset.vars, mode="wt") as fid:
 
         # ================================
         #  Write RINEX observation header

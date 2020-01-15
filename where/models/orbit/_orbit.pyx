@@ -18,7 +18,7 @@ to be decorated with the :func:`~where.lib.plugins.register` decorator as follow
 The decorated function will be called with several parameters::
 
     TODO: Document parameters
-
+    TODO: Plugins does not work with cython
 
 References:
 -----------
@@ -32,6 +32,7 @@ import sys
 cimport libc.math
 import math
 from collections import OrderedDict
+from datetime import datetime, timedelta
 
 # External library imports
 import numpy as np
@@ -45,20 +46,19 @@ from midgard.math import interpolation
 # Where imports
 from where import apriori
 from where.lib import config
-from where.lib.time import Time
-from where.lib.time import TimeDelta
+from where.lib import rotation
+from where.data.time import Time
+from where.data.time import TimeDelta
 from where import integrators
 
 _INITIAL_POSVEL = dict()
 _TRANSITION_MATRIX = dict()
 _PARAMETERS = dict()
-_MEASUREMENT_PARAMETERS = dict()
 _SENSITIVITY_MATRIX = dict()
-_MEASUREMENT_MATRIX = dict()
 _MODELS = dict()
 
 
-def calculate(rundate, sat_name, obs_sec, range_bias_stations, time_bias_stations, return_full_table=False):
+def calculate(rundate, sat_name, obs_sec, return_full_table=False):
     """Calculate the orbit for a satellite at the given observation epochs
 
     Solve the differential equation of motion of the satellite and the differential equation of the state transition
@@ -75,10 +75,10 @@ def calculate(rundate, sat_name, obs_sec, range_bias_stations, time_bias_station
     on the orbit_step_length and the observation epochs.
 
     Args:
-        rundate:           The model run date.
-        sat_name:          Name of the satellite.
-        obs_sec:           List of observation epochs in seconds after rundate.
-        return_full_table: Arrays are for observation epochs or full time grid.
+        rundate:             The model run date.
+        sat_name:            Name of the satellite.
+        obs_sec:             List of observation epochs in seconds after rundate.
+        return_full_table:   Arrays are for observation epochs or full time grid.
 
     Returns:
         Arrays of calculated positions and velocities.
@@ -91,21 +91,19 @@ def calculate(rundate, sat_name, obs_sec, range_bias_stations, time_bias_station
     if sat_name not in _INITIAL_POSVEL:
         satellite = apriori.get_satellite(*sat_name.split("-"))
         _INITIAL_POSVEL[sat_name] = satellite.initial_posvel(rundate)
-
+  
     # Set parameters to be estimated:
-    force_parameter_names = config.tech.force_parameters.list
-    measurement_parameter_names = config.tech.measurement_parameters.list
-    set_parameters(sat_name, force_parameter_names, rundate)
-    set_measurement_parameters(sat_name, measurement_parameter_names, rundate, range_bias_stations, time_bias_stations)
+    parameter_names = config.tech.force_parameters.list
+    set_parameters(sat_name, parameter_names, rundate)
     num_param = len(_PARAMETERS[sat_name])
     end_time = max(obs_sec)
     log.info(
         f"Calculating orbit of {sat_name} from {rundate.strftime(config.FMT_datetime)} to "
-        f"{(Time(rundate, scale='utc') + TimeDelta(end_time, format='sec'))}"
+        f"{(Time(rundate, scale='utc', fmt='datetime') + TimeDelta(end_time, fmt='seconds', scale='utc'))}"
     )
 
     step_length = config.tech.orbit_step_length.float
-    arc_length = config.tech.arc_length.int
+    arc_length = config.tech.arc_length.float
     grid_step = step_length if step_length else 10.0
 
     initial_state = np.hstack((_INITIAL_POSVEL[sat_name], np.identity(6).reshape(-1), np.zeros(6 * num_param)))
@@ -188,8 +186,8 @@ cdef construct_forces(rundate, sat_name, int arc_length, int num_param, double[:
     cdef int num_bodies
     vars_ = dict(rundate=rundate, sat_name=sat_name, force_parameters=_PARAMETERS[sat_name], num_param=num_param)
 
-    epochs = Time([Time(rundate, scale="utc") + TimeDelta(t, format="sec") for t in time_grid])
-    cdef double[:, :, :] gcrs2itrs = epochs.gcrs2itrs
+    epochs = Time([rundate + timedelta(seconds =t) for t in time_grid], fmt="datetime", scale="utc")
+    cdef double[:, :, :] gcrs2itrs = rotation.gcrs2trs(epochs)
 
     # Ephemerides of sun, moon and planets
     bodies = config.tech.gravity_bodies.bodies.list
@@ -288,9 +286,16 @@ cdef set_parameters(sat_name, parameter_names, rundate):
 
     orbit_models = config.tech.orbit_models.list
 
+    # Check that the input makes sense
     if "empirical" in orbit_models and "empirical" not in parameter_names:
-        log.fatal("Empirical is included in orbit_models, not in force_parameters")
-    if "empirical" in parameter_names:
+        log.fatal("Empirical is included in orbit_models, not in force_parameters\n",
+                  "Add the empirical parameters you wish to estimate to --force_parameters")
+        sys.exit(0)
+    elif "empirical" not in orbit_models and "empirical" in parameter_names:
+        log.fatal("Not able to estimate empirical paramters when empirical is not in orbit_models.\n" 
+                   "Remove empirical from --force_parameters")
+        sys.exit(0)
+    elif "empirical" in parameter_names and "empirical" in orbit_models:
         empirical_parameters = config.tech.empirical.empirical_parameters.list
         parameter_names.remove("empirical")
         parameter_names = parameter_names + empirical_parameters
@@ -316,7 +321,16 @@ cdef set_parameters(sat_name, parameter_names, rundate):
                 else:
                     log.warn("Could not estimate radiation pressure coefficient")
                     log.fatal("Solar radiation pressure is not included in orbit models")
-            elif parameter_names[i].startswith("a"):
+            elif parameter_names[i] in ["const_radial",
+                                        "const_cross",
+                                        "const_along",
+                                        "1cpr_sin_radial",
+                                        "1cpr_sin_cross",
+                                        "1cpr_sin_along",
+                                        "1cpr_cos_radial",
+                                        "1cpr_cos_cross",
+                                        "1cpr_cos_along"
+                                        ]:
                 _PARAMETERS[sat_name][parameter_names[i]] = 0
             elif parameter_names[i] == "c20":
                 if "gravity_earth" in orbit_models:
@@ -335,26 +349,7 @@ cdef set_parameters(sat_name, parameter_names, rundate):
                 log.fatal(f"Not a valid parameter name {parameter_names[i]!r}")
 
 
-cdef set_measurement_parameters(sat_name, parameter_names, rundate, range_bias_stations, time_bias_stations):
-    # TODO: Add station in dict
-    if sat_name not in _MEASUREMENT_PARAMETERS:
-        satellite = apriori.get_satellite(*sat_name.split("-"))
-        _MEASUREMENT_PARAMETERS[sat_name] = OrderedDict()
-        for i in range(0, len(parameter_names)):
-            # Test if parameters given on config file are valid
-            # and set default values for parameters
-            if parameter_names[i] == "range_bias":
-                for j in range(0, len(range_bias_stations)):
-                    _MEASUREMENT_PARAMETERS[sat_name][f"range_bias_{range_bias_stations[j]}"] = 0
-            elif parameter_names[i] == "time_bias":
-                for j in range(0, len(time_bias_stations)):
-                    _MEASUREMENT_PARAMETERS[sat_name][f"time_bias_{time_bias_stations[j]}"] = 0
-            else:
-                log.fatal(f"Not a valid parameter name {parameter_names[i]!r}")
-
-
-
-def update_orbit(sat_name, sta_pos_gcrs, sat_pos_gcrs, sat_vel, residual, weight, stations):
+def update_orbit(sat_name, sta_pos_gcrs, sat_pos_gcrs, sat_vel, residual, bin_rms):
     """
     Compute correction to the initial value of position
     and velocity of the satellite in meters and meters/sec
@@ -364,62 +359,37 @@ def update_orbit(sat_name, sta_pos_gcrs, sat_pos_gcrs, sat_vel, residual, weight
         sta_pos_gcrs: Station position in the gcrs system
         sat_pos_gcrs: Satellite position in the gcrs system
         residual:     Observation residual
-        weight:       Weight of the observation
-        stations:     List of stations, one for each observations
+        bin_rms:      RMS of each normal point 
 
     References:
          Montenbruck and Gill [1], Section 8.1.1.
     """
-    num_obs = len(weight)
+    num_obs = len(residual)
     sta_sat_vector = sat_pos_gcrs - sta_pos_gcrs
     unit_vector = (sta_sat_vector / np.linalg.norm(sta_sat_vector, axis=1)[:, None])
     unit_vector_ext = np.hstack((unit_vector, np.zeros(unit_vector.shape)))
-    weight_matrix = np.diag(weight)
-    
+    weight_matrix = np.diag((bin_rms)**(-2))
     if sat_name in _SENSITIVITY_MATRIX:
         H = np.hstack((np.sum(unit_vector_ext[:, :, None] * _TRANSITION_MATRIX[sat_name], axis=1),
                        np.sum(unit_vector_ext[:, :, None] * _SENSITIVITY_MATRIX[sat_name], axis=1)))
     else:
         H = np.sum(unit_vector_ext[:, :, None] * _TRANSITION_MATRIX[sat_name], axis=1)
-
-    _MEASUREMENT_MATRIX[sat_name] = np.zeros((len(stations), len(_MEASUREMENT_PARAMETERS[sat_name])))
-    for i in range(0, len(stations)):
-        for j, (k, val) in enumerate(_MEASUREMENT_PARAMETERS[sat_name].items()):
-            if f"range_bias_{stations[i]}" == k:
-                _MEASUREMENT_MATRIX[sat_name][i, j] = 1
-            elif f"time_bias_{stations[i]}" == k:
-                # TODO! Not sure if this is the correct way of estimating partials of 
-                # measurement with respect to time bias
-                _MEASUREMENT_MATRIX[sat_name][i, j] = np.sum(unit_vector * sat_vel, axis=1)[i]
-    H = np.hstack((H, _MEASUREMENT_MATRIX[sat_name]))
     
-    # Equation 8.15 in Montenbruck and Gill:
+    # Equation 8.23 in Montenbruck and Gill:
     N = np.linalg.pinv(np.dot(H.T, weight_matrix @ H))
-    NH = np.dot(N, H.T)
+    NH = N @ H.T
     _INITIAL_POSVEL[sat_name] += np.dot(NH, weight_matrix @ residual)[: 6]
-
     log.info(f"Estimated initial position {_INITIAL_POSVEL[sat_name][0:3]}")
     log.info(f"Estimated initial velocity {_INITIAL_POSVEL[sat_name][3:6]}")
 
     if sat_name in _SENSITIVITY_MATRIX:
         keys = list(_PARAMETERS[sat_name].keys())
-        keys_measurement = list(_MEASUREMENT_PARAMETERS[sat_name].keys())
         for i in range(0, len(keys)):
             _PARAMETERS[sat_name][keys[i]] += np.dot(NH, weight_matrix @ residual)[6:][i]
             log.info(f"Estimate of {keys[i]} is {_PARAMETERS[sat_name][keys[i]]}:")
-        for i in range(0, len(keys_measurement)): 
-            _MEASUREMENT_PARAMETERS[sat_name][keys_measurement[i]] += np.dot(NH, weight_matrix @ residual)[6 + len(keys):][i]
-            log.info(f"Estimate of {keys_measurement[i]} is {_MEASUREMENT_PARAMETERS[sat_name][keys_measurement[i]]}:")
 
-    estimated_range_bias = np.zeros(num_obs)
-    estimated_time_bias = np.zeros(num_obs)
-    for i in range(0, len(stations)):
-        for (k, val) in _MEASUREMENT_PARAMETERS[sat_name].items():
-            if f"range_bias_{stations[i]}" == k:
-                estimated_range_bias[i] = val
-            if f"time_bias_{stations[i]}" == k:
-                estimated_time_bias[i] = val
-    return estimated_range_bias, estimated_time_bias
+    return 
+
 
 def read_models(rundate, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_itrs, bodies, gcrs2itrs):
     """Read Cython or Python orbit models
@@ -439,7 +409,11 @@ def read_models(rundate, sat_name, time_grid, epochs, body_pos_gcrs, body_pos_it
 
     import importlib
     package = __name__.rsplit(".", maxsplit=1)[0]
-    modules = [m[:-4] for m in os.listdir(os.path.dirname(__file__))
+    # HACK!
+    #module_dir = os.listdir('/home/fauing/where/where/models/orbit')
+    module_dir = os.listdir(os.path.dirname(__file__))
+
+    modules = [m[:-4] for m in module_dir
                if (m.endswith(".pyx") and not m.startswith("_"))]
     for module_name in modules:
         try:
@@ -496,7 +470,4 @@ def calculate_epoch(**kwargs):
         sensitivity_matrix += sens_part
 
     return acceleration, transition_matrix, sensitivity_matrix
-
-
-    
 

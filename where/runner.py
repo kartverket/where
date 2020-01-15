@@ -59,21 +59,22 @@ from datetime import timedelta
 import subprocess
 import sys
 
+# Midgard imports
+from midgard.dev.timer import Timer
 
 # Where imports
 import where
-from where.lib import config
-from where.lib import files
-from where.lib import log
 from where import pipelines
-from where.lib.timer import timer
+from where import setup
+from where.lib import config
+from where.lib import log
 from where.lib import util
 from where.lib.enums import LogLevel
 
 _STATISTICS = {"Number of analyses": 0, "Successful analyses": 0, "Failed analyses": 0}
 
 
-@timer(f"Finish {util.get_program_name()} in")
+@Timer(f"Finish {util.get_program_name()} in")
 def main():
     """Parse command line options and loop over the Where analysis
 
@@ -94,14 +95,12 @@ def main():
         from_date = util.parse_args("date", doc_module=__name__)
         to_date = util.parse_args("date", doc_module=__name__)
 
-    # Handle list of sessions
-    session_list = set(util.read_option_value("--session", default="").replace(",", " ").split())
-    sys.argv = [o for o in sys.argv if not o.startswith("--session=")]
+    setup.set_profile(pipeline)
 
     # Start logging
     file_vars = dict(**util.get_user_info())
     log.file_init(
-        file_path=files.path("log_runner", file_vars=file_vars),
+        file_path=config.files.path("log_runner", file_vars=file_vars),
         log_level=config.where.log.default_level.str,
         prefix="Runner",
         rotation=config.where.log.number_of_log_backups.int,
@@ -120,12 +119,11 @@ def main():
     # Loop over dates
     rundate = from_date
     while rundate <= to_date:
-        available_sessions = set(pipelines.list_sessions(rundate, pipeline))
-        sessions = available_sessions & session_list if session_list else available_sessions
+        args = remove_runner_args(sys.argv[1:])
+        where_args = set(pipelines.get_args(rundate, pipeline, input_args=args))
 
-        where_args = remove_runner_args(sys.argv[1:])
-        for session in sorted(sessions):
-            cmd = f"{where.__executable__} {rundate:%Y %m %d} --session={session}".split() + where_args
+        for arg in sorted(where_args):
+            cmd = f"{where.__executable__} {rundate:%Y %m %d} ".split() + arg.split()
             log.info(f"Running '{' '.join(cmd)}'")
             count("Number of analyses")
             try:
@@ -136,7 +134,7 @@ def main():
                 error_logger(f"Command '{' '.join(cmd)}' failed: {error_msg}")
             else:
                 count("Successful analyses")
-            copy_log_from_where(rundate, pipeline, session)
+            copy_log_from_where(rundate, pipeline, arg)
 
         rundate += timedelta(days=1)
 
@@ -153,19 +151,28 @@ def remove_runner_args(args):
     return list(args - runner_args)
 
 
-def copy_log_from_where(rundate, pipeline, session):
-    file_vars = dict(**config.program_vars(rundate, pipeline, session), **config.date_vars(rundate))
+def copy_log_from_where(rundate, pipeline, args):
+    kwargs = dict()
+    for a in args.split():
+        if "=" in a:
+            a = a.split("=", maxsplit=1)
+            kwargs[a[0].lstrip("-")] = a[1]
+
+    file_vars = dict(
+        **config.program_vars(rundate, pipeline, use_options=False, **kwargs), **config.date_vars(rundate)
+    )
     log_level = config.where.runner.log_level.str
     current_level = "none"
     try:
-        with files.open("log", file_vars=file_vars) as fid:
+        with config.files.open("log", file_vars=file_vars) as fid:
             for line in fid:
                 line_level, _, text = line.partition(" ")
                 line_level = line_level.strip().lower()
                 current_level = line_level if line_level else current_level
                 text = text.strip()
                 if getattr(LogLevel, current_level) >= getattr(LogLevel, log_level) and text:
-                    log.log(text, current_level)
+                    # strip the 20 date characters from the text
+                    log.log(text[20:], current_level)
     except FileNotFoundError as err:
         log.warn(f"'{err}'")
 

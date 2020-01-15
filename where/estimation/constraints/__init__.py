@@ -4,9 +4,9 @@ Description:
 ------------
 
 Each estimator should be defined in a separate .py-file. The function inside the .py-file that
-should be called need to be decorated with the :func:`~where.lib.plugins.register` decorator as follows::
+should be called need to be decorated with the :func:`~midgard.dev.plugins.register` decorator as follows::
 
-    from where.lib import plugins
+    from midgard.dev import plugins
 
     @plugins.register
     def estimate_least_square(dset):
@@ -25,9 +25,11 @@ derivatives it should obtain them by itself calling the :func:`where.estimation.
 """
 import numpy as np
 
+# Midgard imports
+from midgard.dev import plugins
+
 # Where imports
 from where.lib import config
-from where.lib import plugins
 
 
 def get(dset, param_names):
@@ -37,8 +39,9 @@ def get(dset, param_names):
         dset (Dataset):          Model run data.
         param_names:             Names of parameters to estimate
     """
+    constraints = config.tech["estimate_constraints"].list
     constraints = plugins.call_all(
-        package_name=__name__, config_key="estimate_constraint", prefix="todo", dset=dset, param_names=param_names
+        package_name=__name__, plugins=constraints, prefix="todo", dset=dset, param_names=param_names
     )
 
     h = np.concatenate([c[0] for c in constraints.values()])

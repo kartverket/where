@@ -23,36 +23,13 @@ References:
 import numpy as np
 
 # Midgard imports
+from midgard.dev import plugins
 from midgard.math.unit import Unit
 
 # Where imports
 from where.apriori import crf
-from where.lib import plugins
+from where.data.direction import Direction
 from where import parsers
-
-# TODO: Use dataset3 Direction and add derivatives as properties
-def radec2unitvector(ra, dec):
-    """Convert right ascension and declination to a unit vector
-    """
-    return np.array([np.cos(dec) * np.cos(ra), np.cos(dec) * np.sin(ra), np.sin(dec)])
-
-
-def dsrc_dra(ra, dec):
-    """Derivative of radio source unit vector with regards to right ascension
-    """
-    cos_dec = np.cos(dec)
-    cos_ra = np.cos(ra)
-    # sin_dec = np.sin(dec)
-    sin_ra = np.sin(ra)
-    return np.array([-cos_dec * sin_ra, cos_dec * cos_ra, 0])
-
-
-def dsrc_ddec(ra, dec):
-    cos_dec = np.cos(dec)
-    cos_ra = np.cos(ra)
-    sin_dec = np.sin(dec)
-    sin_ra = np.sin(ra)
-    return np.array([-sin_dec * cos_ra, -sin_dec * sin_ra, cos_dec])
 
 
 @plugins.register
@@ -88,15 +65,17 @@ class Icrf3(crf.CrfFactory):
         mjd_2015 = 57023.0  # # Reference epoch of aberration model
 
         # Galactic center
-        gc_ra = Unit.hms_to_rad(17, 45, 40.04)
-        gc_dec = Unit.dms_to_rad(-29, 0, 28.1)
-        gc = radec2unitvector(gc_ra, gc_dec)
+        gc = Direction(ra=Unit.hms_to_rad(17, 45, 40.04), dec=Unit.dms_to_rad(-29, 0, 28.1))
 
-        source_info = self.data[source]
+        # Radio source
+        src = Direction(ra=self.data[source]["ra"], dec=self.data[source]["dec"])
 
         # Compute correction
-        dra = ga * gc @ dsrc_dra(source_info["ra"], source_info["dec"])
-        ddec = ga * gc @ dsrc_ddec(source_info["ra"], source_info["dec"])
+        dra = ga * gc.unit_vector @ src.dsrc_dra
+        ddec = ga * gc.unit_vector @ src.dsrc_ddec
         dt = (self.time.mean.mjd - mjd_2015) * Unit.day2julian_year
 
-        return np.array([source_info["ra"] + dra * dt, source_info["dec"] + ddec * dt])
+        ra = src.right_ascension + dra * dt
+        dec = src.declination + ddec * dt
+
+        return np.squeeze(Direction(ra=ra, dec=dec, time=self.time))

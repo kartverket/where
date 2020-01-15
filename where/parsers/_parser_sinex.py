@@ -26,10 +26,10 @@ import pandas as pd
 
 # Where imports
 from where.parsers._parser import Parser
-from where.lib import files
+from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 from where.lib import util
+from where.lib.unit import Unit
 
 # A simple structure used to define a Sinex block
 SinexBlock = namedtuple("SinexBlock", ["marker", "fields", "parser"])
@@ -199,7 +199,7 @@ class SinexParser(Parser):
         read, a parser is called on each block so that self.data is properly populated.
         """
         # Read raw sinex data to self._sinex from file
-        with files.open_path(self.file_path, mode="rb") as fid:
+        with config.files.open_path(self.file_path, mode="rb") as fid:
             if self._header:
                 self.parse_header_line(next(fid))  # Header must be first line
             self.parse_blocks(fid)

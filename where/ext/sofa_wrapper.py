@@ -5,10 +5,7 @@ Where wrapper for SOFA functions
 Description:
 ------------
 
-This wrapper mainly provides vectorized versions of the SOFA functions, as well as cached versions of the most
-important matrices like Q (the transformation matrix for the celestial motion of the CIP), R (the transformation matrix
-for Earth rotation) and W (the transformation matrix for polar motion). See the IERS conventions [2]_ for more details,
-in particular section 5.
+This wrapper mainly provides vectorized versions of the SOFA functions.
 
 References:
 -----------
@@ -26,30 +23,30 @@ References:
 """
 
 # Standard library imports
+from functools import lru_cache
 
 # External library imports
 import numpy as np
 
 # Where imports
-from where.lib import cache
 from where.ext import sofa
 
 
-@cache.function
+@lru_cache()
 def X_model(time):
     """X coordinates of CIP in GCRS from series based on IAU 2006 precession and IAU 2000A nutation
     """
     return vectorized_xy06(time)[0]
 
 
-@cache.function
+@lru_cache()
 def Y_model(time):
     """Y coordinates of CIP in GCRS from series based on IAU 2006 precession and IAU 2000A nutation
     """
     return vectorized_xy06(time)[1]
 
 
-@cache.function
+@lru_cache()
 def vectorized_xy06(time):
     """Vectorized version of SOFA xy06-function
 
@@ -59,16 +56,16 @@ def vectorized_xy06(time):
     Returns:
         tuple:  CIP x, y coordinates
     """
-    if time.isscalar:
-        return sofa.iau_xy06(time.tt.jd1, time.tt.jd2)
+    if time.size == 1:
+        return sofa.iau_xy06(time.tt.jd_int, time.tt.jd_frac)
 
     x, y = np.empty(time.shape), np.empty(time.shape)
     for idx, t in enumerate(time.tt):
-        x[idx], y[idx] = sofa.iau_xy06(t.jd1, t.jd2)
+        x[idx], y[idx] = sofa.iau_xy06(t.jd_int, t.jd_frac)
     return x, y
 
 
-@cache.function
+@lru_cache()
 def vectorized_s06(time):
     """Vectorized version of SOFA s06-function
 
@@ -80,15 +77,15 @@ def vectorized_s06(time):
     Returns:
         CIO locator s
     """
-    if time.isscalar:
-        return sofa.iau_s06(time.tt.jd1, time.tt.jd2, X_model(time), Y_model(time))
+    if time.size == 1:
+        return sofa.iau_s06(time.tt.jd_int, time.tt.jd_frac, X_model(time), Y_model(time))
 
     return np.array(
-        [sofa.iau_s06(t.jd1, t.jd2, x_i, y_i) for t, x_i, y_i in zip(time.tt, X_model(time), Y_model(time))]
+        [sofa.iau_s06(t.jd_int, t.jd_frac, x_i, y_i) for t, x_i, y_i in zip(time.tt, X_model(time), Y_model(time))]
     )
 
 
-@cache.function
+@lru_cache()
 def vectorized_era00(time):
     """Vectorized version of SOFA era00-function
 
@@ -98,13 +95,13 @@ def vectorized_era00(time):
     Returns:
         Earth rotation angle
     """
-    if time.isscalar:
-        return sofa.iau_era00(time.ut1.jd1, time.ut1.jd2)
+    if time.size == 1:
+        return sofa.iau_era00(time.ut1.jd_int, time.ut1.jd_frac)
 
-    return np.array([sofa.iau_era00(t.jd1, t.jd2) for t in time.ut1])
+    return np.array([sofa.iau_era00(t.jd_int, t.jd_frac) for t in time.ut1])
 
 
-@cache.function
+@lru_cache()
 def vectorized_sp00(time):
     """Vectorized version of SOFA sp00-function
 
@@ -114,29 +111,121 @@ def vectorized_sp00(time):
     Returns:
         TIO locator s'
     """
-    if time.isscalar:
-        return sofa.iau_sp00(time.tt.jd1, time.tt.jd2)
+    if time.size == 1:
+        return sofa.iau_sp00(time.tt.jd_int, time.tt.jd_frac)
 
-    return np.array([sofa.iau_sp00(t.jd1, t.jd2) for t in time.tt])
+    return np.array([sofa.iau_sp00(t.jd_int, t.jd_frac) for t in time.tt])
 
 
-def vectorized_llh(pos, ref_ellipsoid=2):
-    """Vectorized version of SOFA gc2gd-function. 
+@lru_cache()
+def vectorized_gmst06(time):
+    """Vectorized version of SOFA gmst06-function
 
-    Converts xyz coordinates to latitude, longitude and height
-
-    @todo ref_ellipsoid
     Args:
-        pos:        xyz coordinates
+            Time epochs (see where.data.time for more info)
+
     Returns:
-        np.array:   llh coordinates 
+            Greenwich mean time in radians
     """
-    if np.array(pos).ndim == 1:
-        lon, lat, h, _ = sofa.iau_gc2gd(ref_ellipsoid, pos)
-        return np.array([lat, lon, h])
-    else:
-        llh = np.empty(pos.shape)
-        for i, xyz in enumerate(pos):
-            lon, lat, h, _ = sofa.iau_gc2gd(ref_ellipsoid, xyz)
-            llh[i, :] = (lat, lon, h)
-        return llh
+    if time.size == 1:
+        return sofa.iau_gmst06(time.ut1.jd_int, time.ut1.jd_frac, time.tt.jd_int, time.tt.jd_frac)
+
+    return np.array([sofa.iau_gmst06(t.ut1.jd_int, t.ut1.jd_frac, t.tt.jd_int, t.tt.jd_frac) for t in time])
+
+
+@lru_cache()
+def vectorized_gst06(time):
+    """Vectorized version of SOFA gmst06-function
+
+    Args:
+            Time epochs (see where.data.time for more info)
+
+    Returns:
+            Greenwich apparent time in radians
+    """
+
+    if time.size == 1:
+        return sofa.iau_gst06a(time.ut1.jd_int, time.ut1.jd_frac, time.tt.jd_int, time.tt.jd_frac)
+
+    return np.array([sofa.iau_gst06a(t.ut1.jd_int, t.ut1.jd_frac, t.tt.jd_int, t.tt.jd_frac) for t in time])
+
+
+@lru_cache()
+def vectorized_iau_fal03(time):
+    """Vectorized version of SOFA iau_fal03-function
+
+    Args:
+           Time epochs (see where.data.time for more info)
+
+    Returns:
+           Fundamental argument, mean anomaly of the Moon. In radians.
+    """
+    julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
+    if time.size == 1:
+        return sofa.iau_fal03(julian_centuries)
+    return np.array([sofa.iau_fal03(t) for t in julian_centuries])
+
+
+@lru_cache()
+def vectorized_iau_falp03(time):
+    """Vectorized version of SOFA iau_falp03-function
+
+    Args:
+           Time epochs (see where.data.time for more info)
+
+    Returns:
+           Fundamental argument, mean anomaly of the Sun. In radians.
+    """
+    julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
+    if time.size == 1:
+        return sofa.iau_falp03(julian_centuries)
+    return np.array([sofa.iau_falp03(t) for t in julian_centuries])
+
+
+@lru_cache()
+def vectorized_iau_faf03(time):
+    """Vectorized version of SOFA iau_faf03-function
+
+    Args:
+           Time epochs (see where.data.time for more info)
+
+    Returns:
+           Fundamental argument, mean longitude of the Moon minus mean
+           longitude of the ascending node. In radians.
+    """
+    julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
+    if time.size == 1:
+        return sofa.iau_faf03(julian_centuries)
+    return np.array([sofa.iau_faf03(t) for t in julian_centuries])
+
+
+@lru_cache()
+def vectorized_iau_fad03(time):
+    """Vectorized version of SOFA iau_fad03-function
+
+    Args:
+           Time epochs (see where.data.time for more info)
+
+    Returns:
+           Fundamental argument, mean elongation of the Moon from the Sun. In radians.
+    """
+    julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
+    if time.size == 1:
+        return sofa.iau_fad03(julian_centuries)
+    return np.array([sofa.iau_fad03(t) for t in julian_centuries])
+
+
+@lru_cache()
+def vectorized_iau_faom03(time):
+    """Vectorized version of SOFA iau_faom03-function
+
+    Args:
+           Time epochs (see where.data.time for more info)
+
+    Returns:
+           Fundamental argument, mean longitude of the Moon’s ascending node. In radians.
+    """
+    julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
+    if time.size == 1:
+        return sofa.iau_faom03(julian_centuries)
+    return np.array([sofa.iau_faom03(t) for t in julian_centuries])
