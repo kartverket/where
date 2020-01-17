@@ -19,7 +19,7 @@ Example:
 
 """
 # Standard library imports
-from typing import Dict
+from typing import Any, Dict
 
 # External library imports
 import matplotlib.pyplot as plt
@@ -56,14 +56,14 @@ def gnss_comparison_report(dset: Dict[str, "Dataset"]) -> None:
 
     # Generate plots
     _, dfs_day, dfs_month = _generate_dataframes(dset)
-    _plot_position_error(dfs_day, dfs_month, figure_dir)
+    _plot_position_error(dfs_day, dfs_month, figure_dir, dset_first.vars)
 
     # Generate GNSS comparison report
     path = config.files.path("output_gnss_comparison_report", file_vars=dset_first.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset_first.rundate, path=path, description="Comparison of GNSS analyses")
         rpt.title_page()
-        _add_to_report(rpt, figure_dir, dfs_day, dfs_month)
+        _add_to_report(rpt, figure_dir, dfs_day, dfs_month, dset_first.vars)
         rpt.markdown_to_pdf()
 
 
@@ -72,6 +72,7 @@ def _add_to_report(
     figure_dir: "pathlib.PosixPath",
     dfs_day: Dict[str, pd.core.frame.DataFrame],
     dfs_month: Dict[str, pd.core.frame.DataFrame],
+    file_vars: Dict[str, Any],
 ) -> None:
     """Add figures and tables to report
 
@@ -82,6 +83,7 @@ def _add_to_report(
                      samples of 95th percentile and stations as columns.
         dfs_month:   Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value with MONTHLY
                      samples of 95th percentile and stations as columns.
+        file_vars:   File variables used for file and plot title naming.
     """
 
     for sample_name in ["Daily", "Monthly"]:
@@ -107,13 +109,13 @@ def _add_to_report(
 
         # Add HPE 95th and VPE 95th plots
         rpt.add_figure(
-            f"{figure_dir}/plot_hpe_{sample_name.lower()}.{FIGURE_FORMAT}",
+            f"{figure_dir}/plot_hpe_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for horizontal position error (HPE).",
             clearpage=True,
         )
 
         rpt.add_figure(
-            f"{figure_dir}/plot_vpe_{sample_name.lower()}.{FIGURE_FORMAT}",
+            f"{figure_dir}/plot_vpe_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for vertical position error (VPE).",
             clearpage=True,
         )
@@ -217,7 +219,11 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
             df_day = df.set_index("time.gps").resample("D", how=lambda x: np.nanpercentile(x, q=95))
             for field in dfs_day.keys():
-                dfs_day[field][station] = df_day[field]
+                if dfs_day[field].empty:
+                    dfs_day[field][station] = df_day[field]
+                else:
+                    dfs_day[field] = pd.concat([dfs_day[field], df_day[field]], axis=1)
+                dfs_day[field] = dfs_day[field].rename(columns={field: station})
 
             df_month = df.set_index("time.gps").resample("M", how=lambda x: np.nanpercentile(x, q=95))
             df_month.index = df_month.index.strftime("%b-%Y")
@@ -234,6 +240,7 @@ def _plot_position_error(
     dfs_day: Dict[str, pd.core.frame.DataFrame],
     dfs_month: Dict[str, pd.core.frame.DataFrame],
     figure_dir: "pathlib.PosixPath",
+    file_vars: Dict[str, Any],
 ) -> None:
     """Plot horizontal and vertical position error plots (95th percentile) 
 
@@ -254,7 +261,7 @@ def _plot_position_error(
         "plot_to": "file",
         "plot_type": "plot",
         # "statistic": ["rms", "mean", "std", "min", "max", "percentile"], #TODO: Is only shown for data, which are plotted at last.
-        "title": config.tech.gnss_comparison_report.solution.str.lower(),
+        "title": file_vars["solution"].upper(),
     }
 
     colors = (
@@ -302,6 +309,7 @@ def _plot_position_error(
                 y_unit="m",
                 labels=labels,
                 colors=colors,
-                figure_path=figure_dir / f"plot_{field}_{sample_name}.{FIGURE_FORMAT}",
+                figure_path=figure_dir
+                / f"plot_{field}_{sample_name}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
                 opt_args=opt_args,
             )

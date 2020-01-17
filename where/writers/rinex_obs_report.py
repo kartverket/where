@@ -206,13 +206,13 @@ def _table_observation_overview(dset: "Dataset") -> Tuple[pd.core.frame.DataFram
         # Generate observation overview related to observation types
         for obstype in _sort_string_array(dset.meta["obstypes"][system]):
             index = obstype
-            idx_num = dset[obstype][idx] != 0  # TODO: RINEX Parser should be changed to 'nan' instead!!!!
+            idx_num = dset.obs[obstype][idx] != 0  # TODO: RINEX Parser should be changed to 'nan' instead!!!!
             num_sat = len(set(dset.satellite[idx][idx_num]))
 
             row = [
                 gnss_name,  # GNSS name
                 num_sat,  # Number of satellites
-                len(dset[obstype][idx][idx_num]),  # Number of observations
+                len(dset.obs[obstype][idx][idx_num]),  # Number of observations
             ]
             df_obstype = df_obstype.append(pd.DataFrame([row], columns=columns, index=[index]))
 

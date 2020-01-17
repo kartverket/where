@@ -28,7 +28,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where import apriori
-from where import data
+from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import util
 
@@ -62,9 +62,9 @@ class GnssSimulate:
         # MURKS: Should it be done like that. The technique is normally not given for unittest routines (like
         #       test_broadcast.py).
         try:
-            tech = config.analysis.tech.str
+            pipeline = config.analysis.pipeline.str
         except:
-            tech = "gnss"
+            pipeline = "gnss"
 
         # +MURKS
         systems = ["G"]
@@ -79,15 +79,9 @@ class GnssSimulate:
         self.station = station if station else config.tech.simulate.station.str
         # TODO: Generate station position
 
-        self._dset_raw = data.Dataset(
-            rundate=rundate, tech=tech, stage="simulate", dataset_name="raw", dataset_id=0, empty=True, session=""
-        )
-        self._dset_orbit = data.Dataset(
-            rundate=rundate, tech=tech, stage="simulate", dataset_name="orbit", dataset_id=0, empty=True, session=""
-        )
-        self._dset = data.Dataset(
-            rundate=rundate, tech=tech, stage="simulate", dataset_name="simulate", dataset_id=0, empty=True, session=""
-        )
+        self._dset_raw = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage="simulate", label="raw")
+        self._dset_orbit = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage="simulate", label="orbit")
+        self._dset = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage="simulate", label="simulate")
 
     @property
     def dset_raw(self):
@@ -136,7 +130,10 @@ class GnssSimulate:
             dset:   A dataset containing the data.
         """
         orbit = apriori.get(
-            "orbit", rundate=self.dset_raw.rundate, system=tuple(self.dset_raw.unique("system")), station=self.station
+            "orbit",
+            rundate=self.dset_raw.analysis["rundate"],
+            system=tuple(self.dset_raw.unique("system")),
+            station=self.station,
         )
         # orbit.dset_raw.write_as(stage=stage, session=station, dataset_name="raw")
         # orbit.dset_edit.write_as(stage=stage, session=station, dataset_name="edit")
@@ -167,7 +164,14 @@ class GnssSimulate:
         hour = 0
         minute = 0
         second = 0
-        start_time = datetime(dset.rundate.year, dset.rundate.month, dset.rundate.day, hour, minute, second)
+        start_time = datetime(
+            dset.analysis["rundate"].year,
+            dset.analysis["rundate"].month,
+            dset.analysis["rundate"].day,
+            hour,
+            minute,
+            second,
+        )
         time_to_save = start_time
         num_satellite = len(used_satellites)
         while time_to_save < start_time + timedelta(days=1):
@@ -179,9 +183,11 @@ class GnssSimulate:
         # Generate Dataset
         dset.num_obs = len(time)
         dset.add_time("time", val=time, scale="gps", fmt="datetime", write_level="operational")
-        dset.add_text("satellite", val=dset_satellites, write_level="operational", unit="")
-        dset.add_text("system", val=dset_systems, write_level="operational", unit="")
-        dset.add_position("site_pos", time="time", itrs=np.repeat(self.site_pos[None, :], dset.num_obs, axis=0))
+        dset.add_text("satellite", val=dset_satellites, write_level="operational")
+        dset.add_text("system", val=dset_systems, write_level="operational")
+        dset.add_position(
+            "site_pos", time=dset.time, val=np.repeat(self.site_pos[None, :], dset.num_obs, axis=0), system="trs"
+        )
 
         # Write Dataset to file
         dset.write_as(stage="setup")

@@ -88,7 +88,7 @@ def get_args(rundate, input_args=None):
 
         check_master_status = config.where.get(
             "check_master_status",
-            section=pipeline,
+            section="runner",
             value=util.read_option_value("--check_master_status", default=None),
             default=False,
         ).bool
@@ -185,24 +185,14 @@ def file_vars():
         versions = config.files.glob_variable("vlbi_obs_vgosdb", "obs_version", r"\d{3}")
         if versions:
             _file_vars["obs_version"] = max(versions)
-        elif config.where.files.download_missing.bool:
-            # Look online for a candidate
-            log.warn(
-                f"No VGOSDB wrapper file found ({config.files.path('vlbi_obs_vgosdb')}). Not attempting to download."
-            )
-            # log.info("No NGS wrapper file found on disk: Looking for one online.")
-            # obs_versions = [f"{v:03d}" for v in reversed(range(4, 10))]
-            # for obs_version in obs_versions:
-            #    url = files.url(
-            #        "vlbi_obs_ngs", file_vars=dict(obs_version=obs_version), is_zipped=True, use_aliases=False
-            #    )
-            #    log.info(f"Looking for {url} ...")
-            #    if url.exists():
-            #        file_vars["obs_version"] = obs_version
-            #        break
+        agencies = config.files.glob_variable("vlbi_obs_vgosdb", "agency", r"[\w]+", file_vars=_file_vars)
+        if agencies:
+            _file_vars["agency"] = "IVS" if "IVS" in agencies else agencies.pop()
+            if len(agencies) > 1:
+                log.warn(f"Multiple agencies found ({', '.join(agencies)}) for file key vlbi_obs_vgosdb. Using {_file_vars['agency']}")
 
-        if not _file_vars:
-            log.fatal("No VGOSDB observation file found")
+        if not "obs_version" in _file_vars and not "acengy" in _file_vars:
+            log.fatal(f"No VGOSDB wrapper file found ({config.files.path('vlbi_obs_vgosdb')}).")
 
     # Sinex file vars
     if "sinex" in config.tech.section_names:

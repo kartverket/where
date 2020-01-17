@@ -85,8 +85,7 @@ def sisre_report(dset):
         dset.vars["sampling_rate"] = ""
 
     # Generate SISRE report
-    tmp = {"raw": 1, "clean": 2}
-    path = config.files.path(f"output_sisre_report_{tmp[dset.vars['label']]}", file_vars=dset.vars)
+    path = config.files.path(f"output_sisre_report_{dset.vars['label']}", file_vars=dset.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="SISRE analysis")
         rpt.title_page()

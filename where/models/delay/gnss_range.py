@@ -30,7 +30,7 @@ def gnss_range(dset: "Dataset"):
     # if "gnss_earth_rotation" in dset.fields:
     #    dset.sat_posvel[:] += dset.gnss_earth_rotation
     #    correction_itrs = (dset.sat_posvel.trs.pos - dset.site_pos.trs.pos).length
-    #    correction = itrs_result
-    #    print(itrs_result - result)
+    #    print("MURKS: ", correction_itrs - correction)
+    #    correction = correction_itrs
 
-    return result
+    return correction

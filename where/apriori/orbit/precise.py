@@ -274,8 +274,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
         dset_out.num_obs = dset_in.num_obs
         dset_out.add_text("satellite", val=dset_in.satellite)
         dset_out.add_text("system", val=dset_in.system)
-        # MURKS, TODO: How it works to initialize time field with a Time object?
-        dset_out.add_time("time", val=dset_in.time.datetime, scale=dset_in.time.scale, fmt="datetime")
+        dset_out.add_time("time", val=dset_in[time])
         dset_out.vars["orbit"] = self.name
 
         # Add float fields

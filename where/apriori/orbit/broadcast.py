@@ -377,21 +377,13 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         dset_out.num_obs = dset_in.num_obs
         dset_out.add_text("satellite", val=dset_in.satellite)
         dset_out.add_text("system", val=dset_in.system)
-        # MURKS, TODO: How it works to initialize time field with a Time object?
-        dset_out.add_time("time", val=dset_in.time.datetime, scale=dset_in.time.scale, fmt="datetime")
+        dset_out.add_time("time", val=dset_in[time])
         dset_out.vars["orbit"] = self.name
 
         # Add time field
         # MURKS, TODO: How it works to initialize time field with a Time object?
-        dset_out.add_time(
-            "used_transmission_time",
-            val=self.dset_edit.transmission_time.datetime[dset_brdc_idx],
-            scale=self.dset_edit.transmission_time.scale,
-            fmt="datetime",
-        )
-        dset_out.add_time(
-            "used_toe", val=self.dset_edit.toe.datetime[dset_brdc_idx], scale=self.dset_edit.toe.scale, fmt="datetime"
-        )
+        dset_out.add_time("used_transmission_time", val=self.dset_edit.transmission_time[dset_brdc_idx])
+        dset_out.add_time("used_toe", val=self.dset_edit.toe[dset_brdc_idx])
 
         # Add float fields
         for field in ["bgd_e1_e5a", "bgd_e1_e5b", "tgd", "tgd_b1_b3", "tgd_b2_b3"]:

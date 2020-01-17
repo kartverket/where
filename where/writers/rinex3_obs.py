@@ -35,9 +35,9 @@ def rinex3_obs(dset):
     date = datetime.utcnow()
     time_sys = "GPS"  # TODO: So far only GPS time system can be handled by Where.
     file_created = "{:15s} {:3s}".format(date.strftime("%Y%m%d %H%M%S"), "UTC")
-    pos_x = dset.site_pos.itrs[0][0]
-    pos_y = dset.site_pos.itrs[0][1]
-    pos_z = dset.site_pos.itrs[0][2]
+    pos_x = dset.site_pos.trs.x[0]
+    pos_y = dset.site_pos.trs.y[0]
+    pos_z = dset.site_pos.trs.z[0]
 
     cfg_sampling_rate = config.tech.sampling_rate.float
     num_satellites = len(dset.unique("satellite"))
@@ -333,10 +333,10 @@ def rinex3_obs(dset):
                 log.fatal(f"Satellite {dset.satellite[idx]} occurs twice in epoch {dset.time.gps.datetime[idx]}")
 
             for type_ in dset.meta["obstypes"][dset.system[idx]]:
-                lli = " " if dset[type_ + "_lli"][idx] == 0.0 else str(int(dset[type_ + "_lli"][idx]))
-                snr = " " if dset[type_ + "_snr"][idx] == 0.0 else str(int(dset[type_ + "_snr"][idx]))
+                lli = " " if dset.lli[type_][idx] == 0.0 else str(int(dset.lli[type_][idx]))
+                snr = " " if dset.snr[type_][idx] == 0.0 else str(int(dset.snr[type_][idx]))
                 obs_epoch_cache.setdefault(dset.satellite[idx], list()).append(
-                    {"obs": dset[type_][idx], "lli": lli, "snr": snr}
+                    {"obs": dset.obs[type_][idx], "lli": lli, "snr": snr}
                 )
             epoch_prev = epoch
 
