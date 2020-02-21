@@ -189,7 +189,9 @@ def file_vars():
         if agencies:
             _file_vars["agency"] = "IVS" if "IVS" in agencies else agencies.pop()
             if len(agencies) > 1:
-                log.warn(f"Multiple agencies found ({', '.join(agencies)}) for file key vlbi_obs_vgosdb. Using {_file_vars['agency']}")
+                log.warn(
+                    f"Multiple agencies found ({', '.join(agencies)}) for file key vlbi_obs_vgosdb. Using {_file_vars['agency']}"
+                )
 
         if not "obs_version" in _file_vars and not "acengy" in _file_vars:
             log.fatal(f"No VGOSDB wrapper file found ({config.files.path('vlbi_obs_vgosdb')}).")
@@ -271,7 +273,7 @@ def calculate(stage, dset):
     store_outliers = config.tech.store_outliers.bool
 
     for iter_num in itertools.count(start=1):
-        delay.calculate_delay("delay_corr", dset, dset)
+        delay.calculate_delay("delay_corr", dset)
         delta_correction = delay.add("delay_corr", dset)
 
         dset.calc[:] = dset.calc + delta_correction
@@ -316,10 +318,10 @@ def estimate(stage, dset):
         prev_stage (String): Name of previous stage.
         stage (String):      Name of current stage.
     """
-    partial_vectors = estimation.partial_vectors(dset, "estimate_method")
     max_iterations = config.tech.estimate_max_iterations.int
 
     for iter_num in itertools.count(start=1):
+        partial_vectors = estimation.partial_vectors(dset, "estimate_method")
         log.info(f"Estimating parameters for iteration {iter_num}")
         estimation.call(
             "estimate_method",
@@ -334,11 +336,15 @@ def estimate(stage, dset):
             break
 
         # Detect and remove outliers
-        keep_idx = estimation.apply_outlier_detectors("estimate_outlier_detection", dset)
-        if keep_idx.all():
-            break
-        dset.subset(keep_idx)
+        num_obs_before = dset.num_obs
+        independent = config.tech.estimate_obs_rejectors_independent.bool
+        dset = estimation.apply_observation_rejectors("estimate_obs_rejectors", dset, independent)
         log.blank()
+        if dset.num_obs == num_obs_before:
+            break
+
+    estimation.solve_neq(dset)
+    dset.write()
 
 
 @plugins.register

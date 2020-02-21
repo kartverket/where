@@ -7,27 +7,27 @@ Description:
 """
 # Standard library imports
 from collections import namedtuple
-from datetime import datetime
-from typing import List, Tuple
 
 # External library imports
 import numpy as np
 
 # Midgard imports
-import midgard
 from midgard.dev import plugins
-from midgard.math.unit import Unit
+from midgard.writers._writers import get_header
 
 # Where imports
 import where
 from where.lib import config
 from where.lib import util
 
-WriterField = namedtuple("WriterField", ["field", "attrs", "dtype", "format", "width", "header", "unit"])
+WriterField = namedtuple(
+    "WriterField", ["name", "field", "attrs", "dtype", "format", "width", "header", "unit", "description"]
+)
 WriterField.__new__.__defaults__ = (None,) * len(WriterField._fields)
 WriterField.__doc__ = """A convenience class for defining a output field for the writer
 
     Args:
+        name  (str):             Unique field name
         field (str):             Dataset field name
         attrs (Tuple[str]):      Field attributes
         dtype (Numpy dtype):     Type of field
@@ -35,6 +35,7 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
         width (int):             Width of header information
         header (str):            Header information
         unit (str):              Unit of field
+        description (str):       Description of field
     """
 
 # Define fields to plot
@@ -49,15 +50,45 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
 #  58150.000000  3.211111394999998e+05  3.211107445392029e+05  1.038e-01  gnss_site_pos-y
 #  58150.000000  5.445046647700000e+06  5.445048372422102e+06  2.453e-01  gnss_site_pos-z
 FIELDS = (
-    WriterField("date", (), object, "%21s", 19, "DATE", "YYYY/MM/DD hh:mm:ss"),
-    WriterField("mjd", (), float, "%13.6f", 13, "MJD", ""),
-    WriterField("gpsweek", ("gps", "gpsweek"), int, "%5d", 5, "WEEK", ""),
-    WriterField("gpssec", ("gps", "gpssec"), float, "%11.3f", 11, "GPSSEC", "second"),
-    WriterField("apriori", (), float, "%23.15e", 23, "APRIORI", "meter"),
-    WriterField("estimate", (), float, "%23.15e", 23, "ESTIMATE", "meter"),
-    WriterField("sigma", (), float, "%11.3e", 11, "SIGMA", "meter"),
-    WriterField("empty", (), str, "%2s", 2, "", ""),  # get spaces between 'sigma' and 'param_name' column
-    WriterField("param_name", (), object, "%-20s", 20, "PARAM_NAME", ""),
+    WriterField(
+        "date",
+        "date",
+        (),
+        object,
+        "%21s",
+        19,
+        "DATE",
+        "YYYY/MM/DD hh:mm:ss",
+        "Date in format year, month, day and hour, minute and second",
+    ),
+    WriterField("mjd", "mjd", (), float, "%13.6f", 13, "MJD", "", "Modified Julian Day"),
+    WriterField("gpsweek", "gpsweek", ("gps", "gps_ws", "week"), int, "%5d", 5, "WEEK", "", "GPS week"),
+    WriterField(
+        "gpssec", "gpssec", ("gps", "gps_ws", "seconds"), float, "%11.3f", 11, "GPSSEC", "second", "GPS seconds"
+    ),
+    WriterField("apriori", "apriori", (), float, "%23.15e", 23, "APRIORI", "meter", "Apriori value parameter"),
+    WriterField("estimate", "estimate", (), float, "%23.15e", 23, "ESTIMATE", "meter", "Estimated parameter value"),
+    WriterField(
+        "sigma", "sigma", (), float, "%11.3e", 11, "SIGMA", "meter", "Standard deviation of estimated parameter value"
+    ),
+    WriterField("empty", "empty", (), str, "%2s", 2, "", "", ""),  # get spaces between 'sigma' and 'param_name' column
+    WriterField(
+        "param_name",
+        "param_name",
+        (),
+        object,
+        "%-20s",
+        20,
+        "PARAM_NAME",
+        "",
+        f"Parameter name: \n"
+        f"""
+{'': >38}gnss_rcv_clock   - GNSS receiver clock
+{'': >38}gnss_site_pos-x  - X-coordinate of site position
+{'': >38}gnss_site_pos-x  - Y-coordinate of site position
+{'': >38}gnss_site_pos-x  - Z-coordinate of site position
+""",
+    ),
 )
 
 
@@ -90,12 +121,12 @@ def estimate_solution(dset: "Dataset") -> None:
         output_array = _get_epoch(dset, idx)
 
     # Write to disk
-    header = [
-        _get_header(dset),
-        "".join(f"{f.header:>{f.width}s}" for f in FIELDS),
-        "".join(f"{f.unit:>{f.width}s}" for f in FIELDS),
-        "_" * sum([f.width for f in FIELDS]),
-    ]
+    header = get_header(
+        FIELDS,
+        pgm_version=f"where {where.__version__}",
+        run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
+        summary="Estimate solutions results",
+    )
     np.savetxt(
         file_path,
         output_array,
@@ -145,40 +176,3 @@ def _get_epoch(dset: "Dataset", idx: np.ndarray) -> np.ndarray:
         epoch_array = np.concatenate((epoch_array, param_values), axis=0) if epoch_array.size else param_values
 
     return epoch_array
-
-
-def _get_header(dset: "Dataset") -> str:
-    """Get header
-
-    Args:
-        dset:  A dataset containing the data.
-
-    Returns:
-        Header lines
-    """
-    pgm = "where " + where.__version__ + "/midgard " + midgard.__version__
-    run_by = util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else ""
-    file_created = datetime.utcnow().strftime("%Y%m%d %H%M%S") + " UTC"
-    header = "PGM: {:s}  RUN_BY: {:s}  DATE: {:s}\n".format(pgm, run_by, file_created)
-    header = (
-        header
-        + """
-
-HEADER      UNIT                  DESCRIPTION
-______________________________________________________________________________________________________________________
-DATE        YYYY/MM/DD hh:mm:ss   Date in format year, month, day and hour, minute and second
-MJD                               Modified Julian Day
-WEEK                              GPS week
-GPSSEC      second                GPS seconds
-APRIORI     meter                 Apriori value parameter
-ESTIMATE    meter                 Estimated parameter value
-SIGMA       meter                 Standard deviation of estimated parameter value
-PARAM_NAME                        Parameter name:
-                                        gnss_rcv_clock   - GNSS receiver clock
-                                        gnss_site_pos-x  - X-coordinate of site position
-                                        gnss_site_pos-x  - Y-coordinate of site position
-                                        gnss_site_pos-x  - Z-coordinate of site position
-
-"""
-    )
-    return header

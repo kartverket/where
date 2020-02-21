@@ -8,16 +8,14 @@ TODO: Has IGS monitoring group defined a SISRE format?
 """
 # Standard library imports
 from collections import namedtuple
-from datetime import datetime
-from typing import Tuple
 
 # External library imports
 import numpy as np
 
 # Midgard imports
-import midgard
 from midgard.dev import console
 from midgard.dev import plugins
+from midgard.writers._writers import get_field, get_header
 
 # Where imports
 import where
@@ -26,11 +24,14 @@ from where.lib import util
 from where import pipelines
 from where.writers import sisre_output_buffer
 
-WriterField = namedtuple("WriterField", ["field", "attrs", "dtype", "format", "width", "header", "unit"])
+WriterField = namedtuple(
+    "WriterField", ["name", "field", "attrs", "dtype", "format", "width", "header", "unit", "description"]
+)
 WriterField.__new__.__defaults__ = (None,) * len(WriterField._fields)
 WriterField.__doc__ = """A convenience class for defining a output field for the writer
 
     Args:
+        name  (str):             Unique field name
         field (str):             Dataset field name
         attrs (Tuple[str]):      Field attributes
         dtype (Numpy dtype):     Type of field
@@ -38,7 +39,140 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
         width (int):             Width of header information
         header (str):            Header information
         unit (str):              Unit of field
+        description (str):       Description of field
     """
+
+FIELDS = (
+    WriterField(
+        "date",
+        "date",
+        (),
+        object,
+        "%21s",
+        19,
+        "DATE",
+        "YYYY/MM/DD hh:mm:ss",
+        "Date in format year, month, day and hour, minute and second",
+    ),
+    WriterField("mjd", "time", ("gps", "mjd"), float, "%14.6f", 14, "MJD", "", "Modified Julian Day"),
+    WriterField("gpsweek", "time", ("gps", "gps_ws", "week"), int, "%5d", 5, "WEEK", "", "GPS week"),
+    WriterField(
+        "gpssec", "time", ("gps", "gps_ws", "seconds"), float, "%11.3f", 11, "GPSSEC", "second", "GPS seconds"
+    ),
+    WriterField("satellite", "satellite", (), object, "%5s", 5, "SAT", " ", "Satellite number"),
+    WriterField(
+        "used_iode",
+        "used_iode",
+        (),
+        float,
+        "%6d",
+        6,
+        "IODE",
+        "",
+        f"Used ephemeris issue of data indicates changes to the broadcast ephemeris:\n"
+        f"""
+{'': >38}- GPS:     Ephemeris issue of data (IODE), which is set equal to IODC
+{'': >38}- Galileo: Issue of Data of the NAV batch (IODnav)
+{'': >38}- QZSS:    Ephemeris issue of data (IODE)
+{'': >38}- BeiDou:  Age of Data Ephemeris (AODE)
+""",
+    ),
+    WriterField(
+        "trans_time_gpsweek",
+        "trans_time_gpsweek",
+        (),
+        object,
+        "%15s",
+        15,
+        "TRANS_TIME",
+        "wwwwd:ssssss",
+        "Transmission time (receiver reception time)",
+    ),
+    WriterField("toe_gpsweek", "toe_gpsweek", (), object, "%15s", 15, "TOE", "wwwwd:ssssss", "Time of ephemeris"),
+    WriterField(
+        "diff_trans_toe",
+        "diff_trans_toe",
+        (),
+        float,
+        "%8d",
+        8,
+        "TM-TOE",
+        "second",
+        "Difference between transmission time and time of ephemeris",
+    ),
+    WriterField(
+        "age_of_ephemeris",
+        "age_of_ephemeris",
+        (),
+        float,
+        "%8d",
+        8,
+        "T-TOE",
+        "second",
+        "Age of ephemeris, which is the difference between the observation time and the time of ephemeris " "(ToE)",
+    ),
+    # WriterField("diff_time_trans", "diff_time_trans", (), float, "%8d", 8, "T-TM", "", ""),
+    WriterField(
+        "clk_diff",
+        "clk_diff",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "ΔCLOCK",
+        "meter",
+        "Satellite clock correction difference related to center of mass of satellite and corrected for "
+        "satellite biases",
+    ),
+    WriterField(
+        "clk_diff_with_dt_mean",
+        "clk_diff_with_dt_mean",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "ΔCLOCK_MEAN",
+        "meter",
+        "Satellite clock correction difference related to center of mass of satellite and corrected for "
+        "satellite biases and averaged clock offset in each epoch",
+    ),
+    WriterField(
+        "dalong_track",
+        "dalong_track",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "ΔALONG_TRACK",
+        "meter",
+        "Satellite coordinate difference between broadcast and precise ephemeris in along-track direction",
+    ),
+    WriterField(
+        "dcross_track",
+        "dcross_track",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "ΔCROSS_TRACK",
+        "meter",
+        "Satellite coordinate difference between broadcast and precise ephemeris in cross-track direction",
+    ),
+    WriterField(
+        "dradial",
+        "dradial",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "ΔRADIAL",
+        "meter",
+        "Satellite coordinate difference between broadcast and precise ephemeris in radial direction",
+    ),
+    WriterField("orb_diff_3d", "orb_diff_3d", (), float, "%16.4f", 16, "ORB_DIFF_3D", "meter", "3D orbit difference"),
+    WriterField("sisre_orb", "sisre_orb", (), float, "%16.4f", 16, "SISRE_ORB", "meter", "Orbit-only SISRE"),
+    WriterField("sisre", "sisre", (), float, "%16.4f", 16, "SISRE", "meter", "Global averaged SISRE"),
+)
 
 
 @plugins.register
@@ -48,31 +182,8 @@ def sisre_writer(dset: "Dataset") -> None:
     Args:
         dset:   A dataset containing the data.
     """
-    write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
-
-    fields = (
-        WriterField("time_date", (), object, "%21s", 19, "EPOCH", "YYYY/MM/DD hh:mm:ss"),
-        WriterField("time", ("gps", "mjd"), float, "%14.6f", 14, "", "mjd"),
-        WriterField("time_gpsweek", (), object, "%15s", 15, "", "wwwwd:ssssss"),
-        WriterField("satellite", (), object, "%5s", 5, "SAT", " "),
-        WriterField("used_iode", (), float, "%6d", 6, "IODE", " "),
-        WriterField("trans_time_gpsweek", (), object, "%15s", 15, "TRANS_TIME", "wwwwd:ssssss"),
-        WriterField("toe_gpsweek", (), object, "%15s", 15, "TOE", "wwwwd:ssssss"),
-        WriterField("diff_trans_toe", (), float, "%8d", 8, "TM-TOE"),
-        WriterField("age_of_ephemeris", (), float, "%8d", 8, "T-TOE"),
-        # WriterField("diff_time_trans",      (),             float,  "%8d",     8, "T-TM",  ),
-        WriterField("clk_diff", (), float, "%16.4f", 16, "ΔCLOCK"),
-        WriterField("clk_diff_with_dt_mean", (), float, "%16.4f", 16, "ΔCLOCK_MEAN"),
-        WriterField("dalong_track", (), float, "%16.4f", 16, "ΔALONG_TRACK"),
-        WriterField("dcross_track", (), float, "%16.4f", 16, "ΔCROSS_TRACK"),
-        WriterField("dradial", (), float, "%16.4f", 16, "ΔRADIAL"),
-        WriterField("orb_diff_3d", (), float, "%16.4f", 16, "ORB_DIFF_3D"),
-        WriterField("sisre_orb", (), float, "%16.4f", 16, "SISRE_ORB"),
-        WriterField("sisre", (), float, "%16.4f", 16, "SISRE"),
-    )
-
     # Add additional fields used by the writer
-    dset.add_text("time_date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
+    dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
     dset.add_text(
         "time_gpsweek", val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.time]
     )
@@ -92,13 +203,14 @@ def sisre_writer(dset: "Dataset") -> None:
     dset.add_float("dradial", val=dset.orb_diff.acr.radial, unit=dset.unit("orb_diff.acr.radial"))
 
     ## Add 'detail' fields used by the writer
+    # write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
     # if write_level <= enums.get_value("write_level", "detail"):
-    #    fields += (
-    #        WriterField("clk_brdc_com", (), float, "%16.4f", 16, "CLK_BRDC"),
-    #        WriterField("clk_precise_com", (), float, "%16.4f", 16, "CLK_PRECISE"),
-    #        WriterField("bias_brdc", (), float, "%10.4f", 10, "B_BRDC"),
-    #        WriterField("bias_precise", (), float, "%10.4f", 10, "B_PREC"),
-    #        WriterField("dt_mean", (), float, "%10.4f", 10, "dt_MEAN"),
+    #    FIELDS += (
+    #        WriterField("clk_brdc_com", "clk_brdc_com", (), float, "%16.4f", 16, "CLK_BRDC", ""),
+    #        WriterField("clk_precise_com", "clk_precise_com", (), float, "%16.4f", 16, "CLK_PRECISE", ""),
+    #        WriterField("bias_brdc", "bias_brdc", (), float, "%10.4f", 10, "B_BRDC", ""),
+    #        WriterField("bias_precise", "bias_precise", (), float, "%10.4f", 10, "B_PREC", ""),
+    #        WriterField("dt_mean", "dt_mean", (), float, "%10.4f", 10, "dt_MEAN", ""),
     #    )
     #
     #    dset.add_float("dt_mean", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter")
@@ -107,23 +219,17 @@ def sisre_writer(dset: "Dataset") -> None:
     idx = np.concatenate([np.where(dset.filter(satellite=s))[0] for s in dset.unique("satellite")])
 
     # Put together fields in an array as specified by the fields-tuple
-    output_list = list(zip(*(_get_field(dset, f.field, f.attrs) for f in fields)))
-    output_array = np.array(output_list, dtype=[(f.field, f.dtype) for f in fields])[idx]
+    output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in FIELDS)))
+    output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in FIELDS])[idx]
 
     # Write to disk
     # NOTE: np.savetxt is used instead of having a loop over all observation epochs, because the performance is better.
     file_path = config.files.path(f"output_sisre_{dset.vars['label']}", file_vars=dset.vars)
-    header = [
-        _get_header(dset),
-        "".join(f"{f.header:>{f.width}s}" for f in fields),
-        "".join(f"{f.unit if f.unit else dset.unit(f.field)[0]:>{f.width}s}" for f in fields),
-        "_" * sum([f.width for f in fields]),
-    ]
     np.savetxt(
         file_path,
         output_array,
-        fmt=tuple(f.format for f in fields),
-        header="\n".join(header),
+        fmt=tuple(f.format for f in FIELDS),
+        header="\n".join(_get_header(dset)),
         delimiter="",
         encoding="utf8",
     )
@@ -131,23 +237,6 @@ def sisre_writer(dset: "Dataset") -> None:
     # Append SISRE output path to SISRE output buffer file
     if config.tech.sisre_writer.write_buffer_file.bool:
         sisre_output_buffer.sisre_output_buffer(dset)
-
-
-def _get_field(dset: "Dataset", field: "str", attrs: Tuple[str]) -> np.ndarray:
-    """Get field values of a Dataset specified by the field attributes
-
-    Args:
-        dset:     Dataset, a dataset containing the data.
-        field:    Field name.
-        attrs:    Field attributes (e.g. for Time object: (<scale>, <time format>)).
-
-    Returns:
-        Array with Dataset field values
-    """
-    f = dset[field]
-    for attr in attrs:
-        f = getattr(f, attr)
-    return f
 
 
 def _get_header(dset: "Dataset") -> str:
@@ -159,22 +248,16 @@ def _get_header(dset: "Dataset") -> str:
     Returns:
         Header lines
     """
-
-    pgm = "where " + where.__version__ + "/midgard " + midgard.__version__
-    run_by = util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else ""
-    file_created = datetime.utcnow().strftime("%Y%m%d %H%M%S") + " UTC"
-    header = "PGM: {:s}  RUN_BY: {:s}  DATE: {:s}\n\n".format(pgm, run_by, file_created)
-    header += "SISRE ANALYSIS CONFIGURATION\n\n"
-
     # SISRE configuration
-    header += str(config.tech.as_str(key_width=25, width=70, only_used=True)) + "\n\n\n"
-    header += _get_paths()
+    add_description = "\nSISRE ANALYSIS CONFIGURATION\n\n"
+    add_description += str(config.tech.as_str(key_width=25, width=70, only_used=True)) + "\n\n\n"
+    add_description += _get_paths()
 
     # Information about used biases and phase center offsets (PCOs)
-    header += "{:^4s}{:>10s}{:>10s}{:^26s}{:^26s}\n".format("SAT", "BIAS_BRDC", "BIAS_PREC", "PCO_BRDC", "PCO_PREC")
-    header += "{:^4s}{:^10s}{:^10s}{:^26s}{:^26s}\n".format("", "[m]", "[m]", "[m]", "[m]")
+    add_description += f"{'SAT':^4s}{'BIAS_BRDC':>10s}{'BIAS_PREC':>10s}{'PCO_BRDC':^26s}{'PCO_PREC':^26s}\n"
+    add_description += f"{'':^4s}{'[m]':^10s}{'[m]':^10s}{'[m]':^26s}{'[m]':^26s}\n"
     for sat in dset.unique("satellite"):
-        header += "{:>3s}{:>10.4f}{:>10.4f}{:>10.4f}{:>8.4f}{:>8.4f}{:>10.4f}{:>8.4f}{:>8.4f}\n".format(
+        add_description += "{:>3s}{:>10.4f}{:>10.4f}{:>10.4f}{:>8.4f}{:>8.4f}{:>10.4f}{:>8.4f}{:>8.4f}\n".format(
             sat,
             dset.meta["bias_brdc"][sat],
             dset.meta["bias_precise"][sat],
@@ -186,7 +269,15 @@ def _get_header(dset: "Dataset") -> str:
             dset.meta["pco_sat_precise"][sat][2],
         )
 
-    return header + "\n\n"
+    header = get_header(
+        FIELDS,
+        pgm_version=f"where {where.__version__}",
+        run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
+        summary="SISRE analysis results",
+        add_description=add_description + "\n\n",
+    )
+
+    return header
 
 
 def _get_paths() -> str:

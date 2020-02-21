@@ -11,9 +11,7 @@ from datetime import datetime
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_sinex import SinexParser, SinexBlock, SinexField
+from midgard.parsers._parser_sinex import SinexParser, SinexBlock, SinexField
 
 
 @plugins.register

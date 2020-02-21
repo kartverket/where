@@ -27,19 +27,18 @@ from where.lib import config
 from where.lib import log
 
 
-def calculate_delay(config_key, dset_in, dset_out=None, shape=(), write_levels=None):
+def calculate_delay(config_key, dset_in, dset_out=None, write_levels=None):
     """Call delay models and store output in dataset
 
     Args:
         config_key (String):  Key in config with list of models.
         dset_in (Dataset):    Dataset to read data from.
         dset_out (Dataset):   Dataset to store data to.
-        shape (Tuple of int): Shape of output.
     """
-    _calculate_model(calculate, config_key, dset_in, dset_out, shape, write_levels)
+    _calculate_model(calculate, config_key, dset_in, dset_out, write_levels)
 
 
-def _calculate_model(calculate_func, config_key, dset_in, dset_out, shape, write_levels=None):
+def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels=None):
     """Call models and store output in dataset
 
     If the model output is empty, we still create a dummy field in the table only containing zeros. This is done to
@@ -50,23 +49,11 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, shape, write
         config_key (String):        Key in config with list of models, also table the model output is stored in.
         dset_in (Dataset):          Dataset to read data from.
         dset_out (Dataset):         Dataset to store data to.
-        shape (Tuple of int):       Shape of output.
     """
     dset_out = dset_in if dset_out is None else dset_out
     write_levels = dict() if write_levels is None else write_levels
 
     model_output = calculate_func(config_key, dset_in)
-    if not model_output:
-        # TODO update to dataset3
-        model_name = "{}_zeros".format(config_key)
-        if model_name not in dset_out.fields:
-            dset_out.add_float(
-                model_name,
-                table=config_key,
-                shape=shape,
-                unit="meter",
-                write_level=write_levels.get(model_name, "analysis"),
-            )
 
     for model_name, values in sorted(model_output.items()):
         field_name = f"{config_key}.{model_name}"

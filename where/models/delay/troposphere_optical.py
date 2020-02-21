@@ -23,10 +23,10 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where.ext import iers_2010 as iers
-from where.lib.unit import Unit
 
 
 @plugins.register

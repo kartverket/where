@@ -34,7 +34,7 @@ def calculate(config_key, dset):
     return plugins.call_all(package_name=__name__, plugins=config.tech[config_key].list, prefix=prefix, dset=dset)
 
 
-def _calculate_model(calculate_func, config_key, dset_in, dset_out, shape, write_levels=None):
+def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels=None):
     """Call models and store output in dataset
 
     If the model output is empty, we still create a dummy field in the table only containing zeros. This is done to
@@ -45,7 +45,6 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, shape, write
         config_key (String):        Key in config with list of models, also table the model output is stored in.
         dset_in (Dataset):          Dataset to read data from.
         dset_out (Dataset):         Dataset to store data to.
-        shape (Tuple of int):       Shape of output.
     """
     dset_out = dset_in if dset_out is None else dset_out
     write_levels = dict() if write_levels is None else write_levels
@@ -95,13 +94,12 @@ def add(config_key, dset):
     return delta_pos
 
 
-def calculate_site(config_key, dset_in, dset_out=None, shape=(3,), write_levels=None):
+def calculate_site(config_key, dset_in, dset_out=None, write_levels=None):
     """Call site models and store output in dataset
 
     Args:
         config_key (String):  Key in config with list of models.
         dset_in (Dataset):    Dataset to read data from.
         dset_out (Dataset):   Dataset to store data to.
-        shape (Tuple of int): Shape of output.
     """
-    _calculate_model(calculate, config_key, dset_in, dset_out, shape, write_levels)
+    _calculate_model(calculate, config_key, dset_in, dset_out, write_levels)

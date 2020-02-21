@@ -11,13 +11,13 @@ import scipy.sparse
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
 from where.estimation.estimators._kalman import KalmanFilter
 from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 
 
 @plugins.register_named("partial_config_keys")

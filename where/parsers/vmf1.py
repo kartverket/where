@@ -22,9 +22,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser import Parser
+from midgard.parsers._parser import Parser
 
 
 @plugins.register

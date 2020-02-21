@@ -17,8 +17,7 @@ import re
 
 # Midgard imports
 from midgard.dev import plugins
-
-from where.parsers._parser import Parser
+from midgard.parsers._parser import Parser
 
 
 @plugins.register
@@ -28,7 +27,7 @@ class OceanTidesCoeffParser(Parser):
 
     def read_data(self):
         with open(self.file_path) as fid:
-            prog = re.compile("\d")
+            prog = re.compile(r"\d")
             for line in fid:
                 # Search for line containing data
                 if prog.match(line[2:3]):

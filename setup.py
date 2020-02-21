@@ -58,7 +58,7 @@ setup(
         "IPython",
         "jplephem",
         "matplotlib",
-        "midgard>=1.0.0",
+        "midgard>=1.1.1",
         "numpy",
         "pandas",
         "pint",

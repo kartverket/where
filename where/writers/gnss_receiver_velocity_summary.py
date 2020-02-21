@@ -1,4 +1,5 @@
-"""Write GNSS post-fit residual results
+
+"""Write  Doppler GNSS receiver velocity results
 
 Description:
 ------------
@@ -38,27 +39,29 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
         description (str):       Description of field
     """
 
-# Define fields to plot
+
+# =============================================================================================================
+# Define fields to plots
 #
-# # PGM: where 0.21.2/midgard 0.3.0  RUN_BY: NMA  DATE: 20190604 134930 UTC
+# Format
 # #
-# #  SAT               EPOCH           MJD WEEK     GPSSEC    AZI   ELEV       RESIDUAL
-# #      YYYY/MM/DD hh:mm:ss                        second    deg    deg          meter
-# # ___________________________________________________________________________________
-#   E07  2018/02/01 00:00:00  58150.000000 1986 345600.000   46.6   22.3         -0.000
-#   E11  2018/02/01 00:00:00  58150.000000 1986 345600.000 -107.0    8.0          0.000
-#   E12  2018/02/01 00:00:00  58150.000000 1986 345600.000 -114.8   59.0          0.000
-# ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8----+-
-#
+# #               EPOCH          MJD WEEK     GPSSEC     satCNT       3DSpeed    HSpeed     XSpeed
+# # YYYY/MM/DD hh:mm:ss          Unitless     second     unitless      m/s         m/s        m/s
+# # ___________________________________________________________________________________________________________
+#  2018/02/01 00:00:00  58150.000000 1986 345600.000    8   0.00256   0.00056    0.0016       ...
+#  2018/02/01 00:05:00  58150.003472 1986 345900.000    9   0.00126   0.00026    0.0006       ...
+#  2018/02/01 00:10:00  58150.006944 1986 346200.000   13   0.00556   0.00012    0.0006       ...
+# ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8----+----9----+----0----+----
+# =============================================================================================================
 FIELDS = (
-    WriterField("satellite", "satellite", (), object, "%5s", 4, "SAT", "", "Satellite number"),
+    # GR-I
     WriterField(
         "date",
         "date",
         (),
         object,
         "%21s",
-        20,
+        19,
         "DATE",
         "YYYY/MM/DD hh:mm:ss",
         "Date in format year, month, day and hour, minute and second",
@@ -68,48 +71,43 @@ FIELDS = (
     WriterField(
         "gpssec", "time", ("gps", "gps_ws", "seconds"), float, "%11.3f", 11, "GPSSEC", "second", "GPS seconds"
     ),
-    WriterField(
-        "azimuth",
-        "site_pos",
-        ("azimuth",),
-        float,
-        "%7.1f",
-        7,
-        "AZI",
-        "deg",
-        "Azimuth of satellite in relation to station position",
-    ),
-    WriterField(
-        "elevation",
-        "site_pos",
-        ("elevation",),
-        float,
-        "%7.1f",
-        7,
-        "ELEV",
-        "deg",
-        "Elevation of satellite in relation to station position",
-    ),
-    WriterField("residual", "residual", (), float, "%15.3f", 15, "RESIDUAL", "meter", "Post-fit residuals"),
+    WriterField("3d_vel", "gnss_spv_vel", (), float, "%10.6f", 10, "3D_VEL", "m/s", ""),
 )
 
-
+# ===========================================================================================
+######## enu = (dset.site_pos._itrs2enu @ (dset.site_pos.itrs_pos - ref_pos)[:,:,None])[:,:,0]
+# ===========================================================================================
 @plugins.register
-def gnss_residual(dset: "Dataset") -> None:
-    """Write GNSS post-fit residual results
+def gnss_receiver_velocity_summary(dset: "Dataset") -> None:
+    """Write Doppler estimated GNSS receiver velocity results to a text file
+
 
     Args:
         dset:  A dataset containing the data.
     """
+    # File name generation
+    file_path = config.files.path("output_receiver_velocity_summary", file_vars=dset.vars)
 
-    file_path = config.files.path("output_residual", file_vars=dset.vars)
-
-    # Add date field to dataset
+    # Handle GR-I: date field to dataset
     if "date" not in dset.fields:
         dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
 
     # Put together fields in an array as specified by the 'dtype' tuple list
-    output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in FIELDS)))
+    if config.tech.estimate_epochwise.bool:  # Epochwise estimation or over whole time period
+
+        output_list = list()
+        for epoch in dset.unique("time"):
+            idx = dset.filter(time=epoch)
+
+            # Append current epoch position solution to final output solution
+            output_list.append(tuple([get_field(dset, f.field, f.attrs, f.unit)[idx][0] for f in FIELDS]))
+
+    else:
+        # Get position solution for first observation
+        idx = np.squeeze(np.array(np.nonzero(dset.time.gps.mjd)) == 0)  # first observation -> TODO: Better solution?
+        output_list = [tuple([get_field(dset, f.field, f.attrs, f.unit)[idx][0] for f in FIELDS])]
+
+    # define the output atrray
     output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in FIELDS])
 
     # Write to disk
@@ -117,8 +115,9 @@ def gnss_residual(dset: "Dataset") -> None:
         FIELDS,
         pgm_version=f"where {where.__version__}",
         run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
-        summary="GNSS post-fit residual results",
+        summary="GNSS station velocity results",
     )
+
     np.savetxt(
         file_path,
         output_array,

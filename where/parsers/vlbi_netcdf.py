@@ -19,10 +19,7 @@ import netCDF4
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.lib import config
-from where.parsers._parser import Parser
+from midgard.parsers._parser import Parser
 
 
 @plugins.register
@@ -42,10 +39,7 @@ class NetCDFParser(Parser):
     ]
 
     def read_data(self):
-        if True:
-            self.SKIP_FIELDS = self.SKIP_FIELDS_DEFAULT
-        else:
-            self.SKIP_FIELDS = []
+        self.SKIP_FIELDS = self.SKIP_FIELDS_DEFAULT
 
         data = netCDF4.Dataset(self.file_path)
         for key, variable in data.variables.items():

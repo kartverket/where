@@ -13,14 +13,9 @@ http://ilrs.gsfc.nasa.gov/data_and_products/formats/crd.html with links to curre
 from datetime import datetime, timedelta
 import itertools
 
-# External library imports
-import numpy as np
-
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_chain import ParserDef, ChainParser
+from midgard.parsers._parser_chain import ParserDef, ChainParser
 
 
 @plugins.register

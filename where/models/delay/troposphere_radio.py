@@ -27,6 +27,7 @@ import os
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
@@ -34,7 +35,6 @@ from where.ext import iers_2010 as iers
 from where.ext import gpt2w as ext_gpt2w
 from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 
 # Name of model
 MODEL = __name__.split(".")[-1]

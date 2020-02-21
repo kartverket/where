@@ -23,10 +23,8 @@ import itertools
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_chain import ChainParser, ParserDef
 from midgard.math.constant import constant
+from midgard.parsers._parser_chain import ChainParser, ParserDef
 
 
 @plugins.register

@@ -87,10 +87,10 @@ def apply_rates(coefficients, truncation_level, rundate):
     years = (rundate - datetime(2000, 1, 1)).days / 365.25
 
     if truncation_level >= 2:
-        # coefficients['C'][2,0] += 11.6e-12 * years
+        # Note that the C20- value is the tide free value on page 89 in [4],
+        # not the zero tide value in Table 6.2.
         coefficients["C"][2, 0] = -0.484_165_31e-3 + 11.6e-12 * years
     if truncation_level >= 3:
         coefficients["C"][3, 0] += 4.9e-12 * years
     if truncation_level >= 4:
         coefficients["C"][4, 0] += 4.7e-12 * years
-    # TODO: Use consistent values for C21 and S21 as in eq (6.5) in Conventions?

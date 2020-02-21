@@ -156,7 +156,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
         # dset_edit.reorder(precise_filtered.index.values)
 
         # Convert edited fields to Dataset
-        precise_np = precise_filtered.as_matrix()
+        precise_np = precise_filtered.values
         fields = precise_filtered.columns
 
         dset_edit.vars["orbit"] = self.name

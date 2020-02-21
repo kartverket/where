@@ -11,19 +11,20 @@ from collections import namedtuple
 import textwrap
 from typing import Any, Dict, List, Union
 
-# Midgard imports
-from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import get_statistic, plot_subplot_row
-
 # External library imports
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 
+
+# Midgard imports
+from midgard.dev import plugins
+from midgard.plot.matplotlib_extension import get_statistic, plot_subplot_row
+from midgard.math.unit import Unit
+
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 from where.lib import util
 
 

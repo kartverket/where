@@ -27,6 +27,7 @@ import pandas as pd
 from midgard.collections import enums
 from midgard.dev import plugins
 from midgard.math.constant import constant
+from midgard.math.unit import Unit
 from midgard.parsers import rinex_nav
 
 # Where imports
@@ -36,7 +37,6 @@ from where.apriori import orbit
 from where.lib import config
 from where.lib import log
 from where.lib import rotation
-from where.lib.unit import Unit
 
 # Earth's gravitational constant
 GM = {
@@ -170,7 +170,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                     rundate=date_to_read, pipeline=dset_raw.vars["pipeline"], stage="temporary"
                 )
                 parser = rinex_nav.get_rinex2_or_rinex3(file_path)
-                parser.write_to_dataset(dset_temp)
+                dset_temp.update_from(parser.as_dataset())
                 file_paths.append(str(parser.file_path))
 
                 # Extend Dataset dset_raw with temporary Dataset
@@ -272,7 +272,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         # dset_edit.reorder(nav_filtered.index.values)
 
         # Convert edited fields to Dataset
-        nav_np = nav_filtered.as_matrix()
+        nav_np = nav_filtered.values
         fields = nav_filtered.columns
 
         dset_edit.vars["orbit"] = self.name
@@ -357,20 +357,21 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
             # +DEBUG
             # print("DEBUG: {} obs_idx: {:>5d} brdc_idx: {:>5d} toc: {:>5.0f} {:>6.0f} toe: {:>6.0f} trans_time: {:>6.0f}"
-            #      " tk: {:>16.10f} iode: {:>3d} sqrt_a: {:>17.10f} sat_pos: {:>21.10f} {:>21.10f} {:>21.10f} "
-            #      "sat_vel: {:>17.10f} {:>17.10f} {:>17.10f} sat_clk_bias: {:>17.10f}, sat_clk_drft: {:>17.10f} "
-            #      ''.format(self.dset_edit.satellite[brdc_idx], obs_idx, brdc_idx,
-            #                dset_in[time].gps.jd_frac[obs_idx] * 86400,
-            #                dset_in[time].gps.gps_ws.seconds[obs_idx],
-            #                self.dset_edit.toe.gps.gps_ws.seconds[brdc_idx],
-            #                self.dset_edit.transmission_time.gps.gps_ws.seconds[brdc_idx],
-            #                dset_in[time].gps.jd_frac[obs_idx]-self.dset_edit.toe.gps.gps_ws.seconds[brdc_idx],
-            #                int(self.dset_edit.iode[brdc_idx]),
-            #                self.dset_edit.sqrt_a[brdc_idx],
-            #                sat_pos[obs_idx][0], sat_pos[obs_idx][1], sat_pos[obs_idx][2],
-            #                sat_vel[obs_idx][0], sat_vel[obs_idx][1], sat_vel[obs_idx][2],
-            #                self.dset_edit.sat_clock_bias[brdc_idx],
-            #                self.dset_edit.sat_clock_drift[brdc_idx],))
+            #    " tk: {:>16.10f} iode: {:>3d} sqrt_a: {:>17.10f} sat_pos: {:>21.10f} {:>21.10f} {:>21.10f} "
+            #    "sat_vel: {:>17.10f} {:>17.10f} {:>17.10f} sat_clk_bias: {:>17.10f}, sat_clk_drft: {:>17.10f} "
+            #    ''.format(self.dset_edit.satellite[brdc_idx], obs_idx, brdc_idx,
+            #    dset_in[time].gps.jd_frac[obs_idx] * 86400,
+            #    dset_in[time].gps.gps_ws.seconds[obs_idx],
+            #    self.dset_edit.toe.gps.gps_ws.seconds[brdc_idx],
+            #    self.dset_edit.transmission_time.gps.gps_ws.seconds[brdc_idx],
+            #    dset_in[time].gps.jd_frac[obs_idx]-self.dset_edit.toe.gps.gps_ws.seconds[brdc_idx],
+            #    int(self.dset_edit.iode[brdc_idx]),
+            #    self.dset_edit.sqrt_a[brdc_idx],
+            #    sat_pos[obs_idx][0], sat_pos[obs_idx][1], sat_pos[obs_idx][2],
+            #    sat_vel[obs_idx][0], sat_vel[obs_idx][1], sat_vel[obs_idx][2],
+            #    self.dset_edit.sat_clock_bias[brdc_idx],
+            #    self.dset_edit.sat_clock_drift[brdc_idx],)
+            # )
             # -DEBUG
 
         # Copy fields from model data Dataset
@@ -446,16 +447,18 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             + self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk ** 2
         ) * constant.c
 
-    def add_satellite_clock_parameter(self, dset: "Dataset") -> np.ndarray:
+    def add_satellite_clock_parameter(self, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Add satellite clock parameters to dataset
 
         Args:
             dset: A Dataset containing model data.
+            time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
+                  observation time and 'sat_time' to satellite transmission time.
 
         """
         # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
         # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset)
+        dset_brdc_idx = self._get_brdc_block_idx(dset, time=time)
 
         # Add satellite clock parameters to dataset
         dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx])

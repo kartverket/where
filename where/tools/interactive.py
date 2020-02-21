@@ -10,12 +10,10 @@ them available in an interactive IPython session.
 # External library imports
 import IPython
 
-# Standard library imports
-import sys
-
 # Midgard imports
 from midgard.dev import plugins
 from midgard.math.constant import constant  # noqa
+from midgard.math.unit import Unit  # noqa
 
 # Where imports
 from where.data import dataset3 as dataset
@@ -27,7 +25,6 @@ import pandas as pd  # noqa
 import matplotlib.pyplot as plt  # noqa
 from where import apriori  # noqa
 from where.data.time import Time, TimeDelta  # noqa
-from where.lib.unit import Unit  # noqa
 
 
 @plugins.register

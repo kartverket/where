@@ -7,9 +7,7 @@ Description:
 """
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_line import LineParser
+from midgard.parsers._parser_line import LineParser
 
 
 @plugins.register

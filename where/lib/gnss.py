@@ -206,7 +206,20 @@ def get_code_observation(dset):
 
         for sys in dset.unique("system"):
             idx = dset.filter(system=sys)
-            obstype = dset.meta["obstypes"][sys][0]
+            obstypes = dset.meta["obstypes"][sys]
+
+            # TODO: Exists a better solution. Complete routine should be named get_observation(dset).
+            if dset.vars["pipeline"] == "gnss_spv":
+                obstype = None
+                for type_ in obstypes:
+                    if type_.startswith("D"):
+                        obstype = type_
+                        break
+
+                if not obstype:
+                    log.fatal(f"No Doppler observations are defined for {sys}: {', '.join(obstypes)}")
+            else:
+                obstype = obstypes[0]
             code_obs = dset.obs[obstype][idx]
 
     elif freq_type == "dual":

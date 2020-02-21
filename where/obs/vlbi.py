@@ -77,11 +77,8 @@ def _write_to_dataset(parser, dset, rundate, session):
             multiplier = -1 if field.endswith("_1") else 1
             dset.add_text(field, val=values, multiplier=multiplier, write_level="operational")
         elif values.dtype.kind in {"f", "i"}:
-            if getattr(dset, "version", None) is not None:
-                multiplier = -1 if field.endswith("_1") else 1
-                dset.add_float(field, val=values, multiplier=multiplier, write_level="operational")
-            else:
-                dset.add_float(field, val=values, write_level="operational")
+            multiplier = -1 if field.endswith("_1") else 1
+            dset.add_float(field, val=values, multiplier=multiplier, write_level="operational")
         elif values.dtype.kind in {"O"}:
             continue
         else:

@@ -32,6 +32,8 @@ cdef double[:] sun_distance, moon_distance
 cdef Cp, Cm, Sp, Sm
 cdef epoch_list, delaunay_variables
 cdef double[:, :, :] g2i
+cdef double[:] GMST
+cdef double[:] m_1, m_2
 
 
 def register_entry_point():
@@ -71,6 +73,8 @@ def tides_setup(
     global epoch_list
     global g2i
     global delaunay_variables
+    global GMST
+    global m_1, m_2
     epoch_list = epochs
 
     GM_earth = constant.get("GM", source="egm_2008")
@@ -105,6 +109,15 @@ def tides_setup(
 
     # Delaunay variables
     delaunay_variables = delaunay()
+
+    # Greenwich mean sidereal time in radians
+    GMST = epochs.ut1.gmst
+
+    eop = apriori.get('eop', time=epochs) 
+   
+    # Equation (7.24) IERS Conventions 2010
+    m_1 = eop.x - eop.x_pole
+    m_2 = eop.y_pole - eop.y
 
 
 def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
@@ -156,9 +169,19 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     dyz = 0
     dzz = 0
 
-    C, S = solid_earth_tides(gcrs2itrs, current_step)
-    # The ocean tides model does not seem to improve RMS on Lageos, but increases computation time.
-    # C, S = ocean_tides(C, S, current_step)
+    # Solid earth tides
+    C, S = solid_earth_tides(current_step)
+    # Ocean tides
+    # C_ocean, S_ocean = ocean_tides(current_step)
+    # Solid earth pole tides
+    C_sept, S_sept = solid_earth_pole_tides(current_step)
+    # Ocean pole tides
+    C_opt, S_opt = ocean_pole_tides(current_step)
+
+    # C += C_ocean
+    # S += S_ocean
+    C[2, 1] += C_sept + C_opt
+    S[2, 1] += S_sept + S_opt
 
     for n in range(0, truncation_level):
         for m in range(0, n + 1):
@@ -280,16 +303,15 @@ cdef compute_VW(double[:] pos_xyz):
     return V, W
 
 
-cdef solid_earth_tides(double[:, :] gcrs2itrs, int current_step):
+cdef solid_earth_tides(int current_step):
     """Computing the time variable part of the gravity coefficients of the Earth, following chapter 6 in
     IERS Conventions [2].
 
     Args:
-        gcrs2itrs:           Matrix for transforming from gcrs to itrs.
         current_step:        Current step number of the integrator
 
     Returns:
-        C,S:                 Tides part of Gravity coefficients at time t.
+        C,S:                 Solid earth tides part of Gravity coefficients at time t.
     """
     # Elastic or anelastic earth?
     k = k_elastic
@@ -297,15 +319,12 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, int current_step):
 
     cdef int n, m
     cdef double[:, :] C, S
+    C = np.zeros((truncation_level, truncation_level))   
+    S = np.zeros((truncation_level, truncation_level)) 
     cdef complex factor_sun, factor_moon, correction
     V_sun, W_sun = compute_VW(sun_pos[current_step])
     V_moon, W_moon = compute_VW(moon_pos[current_step])
 
-    C = np.zeros((truncation_level, truncation_level))
-    S = np.zeros((truncation_level, truncation_level))
-
-    sun_distance_now = sun_distance[current_step]
-    moon_distance_now = moon_distance[current_step]
     # Compute the non-normalized coefficients here.
     # Equation (6.6)
     for n in range(2, min(4, C.shape[0])):
@@ -346,25 +365,22 @@ cdef solid_earth_tides(double[:, :] gcrs2itrs, int current_step):
     return C, S
 
 
-def ocean_tides(C, S, int current_step):
+def ocean_tides(int current_step):
     """Computing the time variable part of the gravity coefficients of the Earth due to ocean tides
 
     Following chapter 6.3 in [2].
 
     Args:
-        C,S:                 Gravity coefficients without ocean tides.
         current_step:        Int, Current step of the integrator
 
     Returns:
-        C, S:                Time variable part of gravity coefficients with ocean tides at time t.
+        C, S:                Time variable part of gravity coefficients due to ocean tides at time t.
     """
     delaunay_multipliers_a, _, _, doodson_a = table_65a()
     delaunay_multipliers_b, _, _, doodson_b = table_65b()
     delaunay_multipliers_c, _, doodson_c = table_65c()
-
-
-    # Greenwich mean sidereal time in radians
-    cdef double GMST = epoch_list.ut1.gmst[current_step]
+    C = np.zeros((truncation_level, truncation_level))
+    S = np.zeros((truncation_level, truncation_level))
 
     # Equation 6.15
     for n in range(0, C.shape[0]):
@@ -387,8 +403,8 @@ def ocean_tides(C, S, int current_step):
                 if delaunay_multipliers == []:
                     break
 
-                sin_theta_f = math.sin(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
-                cos_theta_f = math.cos(m * (GMST + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
+                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
+                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
 
                 C[n, m] += normalization_factor(n, m)**2 * (Cp[n, m][doodson] * cos_theta_f
                                 + Sp[n, m][doodson] * sin_theta_f + Cm[n, m][doodson] * cos_theta_f
@@ -397,6 +413,44 @@ def ocean_tides(C, S, int current_step):
                                 + Sp[n, m][doodson] * cos_theta_f + Cm[n, m][doodson] * sin_theta_f
                                 - Sm[n, m][doodson] * cos_theta_f)
     return C, S
+
+ 
+cdef solid_earth_pole_tides(int current_step):
+    """Computing the time variable part of the gravity coefficients of the Earth due to solid earth pole tides
+
+    Following chapter 6.4 in [2].
+
+    Args:
+        current_step:        Int, Current step of the integrator
+
+    Returns:
+        C21, S21:            Time variable part of (2,1)-gravity coefficients due to solid earth pole tides at time t.
+    """
+    
+    C21 = -1.333e-9 * (m_1[current_step] + 0.0115 * m_2[current_step])
+    S21 = -1.333e-9 * (m_2[current_step] - 0.0115 * m_1[current_step])
+
+    return C21, S21
+
+
+cdef ocean_pole_tides(int current_step):
+    """Computing the time variable part of the gravity coefficients of the Earth due to ocean pole tides
+
+    Following chapter 6.5 in [2].
+
+    Args:
+        current_step:        Int, Current step of the integrator
+
+    Returns:
+        C21, S21:            Time variable part of (2,1)-gravity coefficients due to solid earth pole tides at time t.
+    """
+
+    # Equation (6.24)
+    C21 = -2.1778e-10 * (m_1[current_step] - 0.01724 * m_2[current_step])
+    S21 = -1.7232e-10 * (m_2[current_step] - 0.03365 * m_1[current_step])
+
+    return C21, S21
+
 
 
 cdef k_elastic(int n, int m):
@@ -552,9 +606,6 @@ cdef equation_68b_m1(int current_step):
     """
     cdef long[:, :] delaunay_multipliers
     cdef double[:] ip, op, sin_theta_f, cos_theta_f
-    # Greenwich mean sidereal time in radians
-    cdef double GMST = epoch_list.ut1.gmst[current_step]
-
  
     delaunay_multipliers, ip, op, _ = table_65a()
 
@@ -562,8 +613,8 @@ cdef equation_68b_m1(int current_step):
     cos_theta_f = np.zeros(delaunay_multipliers.shape[0])
 
     for i in range(0, delaunay_multipliers.shape[0]):
-        sin_theta_f[i] = math.sin(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
-        cos_theta_f[i] = math.cos(GMST + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        sin_theta_f[i] = math.sin(GMST[current_step] + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        cos_theta_f[i] = math.cos(GMST[current_step] + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
 
     return (
         np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip),
@@ -629,17 +680,14 @@ cdef equation_68b_m2(int current_step):
     """
     Equation (6.8b) (with m=2) in IERS Conventions [2].
     """
-    # Greenwich mean sidereal time in radians
-    cdef double GMST = epoch_list.ut1.gmst[current_step]
-
     delaunay_multipliers, ip, _ = table_65c()
 
     sin_theta_f = np.zeros(delaunay_multipliers.shape[0])
     cos_theta_f = np.zeros(delaunay_multipliers.shape[0])
 
     for i in range(0, delaunay_multipliers.shape[0]):
-        sin_theta_f[i] = math.sin(2*(GMST + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
-        cos_theta_f[i] = math.cos(2*(GMST + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        sin_theta_f[i] = math.sin(2*(GMST[current_step] + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        cos_theta_f[i] = math.cos(2*(GMST[current_step] + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
 
     C_correction = np.dot(cos_theta_f, ip) 
     S_correction = -np.dot(sin_theta_f, ip) 
@@ -707,13 +755,12 @@ cdef delaunay():
         Five Delaunay variables, l, lprime, F, D, Omega, see section 5.7 in IERS Conventions [2] for their definition.
         One for each time in epoch_list
     """
-
     fundamental_arguments = np.vstack((sofa_wrapper.vectorized_iau_fal03(epoch_list), 
                                        sofa_wrapper.vectorized_iau_falp03(epoch_list), 
                                        sofa_wrapper.vectorized_iau_faf03(epoch_list), 
                                        sofa_wrapper.vectorized_iau_fad03(epoch_list), 
                                        sofa_wrapper.vectorized_iau_faom03(epoch_list)))
-    
+
     return fundamental_arguments.T
 
 

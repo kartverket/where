@@ -109,6 +109,7 @@ def _find_conversion_hops(hop: Tuple[str, str]) -> List[Tuple[str, str]]:
 
 class DirectionArray(np.ndarray):
 
+    type = "direction"
     _units = ("unitless", "unitless", "unitless")
 
     def __new__(cls, val, **dir_args):
@@ -444,30 +445,6 @@ class DirectionArray(np.ndarray):
         new_pos = _SYSTEMS[self.system](val, **dir_args)
         memo[old_id] = new_pos
         return new_pos
-
-    def __add__(self, _):
-        """self + other"""
-        return NotImplemented
-
-    def __radd__(self, _):
-        """other + self"""
-        return NotImplemented
-
-    def __sub__(self, _):
-        """self - other"""
-        return NotImplemented
-
-    def __rsub__(self, _):
-        """other - self"""
-        return NotImplemented
-
-    def __iadd__(self, _):
-        """self += other"""
-        return NotImplemented
-
-    def __isub__(self, _):
-        """self -= other"""
-        return NotImplemented
 
     def __matmul__(self, _):
         """self @ _"""

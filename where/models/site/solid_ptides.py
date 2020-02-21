@@ -22,11 +22,11 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
 from where.data import position
-from where.lib.unit import Unit
 
 
 @plugins.register

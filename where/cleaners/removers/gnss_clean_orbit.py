@@ -21,6 +21,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
@@ -28,7 +29,6 @@ from where import cleaners
 from where.lib import config
 from where.lib import log
 from where.data.time import Time, TimeDelta
-from where.lib.unit import Unit
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -242,7 +242,7 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset") -> None:
             )
         ]
     )
-    log.info(f"Following entries are removed: \nDEBUG: {removed_entries}")
+    log.debug(f"Following entries are removed: \n{removed_entries}")
 
     # Check if first and last observation epochs exceed the epoch interval of the precise orbits
     keep_first_epoch, first_epoch_idx = _check_first_epoch_sample_point(dset, precise, epoch_interval)
@@ -303,7 +303,7 @@ def _check_first_epoch_sample_point(dset: "Dataset", precise, epoch_interval):
             )
         ]
     )
-    log.info(f"Following first epoch entries are removed: \nDEBUG: {removed_entries}")
+    log.debug(f"Following first epoch entries are removed: \n{removed_entries}")
 
     return keep_idx, first_epoch_idx
 
@@ -365,6 +365,6 @@ def _check_last_epoch_sample_point(dset, precise, epoch_interval):
             )
         ]
     )
-    log.info(f"Following last epoch entries are removed: \nDEBUG: {removed_entries}")
+    log.debug(f"Following last epoch entries are removed: \n{removed_entries}")
 
     return keep_idx, last_epoch_idx

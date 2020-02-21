@@ -16,8 +16,10 @@ import h5py
 # Standard library import
 import os
 
+# Midgard imports
+from midgard.math.unit import Unit
+
 # Where imports
-from where.lib.unit import Unit
 from where.lib import log
 from where.lib import config
 
@@ -190,115 +192,116 @@ class KalmanFilter(object):
         )
 
         # TODO should this be here?
-        log.info("Solving normal equations")
-        names = dset.meta["normal equation"]["names"]
-        n = len(names)
-        d = np.zeros((n, 6))
-        fix_param_weight = np.zeros(n)
-        H = np.zeros((6, n))
-        stations = set()
-        from where import apriori
 
-        reference_frame = config.tech.reference_frames.list[0]
-        trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
-        # thaller2008: eq 2.51 (skipping scale factor)
-        for idx, column in enumerate(names):
-            if "_site_pos-" not in column:
-                continue
-            station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
-            site_id = dset.meta[station]["site_id"]
-            if site_id in trf:
-                x0, y0, z0 = trf[site_id].pos.trs
-                if column.endswith("_x"):
-                    d[idx, :] = np.array([1, 0, 0, 0, z0, -y0])
-                if column.endswith("_y"):
-                    d[idx, :] = np.array([0, 1, 0, -z0, 0, x0])
-                if column.endswith("_z"):
-                    d[idx, :] = np.array([0, 0, 1, y0, -x0, 0])
-                stations.add(station)
-
-        if len(stations) >= 3:
-            try:
-                # thaller2008: eq 2.57
-                H = np.linalg.inv(d.T @ d) @ d.T
-                log.info(f"Applying NNT/NNR with {', '.join(stations)} from {reference_frame.upper()}")
-            except np.linalg.LinAlgError:
-                log.warn(f"Unable to invert matrix for NNR/NNT constraints")
-        else:
-            log.info(
-                f"Too few stations to use NNR/NNT contraints from {reference_frame.upper()}. Using absolute constraints for station positions."
-            )
-            # Too few stations to use NNT/NNR?
-            for idx, column in enumerate(names):
-                if "_site_pos-" not in column:
-                    continue
-                station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
-                fix_param_weight[idx] = 1 / (1e-6) ** 2  # 1/meters**2
-
-        sigmas = [0.0001] * 3 + [1.5e-11] * 3
-
-        # NNR to CRF
-        if "celestial_reference_frames" in config.tech.master_section:
-            celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-            crf = apriori.get("crf", time=dset.time, celestial_reference_frames=celestial_reference_frame)
-            H2 = np.zeros((3, n))
-            for idx, column in enumerate(names):
-                if "_src_dir-" not in column:
-                    continue
-                source = column.split("-", maxsplit=1)[-1].split("_")[0]
-                if source in crf:
-                    ra = crf[source].pos.right_ascension
-                    dec = crf[source].pos.declination
-                    if dset.num(source=source) < 5:
-                        fix_param_weight[idx] = 1 / (1e-12) ** 2  # 1/radians**2
-                        if column.endswith("_ra"):
-                            log.info(
-                                f"Too few observations for source {source}. Using absolute constraints for source positions."
-                            )
-                        continue
-
-                    if column.endswith("_ra"):
-                        H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
-                        H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
-                        H2[2, idx] = np.cos(dec) ** 2
-                    if column.endswith("_dec"):
-                        H2[0, idx] = np.sin(ra)
-                        H2[1, idx] = -np.cos(ra)
-
-            if H2.any():
-                log.info(f"Applying NNR constraint to {celestial_reference_frame.upper()}")
-                # add NNR to CRF constraints
-                H = np.concatenate((H, H2))
-                sigmas = sigmas + [1e-6] * 3
-
-        # thaller2008: eq 2.45
-        P_h = np.diag(1 / np.array(sigmas) ** 2)
-
-        # Free network constraints: thaller2008: eq 2.58
-        N_h = N + H.T @ P_h @ H
-
-        # Baselines with too few obs?
-        for idx, column in enumerate(names):
-            if "_baseline-" not in column:
-                continue
-            baseline = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
-            if dset.num(baseline=baseline) < 5:
-                fix_param_weight[idx] = 1 / (1e-6) ** 2  # 1/meters**2
-                log.info(f"Too few observations for baseline {baseline}. Constrained to a priori value")
-                continue
-
-        # Absolute constraints (on sources with too few observations): thaller2008: eq.2.49
-        N_h += np.diag(fix_param_weight)
-
-        # solve neq
-        N_h_inv = np.linalg.inv(N_h)
-        x = N_h_inv @ b
-
-        # Covariance: thaller2008: eq 2.16
-        Q_xx = variance_factor ** 2 * N_h_inv
-
-        dset.meta.add("solution", x[:, 0].tolist(), section="normal equation")
-        dset.meta.add("covariance", Q_xx.tolist(), section="normal equation")
+    #         log.info("Solving normal equations")
+    #         names = dset.meta["normal equation"]["names"]
+    #         n = len(names)
+    #         d = np.zeros((n, 6))
+    #         fix_param_weight = np.zeros(n)
+    #         H = np.zeros((6, n))
+    #         stations = set()
+    #         from where import apriori
+    #
+    #         reference_frame = config.tech.reference_frames.list[0]
+    #         trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
+    #         # thaller2008: eq 2.51 (skipping scale factor)
+    #         for idx, column in enumerate(names):
+    #             if "_site_pos-" not in column:
+    #                 continue
+    #             station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
+    #             site_id = dset.meta[station]["site_id"]
+    #             if site_id in trf:
+    #                 x0, y0, z0 = trf[site_id].pos.trs
+    #                 if column.endswith("_x"):
+    #                     d[idx, :] = np.array([1, 0, 0, 0, z0, -y0])
+    #                 if column.endswith("_y"):
+    #                     d[idx, :] = np.array([0, 1, 0, -z0, 0, x0])
+    #                 if column.endswith("_z"):
+    #                     d[idx, :] = np.array([0, 0, 1, y0, -x0, 0])
+    #                 stations.add(station)
+    #
+    #         if len(stations) >= 3:
+    #             try:
+    #                 # thaller2008: eq 2.57
+    #                 H = np.linalg.inv(d.T @ d) @ d.T
+    #                 log.info(f"Applying NNT/NNR with {', '.join(stations)} from {reference_frame.upper()}")
+    #             except np.linalg.LinAlgError:
+    #                 log.warn(f"Unable to invert matrix for NNR/NNT constraints")
+    #         else:
+    #             log.info(
+    #                 f"Too few stations to use NNR/NNT contraints from {reference_frame.upper()}. Using absolute constraints for station positions."
+    #             )
+    #             # Too few stations to use NNT/NNR?
+    #             for idx, column in enumerate(names):
+    #                 if "_site_pos-" not in column:
+    #                     continue
+    #                 station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
+    #                 fix_param_weight[idx] = 1 / (1e-6) ** 2  # 1/meters**2
+    #
+    #         sigmas = [0.0001] * 3 + [1.5e-11] * 3
+    #
+    #         # NNR to CRF
+    #         if "celestial_reference_frames" in config.tech.master_section:
+    #             celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
+    #             crf = apriori.get("crf", time=dset.time, celestial_reference_frames=celestial_reference_frame)
+    #             H2 = np.zeros((3, n))
+    #             for idx, column in enumerate(names):
+    #                 if "_src_dir-" not in column:
+    #                     continue
+    #                 source = column.split("-", maxsplit=1)[-1].split("_")[0]
+    #                 if source in crf:
+    #                     ra = crf[source].pos.right_ascension
+    #                     dec = crf[source].pos.declination
+    #                     if dset.num(source=source) < 5:
+    #                         fix_param_weight[idx] = 1 / (1e-12) ** 2  # 1/radians**2
+    #                         if column.endswith("_ra"):
+    #                             log.info(
+    #                                 f"Too few observations for source {source}. Using absolute constraints for source positions."
+    #                             )
+    #                         continue
+    #
+    #                     if column.endswith("_ra"):
+    #                         H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
+    #                         H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
+    #                         H2[2, idx] = np.cos(dec) ** 2
+    #                     if column.endswith("_dec"):
+    #                         H2[0, idx] = np.sin(ra)
+    #                         H2[1, idx] = -np.cos(ra)
+    #
+    #             if H2.any():
+    #                 log.info(f"Applying NNR constraint to {celestial_reference_frame.upper()}")
+    #                 # add NNR to CRF constraints
+    #                 H = np.concatenate((H, H2))
+    #                 sigmas = sigmas + [1e-6] * 3
+    #
+    #         # thaller2008: eq 2.45
+    #         P_h = np.diag(1 / np.array(sigmas) ** 2)
+    #
+    #         # Free network constraints: thaller2008: eq 2.58
+    #         N_h = N + H.T @ P_h @ H
+    #
+    #         # Baselines with too few obs?
+    #         for idx, column in enumerate(names):
+    #             if "_baseline-" not in column:
+    #                 continue
+    #             baseline = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
+    #             if dset.num(baseline=baseline) < 5:
+    #                 fix_param_weight[idx] = 1 / (1e-6) ** 2  # 1/meters**2
+    #                 log.info(f"Too few observations for baseline {baseline}. Constrained to a priori value")
+    #                 continue
+    #
+    #         # Absolute constraints (on sources with too few observations): thaller2008: eq.2.49
+    #         N_h += np.diag(fix_param_weight)
+    #
+    #         # solve neq
+    #         N_h_inv = np.linalg.inv(N_h)
+    #         x = N_h_inv @ b
+    #
+    #         # Covariance: thaller2008: eq 2.16
+    #         Q_xx = variance_factor ** 2 * N_h_inv
+    #
+    #         dset.meta.add("solution", x[:, 0].tolist(), section="normal equation")
+    #         dset.meta.add("covariance", Q_xx.tolist(), section="normal equation")
 
     def cleanup(self):
         if not config.tech.keep_covariance_file.bool:
@@ -315,6 +318,13 @@ class KalmanFilter(object):
             param_names (List):   Strings with names of parameters. Used to form field names.
 
         """
+        # Delete values from previous iterations
+        if "state" in dset.fields:
+            del dset.state
+
+        if "estimate" in dset.fields:
+            del dset.estimate
+
         for idx, param_name in enumerate(param_names):
             if param_name.endswith("_"):
                 continue
@@ -325,35 +335,26 @@ class KalmanFilter(object):
             value = self.x_smooth[: dset.num_obs, idx, 0]
             value_sigma = np.sqrt(self.x_hat_ferr[: dset.num_obs, idx])
 
-            if fieldname in dset.fields:
-                dset[fieldname][:] = value * dset.meta["display_factors"][param_name]
-            else:
-                # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
-                partial_unit = dset.unit("partial.{}".format(param_name))
-                to_unit = dset.meta["display_units"][param_name]
-                from_unit = f"meter/({partial_unit[0]})"
-                factor = Unit(from_unit, to_unit)
-                dset.meta.add(param_name, factor, section="display_factors")
-                dset.add_float(fieldname, val=value * factor, unit=to_unit, write_level="operational")
+            # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
+            partial_unit = dset.unit("partial.{}".format(param_name))
+            to_unit = dset.meta["display_units"][param_name]
+            from_unit = f"meter/({partial_unit[0]})"
+            factor = Unit(from_unit, to_unit)
+            dset.meta.add(param_name, factor, section="display_factors")
+            dset.add_float(fieldname, val=value * factor, unit=to_unit, write_level="operational")
 
-            if fieldname_sigma in dset.fields:
-                dset[fieldname_sigma][:] = value_sigma * dset.meta["display_factors"][param_name]
-            else:
-                # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
-                partial_unit = dset.unit("partial.{}".format(param_name))
-                to_unit = dset.meta["display_units"][param_name]
-                from_unit = f"meter/({partial_unit[0]})"
-                factor = Unit(from_unit, to_unit)
-                dset.meta.add(param_name, factor, section="display_factors")
-                dset.add_float(fieldname_sigma, val=value_sigma * factor, unit=to_unit, write_level="operational")
+            # Convert values to the display unit. It corresponds to "meter per <unit of partial>"
+            partial_unit = dset.unit("partial.{}".format(param_name))
+            to_unit = dset.meta["display_units"][param_name]
+            from_unit = f"meter/({partial_unit[0]})"
+            factor = Unit(from_unit, to_unit)
+            dset.meta.add(param_name, factor, section="display_factors")
+            dset.add_float(fieldname_sigma, val=value_sigma * factor, unit=to_unit, write_level="operational")
 
             # Estimate vectors
             fieldname = f"estimate.{param_name}"
             value = self.h[: dset.num_obs, idx, 0] * self.x_smooth[: dset.num_obs, idx, 0]
-            if fieldname in dset.fields:
-                dset[fieldname][:] = value
-            else:
-                dset.add_float(fieldname, val=value, unit="meter", write_level="analysis")
+            dset.add_float(fieldname, val=value, unit="meter", write_level="analysis")
 
         value = (self.x_smooth.transpose(0, 2, 1) @ self.h)[: dset.num_obs, 0, 0]
         fieldname = "est"

@@ -25,12 +25,12 @@ from scipy import interpolate
 # Midgard imports
 from midgard.dev import plugins
 from midgard.math.constant import constant
+from midgard.math.unit import Unit
+from midgard.parsers._parser import Parser
+from midgard import parsers
 
 # Where imports
 from where.lib import log
-from where.lib.unit import Unit
-from where.parsers._parser import Parser
-from where import parsers
 
 
 @plugins.register

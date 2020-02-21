@@ -24,12 +24,12 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
 from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 from where.data import position
 
 

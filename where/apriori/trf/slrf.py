@@ -20,15 +20,15 @@ import numpy as np
 # Midgard imports
 from midgard.dev import plugins
 from midgard.math import ellipsoid
+from midgard.math.unit import Unit
 
 # Where imports
 from where.data.position import Position
+from where.data.time import Time
 from where.apriori.trf import TrfFactory
 from where.lib import config
 from where.lib import log
 from where import parsers
-from where.data.time import Time
-from where.lib.unit import Unit
 
 
 @plugins.register

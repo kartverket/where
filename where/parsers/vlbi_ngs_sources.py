@@ -17,15 +17,10 @@ References:
 # Standard library imports
 import itertools
 
-# External library imports
-import numpy as np
-
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib.unit import Unit
+from midgard.math.unit import Unit
+from midgard.parsers._parser_chain import ParserDef, ChainParser
 
 
 @plugins.register

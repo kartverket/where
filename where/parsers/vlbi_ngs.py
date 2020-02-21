@@ -25,12 +25,12 @@ import itertools
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.constant import constant
+from midgard.math.unit import Unit
+from midgard.parsers._parser_chain import ParserDef, ChainParser
 
 # Where imports
-from midgard.math.constant import constant
 from where.lib import log
-from where.parsers._parser_chain import ParserDef, ChainParser
-from where.lib.unit import Unit
 
 
 @plugins.register

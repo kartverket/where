@@ -17,12 +17,12 @@ import numpy as np
 # Midgard imports
 from midgard.dev import plugins
 from midgard.math import ellipsoid
+from midgard.math.unit import Unit
 
 # Where imports
 from where.data.position import Position
 from where.apriori.trf import TrfFactory
 from where.data.time import Time
-from where.lib.unit import Unit
 from where import parsers
 
 

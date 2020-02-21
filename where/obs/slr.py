@@ -8,6 +8,7 @@ import numpy as np
 from midgard.dev import plugins
 from midgard.math import interpolation
 from midgard.dev import exceptions
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
@@ -15,7 +16,6 @@ from where import parsers
 from where.ext import sofa
 from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 
 TECH = __name__.split(".")[-1]
 

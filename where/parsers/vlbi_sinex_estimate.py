@@ -7,16 +7,9 @@ Reads station positions and velocities from ITRF files in SNX format.
 
 """
 
-# Standard library imports
-from datetime import datetime, timedelta
-import itertools
-
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.lib import config
-from where.parsers._parser_sinex import SinexParser, SinexBlock, SinexField, parsing_factory
+from midgard.parsers._parser_sinex import SinexParser, SinexBlock, SinexField
 
 
 @plugins.register

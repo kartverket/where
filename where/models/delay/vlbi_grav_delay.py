@@ -23,13 +23,13 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where import apriori
 from midgard.math.constant import constant
 from where.lib import log
 from where.data.time import TimeDelta
-from where.lib.unit import Unit
 
 
 @plugins.register

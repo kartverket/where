@@ -39,6 +39,7 @@ def write_sinex(dset):
     if config.tech.analysis_status.status.str == "bad":
         log.info("Bad session. Not producing SINEX.")
         return
+    log.info("Creating SINEX file")
     with config.files.open("output_sinex", file_vars=dset.vars, mode="wt") as fid:
         sinex = sinex_blocks.SinexBlocks(dset, fid)
         sinex.header_line()

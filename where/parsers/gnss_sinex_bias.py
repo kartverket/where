@@ -20,10 +20,8 @@ import itertools
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_chain import ChainParser, ParserDef
-from where.lib.unit import Unit
+from midgard.math.unit import Unit
+from midgard.parsers._parser_chain import ChainParser, ParserDef
 
 
 # TODO: Should we use SINEX class instead?

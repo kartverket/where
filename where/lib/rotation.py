@@ -15,9 +15,10 @@ from functools import lru_cache
 # Include all rotation matrices defined in Midgard
 from midgard.math.constant import constant
 from midgard.math.rotation import *  # noqa
+from midgard.math.unit import Unit
 
+# Where imports
 from where import apriori
-from where.lib.unit import Unit
 from where.ext import sofa_wrapper as sofa
 
 #

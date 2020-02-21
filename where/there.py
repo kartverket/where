@@ -79,6 +79,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import console
+from midgard.math.unit import Unit
 
 # Where imports
 import where
@@ -88,7 +89,6 @@ from where.lib import log
 from where import pipelines
 from where import setup
 from where.data.time import Time
-from where.lib.unit import Unit
 from where.lib import util
 
 

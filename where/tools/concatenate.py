@@ -27,12 +27,12 @@ Furthermore, the following options are recognized:
 Option               Description
 ===================  ===========================================================
 --doy                Specify date as <year day-of-year>.
---dset_id=           Dataset identifier (Default: 'last').
---dset_name=         Dataset name (Default: '').
+--label=             Dataset label (Default: 'last').
 --id=                Analysis identifier (Default: '').
 --only_for_rundate   Concatenate only data for given run date. Data are removed
                      from Datasets, which exceeds run date boundaries.
 --session=           Session name (Default: '').
+--station=           Station name (Default: '').
 --writers=           List with writers.
 -h, --help           Show this help message and exit.
 ===================  ===========================================================
@@ -49,10 +49,13 @@ Example:
 Here are some concrete examples of how to run the program:
 
 Concatenate datasets from GNSS analysis for a given period:
-  {exe:tools} concatenate 2019 1 1 2019 1 31 --gnss --session=vegs --stage=estimate --id=grc_inav_e1 --writers=gnss_report
+  {exe:tools} concatenate 2019 1 1 2019 1 31 --gnss --station=vegs --stage=estimate --id=grc_inav_e1 --writers=gnss_report
+
+Concatenate datasets from GNSS SPV analysis for a given period:
+  {exe:tools} concatenate 2019 1 1 2019 1 31 --gnss_spv --station=vegs --stage=spv_doppler --writers=gnss_spv_report
 
 Concatenate datasets from SISRE analysis for a given period:
-  {exe:tools} concatenate 2018 2 1 2018 2 3 --sisre --stage=calculate --id=mgex_fnav_e1e5a_5min --dset_id=2
+  {exe:tools} concatenate 2018 2 1 2018 2 3 --sisre --stage=calculate --id=mgex_fnav_e1e5a_5min --label=2
 
 Concatenate datasets from RINEX_NAV analysis for a given period:
   {exe:tools} concatenate 2018 2 1 2018 2 3 --rinex_nav --stage=edit --only_for_rundate --rinex_nav_report:only_for_rundate=False 
@@ -71,53 +74,48 @@ from midgard.writers import write
 
 # Where imports
 from where import pipelines
+from where.data import dataset3 as dataset
 from where.lib import config
-from where import data
 from where.lib import log
 from where.lib import util
 
 
 @plugins.register
-def concatenate(from_date: "datedoy", to_date: "datedoy", tech: "pipeline", stage: "option"):
+def concatenate(from_date: "datedoy", to_date: "datedoy", pipeline: "pipeline", stage: "option"):
     log.init(log_level="info")
 
     # Get options
-    dataset_id = util.read_option_value("--dset_id", default="last")
-    dataset_id = "last" if dataset_id == "last" else int(dataset_id)
-    dataset_name = util.read_option_value("--dset_name", default="")
-    id = util.read_option_value("--id", default="")
+    label = util.read_option_value("--label", default="None")
+    # TODO: label = "last" if label == "last" else label
+    id_ = util.read_option_value("--id", default="")
     only_for_rundate = True if util.check_options("--only_for_rundate") else False
     session = util.read_option_value("--session", default="")
-    writer_names = util.read_option_value("--writers", default="").replace(",", " ").split()
+    station = util.read_option_value("--station", default="")
+    writers = util.read_option_value("--writers", default="").replace(",", " ").split()
 
     # Update configuration of Where analysis
-    config.where.update_from_options(_clean_sys_argv(tech))
+    config.where.update_from_options(_clean_sys_argv(pipeline))
 
-    dset_vars = dict(
-        tech=tech,
-        stage=stage,
-        session=session,
-        dataset_name=session,
-        dataset_id=dataset_id,
-        session_name=id + "_concatenated",
-    )
+    dset_vars = dict(pipeline=pipeline, stage=stage, session=session, station=station, label=label, id=id_)
+    dset_vars = config.create_file_vars(rundate=from_date, **dset_vars)
+
     dset = _concatenate_datasets(from_date, to_date, dset_vars, only_for_rundate)
     if dset.num_obs == 0:
         log.fatal(f"No data to read period from {from_date} to {to_date}.")
     dset.write()
 
     # Loop over writers
-    for writer in writer_names:
+    for writer in writers:
         write(writer, dset=dset)
 
 
 #
 # AUXILIARY FUNCTIONS
 #
-def _clean_sys_argv(tech: str) -> List[str]:
+def _clean_sys_argv(pipeline: str) -> List[str]:
     """Values in sys.argv that are not valid option values in Where
     """
-    reserved_opts = {tech, "dset_id", "dset_name", "id", "only_for_rundate", "session", "stage", "writers"}
+    reserved_opts = {pipeline, "label", "id", "only_for_rundate", "session", "stage", "station", "writers"}
     return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]
 
 
@@ -132,13 +130,13 @@ def _concatenate_datasets(
         dset_vars:         Common Dataset variables.
         only_for_rundate:  Concatenate only data for given rundate.
     """
-    merged_vars = config.program_vars(rundate=from_date, tech_name=dset_vars["tech"], **dset_vars)
+    merged_vars = dset_vars.copy()
     merged_vars["id"] += "_concatenated"
-    dset_merged = data.Dataset(**dict(merged_vars, rundate=from_date, empty=True))
+    dset_merged = dataset.Dataset(**dict(merged_vars, rundate=from_date, empty=True))
 
     date_to_read = from_date
     while date_to_read <= to_date:
-        dset = data.Dataset(rundate=date_to_read, **dset_vars)
+        dset = dataset.Dataset().read(**dict(dset_vars, rundate=date_to_read))
 
         current_date = date_to_read
         date_to_read += timedelta(days=1)
@@ -156,7 +154,7 @@ def _concatenate_datasets(
 
         log.info(f"Reading data for {current_date}")
         if not dset_merged:
-            dset_merged.copy_from(dset)
+            dset_merged.update_from(dset)
         else:
             dset_merged.extend(dset)
 

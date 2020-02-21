@@ -63,16 +63,6 @@ def src_dir(dset):
         except_idx = np.array([icrf[src].meta[group] if group in icrf[src].meta else src == group for src in sources])
         fix_idx = np.logical_and(np.logical_not(except_idx), fix_idx)
 
-    # Remove sources with few observations
-    # TODO redo this type of test after outlier elimination, maybe this should be done in the estimator?
-    # Similar test might be useful for stations
-    limit = config.tech[PARAMETER].num_obs_limit.int
-    for idx, src in enumerate(sources):
-        src_idx = dset.filter(source=src)
-        if np.sum(src_idx) < limit:
-            fix_idx[idx] = True
-            log.info(f"Radio source {src} has less than {limit} observations. Keeping coordinates fixed.")
-
     sources = sources[np.logical_not(fix_idx)]
 
     # Calculate partials

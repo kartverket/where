@@ -14,11 +14,11 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where.lib import log
 from where import parsers
-from where.lib.unit import Unit
 
 DEFAULT_COM = {"lageos": 0.251, "etalon": 0.65, "lares": 0.13}
 

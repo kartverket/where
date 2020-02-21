@@ -25,9 +25,9 @@ TODO:
 Important: Bad satellites has to be removed from observation Dataset!!!! E.g. indicated by bad satellite clock values.
 
 
-$Revision: 18780 $
-$Date: 2019-12-17 12:16:46 +0100 (Tue, 17 Dec 2019) $
-$LastChangedBy: dahmic $
+$Revision: 18916 $
+$Date: 2020-01-21 14:50:27 +0100 (Tue, 21 Jan 2020) $
+$LastChangedBy: kirann $
 
 """
 
@@ -39,12 +39,12 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.constant import constant
+from midgard.math.unit import Unit
+from midgard.parsers._parser_chain import ChainParser, ParserDef
 
 # Where imports
-from where.parsers._parser_chain import ChainParser, ParserDef
-from midgard.math.constant import constant
 from where.lib import log
-from where.lib.unit import Unit
 
 
 @plugins.register

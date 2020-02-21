@@ -71,6 +71,8 @@ def gnss_select_obs(dset):
         remove_obs_pattern = "^C|^P|^S"
     elif cfg_obs_code == "snr":
         remove_obs_pattern = "^C|^P|^L"
+    elif cfg_obs_code == "code:doppler":
+        remove_obs_pattern = "^L|^S"
     elif cfg_obs_code == "code:phase":
         remove_obs_pattern = "^D|^S"
     else:
@@ -156,6 +158,9 @@ def _select_observations(obstypes_all, obstypes):
             elif obs_code == "snr":
                 for type_ in ["S1"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "code:doppler":
+                for type_ in ["C1", "D1"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
             elif obs_code == "code:phase":
                 for type_ in ["C1", "L1"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
@@ -174,6 +179,9 @@ def _select_observations(obstypes_all, obstypes):
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
             elif obs_code == "snr":
                 for type_ in ["S1", "S2"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "code:doppler":
+                for type_ in ["C1", "D1", "C2", "D2"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
             elif obs_code == "code:phase":
                 for type_ in ["C1", "L1", "C2", "L2"]:
@@ -194,8 +202,11 @@ def _select_observations(obstypes_all, obstypes):
             elif obs_code == "snr":
                 for type_ in ["S1", "S2", "S3"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+            elif obs_code == "code:doppler":
+                for type_ in ["C1", "D1", "C2", "D2", "C3", "D3"]:
+                    use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
             elif obs_code == "code:phase":
-                for type_ in ["C1", "L1", "C2", "L2"]:
+                for type_ in ["C1", "L1", "C2", "L2", "C3", "L3"]:
                     use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
             else:
                 log.fatal(f"Configuration option 'obs_code = {obs_code}' is not valid.")

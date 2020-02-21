@@ -8,7 +8,7 @@ Description:
 """
 # Standard library imports
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, Union
+from typing import List, Tuple, Union
 
 # External library imports
 import numpy as np

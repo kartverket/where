@@ -12,10 +12,8 @@ because they exhibit temporal variations in celestial coordinates.
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_line import LineParser
-from where.lib.unit import Unit
+from midgard.math.unit import Unit
+from midgard.parsers._parser_line import LineParser
 
 
 @plugins.register

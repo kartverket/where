@@ -19,9 +19,7 @@ import itertools
 
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_chain import ParserDef, ChainParser
+from midgard.parsers._parser_chain import ParserDef, ChainParser
 
 
 @plugins.register

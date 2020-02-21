@@ -36,6 +36,7 @@ def add_to_full_timeseries(dset):
     Args:
         dset:  Dataset, data for a model run.
     """
+    log.info(f"Updating timeseries dataset")
     dset_id = config.tech.timeseries.dataset_id.str.format(**dset.vars)
     try:
         # Read existing dataset
@@ -130,7 +131,6 @@ def add_to_full_timeseries(dset):
     # Extend timeseries dataset with dset_session and write to disk
     dset_ts.extend(dset_session)
     dset_ts.write()
-    log.info(f"Updating timeseries dataset")
 
 
 def _add_solved_neq_fields(dset, dset_session, idx_values):

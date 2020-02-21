@@ -9,11 +9,11 @@ import numpy as np
 from midgard.data.fieldtypes._fieldtype import FieldType
 from midgard.dev import exceptions
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where.data.direction import Direction
 from where.data._direction import DirectionArray
-from where.lib.unit import Unit
 
 
 @plugins.register
@@ -31,7 +31,7 @@ class DirectionField(FieldType):
             data = self._factory(val, **dir_args)
 
         # Check that unit is not given, overwrite with direction units
-        if self._unit is not None:
+        if self._unit is not None and self._unit != data.unit():
             raise exceptions.InitializationError("Parameter 'unit' should not be specified for directions")
         self._unit = data.unit()
 

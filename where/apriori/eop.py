@@ -67,6 +67,7 @@ import numpy as np
 # Midgard imports
 from midgard.dev import plugins
 from midgard.math import nputil
+from midgard.math.unit import Unit
 
 # Where imports
 from where import parsers
@@ -76,7 +77,6 @@ from where.ext import hf_eop_wrapper as hf_eop
 from where.lib import config
 from where.lib import exceptions
 from where.lib import log
-from where.lib.unit import Unit
 
 # Cache for EOP data read from file
 _EOP_DATA = dict()

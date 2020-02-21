@@ -24,12 +24,15 @@ from midgard.math.constant import constant
 from where.lib import log
 from where import apriori
 
+# Midgard imports
+from midgard.math.unit import Unit
+
 cdef double GM, R
 cdef double[:, :] C, S
 cdef int degree_and_order
 cdef double[:, :, :] gcrs2itrs
 cdef int c20_index
-
+cdef double[:] xp, yp
 
 def register_entry_point():
     """Register entry points for setup and later calls."""
@@ -57,6 +60,7 @@ def gravity_earth_setup(
     global degree_and_order
     global g2i
     global c20_index
+    global xp, yp
 
     GM = constant.get("GM", source="egm_2008")
     R = constant.get("a", source="egm_2008")
@@ -73,6 +77,10 @@ def gravity_earth_setup(
     if "c20" in force_parameters:
         C[2, 0] = force_parameters["c20"]
         c20_index = list(force_parameters.keys()).index("c20")
+    
+    eop = apriori.get('eop', time=epochs)
+    xp = eop.x_mean_2010() * Unit.arcsec2rad
+    yp = eop.y_mean_2010() * Unit.arcsec2rad
 
 
 def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **_not_used):
@@ -117,6 +125,11 @@ def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **
 
     V = VW[:, :, 0]
     W = VW[:, :, 1]
+
+    # Equation 6.5 in IERS Conventions [2]
+    C[2, 1] = math.sqrt(3) * xp[current_step] * C[2, 0] - xp[current_step] * C[2, 2] + yp[current_step] * S[2, 2]
+    S[2, 1] = -math.sqrt(3) * yp[current_step] * C[2, 0] - yp[current_step] * C[2, 2] - xp[current_step] * S[2, 2]
+
 
     # Acceleration forces, equation (3.33)
     # Transition matrix, equations (7.65) - (7.70)

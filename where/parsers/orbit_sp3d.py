@@ -45,13 +45,12 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.constant import constant
+from midgard.math.unit import Unit
+from midgard.parsers._parser_chain import ChainParser, ParserDef
 
 # Where imports
-from where.parsers._parser_chain import ChainParser, ParserDef
-from where.lib import config
-from midgard.math.constant import constant
 from where.lib import log
-from where.lib.unit import Unit
 
 
 @plugins.register

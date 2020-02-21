@@ -16,11 +16,11 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib.unit import Unit
 
 
 @plugins.register
@@ -29,8 +29,8 @@ def web_map_writer(dset):
     log.info(f"Storing a web map at '{file_path}'. Open in a browser to look at it")
 
     sites = read_site_latlons(dset)
-    map = draw_map(dset, sites)
-    map.save(str(file_path))
+    webmap = draw_map(dset, sites)
+    webmap.save(str(file_path))
 
 
 def read_site_latlons(dset):
@@ -49,14 +49,14 @@ def draw_map(dset, latlons):
     rms = dset.rms("residual") * Unit.m2mm
 
     # Map layers
-    map = folium.Map((20, 0), zoom_start=2)  # Default is OpenStreetMap
-    folium.TileLayer("Stamen Toner").add_to(map)
-    folium.TileLayer("CartoDB Positron").add_to(map)
+    webmap = folium.Map((20, 0), zoom_start=2)  # Default is OpenStreetMap
+    folium.TileLayer("Stamen Toner").add_to(webmap)
+    folium.TileLayer("CartoDB Positron").add_to(webmap)
 
     # Colors
     colors = colormap.LinearColormap(("green", "yellow", "red"), vmin=rms / 2, vmax=rms * 2)
     colors.caption = "RMS [mm]"
-    map.add_child(colors)
+    webmap.add_child(colors)
 
     # Stations
     stations_layer = folium.FeatureGroup(name="Stations")
@@ -79,7 +79,7 @@ def draw_map(dset, latlons):
                 radius=max(5, 10 * np.sqrt(np.mean(idx) * len(stations))),
             )
         )
-    map.add_child(stations_layer)
+    webmap.add_child(stations_layer)
 
     # Baselines
     for sta_1 in stations:
@@ -97,7 +97,7 @@ def draw_map(dset, latlons):
                 )
             )
         if baseline_layer._children:
-            map.add_child(baseline_layer)
+            webmap.add_child(baseline_layer)
 
-    folium.LayerControl().add_to(map)
-    return map
+    folium.LayerControl().add_to(webmap)
+    return webmap

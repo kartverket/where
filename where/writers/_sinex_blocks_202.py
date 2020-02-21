@@ -22,7 +22,11 @@ References:
 from datetime import datetime
 from functools import lru_cache
 
+# Third party imports
 import numpy as np
+
+# Midgard imports
+from midgard.math.unit import Unit
 
 # Where imports
 import where
@@ -30,7 +34,6 @@ from where import apriori
 from where.lib import config
 from where.lib import log
 from where.data import time
-from where.lib.unit import Unit
 from where.lib import util
 
 _PARAMS = dict(

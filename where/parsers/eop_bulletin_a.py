@@ -10,9 +10,7 @@ Reads data from EOP files.
 # Midgard imports
 from midgard.dev import plugins
 from midgard.math.unit import Unit
-
-# Where imports
-from where.parsers._parser_line import LineParser
+from midgard.parsers._parser_line import LineParser
 
 
 @plugins.register

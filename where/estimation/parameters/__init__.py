@@ -15,19 +15,16 @@ should be called need to be decorated with the :func:`~midgard.dev.plugins.regis
 The decorated function will be called with a single parameter, ``dset`` which contains a
 :class:`~where.data.dataset.Dataset` with data that can be used when calculating the partial derivatives.
 
-
-
-
 """
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.unit import Unit
 
 # Where imports
 from where.lib import config
 from where.estimation import estimators
 from where.lib import log
-from where.lib.unit import Unit
 
 
 def partial_vectors(dset, estimator_config_key):
@@ -46,6 +43,10 @@ def partial_vectors(dset, estimator_config_key):
     """
     partial_vectors = dict()
     prefix = dset.vars["pipeline"]
+
+    # Delete values from previous iterations
+    if "partial" in dset.fields:
+        del dset.partial
 
     for config_key in estimators.partial_config_keys(estimator_config_key):
         partial_vectors[config_key] = list()
@@ -67,10 +68,7 @@ def partial_vectors(dset, estimator_config_key):
                 partial_vectors[config_key].append(partial_name)
 
                 field_name = f"partial.{partial_name}"
-                if field_name in dset.fields:
-                    dset[field_name][:] = values * factor
-                else:
-                    dset.add_float(field_name, val=values * factor, unit=partial_unit, write_level="operational")
-                    dset.meta.add(partial_name, display_unit, section="display_units")
+                dset.add_float(field_name, val=values * factor, unit=partial_unit, write_level="operational")
+                dset.meta.add(partial_name, display_unit, section="display_units")
 
     return partial_vectors

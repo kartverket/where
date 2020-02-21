@@ -307,6 +307,7 @@ def run(rundate, pipeline, *args, **kwargs):
     for prev_stage, stage in zip([prev_stage_start] + stage_list, stage_list):
         if stage not in skip_stages:
             dset = run_stage(rundate, pipeline, dset, stage, prev_stage, **kwargs)
+            log.blank()
 
         if dset is not None and dset.num_obs == 0:
             log.warn(f"No observations in dataset after {stage} stage.")

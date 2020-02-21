@@ -8,9 +8,7 @@ Reads atmospheric tide coefficients. Gridded coefficients for the S1 and S2 atmo
 """
 # Midgard imports
 from midgard.dev import plugins
-
-# Where imports
-from where.parsers._parser_line import LineParser
+from midgard.parsers._parser_line import LineParser
 
 
 @plugins.register
