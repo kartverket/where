@@ -68,6 +68,7 @@ from midgard.writers import write
 
 # Where imports
 from where.data import dataset3 as dataset
+from where.lib import config
 from where.lib import log
 from where.lib import util
 
@@ -88,6 +89,10 @@ def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "opt
     station = util.read_option_value("--station", default="")
     id_ = util.read_option_value("--id", default="")
 
+    # Get dataset variables
+    dset_vars = dict(pipeline=pipeline, stage=stage, station=station, label=label, id=id_)
+    dset_vars = config.create_file_vars(rundate=date, **dset_vars)
+
     # Read datasets for given specifier
     if specifier == "id":
         for id_ in items_:
@@ -97,6 +102,8 @@ def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "opt
             if dset.num_obs == 0:
                 log.warn(f"Dataset '{id_}' is empty.")
                 continue
+            dset_vars["id"] = id_ #TODO: Better solution for handling of dataset variables?
+            dset.vars.update(dset_vars) # Necessary for example for getting correct file path in used writers.
             dsets.update({id_: dset})
 
     elif specifier == "station":
@@ -107,6 +114,8 @@ def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "opt
             if dset.num_obs == 0:
                 log.warn(f"Dataset '{station}' is empty.")
                 continue
+            dset_vars["station"] = station #TODO: Better solution for handling of dataset variables?
+            dset.vars.update(dset_vars) # Necessary for example for getting correct file path in used writers.
             dsets.update({station: dset})
 
     elif specifier == "stage":
@@ -117,6 +126,8 @@ def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "opt
             if dset.num_obs == 0:
                 log.warn(f"Dataset '{stage}' is empty.")
                 continue
+            dset_vars["stage"] = stage #TODO: Better solution for handling of dataset variables?
+            dset.vars.update(dset_vars) # Necessary for example for getting correct file path in used writers.
             dsets.update({stage: dset})
     else:
         log.fatal(f"Specifier {specifier} is not defined. It should be either 'id', 'station' or 'stage'.")

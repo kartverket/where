@@ -1,6 +1,4 @@
-"""A Dataset position field
-
-"""
+"""A Dataset position field"""
 
 # Midgard imports
 from midgard.data.fieldtypes.position import PositionField as MgPositionField

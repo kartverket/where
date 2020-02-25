@@ -1,6 +1,4 @@
-"""A Dataset time field
-
-"""
+"""A Dataset time field"""
 
 # Midgard imports
 from midgard.data.fieldtypes.time import TimeField as MgTimeField

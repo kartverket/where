@@ -61,7 +61,7 @@ def gnss_spv_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     # Generate GNSS comparison report
     path = config.files.path("output_gnss_spv_comparison_report", file_vars=dset_first.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
-        rpt = Report(fid, rundate=dset_first.rundate, path=path, description="Comparison of GNSS SPV analyses")
+        rpt = Report(fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of GNSS SPV analyses")
         rpt.title_page()
         _add_to_report(rpt, figure_dir, dfs_day, dfs_month, dset_first.vars)
         rpt.markdown_to_pdf()
@@ -95,27 +95,27 @@ def _add_to_report(
                 dfs_day[field].index = dfs_day[field].index.strftime("%d-%m-%Y")
 
             rpt.add_text("Daily 95th percentile 2D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_day["hpe"], format="6.2f", statistic=True)
+            rpt.write_dataframe_to_markdown(dfs_day["2d_vel"], format="6.2f", statistic=True)
 
             rpt.add_text("Daily 95th percentile 3D velocity in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_day["vpe"], format="6.2f", statistic=True)
+            rpt.write_dataframe_to_markdown(dfs_day["3d_vel"], format="6.2f", statistic=True)
 
         elif sample_name == "Monthly":
             rpt.add_text("Monthly 95th percentile 2D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_month["hpe"], format="6.2f")
+            rpt.write_dataframe_to_markdown(dfs_month["2d_vel"], format="6.2f")
 
             rpt.add_text("Monthly 95th percentile 3D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_month["vpe"], format="6.2f")
+            rpt.write_dataframe_to_markdown(dfs_month["3d_vel"], format="6.2f")
 
         # Add 2D and 3D velocity plots
         rpt.add_figure(
-            f"{figure_dir}/plot_hpe_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            f"{figure_dir}/plot_2d_vel_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for 2D velocity.",
             clearpage=True,
         )
 
         rpt.add_figure(
-            f"{figure_dir}/plot_vpe_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            f"{figure_dir}/plot_3d_vel_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for 3D velocity.",
             clearpage=True,
         )
@@ -278,11 +278,11 @@ def _plot_velocity_error(
             x_arrays = []
             y_arrays = []
             labels = []
-
             for station in sample_data[field].columns:
                 if sample_name == "monthly":
                     opt_args.update({"xlim": "auto", "ylim": [0.0, 3.0]})
-                x_arrays.append(list(sample_data[field].index))
+                x_data = sample_data[field].index.to_pydatetime() if isinstance(sample_data[field].index, pd.core.indexes.datetimes.DatetimeIndex) else sample_data[field].index
+                x_arrays.append(list(x_data))
                 y_arrays.append(list(sample_data[field][station]))
                 labels.append(station.upper())
 

@@ -1,6 +1,4 @@
-"""A Dataset direction field
-
-"""
+"""A Dataset direction field"""
 
 # Third party imports
 import numpy as np
@@ -112,6 +110,4 @@ class DirectionField(FieldType):
 
     def _write(self, h5_group, memo) -> None:
         """Write a DirectionField to a HDF5 data source"""
-        #         h5_group.attrs["fieldname"] = h5_group.name[1:].replace("/", ".")
-        #         h5_group.attrs["__class__"] = f"{self.data.__class__.__module__}.{self.data.__class__.__name__}"
         self.data._write(h5_group, memo)

@@ -100,6 +100,7 @@ def concatenate(from_date: "datedoy", to_date: "datedoy", pipeline: "pipeline", 
     dset_vars = config.create_file_vars(rundate=from_date, **dset_vars)
 
     dset = _concatenate_datasets(from_date, to_date, dset_vars, only_for_rundate)
+    dset.vars.update(dset_vars) # Necessary for example for getting correct file path in used writers.
     if dset.num_obs == 0:
         log.fatal(f"No data to read period from {from_date} to {to_date}.")
     dset.write()
