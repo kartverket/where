@@ -29,7 +29,8 @@ cdef double GM_earth, R_earth, GM_moon, GM_sun
 cdef int truncation_level
 cdef double[:, :] sun_pos, moon_pos
 cdef double[:] sun_distance, moon_distance
-cdef Cp, Cm, Sp, Sm
+cdef dict ocean_tides_coeffs
+cdef CpS1, CmS1
 cdef epoch_list, delaunay_variables
 cdef double[:, :, :] g2i
 cdef double[:] GMST
@@ -69,12 +70,13 @@ def tides_setup(
     global GM_earth, G_earth, GM_moon, GM_sun, R_earth
     global truncation_level
     global moon_pos, sun_pos, moon_distance, sun_distance
-    global Cp, Cm, Sp, Sm
+    global CpS1, CmS1
     global epoch_list
     global g2i
     global delaunay_variables
     global GMST
     global m_1, m_2
+    global ocean_tides_coeffs
     epoch_list = epochs
 
     GM_earth = constant.get("GM", source="egm_2008")
@@ -85,11 +87,11 @@ def tides_setup(
     # Ocean tides coefficients, corrections to the gravity coefficients C and S.
     # The dict containing the values Cp, Cm, Sp and Sm
     ocean_tides_coeffs = apriori.get("ocean_tides_orbit")
-
-    Cp = ocean_tides_coeffs["C+"]
-    Cm = ocean_tides_coeffs["C-"]
-    Sp = ocean_tides_coeffs["S+"]
-    Sm = ocean_tides_coeffs["S-"]
+    
+    # The S1 wave is contained in a separate file
+    s1_wave = apriori.get("ocean_tides_s1")
+    CpS1 = s1_wave[164.556]["C+"]
+    CmS1 = s1_wave[164.556]["C-"]
 
     # Read configuration settings
     truncation_level = config.tech.gravity_truncation_level.int
@@ -172,14 +174,14 @@ def tides(double[:] sat_pos_itrs, int num_param, int current_step, **_not_used):
     # Solid earth tides
     C, S = solid_earth_tides(current_step)
     # Ocean tides
-    # C_ocean, S_ocean = ocean_tides(current_step)
+    C_ocean, S_ocean = ocean_tides(current_step)
     # Solid earth pole tides
     C_sept, S_sept = solid_earth_pole_tides(current_step)
     # Ocean pole tides
     C_opt, S_opt = ocean_pole_tides(current_step)
 
-    # C += C_ocean
-    # S += S_ocean
+    C += C_ocean
+    S += S_ocean
     C[2, 1] += C_sept + C_opt
     S[2, 1] += S_sept + S_opt
 
@@ -382,36 +384,92 @@ def ocean_tides(int current_step):
     C = np.zeros((truncation_level, truncation_level))
     S = np.zeros((truncation_level, truncation_level))
 
+    # Pick the waves from the tables 6.5a and 6.5b that are fundamental in FES.
+    # The two waves in table 6.5c are both fundamental.
+    # Ref table 6.7, where the fundamental waves are in bold.
+
+    fundamental_waves_a = [3, 6, 17, 23]
+    fundamental_waves_b = [0, 1, 2, 3, 8, 13, 17, 19]
+    
     # Equation 6.15
+    for i in fundamental_waves_a:
+        doodson = doodson_a[i]
+        NF = np.dot(delaunay_multipliers_a[i], delaunay_variables[current_step])
+        Cp = ocean_tides_coeffs[doodson]["C+"]
+        Cm = ocean_tides_coeffs[doodson]["C-"]
+        Sp = ocean_tides_coeffs[doodson]["S+"]
+        Sm = ocean_tides_coeffs[doodson]["S-"]
+        for n in range(0, C.shape[0]):
+            for m in range(0, n + 1):
+ 
+                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
+                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
+                
+                C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
+                           + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f
+                           + Sm[n, m] * sin_theta_f)
+                S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
+                           + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f
+                           - Sm[n, m] * cos_theta_f)
+              
+    for i in fundamental_waves_b:
+        doodson = doodson_b[i]
+        # Some of these are actually missing in FES2004
+        if doodson not in ocean_tides_coeffs:
+            continue
+
+        Cp = ocean_tides_coeffs[doodson]["C+"]
+        Cm = ocean_tides_coeffs[doodson]["C-"]
+        Sp = ocean_tides_coeffs[doodson]["S+"]
+        Sm = ocean_tides_coeffs[doodson]["S-"]
+
+        NF = np.dot(delaunay_multipliers_b[i], delaunay_variables[current_step])
+        
+        for n in range(0, C.shape[0]):
+            for m in range(0, n + 1):
+                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
+                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
+                
+                if (n, m) in Cp:
+                    C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
+                        + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f + Sm[n, m] * sin_theta_f)
+                    S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
+                        + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f - Sm[n, m] * cos_theta_f)
+
+    for i in range(0, len(doodson_c)):
+        doodson = doodson_c[i]
+        NF = np.dot(delaunay_multipliers_c[i], delaunay_variables[current_step])
+        
+        Cp = ocean_tides_coeffs[doodson]["C+"]
+        Cm = ocean_tides_coeffs[doodson]["C-"]
+        Sp = ocean_tides_coeffs[doodson]["S+"]
+        Sm = ocean_tides_coeffs[doodson]["S-"]
+        for n in range(0, C.shape[0]):
+            for m in range(0, n + 1):
+                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
+                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
+                
+                C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
+                           + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f + Sm[n, m] * sin_theta_f)
+                S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
+                           + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f - Sm[n, m] * cos_theta_f)
+   
+ 
+    #Treat the S1 case separately:
+    NF = np.dot(delaunay_multipliers_a[19], delaunay_variables[current_step])
     for n in range(0, C.shape[0]):
         for m in range(0, n + 1):
-            for doodson in Cp[n, m]:
-                delaunay_multipliers = []
-                # Look up the right frequency component from the right table:
-                for i in range(0, len(doodson_a)):
-                    if doodson == doodson_a[i]:
-                        delaunay_multipliers = delaunay_multipliers_a[i]
-                        break
-                for i in range(0, len(doodson_b)):
-                    if doodson == doodson_b[i]:
-                        delaunay_multipliers = delaunay_multipliers_b[i]
-                        break
-                for i in range(0, len(doodson_c)):
-                    if doodson == doodson_c[i]:
-                        delaunay_multipliers = delaunay_multipliers_c[i]
-                        break
-                if delaunay_multipliers == []:
-                    break
+            if n == 0 and m == 0:
+                continue
 
-                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
-                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - np.dot(delaunay_multipliers, delaunay_variables[current_step]))
+            sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
+            cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
 
-                C[n, m] += normalization_factor(n, m)**2 * (Cp[n, m][doodson] * cos_theta_f
-                                + Sp[n, m][doodson] * sin_theta_f + Cm[n, m][doodson] * cos_theta_f
-                                + Sm[n, m][doodson] * sin_theta_f)
-                S[n, m] += normalization_factor(n, m)**2 * (-Cp[n, m][doodson] * sin_theta_f
-                                + Sp[n, m][doodson] * cos_theta_f + Cm[n, m][doodson] * sin_theta_f
-                                - Sm[n, m][doodson] * cos_theta_f)
+            C[n, m] += normalization_factor(n, m) * (CpS1[n, m] * cos_theta_f
+                       + CmS1[n, m] * cos_theta_f)
+            S[n, m] += normalization_factor(n, m) * (-CpS1[n, m] * sin_theta_f
+                       + CmS1[n, m] * sin_theta_f)
+ 
     return C, S
 
  
@@ -558,8 +616,9 @@ cdef table_65b():
     Returns:
         delaunay_multipliers:   Matrix, numbers to be multiplied by the
                                 Delaunay variables
-        ip:                     vector of in-phase amplitudes
-        op:                     vector of out-of-phase amplitudes
+        ip:                     np array of in-phase amplitudes
+        op:                     np array of out-of-phase amplitudes
+        doodson:                np array of doodson numbers
 
     Notes: theta_f is computed as the sum over n_i * beta_i, see page 84 in the reference above.
            theta_f is a vector, with different values for every frequency f.
@@ -630,11 +689,10 @@ cdef table_65a():
                                  IERS Technical Note No. 36, BKG (2010).
 
     Returns:
-         sin_theta_f: vector with entries sinus(theta_f) for various f, see notes.
-         cos_theta_f: vector with entries cos(theta_f) for various f, see notes
-         ip:          vector of in-phase amplitudes
-         op:          vector of out-of-phase amplitudes
-
+         delaunay_multipliers:  np array of multipliers
+         ip:                    np array in-phase amplitude
+         op:                    np array of out-of-phase amplitudes
+         doodson:               np array of doodson numbers
     Notes: theta_f is computed as the sum over n_i * beta_i, see page 84 in the reference above.
            theta_f is a vector, with entries the values of this sum for every frequency f.
     """
@@ -703,7 +761,7 @@ cdef table_65c():
     Returns:
         delaunay_multipliers: matrix of numbers to be multiplied with the Delaunay variables
         ip:                   vector of in-phase amplitudes
-        op:                   vector of out-of-phase amplitudes
+        doodson               list of doodson numbers
 
     """
     # Delauney multipliers

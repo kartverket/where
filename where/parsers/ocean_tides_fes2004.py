@@ -34,7 +34,8 @@ class OceanTidesCoeffParser(Parser):
                     self._parse_line(line, int(line[12:15]), int(line[16:19]))
 
     def _parse_line(self, line, n, m):
-        self.data.setdefault("C+", {}).setdefault((n, m), {}).setdefault(float(line[0:7]), float(line[19:29]) * 1e-12)
-        self.data.setdefault("C-", {}).setdefault((n, m), {}).setdefault(float(line[0:7]), float(line[29:39]) * 1e-12)
-        self.data.setdefault("S+", {}).setdefault((n, m), {}).setdefault(float(line[0:7]), float(line[41:51]) * 1e-12)
-        self.data.setdefault("S-", {}).setdefault((n, m), {}).setdefault(float(line[0:7]), float(line[51:61]) * 1e-12)
+        self.data.setdefault(float(line[0:7]), {}).setdefault("C+", {}).setdefault((n, m), float(line[19:29]) * 1e-12)
+        self.data.setdefault(float(line[0:7]), {}).setdefault("C-", {}).setdefault((n, m), float(line[29:39]) * 1e-12)
+        self.data.setdefault(float(line[0:7]), {}).setdefault("S+", {}).setdefault((n, m), float(line[41:51]) * 1e-12)
+        self.data.setdefault(float(line[0:7]), {}).setdefault("S-", {}).setdefault((n, m), float(line[51:61]) * 1e-12)
+
