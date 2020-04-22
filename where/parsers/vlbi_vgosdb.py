@@ -35,13 +35,18 @@ from where.lib import log
 
 @plugins.register
 class VgosDbParser(Parser):
-    """A parser for reading VLBI data from a VGOS database
-    """
+    """A parser for reading VLBI data from a VGOS database"""
 
+    # Dictionary stucture for each field: 
+    # filestub: name of netcdf file
+    # variable: name of variable inside netcdf file
+    # factor: used to convert from unit given in file to desired unit
+    # nan_value: value used to indicate missing data
+    # unit: desired unit after conversion
     _STATION_FIELDS = {
-        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1, "nan_value": -999},
-        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1, "nan_value": -999},
-        "cable_delay": {"filestub": "Cal-Cable", "variable": "Cal-Cable", "factor": constant.c, "nan_value": np.nan},
+        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1, "nan_value": -999, "unit":("Celcius", )},
+        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1, "nan_value": -999, "unit": ("hPa", )},
+        "cable_delay": {"filestub": "Cal-Cable", "variable": "Cal-Cable", "factor": constant.c, "nan_value": np.nan, "unit": ("meter", )},
     }
 
     def __init__(self, file_path, encoding=None):
@@ -109,6 +114,7 @@ class VgosDbParser(Parser):
         """
         meta = self.data.setdefault("meta", {})
         meta["session_code"] = self.raw["Session"].get("Session")
+        units = meta.setdefault("units", {})
 
         # Epoch info
         self.data["time"] = self.raw["Observables"]["TimeUTC"]["time"]
@@ -124,6 +130,7 @@ class VgosDbParser(Parser):
         except KeyError:
             self.data["observed_delay_ferr"] = np.zeros(num_obs)
             log.error("Missing group delay formal error information")
+        units["observed_delay_ferr"] = ("meter", )
 
         try:
             self.data["data_quality"] = self.raw["ObsEdit"]["Edit"]["DelayFlag"]
@@ -136,6 +143,7 @@ class VgosDbParser(Parser):
         except KeyError:
             self.data["observed_delay"] = np.full(num_obs, np.nan)
             log.error("Missing full group delay information")
+        units["observed_delay"] = ("meter", )
 
         try:
             self.data["iono_delay"] = (
@@ -146,11 +154,14 @@ class VgosDbParser(Parser):
             )
         except KeyError:
             try:
-                self.data["dtec"] = self.raw["Observables"]["DiffTec"]["diffTec"]  # Unit: TECU
-                self.data["ref_freq"] = self.raw["Observables"]["RefFreq"]["X"]["RefFreq"] * Unit.MHz2Hz  # Unit:
+                self.data["dtec"] = self.raw["Observables"]["DiffTec"]["diffTec"]
+                units["dtec"] = ("TECU", )
+                self.data["ref_freq"] = self.raw["Observables"]["RefFreq"]["X"]["RefFreq"] * Unit.MHz2Hz
+                units["ref_freq"] = ("Hz", )
             except KeyError:
                 self.data["iono_delay"] = np.full(num_obs, np.nan)
                 log.warn("Missing ionosphere delay information")
+        units["iono_delay"] = ("meter", )
 
         try:
             self.data["iono_delay_ferr"] = (
@@ -162,10 +173,12 @@ class VgosDbParser(Parser):
         except KeyError:
             try:
                 self.data["dtec_ferr"] = self.raw["Observables"]["DiffTec"]["diffTecStdDev"]  # Unit: TECU
+                units["dtec_ferr"] = ("TECU", )
             except KeyError:
                 self.data["iono_delay_ferr"] = np.full(num_obs, np.nan)
                 if not np.isnan(self.data["iono_delay"]).all():
                     log.warn("Missing ionosphere delay formal error information")
+        units["iono_delay_ferr"] = ("meter", )
 
         try:
             self.data["iono_quality"] = self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"][
@@ -209,6 +222,8 @@ class VgosDbParser(Parser):
                 epochs_2 = self.raw["Observables"]["TimeUTC"]["sec_since_ref"][sta_idx_2]
                 self.data[field + "_1"][sta_idx_1] = func(epochs_1) * params["factor"]
                 self.data[field + "_2"][sta_idx_2] = func(epochs_2) * params["factor"]
+                units[field + "_1"] = params["unit"]
+                units[field + "_2"] = params["unit"]
 
     def _parse_time(self, time_dict):
         part1 = time_dict.pop("YMDHM")

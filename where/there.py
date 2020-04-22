@@ -67,7 +67,6 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import scrolledtext
 from tkinter import font as tk_font
-import webbrowser
 
 # External library imports
 import matplotlib
@@ -672,12 +671,7 @@ class TabAnalysis(TabFigure):
         log.print_file(log_path, config.there.log.print_log_level.str)
 
     def show_map(self):
-        map_path = config.files.path("output_web_map", file_vars=self.vars)
-        if not map_path.exists():
-            from where.writers import web_map
-
-            web_map.web_map_writer(self.figure.dataset)
-        webbrowser.open(map_path.as_uri())
+        pipelines.make_map(self.figure.dataset)
 
     def edit_config(self):
         cfg_path = config.files.path("config", file_vars=self.vars)
@@ -937,8 +931,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             except TypeError:
                 idx_finite &= np.ones(sum(idx), dtype=bool)
 
-        i_obs = np.where(idx)[0][idx_finite]
-        return i_obs[ind]
+        return np.where(idx)[0][ind][idx_finite[ind]]
 
     def dbl_click_pick(self, event, mouse_event=None):
         if mouse_event is None:

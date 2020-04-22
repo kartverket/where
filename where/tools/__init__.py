@@ -46,6 +46,7 @@ import sys
 # Midgard imports
 from midgard.dev import exceptions
 from midgard.dev import plugins
+from midgard.dev.timer import Timer
 
 # Where imports
 from where.lib import config
@@ -54,6 +55,7 @@ from where.lib import util
 from where import pipelines
 
 
+@Timer(f"Finish {util.get_program_name()} in")
 @util.no_traceback
 def main():
     """Invoke where_tools

@@ -3,13 +3,14 @@
 -------
 
 
-$Revision: 18265 $
-$Date: 2019-09-20 12:52:36 +0200 (fr., 20 sep. 2019) $
+$Revision: 19125 $
+$Date: 2020-03-03 14:39:13 +0100 (ti., 03 mars 2020) $
 $LastChangedBy: kirann $
 
 """
 # Standard library imports
 from datetime import datetime
+import pathlib
 import unittest
 
 # External library imports
@@ -18,9 +19,10 @@ import pytest
 
 # Where imports
 from where import apriori
+from where.data import dataset3 as dataset
 from where.data.time import Time
 
-TEST = "test_2"
+TEST = "test_3"
 
 
 @pytest.mark.quick
@@ -57,86 +59,85 @@ class TestBroadcast(unittest.TestCase):
             0.200000000000D+01 0.000000000000D+00-0.838190317154D-08 0.100000000000D+02
             0.172770000000D+06 0.400000000000D+01 0.000000000000D+00 0.000000000000D+00
 
-        The second test set up compares results from Where against gLAB solution for satellite E11 and epoch
+        The third test set up compares results from Where against CNES solution for satellite E11 and epoch
         2016-03-01 00:00:00.0.
 
-        /* Sample Broadcast Message in unit of radians, seconds, meters for satellite E11 and
-        /  epoch 2016-03-01 00:00:00.0
-        E11 2016 03 01 00 00 00 6.643886445090e-05 1.097077984014e-11 0.000000000000e+00
-             3.200000000000e+01-3.243750000000e+01 3.015839907552e-09 2.397505637802e+00
-            -1.462176442146e-06 3.306962316856e-04 8.240342140198e-06 5.440621692657e+03
-             1.728000000000e+05 9.313225746155e-09-1.259905024101e+00 5.960464477539e-08
-             9.679475503522e-01 1.663125000000e+02-6.590241211713e-01-5.572732126661e-09
-             2.775115594704e-10 2.580000000000e+02 1.886000000000e+03                   
-             3.120000000000e+00 0.000000000000e+00-2.328306436539e-08 0.000000000000e+00
-             1.735000000000e+05 
+        /* Sample Broadcast Message in unit of radians, seconds, meters for satellite E01 and
+        /  epoch 2019-07-01 00:00:00.0
+        E01 2019 07 01 00 00 00-6.374700460583D-04-8.085976332950D-12 0.000000000000D+00
+             1.600000000000D+01 2.106250000000D+02 2.413671967697D-09 5.641607228729D-01
+             9.929761290550D-06 1.870252890512D-04 7.383525371552D-06 5.440612319946D+03
+             8.640000000000D+04-3.725290298462D-09 2.424721177655D-01 1.657754182816D-07
+             9.878562635157D-01 1.958125000000D+02 3.073143357419D+00-5.291648989849D-09
+             2.003654888840D-10 2.580000000000D+02 2.060000000000D+03 0.000000000000D+00
+             3.120000000000D+00 0.000000000000D+00-1.862645149231D-09 0.000000000000D+00
+             8.714000000000D+04 0.000000000000D+00 0.000000000000D+00 0.000000000000D+00 
 
         """
 
         # Get GNSS ephemeris data for testing
         if TEST == "test_1":
-            file_key = "test_apriori_orbit_broadcast_1"
+            file_name = "test2040.01n"
             year = 2001
             month = 7
             day = 23
             hour = 2
             minute = 0
-            second = 0.0
+            second = 0
             satellite = "G20"
             self.system = "G"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat = 86400.00
+            self.t_sat_gpsweek = 1124.0
+            self.t_sat_gpssec = 86400.00
 
         elif TEST == "test_2":
-            file_key = "test_apriori_orbit_broadcast_2"
+            file_name = "test0610.16n"
             year = 2016
             month = 3
             day = 1
             hour = 0
             minute = 0
-            second = 0.0
+            second = 0
             satellite = "G20"
             self.system = "G"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat = 172799.92312317
+            self.t_sat_gpsweek = 1886.0
+            self.t_sat_gpssec = 172799.92312317
 
         elif TEST == "test_3":
-            file_key = "test_apriori_orbit_broadcast_3"
-            year = 2016
-            month = 3
+            file_name = "TEST00CNS_R_20191820000_01D_EN.rnx"
+            year = 2019
+            month = 7
             day = 1
             hour = 0
             minute = 0
-            second = 0.0
-            satellite = "E11"
+            second = 0
+            satellite = "E01"
             self.system = "E"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat = 173699.999
+            self.t_sat_gpsweek = 1886.0
+            self.t_sat_gpssec = 173699.999
 
-        rundate = datetime(year, month, day, hour, minute)
-        time = Time(
-            [
-                (
-                    "{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:010.7f}"
-                    "".format(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
-                )
-            ],
-            fmt="isot",
-            scale="gps",
+        rundate = datetime(year, month, day, hour, minute, second)
+
+        # Generate observation datast
+        self.dset = dataset.Dataset(num_obs=1, rundate=rundate)
+        self.dset.add_time(
+            name="time", val=Time(val=[self.t_sat_gpsweek], val2=[self.t_sat_gpssec], fmt="gps_ws", scale="gps")
         )
+        self.dset.add_text(name="satellite", val=[satellite])
 
+        # Get broadcast ephemeris
         self.brdc = apriori.get(
             "orbit",
-            apriori_orbit="broadcast",
             rundate=rundate,
-            time=time,
-            satellite=tuple({satellite}),
             system=tuple({self.system}),
             station="test",
-            file_key=file_key,
+            apriori_orbit="broadcast",
+            file_path=pathlib.Path(__file__).parent / "files" / file_name,
         )
 
         self.idx = 0  # Broadcast ephemeris index
@@ -145,7 +146,9 @@ class TestBroadcast(unittest.TestCase):
         """
         The test is based on the bc_velo.c program, which is published in :cite:`remondi2004`.
         """
-        brdc_dict = self.brdc._get_corrected_broadcast_ephemeris(self.t_sat, self.idx, self.system)
+        brdc_dict = self.brdc._get_corrected_broadcast_ephemeris(
+            self.t_sat_gpsweek, self.t_sat_gpssec, self.idx, self.system
+        )
 
         if TEST == "test_1":
             expected_a = np.array([26561612.084130041])  # Semimajor axis
@@ -172,17 +175,17 @@ class TestBroadcast(unittest.TestCase):
             expected_vega = np.array([0.2559048275])  # True anomaly (fk)
 
         elif TEST == "test_3":
-            expected_a = np.array([29600364.402609915])  # Semimajor axis (a^2)
-            expected_E = np.array([2.509278395268e00])  # Eccentric anomaly (E)
-            expected_i = np.array([0.967948])  # Inclination (i)
+            expected_a = np.array([29600262.4159])  # Semimajor axis (a^2)
+            expected_E = np.array([1.233802050337e00])  # Eccentric anomaly (E)
+            expected_i = np.array([9.878574681865e-01])  # Inclination (i)
             expected_lambda = np.array(
-                [-1.392631397645e01]
+                [-6.451718161810]
             )  # Instantaneous Greenwich longitude of the ascending node (O)
-            expected_n = np.array([1.239749284615e-04])  # Corrected mean motion (n)
-            expected_r = np.array([29608136.838406])  # Orbit radius (r)
-            expected_tk = np.array([899.999000000000024])  # Eclapsed time referred to ephemeris reference epoch (diff)
-            expected_u = np.array([1.850446560922e00])  # Argument of latitude (u)
-            expected_vega = np.array([2.509473815034e00])  # True anomaly (fk)
+            expected_n = np.array([1.239725533334e-04])  # Corrected mean motion (n)
+            expected_r = np.array([2.959844962154e07])  # Orbit radius (r)
+            expected_tk = np.array([5400.0])  # Eclapsed time referred to ephemeris reference epoch (diff)
+            expected_u = np.array([4.307121918851])  # Argument of latitude (u)
+            expected_vega = np.array([1.233978561432])  # True anomaly (fk)
 
         with self.subTest(msg="a"):
             np.testing.assert_allclose(brdc_dict["a"], expected_a, rtol=0, atol=1e-6)
@@ -220,7 +223,9 @@ class TestBroadcast(unittest.TestCase):
         """
         The test is based on the bc_velo.c program, which is published in :cite:`remondi2004`.
         """
-        sat_pos, sat_vel = self.brdc._get_satellite_position_velocity(self.t_sat, self.idx, self.system)
+        sat_pos, sat_vel = self.brdc._get_satellite_position_velocity(
+            self.t_sat_gpsweek, self.t_sat_gpssec, self.idx, self.system
+        )
 
         if TEST == "test_1":
             expected_sat_pos = np.array([-12611434.19782218677, -13413103.97797041245, 19062913.07357876940])
@@ -231,7 +236,7 @@ class TestBroadcast(unittest.TestCase):
             expected_sat_vel = np.array([-2632.8593, -735.4519, -69.6660])
 
         elif TEST == "test_3":
-            expected_sat_pos = np.array([14067596.917149, 11368467.367032, 23441468.250584])
+            expected_sat_pos = np.array([-14015916.0717, -12803962.9430, -22708607.3907])
             expected_sat_vel = np.array([0, 0, 0])  # TODO: Not known
 
         with self.subTest(msg="sat_pos"):
@@ -248,19 +253,21 @@ class TestBroadcast(unittest.TestCase):
     # @pytest.mark.xfail(reason="Tada")
     def test_get_satellite_clock_correction(self):
 
-        sat_clk_corr = self.brdc.satellite_clock_correction()
+        sat_clk_corr = self.brdc.satellite_clock_correction(self.dset)
 
         if TEST == "test_1":
             expected_sat_clk_corr = -25696.047654177062
         elif TEST == "test_2":
             expected_sat_clk_corr = 118787.68054
         elif TEST == "test_3":
-            expected_sat_clk_corr = 19920.830541813138552
+            expected_sat_clk_corr = -6.375137103305e-04
 
         np.testing.assert_allclose(sat_clk_corr, expected_sat_clk_corr, rtol=0, atol=1e-5)
 
     def test_get_relativistic_clock_correction(self):
-        rel_clk_corr = self.brdc._get_relativistic_clock_correction(self.t_sat, self.idx, self.system)
+        rel_clk_corr = self.brdc._get_relativistic_clock_correction(
+            self.t_sat_gpsweek, self.t_sat_gpssec, self.idx, self.system
+        )
 
         if TEST == "test_1":
             expected_rel_clk_corr = -0.012570413426601913

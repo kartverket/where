@@ -13,13 +13,13 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.gnss import gnss
 from midgard.writers._writers import get_field, get_header
 
 # Where imports
 import where
 from where.cleaners.editors.gnss_dop import gnss_dop
 from where.lib import config
-from where.lib import gnss
 from where.lib import util
 
 WriterField = namedtuple(
@@ -119,7 +119,10 @@ def gnss_position(dset: "Dataset") -> None:
         gnss_dop(dset)
 
     if "num_satellite_used" not in dset.fields:
-        dset.add_float("num_satellite_used", val=gnss.get_number_of_satellites(dset))
+        dset.add_float(
+                "num_satellite_used", 
+                val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time),
+        )
 
     # Put together fields in an array as specified by the 'dtype' tuple list
     output_list = list()

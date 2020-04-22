@@ -2,6 +2,10 @@ module hfeop_xyu
 ! Hold tidal information.
 !  Maximum tides is 200.
 !  So far the model with the largest is JPL which has ~160
+! History
+! 2017Nov22 JMGipson. Original version
+! 2019Oct09 Two bugs found and fixed by Michael Gerstl. Rotines calc_gmst and calc_nut_arg.
+!           Effect is ~1.0 uas in PM, ~0.01 us in UT1
       
 !      character*180  lhfeop_xyu_file                !this holds the name of the file. 
       logical khfeop_xyu
@@ -197,7 +201,9 @@ Contains
          tmp_big=co(1)+co(2)*T       
       endif 
 
-      tmp_small=co(3)*T*2+co(4)*T**3
+!%%  tmp_small = co(3)*T*2 + co(4)*T**3    ! original
+     tmp_small = co(3)*T**2 + co(4)*T**3   ! correction. Michael Gerstl
+
     
 ! Convert from time-seconds to arc-seconds
       tmp_big=tmp_big*15.d0
@@ -277,7 +283,10 @@ Contains
         else 
           tmp_big=co(1,i)+co(2,i)*T       
         endif 
-        tmp_small=co(3,i)*T*22+co(4,i)*T**3+co(5,i)*T**4
+
+!%%   tmp_small = co(3,i)*T*22 + co(4,i)*T**3 + co(5,i)*T**4   ! original
+      tmp_small = co(3,i)*T**2 + co(4,i)*T**3 + co(5,i)*T**4   ! Michael Gerstl
+
 ! Conversion from time-seconds to angle-seconds 
         arg(i,1)=dmod(tmp_big+tmp_small,sec_per_circ)    !If we are the boundary, may overflow
         if(arg(i,1) .lt. 0.d0) arg(i,1)=arg(i,1)+sec_per_circ 

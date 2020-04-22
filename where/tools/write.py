@@ -27,9 +27,10 @@ Furthermore, the following options are recognized:
 Option               Description
 ===================  ===========================================================
 --doy                Specify date as <year day-of-year>.
---dset_id=           Dataset identifier (Default: 'last').
+--label=             Dataset label (Default: 'last').
 --id=                Analysis identifier (Default: '').
 --session=           Session name (Default: '').
+--station=           Station name (Default: '').
 -h, --help           Show this help message and exit.
 ===================  ===========================================================
 
@@ -41,44 +42,42 @@ Read Where dataset and write Where datasets fields via a defined writer.
 Example:
 --------
 
-  {exe:tools} write 2018 10 26 --sisre --stage=calculate --dset_id=1 --id='grc_inav_e1_std_sat' --writers=sisre_plot
-  {exe:tools} write 2019 2 1 --gnss --session=stas --stage=estimate --dset_id=last --writers=gnss_report
+  {exe:tools} write 2018 10 26 --sisre --stage=calculate --label=1 --id='grc_inav_e1_std_sat' --writers=sisre_plot
+  {exe:tools} write 2019 2 1 --gnss --station=stas --stage=estimate --writers=gnss_report
 """
 # Midgard imports
 from midgard.dev import plugins
 from midgard.writers import write as write_
 
 # Where imports
+from where.data import dataset3 as dataset
 from where.lib import config
-from where import data
 from where.lib import log
 from where.lib import util
 
 
 @plugins.register
-def write(rundate: "datedoy", tech: "pipeline", stage: "option", writers: "option"):
+def write(rundate: "datedoy", pipeline: "pipeline", stage: "option", writers: "option"):
     log.init(log_level="info")
 
     # Get options
-    writer_names = writers.replace(",", " ").split()
-    dataset_id = util.read_option_value("--dset_id", default="last")
-    dataset_id = "last" if dataset_id == "last" else int(dataset_id)
-    identifier = util.read_option_value("--id", default="")
-    identifier = f"-{identifier}" if identifier else ""
+    label = util.read_option_value("--label", default="None")
+    # TODO: label = "last" if label == "last" else label
+    id_ = util.read_option_value("--id", default="")
     session = util.read_option_value("--session", default="")
+    station = util.read_option_value("--station", default="")
+    writers = writers.replace(",", " ").split()
 
-    dset = data.Dataset(
-        rundate=rundate, tech=tech, stage=stage, id=identifier, dataset_name=session, dataset_id=dataset_id
-    )
+    dset_vars = dict(pipeline=pipeline, stage=stage, session=session, station=station, label=label, id=id_)
 
-    path_hdf5 = config.files.path("dataset_hdf5", file_vars=dset.vars)
-    path_json = config.files.path("dataset_json", file_vars=dset.vars)
-    log.info(f"Read Where dataset files {path_hdf5} and {path_json}.")
-
-    if dset.num_obs == 0:
-        log.fatal(f"No data to read for date {rundate}.")
+    try:
+        dset = dataset.Dataset.read(**dict(dset_vars, rundate=rundate))
+        path = config.files.path("dataset", file_vars={**dset.vars, **dset.analysis})
+        log.info(f"Read Where dataset files {path}.")
+    except OSError as err:
+        log.fatal(f"Unable to read data for {rundate}: {err}")
 
     # Loop over writers
-    for writer in writer_names:
+    for writer in writers:
         log.info(f"Apply writer '{writer}'.")
         write_(writer, dset=dset)

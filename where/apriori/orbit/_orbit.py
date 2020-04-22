@@ -9,12 +9,13 @@ Implementations of apriori orbits should inherit from `AprioriOrbit` and define 
 """
 # Standard library imports
 import datetime
-from typing import Any, Dict, List, Union
+from typing import Any, Dict
 
 # External library imports
 import numpy as np
 
 # Midgard imports
+from midgard.dev import exceptions
 from midgard.math.constant import constant
 
 # Where imports
@@ -22,7 +23,6 @@ from where.lib import config
 from where.data import dataset3 as dataset
 from where.lib import log
 from where.lib import util
-from where.data import position
 
 
 class AprioriOrbit:
@@ -34,8 +34,6 @@ class AprioriOrbit:
     def __init__(
         self,
         rundate: datetime.date,
-        time: Union[None, "TimeTable"] = None,
-        satellite: Union[None, List[str]] = None,
         **kwargs: Dict[str, Any],
     ) -> None:
         """Set up a new AprioriOrbit object, does not parse any data
@@ -44,20 +42,16 @@ class AprioriOrbit:
 
         Args:
             rundate:    Date of model run.
-            time:       Time epochs at the satellite for which to calculate the apriori orbit.
-            satellite:  Strings with names of satellites.
         """
         # MURKS: Should it be done like that. The technique is normally not given for unittest routines (like
         #       test_broadcast.py).
         try:
             pipeline = config.analysis.pipeline.str
-        except AttributeError:
+        except (AttributeError, exceptions.MissingSectionError):
             pipeline = None
 
         self.rundate = rundate
         self.pipeline = pipeline
-        self.time = time
-        self.satellite = satellite
 
         self._dset_raw = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage=self.name, label="raw")
         self._dset_edit = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage=self.name, label="edit")

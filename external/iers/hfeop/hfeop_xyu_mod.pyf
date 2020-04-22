@@ -13,7 +13,7 @@ python module hf_eop ! in
             real*8 dimension(200) :: tide_period
             real*8 dimension(2,4,200) :: tide_coef
             subroutine import_tides_xyu(lhfeop_file) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
-                character*80, intent(in) :: lhfeop_file
+                character*80 :: lhfeop_file
             end subroutine import_tides_xyu
             subroutine calc_hf_eop_xyu(rmjd_tt,delta_t,eop) ! in :hf_eop:hfeop_xyu_mod.f90:hfeop_xyu
                 real*8, intent(in) :: rmjd_tt

@@ -35,8 +35,12 @@ def apply_observation_rejectors(config_key: str, dset: "Dataset", independent: b
     """Apply all configured observation rejectors
 
     Args:
-        config_key:  The configuration key listing which rejectors to apply.
-        dset:        Dataset containing analysis data.
+        config_key:     The configuration key listing which rejectors to apply.
+        dset:           Dataset containing analysis data.
+        independent:    Flag to indicate whether the rejectors are applied independently or sequentially
+
+    Returns:
+        Dataset with rejected observation
     """
     prefix = dset.vars["pipeline"]
     rejectors = config.tech[config_key].list

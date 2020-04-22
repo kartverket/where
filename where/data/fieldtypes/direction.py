@@ -18,7 +18,6 @@ from where.data._direction import DirectionArray
 class DirectionField(FieldType):
 
     _subfields = DirectionArray.fieldnames()
-    _plotfields = DirectionArray.plot_fields()
     _factory = staticmethod(Direction)
 
     def _post_init(self, val, **dir_args):

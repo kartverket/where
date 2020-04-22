@@ -576,7 +576,7 @@ class Eop:
         else:
             interp_values = {d: ip(self.time.utc.mjd_frac) for d, ip in interpolators.items()}
 
-        if self.time.size == 1:
+        if self.time.ndim == 0:
             return interp_values[self.time.utc.mjd_int]
 
         values = np.empty(self.time.size)

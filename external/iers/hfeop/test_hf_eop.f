@@ -45,10 +45,10 @@
       else if(j .eq. 4) then
         lhfeop_file="../models/2017a_astro_xyu.txt"
         leop_out="2017a_astro_xyu.out"
-      else if(j .eq. 3) then
+      else if(j .eq. 5) then
         lhfeop_file="../models/fes2012_xyu.txt"
         leop_out="fes2012_xyu.out"
-      else if(j .eq. 4) then
+      else if(j .eq. 6) then
         lhfeop_file= "../models/madzak_xyu.txt"
         leop_out="madzak_xyu.out"        
       endif 

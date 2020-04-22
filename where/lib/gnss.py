@@ -252,30 +252,6 @@ def get_flight_time(dset):
     return geometric_range / constant.c
 
 
-def get_number_of_satellites(dset: "Dataset") -> np.ndarray:
-    """Get number of satellites per epoch
-
-    Args:
-        dset:  A dataset containing the data.
-
-    Returns:
-        Number of satellites per epoch
-    """
-    num_satellite = np.zeros((dset.num_obs))
-
-    for sys in dset.unique("system"):
-        idx_sys = dset.filter(system=sys)
-        num_satellite_epoch = np.zeros((len(dset.system[idx_sys])))
-
-        for time in dset.unique("time"):
-            idx = dset.time.datetime[idx_sys] == time.datetime
-            num_satellite_epoch[idx] = len(dset.satellite[idx_sys][idx])
-
-        num_satellite[idx_sys] = num_satellite_epoch
-
-    return num_satellite
-
-
 def obstype_to_freq(sys, obstype):
     """Get GNSS frequency based on given GNSS observation type
 
@@ -490,16 +466,15 @@ def linear_combination(type_: str, dset: "Dataset") -> Tuple[np.ndarray]:
             L2 = dset.meta["obstypes"][sys][3]  # Carrier phase observation for 2nd frequency
         else:
             log.fatal(f"Linear combination determination is not defined for observation code {observation_code}.")
-
         if type_ == "ionosphere-free":
             if "code" in observation_code:
                 f1 = getattr(enums, "gnss_freq_" + sys)["f" + C1[1]]  # Frequency of 1st band
                 f2 = getattr(enums, "gnss_freq_" + sys)["f" + C2[1]]  # Frequency of 2nd band
-                code_obs_combined[idx] = ionosphere_free_linear_combination(dset[C1][idx], dset[C2][idx], f1, f2)
+                code_obs_combined[idx] = ionosphere_free_linear_combination(dset.obs[C1][idx], dset.obs[C2][idx], f1, f2)
             elif "phase" in observation_code:
                 f1 = getattr(enums, "gnss_freq_" + sys)["f" + L1[1]]  # Frequency of 1st band
                 f2 = getattr(enums, "gnss_freq_" + sys)["f" + L2[1]]  # Frequency of 2nd band
-                phase_obs_combind[idx] = ionosphere_free_linear_combination(dset[L1][idx], dset[L2][idx], f1, f2)
+                phase_obs_combind[idx] = ionosphere_free_linear_combination(dset.obs[L1][idx], dset.obs[L2][idx], f1, f2)
         else:
             log.fatal(f"Linear combination type '{type_}' is not defined.")
 

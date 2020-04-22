@@ -7,6 +7,7 @@ Description:
 
 """
 # Standard library imports
+from collections import namedtuple
 from datetime import datetime
 from typing import List, Tuple, Union
 
@@ -17,18 +18,86 @@ import pandas as pd
 # Midgard imports
 from where.data import position
 from midgard.dev import plugins
+from midgard.gnss import gnss
 from midgard.plot.matplotlib_extension import plot_scatter_subplots, plot
+from midgard.writers._writers import get_existing_fields_by_attrs, get_field_by_attrs
 
 # Where imports
 from where.data import dataset3 as dataset
 from where.lib import config
-from where.lib import gnss
 from where.lib import log
 from where.writers._report import Report
 
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
+
+PlotField = namedtuple(
+    "PlotField", ["name", "attrs", "unit", "ylabel", "caption"]
+)
+PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
+PlotField.__doc__ = """A convenience class for defining a output field for plotting
+
+    Args:
+        name  (str):             Unique name
+        attrs (Tuple[str]):      Dataset field attributes
+        unit (str):              Unit of field
+        ylabel (str):            Y-axis label description
+        caption (str):           Caption of plot
+    """
+
+FIELDS = (
+
+    PlotField(
+        "gnss_range",
+        ("delay", "gnss_range"),
+        "m",
+        "Range",
+        "Correction of range between satellite and receiver",
+    ),
+    PlotField(
+        "gnss_satellite_clock",
+        ("delay", "gnss_satellite_clock"),
+        "m",
+        "Satellite clock",
+        "Correction of satellite clock",
+    ),
+    PlotField(
+        "troposphere_radio",
+        ("delay", "troposphere_radio"),
+        "m",
+        "Troposphere delay",
+        "Correction of tropospheric delay",
+    ),
+    #PlotField(
+    #    "gnss_total_group_delay",
+    #    ("delay", "gnss_total_group_delay"),
+    #    "m",
+    #    "Total group delay",
+    #    "Correction of total group delay",
+    #),
+    #PlotField(
+    #    "gnss_ionosphere",
+    #    ("delay", "gnss_ionosphere"),
+    #    "m",
+    #    "Ionospheric delay",
+    #    "Correction of ionospheric delay",
+    #),
+    PlotField(
+        "gnss_relativistic_clock",
+        ("delay", "gnss_relativistic_clock"),
+        "m",
+        "Relativistic clock",
+        "Correction of relativistic clock effect due to orbit eccentricity",
+    ),
+#    PlotField(
+#        "estimate_gnss_rcv_clock",
+#        ("estimate_gnss_rcv_clock",),
+#        "m",
+#        "Receiver clock estimate",
+#        "Estimate of receiver clock",
+#    ),
+)
 
 
 @plugins.register
@@ -38,14 +107,13 @@ def gnss_report(dset: "Dataset") -> None:
     Args:
         dset:        A dataset containing the data.
     """
-
     # TODO: Better solution?
     if "station" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
         dset.vars["station"] = ""
         dset.vars["STATION"] = ""
-
+        
     # Generate figure directory to save figures generated for GNSS report
-    figure_dir = config.files.path("output_gnss_report_figure", file_vars=dset.vars)
+    figure_dir = config.files.path("output_gnss_report_figure", file_vars={**dset.vars, **dset.analysis})
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
@@ -55,12 +123,13 @@ def gnss_report(dset: "Dataset") -> None:
     _plot_satellite_overview(dset, figure_dir)
     _plot_skyplot(dset, figure_dir)
     _plot_satellite_elevation(dset, figure_dir)
+    _plot_model(dset, figure_dir)
 
     if "pdop" in dset.fields:
         _plot_dop(dset, figure_dir)
 
     # Generate GNSS report
-    path = config.files.path("output_gnss_report", file_vars=dset.vars)
+    path = config.files.path("output_gnss_report", file_vars={**dset.vars, **dset.analysis})
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="GNSS analysis")
         rpt.title_page()
@@ -110,12 +179,14 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     rpt.add_text("\n# GNSS residual\n\n")
 
     # Add outlier table
-    rpt.write_dataframe_to_markdown(_table_outlier_overview(dset))
+    #MURKS: does not work at the moment. complement_with is not implemented in Dataset v3.
+    #MURKS rpt.write_dataframe_to_markdown(_table_outlier_overview(dset))
 
     # Plot residuals
     rpt.add_figure(
         f"{figure_dir}/plot_residual.{FIGURE_FORMAT}",
-        caption="Post-fit residuals, whereby the red dots represents the rejected outliers. The histogram represent only number of residuals from kept observations.",
+        #MURKScaption="Post-fit residuals, whereby the red dots represents the rejected outliers. The histogram represent only number of residuals from kept observations.",
+        caption="Post-fit residuals.",
         clearpage=True,
     )
 
@@ -152,6 +223,14 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     rpt.add_figure(
         f"{figure_dir}/plot_satellite_elevation.{FIGURE_FORMAT}", caption="Satellite elevation", clearpage=True
     )
+    
+    #
+    # Model parameter plots
+    #
+    rpt.add_text("\n# Plots of model parameters\n\n")
+
+    for f in get_existing_fields_by_attrs(dset, FIELDS): 
+        rpt.add_figure(f"{figure_dir}/plot_{f.name}.{FIGURE_FORMAT}", caption=f.caption, clearpage=False)
 
 
 #
@@ -222,8 +301,8 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
             "histogram": "x, y",
             "plot_to": "file",
             "title": "Horizontal error",
-            "xlim": [-4, 4],
-            "ylim": [-4, 4],
+            "xlim": [-8, 8],
+            "ylim": [-8, 8],
         },
     )
 
@@ -307,7 +386,10 @@ def _plot_number_of_satellites(dset: "Dataset", figure_dir: "pathlib.PosixPath")
     """
 
     if "num_satellite_used" not in dset.fields:
-        dset.add_float("num_satellite_used", val=gnss.get_number_of_satellites(dset))
+        dset.add_float(
+                "num_satellite_used", 
+                val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time),
+        )
 
     plot(
         x_arrays=[dset.time.gps.datetime, dset.time.gps.datetime],
@@ -471,6 +553,54 @@ def _plot_satellite_overview(dset: "Dataset", figure_dir: "pathlib.PosixPath") -
         },
     )
 
+    
+def _plot_model(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
+    """Plot model parameters
+
+    Args:
+       dset:        A dataset containing the data.
+       figure_dir:  Figure directory
+    """
+    
+    # Limit x-axis range to rundate
+    day_start, day_end = _get_day_limits(dset)
+    
+    
+    for f in get_existing_fields_by_attrs(dset, FIELDS): 
+
+        # Generate x- and y-axis data per satellite
+        x_arrays = []
+        y_arrays = []
+        labels = []
+    
+        for sat in dset.unique("satellite"):
+            idx = dset.filter(satellite=sat)
+            x_arrays.append(dset.time.gps.datetime[idx])
+            y_arrays.append(get_field_by_attrs(dset, f.attrs, f.unit)[idx])
+            labels.append(sat)
+        
+        # Plot with scatter plot
+        plot(
+            x_arrays=x_arrays,
+            y_arrays=y_arrays,
+            xlabel="Time [GPS]",
+            ylabel=f.ylabel,
+            y_unit=f.unit,
+            labels=labels,
+            figure_path=figure_dir / f"plot_{f.name}.{FIGURE_FORMAT}",
+            opt_args={
+                "colormap": "tab20",
+                "figsize": (7, 6),
+                "legend": True,
+                "legend_ncol": 6,
+                "legend_location": "bottom",
+                "plot_to": "file",
+                "plot_type": "scatter",
+                "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                "xlim": [day_start, day_end],
+            },
+        )
+
 
 #
 # TABLE GENERATION FUNCTIONS
@@ -552,19 +682,17 @@ def _get_outliers_dataset(dset: "Dataset") -> "Dataset":
     """
 
     # Get Dataset where no outliers are rejected
-    dset_complete = dataset.Dataset(
-        rundate=dset.analysis["rundate"],
-        pipeline=dset.vars["pipeline"],
-        stage="calculate",
-        station=dset.vars["station"],
-    )
+    dset_vars = {**dset.vars, **dset.analysis}
+    dset_vars["stage"] = "calculate"
+    dset_complete = dataset.Dataset.read(**dset_vars)
 
     if dset_complete.num_obs == 0:
         # NOTE: This is the case for concatencated Datasets, where "calculate" stage data are not available.
         return 1
 
     # Get relative complement, which corresponds to "outlier" dataset
-    dset_outliers = dset_complete.complement_with(dset, complement_by=["time", "satellite"])
+    #dset_outliers = dset_complete.complement_with(dset, complement_by=["time", "satellite"])
+    dset_outliers = dataset.Dataset(num_obs=0) #MURKS: complement_with does not exists so far in Dataset v3.
 
     return dset_outliers
 
@@ -582,7 +710,9 @@ def _get_dataset(dset: "Dataset", stage: str, systems: Union[List[str], None] = 
 
     # Get Dataset
     # TODO: "label" should have a default value.
-    dset_out = dset.read(rundate=dset.analysis["rundate"], pipeline=dset.vars["pipeline"], stage=stage, label="None")
+    dset_vars = {**dset.vars, **dset.analysis}
+    dset_vars["stage"] = stage
+    dset_out = dataset.Dataset.read(**dset_vars)
 
     # Reject not defined GNSS observations
     if systems:

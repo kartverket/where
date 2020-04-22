@@ -51,7 +51,9 @@ def gnss_spv_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     dset_first.vars["solution"] = config.tech.gnss_spv_comparison_report.solution.str.lower()
 
     # Generate figure directory to save figures generated for GNSS report
-    figure_dir = config.files.path("output_gnss_spv_comparison_report_figure", file_vars=dset_first.vars)
+    figure_dir = config.files.path(
+        "output_gnss_spv_comparison_report_figure", file_vars={**dset_first.vars, **dset_first.analysis}
+    )
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
@@ -59,9 +61,11 @@ def gnss_spv_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     _plot_velocity_error(dfs_day, dfs_month, figure_dir, dset_first.vars)
 
     # Generate GNSS comparison report
-    path = config.files.path("output_gnss_spv_comparison_report", file_vars=dset_first.vars)
+    path = config.files.path("output_gnss_spv_comparison_report", file_vars={**dset_first.vars, **dset_first.analysis})
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
-        rpt = Report(fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of GNSS SPV analyses")
+        rpt = Report(
+            fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of GNSS SPV analyses"
+        )
         rpt.title_page()
         _add_to_report(rpt, figure_dir, dfs_day, dfs_month, dset_first.vars)
         rpt.markdown_to_pdf()
@@ -95,17 +99,17 @@ def _add_to_report(
                 dfs_day[field].index = dfs_day[field].index.strftime("%d-%m-%Y")
 
             rpt.add_text("Daily 95th percentile 2D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_day["2d_vel"], format="6.2f", statistic=True)
+            rpt.write_dataframe_to_markdown(dfs_day["2d_vel"], format="6.3f", statistic=True)
 
             rpt.add_text("Daily 95th percentile 3D velocity in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_day["3d_vel"], format="6.2f", statistic=True)
+            rpt.write_dataframe_to_markdown(dfs_day["3d_vel"], format="6.3f", statistic=True)
 
         elif sample_name == "Monthly":
             rpt.add_text("Monthly 95th percentile 2D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_month["2d_vel"], format="6.2f")
+            rpt.write_dataframe_to_markdown(dfs_month["2d_vel"], format="6.3f")
 
             rpt.add_text("Monthly 95th percentile 3D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_month["3d_vel"], format="6.2f")
+            rpt.write_dataframe_to_markdown(dfs_month["3d_vel"], format="6.3f")
 
         # Add 2D and 3D velocity plots
         rpt.add_figure(
@@ -269,19 +273,23 @@ def _plot_velocity_error(
         # Loop over fields to plot
         for field in ["2d_vel", "3d_vel"]:
 
-            if field == "2d_vel":
-                opt_args["ylim"] = [0.0, 1.0]
-            elif field == "3d_vel":
-                opt_args["ylim"] = [0.0, 1.0]
+            # if field == "2d_vel":
+            #    opt_args["ylim"] = [0.0, 0.2]
+            # elif field == "3d_vel":
+            #    opt_args["ylim"] = [0.0, 0.2]
 
             # Generate x- and y-arrays for plotting
             x_arrays = []
             y_arrays = []
             labels = []
             for station in sample_data[field].columns:
-                if sample_name == "monthly":
-                    opt_args.update({"xlim": "auto", "ylim": [0.0, 3.0]})
-                x_data = sample_data[field].index.to_pydatetime() if isinstance(sample_data[field].index, pd.core.indexes.datetimes.DatetimeIndex) else sample_data[field].index
+                # if sample_name == "monthly":
+                #    opt_args.update({"xlim": "auto", "ylim": [0.0, 3.0]})
+                x_data = (
+                    sample_data[field].index.to_pydatetime()
+                    if isinstance(sample_data[field].index, pd.core.indexes.datetimes.DatetimeIndex)
+                    else sample_data[field].index
+                )
                 x_arrays.append(list(x_data))
                 y_arrays.append(list(sample_data[field][station]))
                 labels.append(station.upper())

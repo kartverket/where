@@ -71,6 +71,7 @@ import numpy as np
 # Midgard imports
 from midgard.dev import plugins
 from midgard.writers import write
+from midgard.dev.timer import Timer
 
 # Where imports
 from where import pipelines
@@ -97,10 +98,7 @@ def concatenate(from_date: "datedoy", to_date: "datedoy", pipeline: "pipeline", 
     config.where.update_from_options(_clean_sys_argv(pipeline))
 
     dset_vars = dict(pipeline=pipeline, stage=stage, session=session, station=station, label=label, id=id_)
-    dset_vars = config.create_file_vars(rundate=from_date, **dset_vars)
-
     dset = _concatenate_datasets(from_date, to_date, dset_vars, only_for_rundate)
-    dset.vars.update(dset_vars) # Necessary for example for getting correct file path in used writers.
     if dset.num_obs == 0:
         log.fatal(f"No data to read period from {from_date} to {to_date}.")
     dset.write()
@@ -131,34 +129,34 @@ def _concatenate_datasets(
         dset_vars:         Common Dataset variables.
         only_for_rundate:  Concatenate only data for given rundate.
     """
-    merged_vars = dset_vars.copy()
-    merged_vars["id"] += "_concatenated"
-    dset_merged = dataset.Dataset(**dict(merged_vars, rundate=from_date, empty=True))
 
-    date_to_read = from_date
+    def read_dset(rundate):
+        with Timer(f"Finish read of day {rundate} in", logger=log.time):
+            try:
+                log.info(f"Reading data for {rundate}")
+                return dataset.Dataset.read(**dict(dset_vars, rundate=rundate))
+            except OSError as err:
+                log.warn(f"Unable to read data for {rundate}: {err}")
+                return dataset.Dataset()
+
+    dset_merged = read_dset(from_date)
+
+    date_to_read = from_date + timedelta(days=1)
     while date_to_read <= to_date:
-        dset = dataset.Dataset().read(**dict(dset_vars, rundate=date_to_read))
 
-        current_date = date_to_read
-        date_to_read += timedelta(days=1)
-
-        if dset.num_obs == 0:
-            log.info(f"No data to read for {current_date}")
-            continue
+        dset = read_dset(date_to_read)
 
         if only_for_rundate:
             _keep_data_only_for_rundate(dset)
 
             if dset.num_obs == 0:
-                log.info(f"No data to read for {current_date}")
-                continue
+                log.warn(f"No data to for {date_to_read} in dataset")
 
-        log.info(f"Reading data for {current_date}")
-        if not dset_merged:
-            dset_merged.update_from(dset)
-        else:
+        with Timer(f"Finish extend for day {date_to_read} in", logger=log.time):
             dset_merged.extend(dset)
+        date_to_read += timedelta(days=1)
 
+    dset_merged.vars.update(id="_concatenated")
     return dset_merged
 
 

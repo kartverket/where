@@ -26,7 +26,7 @@ Important: Bad satellites has to be removed from observation Dataset!!!! E.g. in
 
 
 $Revision: 18916 $
-$Date: 2020-01-21 14:50:27 +0100 (Tue, 21 Jan 2020) $
+$Date: 2020-01-21 14:50:27 +0100 (ti., 21 jan. 2020) $
 $LastChangedBy: kirann $
 
 """

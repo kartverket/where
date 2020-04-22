@@ -8,7 +8,8 @@ asdf
 
 """
 # Standard library imports
-from typing import Any, Dict, List, Tuple, Union
+import pathlib
+from typing import List, Tuple
 
 # External library imports
 import pandas as pd
@@ -45,8 +46,10 @@ def rinex_obs_report(dset: "Dataset") -> None:
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
+    df_system, df_obstype = _generate_dataframes(dset)
     _plot_scatter_satellite_availability(dset, figure_dir)
-    _table_observation_overview(dset)
+    _plot_observation_system(df_system, figure_dir)
+    _plot_observation_type(df_obstype, figure_dir)
 
     # Generate RINEX observation file report
     path = config.files.path("output_rinex_obs_report", file_vars=dset.vars)
@@ -54,8 +57,7 @@ def rinex_obs_report(dset: "Dataset") -> None:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="RINEX observation file analysis")
         rpt.title_page()
         rpt.write_config()
-        # TODO _add_figures(dset, rpt, figure_dir)
-        _add_tables(dset, rpt, figure_dir)
+        _add_to_report(rpt, figure_dir, df_system, df_obstype)
         rpt.markdown_to_pdf()
 
 
@@ -76,78 +78,61 @@ def _add_figures(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath"
         rpt.add_figure(f"{figure_dir}/{figure_name}", caption, clearpage=True)
 
 
-def _add_tables(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath") -> None:
-    """Add tables and related plots to report
+def _add_to_report(
+        rpt: "Report", 
+        figure_dir: pathlib.PosixPath,
+        df_system: pd.core.frame.DataFrame,
+        df_obstype: pd.core.frame.DataFrame,
+) -> None:
+    """Add figures and tables to report
 
     Args:
-        dset:        A dataset containing the data.
         rpt:         Report object.
         figure_dir:  Figure directory.
+        df_system:   Dataframe with GNSS observation overview in relation to GNSS. Indices are GNSS identifiers, e.g. 
+                     E, G, ..., osv.. 
+        df_obstype:  Dataframe with GNSS observation overview in relation to observation type. Indices are combination
+                     of GNSS identifier and observation type, e.g. 'G C1C' or 'E L8X'.
     """
-    # Generate tables
-    df_obstype, df_system = _table_observation_overview(dset)
+
 
     # Generate GNSS observation overview by system
     rpt.add_text("\n# GNSS observation overview by system\n\n")
     rpt.write_dataframe_to_markdown(df_system, format="6.0f")
 
-    path = figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}"
-    plot_bar_dataframe_columns(
-        df_system,
-        column="num_sat",
-        path=path,
-        xlabel="GNSS name",
-        ylabel="Number of satellites",
-        label="sys",
-        opt_args={"legend": False},
+    
+    rpt.add_figure(
+            figure_path=figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}", 
+            caption="Number of satellites for each GNSS.",
     )
-    rpt.add_figure(path, "Number of satellites for each GNSS.")
 
-    path = figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}"
-    plot_bar_dataframe_columns(
-        df_system,
-        column="num_obs",
-        path=path,
-        xlabel="GNSS name",
-        ylabel="Number of observations",
-        label="sys",
-        opt_args={"legend": False},
+    rpt.add_figure(
+            figure_path=figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}", 
+            caption="Number of observations for each GNSS.", 
+            clearpage=True,
     )
-    rpt.add_figure(path, "Number of observations for each GNSS.", clearpage=True)
 
     # Generate GNSS observation overview by observation type
     rpt.add_text("\n# GNSS observation overview by observation type\n\n")
     rpt.write_dataframe_to_markdown(df_obstype, format="6.0f")
 
-    path = figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}"
-    plot_bar_dataframe_columns(
-        df_obstype,
-        column="num_sat",
-        path=path,
-        xlabel="Observation type",
-        ylabel="Number of satellites",
-        label="sys",
-        opt_args={"figsize": (15, 10), "fontsize": 16},
-    )
-    rpt.add_figure(path, "Number of satellites for each GNSS observation type.")
 
-    path = figure_dir / f"plot_gnss_observation_type_overview.{FIGURE_FORMAT}"
-    plot_bar_dataframe_columns(
-        df_obstype,
-        column="num_obs",
-        path=path,
-        xlabel="Observation type",
-        ylabel="Number of observations",
-        label="sys",
-        opt_args={"figsize": (15, 10), "fontsize": 16},
+    rpt.add_figure(
+            figure_path=figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}",
+            caption="Number of satellites for each GNSS observation type.",
     )
-    rpt.add_figure(path, "Number of observations for each GNSS observation type.", clearpage=True)
+
+    rpt.add_figure(
+            figure_path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}", 
+            caption="Number of observations for each GNSS observation type.", 
+            clearpage=True,
+    )
 
 
 #
-# TABLE GENERATION FUNCTIONS
+# GENERATE DATAFRAMES
 #
-def _table_observation_overview(dset: "Dataset") -> Tuple[pd.core.frame.DataFrame, pd.core.frame.DataFrame]:
+def _generate_dataframes(dset: "Dataset") -> Tuple[pd.core.frame.DataFrame, pd.core.frame.DataFrame]:
     """Generate Dataframe table with overview over number of observations
 
     Args:
@@ -158,10 +143,10 @@ def _table_observation_overview(dset: "Dataset") -> Tuple[pd.core.frame.DataFram
 
         | Name        | Type       | Description                                                                     |
         |-------------|----------------------------------------------------------------------------------------------|
-        | df_obstype  | np.ndarray | GNSS observation overview in relation to observation type. Indices are          |
-        |             |            | combination of GNSS identifier and observation type, e.g. 'G C1C' or 'E L8X'    |
         | df_system   | np.ndarray | GNSS observation overview in relation to GNSS. Indices are GNSS identifiers,    |
         |             |            | e.g. E, G, ..., osv.                                                            |
+        | df_obstype  | np.ndarray | GNSS observation overview in relation to observation type. Indices are          |
+        |             |            | combination of GNSS identifier and observation type, e.g. 'G C1C' or 'E L8X'    |
         
         whereby following columns are defined:
 
@@ -171,7 +156,16 @@ def _table_observation_overview(dset: "Dataset") -> Tuple[pd.core.frame.DataFram
         | num_sat     | Number of satellites                                                                         |
         | num_obs     | Number of observations                                                                       |
 
-        Example for df_obstype:
+        Example for df_system:
+
+            | index | sys | num_sat | num_obs |
+            |-------|-----|---------|---------|
+            |     C |  C  |      23 |   11949 |
+            |     E |  E  |      21 |   26072 | 
+            |     G |  G  |      31 |   33958 |
+            |     R |  R  |      23 |   30391 |
+            
+        and for df_obstype:
 
             | index | sys | num_sat | num_obs |
             |-------|-----|---------|---------|
@@ -182,15 +176,6 @@ def _table_observation_overview(dset: "Dataset") -> Tuple[pd.core.frame.DataFram
             | E C1X |  E  |      21 |    2151 |
             | E C5X |  E  |      20 |    2066 |
             |   ... | ... |     ... |     ... |
-
-        and for df_system:
-
-            | index | sys | num_sat | num_obs |
-            |-------|-----|---------|---------|
-            |     C |  C  |      23 |   11949 |
-            |     E |  E  |      21 |   26072 | 
-            |     G |  G  |      31 |   33958 |
-            |     R |  R  |      23 |   30391 |
       
     """
     df = dset.as_dataframe()
@@ -225,13 +210,16 @@ def _table_observation_overview(dset: "Dataset") -> Tuple[pd.core.frame.DataFram
         ]
         df_system = df_system.append(pd.DataFrame([row], columns=columns, index=[gnss_name]))
 
-    return df_obstype, df_system
+    return df_system, df_obstype
 
 
 #
 # PLOT FUNCTIONS
 #
-def _plot_scatter_satellite_availability(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
+def _plot_scatter_satellite_availability(
+        dset: "Dataset", 
+        figure_dir: pathlib.PosixPath,
+) -> None:
     """Generate GNSS satellite observation availability overview based on RINEX observation file
 
     Args:
@@ -266,6 +254,72 @@ def _plot_scatter_satellite_availability(dset: "Dataset", figure_dir: "pathlib.P
             "plot_type": "scatter",
             "title": "Satellite availability",
         },
+    )
+    
+  
+def _plot_observation_system(
+        df_system: pd.core.frame.DataFrame,
+        figure_dir: pathlib.PosixPath,
+) -> None:
+    """Plot observation system plots
+
+    Args:
+       df_system:   Dataframe with GNSS observation overview in relation to GNSS. Indices are GNSS identifiers, e.g. 
+                    E, G, ..., osv..                               
+       figure_dir:  Figure directory
+    """ 
+     
+    plot_bar_dataframe_columns(
+        df_system,
+        column="num_sat",
+        path=figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}",
+        xlabel="GNSS name",
+        ylabel="Number of satellites",
+        label="sys",
+        opt_args={"legend": False},
+    )
+    
+    plot_bar_dataframe_columns(
+        df_system,
+        column="num_obs",
+        path=figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}",
+        xlabel="GNSS name",
+        ylabel="Number of observations",
+        label="sys",
+        opt_args={"legend": False},
+    )
+    
+    
+def _plot_observation_type(
+        df_obstype: pd.core.frame.DataFrame,
+        figure_dir: pathlib.PosixPath,
+) -> None:
+    """Plot observation type plots
+
+    Args:
+       df_obstype:  Dataframe with GNSS observation overview in relation to observation type. Indices are combination
+                    of GNSS identifier and observation type, e.g. 'G C1C' or 'E L8X'.
+       figure_dir:  Figure directory
+    """    
+
+    plot_bar_dataframe_columns(
+        df_obstype,
+        column="num_sat",
+        path=figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}",
+        xlabel="Observation type",
+        ylabel="Number of satellites",
+        label="sys",
+        opt_args={"figsize": (15, 10), "fontsize": 16},
+    )
+    
+    plot_bar_dataframe_columns(
+        df_obstype,
+        column="num_obs",
+        path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}",
+        xlabel="Observation type",
+        ylabel="Number of observations",
+        label="sys",
+        opt_args={"figsize": (15, 10), "fontsize": 16},
     )
 
 

@@ -1,9 +1,11 @@
-"""Create a map showing all sites in analysis and some simple statistics
+"""Create a web map showing all sites in analysis and some simple statistics
 
 Description:
 ------------
 
-asdf
+The web map is based on folium and shows the position of each site in the dataset.
+The colors in the plot indicate the RMS of the individual stations and baselines.
+The line width in the plot indicate the number of observations on the baseline.
 
 """
 
@@ -25,7 +27,8 @@ from where.lib import log
 
 @plugins.register
 def web_map_writer(dset):
-    file_path = config.files.path("output_web_map", file_vars=dset.vars)
+    file_vars = {**dset.vars, **dset.analysis}
+    file_path = config.files.path("output_web_map", file_vars=file_vars)
     log.info(f"Storing a web map at '{file_path}'. Open in a browser to look at it")
 
     sites = read_site_latlons(dset)
@@ -36,11 +39,7 @@ def web_map_writer(dset):
 def read_site_latlons(dset):
     sites = dict()
     for station in dset.unique("station"):
-        for _ in dset.for_each_suffix("station"):
-            llh = dset.first("site_pos.llh", station=station)
-            if llh is not None:
-                sites[station] = (llh[0] * Unit.rad2degree, llh[1] * Unit.rad2degree)
-
+        sites[station] = (dset.meta[station]["latitude"] * Unit.rad2deg, dset.meta[station]["longitude"] * Unit.rad2deg)
     return sites
 
 

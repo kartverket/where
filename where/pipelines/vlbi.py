@@ -208,6 +208,79 @@ def file_vars():
 def log_prefix(rundate, session="", **kwargs):
     return f"{pipeline.upper()} {session} {rundate:%Y-%m-%d}"
 
+def _matplotlib_map(dset):
+    # Local imports since only this function uses plotting
+    import cartopy.crs as ccrs
+    from matplotlib import cm
+    import matplotlib.pyplot as plt
+
+    stations = dset.unique("station")
+    baselines = dset.unique("baseline")
+    b_width = {b: dset.num(baseline=b)/dset.num_obs*40 for b in baselines}
+    s_size = [int(dset.num(station=s)/dset.num_obs*400) for s in stations]
+
+    lat = np.degrees([dset.meta[station]["latitude"] for station in stations])
+    lon = np.degrees([dset.meta[station]["longitude"] for station in stations])
+
+    rms = [dset.rms("residual", station=station) for station in stations] if "residual" in dset._fields else None
+    plt.figure()
+    ax = plt.axes(projection=ccrs.Mollweide())
+    ax.set_global()
+    ax.coastlines()
+    cmap = cm.get_cmap(config.there.colormap.str)
+
+    for baseline in baselines:
+        sta_1, _, sta_2 = baseline.partition("/")
+        sta_1_lon = np.degrees(dset.meta[sta_1]["longitude"])
+        sta_2_lon = np.degrees(dset.meta[sta_2]["longitude"])
+        sta_1_lat = np.degrees(dset.meta[sta_1]["latitude"])
+        sta_2_lat = np.degrees(dset.meta[sta_2]["latitude"])
+        b_rms = dset.rms("residual", baseline=baseline) if "residual" in dset._fields else 0
+        color = cmap(b_rms)
+        plt.plot([sta_1_lon, sta_2_lon], [sta_1_lat, sta_2_lat],
+                c=color, linestyle='--', linewidth=b_width[baseline],
+                transform=ccrs.Geodetic(), zorder=0,
+        )
+    plt.scatter(lon, lat, c=rms, transform=ccrs.Geodetic(), cmap=cmap, s=s_size, zorder=10)
+    plt.title(f"{dset.meta['input']['session_code']}")
+    plt.figtext(0.99, 0.01, 'Size: number of observations', horizontalalignment='right') 
+    if rms is not None:
+        cbar = plt.colorbar()
+        cbar.set_label("RMS of residual [m]")
+
+    plt.show()
+
+
+@plugins.register_named("make_map")
+def make_map(dset):
+    """Plots station positions on a global map."""
+
+    web_map = config.where.get(
+        "web_map",
+        section=pipeline,
+        value=util.read_option_value("--web_map", default=None),  # TODO: add this to mg_config
+        default=False,
+    ).bool
+
+    if web_map:
+        import webbrowser     # Local import (Only needed if this function is called)
+        map_path = config.files.path("output_web_map", file_vars={**dset.vars, **dset.analysis})
+        if not map_path.exists():
+            writers.write_one("web_map", dset=dset)
+        webbrowser.open(map_path.as_uri())
+
+    plot_map = config.where.get(
+        "plot_map",
+        section=pipeline,
+        value=util.read_option_value("--plot_map", default=None),  # TODO: add this to mg_config
+        default=False,
+    ).bool
+
+    if plot_map:
+        _matplotlib_map(dset)
+
+
+### Stages
 
 @plugins.register
 def read(stage, dset):
@@ -322,12 +395,13 @@ def estimate(stage, dset):
 
     for iter_num in itertools.count(start=1):
         partial_vectors = estimation.partial_vectors(dset, "estimate_method")
+        obs_noise = dset.observed_delay_ferr ** 2 + np.nan_to_num(dset.iono_delay_ferr) ** 2 + 0.01 ** 2
         log.info(f"Estimating parameters for iteration {iter_num}")
         estimation.call(
             "estimate_method",
             dset=dset,
             partial_vectors=partial_vectors,
-            obs_noise=dset.observed_delay_ferr ** 2 + 0.01 ** 2,
+            obs_noise=obs_noise,
         )
         rms = dset.rms("residual")
         log.info(f"{dset.num_obs} observations, postfit residual = {rms:.4f}")

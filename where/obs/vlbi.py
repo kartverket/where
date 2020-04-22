@@ -36,7 +36,7 @@ def write_to_dataset(dset, rundate=None, session=None, obs_format=None, **obs_ar
 def _write_to_dataset(parser, dset, rundate, session):
 
     data = parser.as_dict()
-    # TODO: units on fields
+    units = data["meta"].get("units", {})
 
     # Session meta
     dset.meta.add("tech", "vlbi")
@@ -78,7 +78,8 @@ def _write_to_dataset(parser, dset, rundate, session):
             dset.add_text(field, val=values, multiplier=multiplier, write_level="operational")
         elif values.dtype.kind in {"f", "i"}:
             multiplier = -1 if field.endswith("_1") else 1
-            dset.add_float(field, val=values, multiplier=multiplier, write_level="operational")
+            unit = units.get(field, None)
+            dset.add_float(field, val=values, multiplier=multiplier, write_level="operational", unit=unit)
         elif values.dtype.kind in {"O"}:
             continue
         else:
