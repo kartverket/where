@@ -72,26 +72,28 @@ def calculate_initial_values(eph, rundate):
     Returns:
         eph:  Dict where the initial position and velocity is added
     """
-    pos_gcrs = np.empty((3, 0))
+
     times = np.empty((0))
-    table_of_positions = sorted(eph["positions"].items())
-    mjd1, mjd2 = zip(*[t for t, d in table_of_positions])
+    data = sorted(eph["positions"].items())
+    pos_itrs = np.zeros((len(data), 3))
+    mjd1, mjd2 = zip(*[t for t, d in data])
+    rotation_mat = rotation.trs2gcrs(time.Time(val=mjd1, val2=mjd2, fmt="mjd", scale="utc"))
+    tbl = time.Time(val=mjd1, val2=mjd2, fmt="mjd", scale="utc")
 
-    for pos_time, (_, data) in zip(time.Time(val=mjd1, val2=mjd2, fmt="mjd", scale="utc"), table_of_positions):
-        diffsec = (pos_time.utc.datetime - rundate).total_seconds()
-        # Only look at points close to rundate (start of integration)
-        # if abs(diffsec) > 4000:
-        #    continue
-        # Table given in ITRF coordinate system. Convert to GCRS, where the integration of the satellite orbit will
-        # be done
+    for i in range(0, len(data)):
+        pos_itrs[i] = data[i][1]["pos"]
 
-        pos_gcrs = np.hstack((pos_gcrs, np.transpose([rotation.trs2gcrs(pos_time) @ data["pos"]])))
-        times = np.hstack((times, diffsec))
+    diffsec = np.array([(t - rundate).total_seconds() for t in tbl.utc.datetime])
 
+    # Table given in ITRF coordinate system. Convert to GCRS, where the integration of the satellite orbit will
+    # be done
+
+    pos_gcrs = np.sum(rotation_mat @ pos_itrs[:, :, None], axis=2)
     log.info("Interpolating data from prediction file in order to get initial pos/vel")
     pos_gcrs_ip, vel_gcrs_ip = interpolation.interpolate_with_derivative(
-        times, np.transpose(pos_gcrs), np.array([0.0]), kind="lagrange", window=10, bounds_error=False
+        diffsec, pos_gcrs, np.array([0.0]), kind="lagrange", window=10, bounds_error=False
     )
     eph["initial_pos"] = pos_gcrs_ip[0]
     eph["initial_vel"] = vel_gcrs_ip[0]
+
     return eph
