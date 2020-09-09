@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Differentiate data between two give Datasets
+"""Differentiate data between two given Datasets
 
 Usage::
 
@@ -16,7 +16,7 @@ The following commands are required:
 Command              Description
 ===================  ===========================================================
 date                 The model run date in the format ``<year month day>``.
-{pipelines_doc:Plot results from}
+{pipelines_doc:Differenciate results from}
 --ids=               List with special analysis identifiers.
 --difference_by=     Name of fields to be used for differentiation of the two 
                      Datasets (e.g. 'time, satellite').
@@ -29,9 +29,9 @@ Furthermore, the following options are recognized:
 Option               Description
 ===================  ===========================================================
 --doy                Specify date as <year day-of-year>.
---dset_id=           Dataset identifier (Default: 'last').
---dset_name=         Dataset name (Default: '').
+--label=             Dataset label (Default: 'last').
 --session=           Session name (Default: '').
+--station=           Station name (Default: '').
 --writers=           List with writers.
 -h, --help           Show this help message and exit.
 ===================  ===========================================================
@@ -59,7 +59,7 @@ from where.lib import util
 
 
 @plugins.register
-def main(date: "datedoy", tech: "pipeline", ids: "option"):
+def main(date: "datedoy", pipeline: "pipeline", ids: "option"):
     log.init(log_level="info")
 
     # Additional required options
@@ -73,14 +73,27 @@ def main(date: "datedoy", tech: "pipeline", ids: "option"):
     dataset_name = util.read_option_value("--dset_name", default="")
     writer_names = util.read_option_value("--writers", default="").replace(",", " ").split()
     session = util.read_option_value("--session", default="")
+    station = util.read_option_value("--station", default="")
 
     # Get datasets
     dset = data.Dataset(
-        rundate=date, tech=tech, stage=stage, dataset_name=dataset_name, dataset_id=dataset_id, id="-" + identifiers[0]
+            rundate=date, 
+            pipeline=pipeline, 
+            stage=stage, 
+            session=session, 
+            station=station, 
+            label=label, 
+            id="-" + identifiers[0],
     )
 
     dset_other = data.Dataset(
-        rundate=date, tech=tech, stage=stage, dataset_name=dataset_name, dataset_id=dataset_id, id="-" + identifiers[1]
+            rundate=date, 
+            pipeline=pipeline, 
+            stage=stage, 
+            session=session, 
+            station=station, 
+            label=label, 
+            id="-" + identifiers[1],
     )
 
     if dset.num_obs == 0:
@@ -92,7 +105,7 @@ def main(date: "datedoy", tech: "pipeline", ids: "option"):
         return 1
 
     # Differentiate dataset
-    dset_diff = dset.difference_with(dset_other, difference_by=difference_by)
+    dset_diff = dset.difference(dset_other, index_by=','.join(difference_by))
     dset_diff.write_as(stage="difference")
 
     # Loop over writers

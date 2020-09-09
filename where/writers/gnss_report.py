@@ -7,6 +7,7 @@ Description:
 
 """
 # Standard library imports
+from enum import Enum
 from collections import namedtuple
 from datetime import datetime
 from typing import List, Tuple, Union
@@ -16,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 # Midgard imports
-from where.data import position
+from midgard.collections import enums 
 from midgard.dev import plugins
 from midgard.gnss import gnss
 from midgard.plot.matplotlib_extension import plot_scatter_subplots, plot
@@ -26,15 +27,14 @@ from midgard.writers._writers import get_existing_fields_by_attrs, get_field_by_
 from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import log
+from where.data import position
 from where.writers._report import Report
 
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
 
-PlotField = namedtuple(
-    "PlotField", ["name", "attrs", "unit", "ylabel", "caption"]
-)
+PlotField = namedtuple("PlotField", ["name", "attrs", "unit", "ylabel", "caption"])
 PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
 PlotField.__doc__ = """A convenience class for defining a output field for plotting
 
@@ -47,13 +47,8 @@ PlotField.__doc__ = """A convenience class for defining a output field for plott
     """
 
 FIELDS = (
-
     PlotField(
-        "gnss_range",
-        ("delay", "gnss_range"),
-        "m",
-        "Range",
-        "Correction of range between satellite and receiver",
+        "gnss_range", ("delay", "gnss_range"), "m", "Range", "Correction of range between satellite and receiver"
     ),
     PlotField(
         "gnss_satellite_clock",
@@ -69,20 +64,20 @@ FIELDS = (
         "Troposphere delay",
         "Correction of tropospheric delay",
     ),
-    #PlotField(
-    #    "gnss_total_group_delay",
-    #    ("delay", "gnss_total_group_delay"),
-    #    "m",
-    #    "Total group delay",
-    #    "Correction of total group delay",
-    #),
-    #PlotField(
-    #    "gnss_ionosphere",
-    #    ("delay", "gnss_ionosphere"),
-    #    "m",
-    #    "Ionospheric delay",
-    #    "Correction of ionospheric delay",
-    #),
+    PlotField(
+        "gnss_total_group_delay",
+        ("delay", "gnss_total_group_delay"),
+        "m",
+        "Total group delay",
+        "Correction of total group delay",
+    ),
+    PlotField(
+        "gnss_ionosphere",
+        ("delay", "gnss_ionosphere"),
+        "m",
+        "Ionospheric delay",
+        "Correction of ionospheric delay",
+    ),
     PlotField(
         "gnss_relativistic_clock",
         ("delay", "gnss_relativistic_clock"),
@@ -90,13 +85,13 @@ FIELDS = (
         "Relativistic clock",
         "Correction of relativistic clock effect due to orbit eccentricity",
     ),
-#    PlotField(
-#        "estimate_gnss_rcv_clock",
-#        ("estimate_gnss_rcv_clock",),
-#        "m",
-#        "Receiver clock estimate",
-#        "Estimate of receiver clock",
-#    ),
+   # PlotField(
+   #     "estimate_gnss_rcv_clock",
+   #     ("estimate_gnss_rcv_clock",),
+   #     "m",
+   #     "Receiver clock estimate",
+   #     "Estimate of receiver clock",
+   # ),
 )
 
 
@@ -111,7 +106,7 @@ def gnss_report(dset: "Dataset") -> None:
     if "station" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
         dset.vars["station"] = ""
         dset.vars["STATION"] = ""
-        
+
     # Generate figure directory to save figures generated for GNSS report
     figure_dir = config.files.path("output_gnss_report_figure", file_vars={**dset.vars, **dset.analysis})
     figure_dir.mkdir(parents=True, exist_ok=True)
@@ -179,13 +174,13 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     rpt.add_text("\n# GNSS residual\n\n")
 
     # Add outlier table
-    #MURKS: does not work at the moment. complement_with is not implemented in Dataset v3.
-    #MURKS rpt.write_dataframe_to_markdown(_table_outlier_overview(dset))
+    # MURKS: does not work at the moment. complement_with is not implemented in Dataset v3.
+    # MURKS rpt.write_dataframe_to_markdown(_table_outlier_overview(dset))
 
     # Plot residuals
     rpt.add_figure(
         f"{figure_dir}/plot_residual.{FIGURE_FORMAT}",
-        #MURKScaption="Post-fit residuals, whereby the red dots represents the rejected outliers. The histogram represent only number of residuals from kept observations.",
+        # MURKScaption="Post-fit residuals, whereby the red dots represents the rejected outliers. The histogram represent only number of residuals from kept observations.",
         caption="Post-fit residuals.",
         clearpage=True,
     )
@@ -223,13 +218,13 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     rpt.add_figure(
         f"{figure_dir}/plot_satellite_elevation.{FIGURE_FORMAT}", caption="Satellite elevation", clearpage=True
     )
-    
+
     #
     # Model parameter plots
     #
     rpt.add_text("\n# Plots of model parameters\n\n")
 
-    for f in get_existing_fields_by_attrs(dset, FIELDS): 
+    for f in get_existing_fields_by_attrs(dset, FIELDS):
         rpt.add_figure(f"{figure_dir}/plot_{f.name}.{FIGURE_FORMAT}", caption=f.caption, clearpage=False)
 
 
@@ -317,7 +312,7 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     figure_path = figure_dir / f"plot_residual.{FIGURE_FORMAT}"
     dset_outlier = _get_outliers_dataset(dset)
 
-    if dset_outlier == 1:
+    if dset_outlier == enums.ExitStatus.error:
         # NOTE: This is the case for concatencated Datasets, where "calculate" stage data are not available.
         log.warn(f"No data for calculate stage available. No outliers are plotted in {figure_path}.")
         x_arrays = [dset.time.gps.datetime]
@@ -387,8 +382,8 @@ def _plot_number_of_satellites(dset: "Dataset", figure_dir: "pathlib.PosixPath")
 
     if "num_satellite_used" not in dset.fields:
         dset.add_float(
-                "num_satellite_used", 
-                val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time),
+            "num_satellite_used",
+            val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time.gps.datetime),
         )
 
     plot(
@@ -505,12 +500,15 @@ def _plot_satellite_elevation(dset: "Dataset", figure_dir: "pathlib.PosixPath") 
     )
 
 
-def _plot_satellite_overview(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
+def _plot_satellite_overview(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> Union[None, Enum]:
     """Plot satellite observation overview
 
     Args:
        dset:        A dataset containing the data.
        figure_dir:  Figure directory
+       
+    Returns:
+       Error exit status if necessary datasets could not be read
     """
     figure_path = figure_dir / f"plot_satellite_overview.{FIGURE_FORMAT}"
 
@@ -518,19 +516,24 @@ def _plot_satellite_overview(dset: "Dataset", figure_dir: "pathlib.PosixPath") -
     day_start, day_end = _get_day_limits(dset)
 
     # Get time and satellite data from read and orbit stage
-    time_read, satellite_read = _sort_by_satellite(
-        _get_dataset(dset, stage="read", systems=dset.meta["obstypes"].keys())
-    )
-    time_orbit, satellite_orbit = _sort_by_satellite(
-        _get_dataset(dset, stage="orbit", systems=dset.meta["obstypes"].keys())
-    )
-    time_edit, satellite_edit = _sort_by_satellite(
-        _get_dataset(dset, stage="edit", systems=dset.meta["obstypes"].keys())
-    )
-    if not time_read:
+    file_vars = {**dset.vars, **dset.analysis}
+    file_vars["stage"] = "read"
+    file_path = config.files.path("dataset", file_vars=file_vars)
+    if file_path.exists(): 
+        time_read, satellite_read = _sort_by_satellite(
+            _get_dataset(dset, stage="read", systems=dset.meta["obstypes"].keys())
+        )
+        time_orbit, satellite_orbit = _sort_by_satellite(
+            _get_dataset(dset, stage="orbit", systems=dset.meta["obstypes"].keys())
+        )
+        time_edit, satellite_edit = _sort_by_satellite(
+            _get_dataset(dset, stage="edit", systems=dset.meta["obstypes"].keys())
+        )
+        
+    else:
         # NOTE: This is the case for concatencated Datasets, where "read" and "edit" stage data are not available.
-        log.warn(f"No data for read stage available. Plot {figure_path} can not be plotted.")
-        return 1
+        log.warn(f"Read dataset does not exists: {file_path}. Plot {figure_path} can not be plotted.")
+        return enums.ExitStatus.error
 
     # Generate plot
     plot(
@@ -553,7 +556,7 @@ def _plot_satellite_overview(dset: "Dataset", figure_dir: "pathlib.PosixPath") -
         },
     )
 
-    
+
 def _plot_model(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     """Plot model parameters
 
@@ -561,24 +564,23 @@ def _plot_model(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
        dset:        A dataset containing the data.
        figure_dir:  Figure directory
     """
-    
+
     # Limit x-axis range to rundate
     day_start, day_end = _get_day_limits(dset)
-    
-    
-    for f in get_existing_fields_by_attrs(dset, FIELDS): 
+
+    for f in get_existing_fields_by_attrs(dset, FIELDS):
 
         # Generate x- and y-axis data per satellite
         x_arrays = []
         y_arrays = []
         labels = []
-    
+
         for sat in dset.unique("satellite"):
             idx = dset.filter(satellite=sat)
             x_arrays.append(dset.time.gps.datetime[idx])
             y_arrays.append(get_field_by_attrs(dset, f.attrs, f.unit)[idx])
             labels.append(sat)
-        
+
         # Plot with scatter plot
         plot(
             x_arrays=x_arrays,
@@ -634,7 +636,7 @@ def _table_outlier_overview(dset: "Dataset"):
     df = pd.DataFrame(columns=columns)
 
     dset_outlier = _get_outliers_dataset(dset)
-    if dset_outlier == 1:
+    if dset_outlier == enums.ExitStatus.error:
         # NOTE: This is the case for concatencated Datasets, where "calculate" stage data are not available.
         log.warn(f"No data for calculate stage available. Outliers can not be detected.")
         return df
@@ -671,33 +673,34 @@ def _get_day_limits(dset: "Dataset") -> Tuple[datetime, datetime]:
     return day_start, day_end
 
 
-def _get_outliers_dataset(dset: "Dataset") -> "Dataset":
+def _get_outliers_dataset(dset: "Dataset") -> Union["Dataset", Enum]:
     """Get dataset with outliers
 
     Args:
        dset:        A dataset containing the data.
 
     Returns:
-       Dataset with outliers or status 1 if no data for "calculate" stage are available
+       Dataset with outliers or error exit status if no data for "calculate" stage are available
     """
 
     # Get Dataset where no outliers are rejected
-    dset_vars = {**dset.vars, **dset.analysis}
-    dset_vars["stage"] = "calculate"
-    dset_complete = dataset.Dataset.read(**dset_vars)
+    file_vars = {**dset.vars, **dset.analysis}
+    file_vars["stage"] = "calculate"
 
-    if dset_complete.num_obs == 0:
-        # NOTE: This is the case for concatencated Datasets, where "calculate" stage data are not available.
-        return 1
+    try:
+        dset_complete = dataset.Dataset.read(**file_vars)
+    except OSError:
+        log.warn(f"Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
+        return enums.ExitStatus.error
 
     # Get relative complement, which corresponds to "outlier" dataset
-    #dset_outliers = dset_complete.complement_with(dset, complement_by=["time", "satellite"])
-    dset_outliers = dataset.Dataset(num_obs=0) #MURKS: complement_with does not exists so far in Dataset v3.
+    # dset_outliers = dset_complete.complement_with(dset, complement_by=["time", "satellite"])
+    dset_outliers = dataset.Dataset(num_obs=0)  # MURKS: complement_with does not exists so far in Dataset v3.
 
     return dset_outliers
 
 
-def _get_dataset(dset: "Dataset", stage: str, systems: Union[List[str], None] = None) -> "Dataset":
+def _get_dataset(dset: "Dataset", stage: str, systems: Union[List[str], None] = None) -> Union["Dataset", Enum]:
     """Get dataset for given stage
 
     Args:
@@ -705,14 +708,18 @@ def _get_dataset(dset: "Dataset", stage: str, systems: Union[List[str], None] = 
        systems:     List with GNSS identifiers (e.g. E, G, ...)
 
     Returns:
-       Dataset for given stage
+       Dataset for given stage or error exit status if dataset could not be read
     """
 
     # Get Dataset
     # TODO: "label" should have a default value.
-    dset_vars = {**dset.vars, **dset.analysis}
-    dset_vars["stage"] = stage
-    dset_out = dataset.Dataset.read(**dset_vars)
+    file_vars = {**dset.vars, **dset.analysis}
+    file_vars["stage"] = stage
+    try:
+        dset_out = dataset.Dataset.read(**file_vars)
+    except OSError:
+        log.warn("Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
+        return enums.ExitStatus.error
 
     # Reject not defined GNSS observations
     if systems:
@@ -726,7 +733,7 @@ def _get_dataset(dset: "Dataset", stage: str, systems: Union[List[str], None] = 
     return dset_out
 
 
-def _sort_by_satellite(dset: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
+def _sort_by_satellite(dset: "Dataset") -> Tuple[List[datetime], List[str]]:
     """Sort time and satellite fields of dataset by satellite order
 
     Args: 

@@ -97,29 +97,45 @@ def t2g_posvel(trs: "TrsPosVel", time: "Time" = None) -> "GcrsPosVel":
     return _matmul(transformation, trs)
 
 
-def delta_t2y(trs: "TrsPositionDelta") -> "YawPositionDelta":
+def delta_t2y(trs: "TrsPositionDelta", time: "Time" = None) -> "YawPositionDelta":
     """Convert position deltas from TRS to YAW"""
-    t2y = rotation.trs2yaw(trs.ref_pos, trs.time)
+    if time is None:
+        time = trs.time
+        if time is None:
+            raise mg_exceptions.InitializationError("Time is not defined")
+    t2y = rotation.trs2yaw(trs.ref_pos, time)
     return _matmul(t2y, trs.mat)
 
 
-def delta_y2t(yaw: "YawPositionDelta") -> "TrsPositionDelta":
+def delta_y2t(yaw: "YawPositionDelta", time: "Time" = None) -> "TrsPositionDelta":
     """Convert position deltas from YAW to TRS"""
-    y2t = rotation.yaw2trs(yaw.ref_pos, yaw.time)
+    if time is None:
+        time = yaw.time
+        if time is None:
+            raise mg_exceptions.InitializationError("Time is not defined")
+    y2t = rotation.yaw2trs(yaw.ref_pos, time)
     return _matmul(y2t, yaw.mat)
 
 
-def delta_t2y_posvel(trs: "TrsPosVelDelta") -> "YawPosVelDelta":
+def delta_t2y_posvel(trs: "TrsPosVelDelta", time: "Time" = None) -> "YawPosVelDelta":
     """Convert position deltas from TRS to YAW"""
-    t2y = rotation.trs2yaw(trs.ref_pos, trs.time)
+    if time is None:
+        time = trs.time
+        if time is None:
+            raise mg_exceptions.InitializationError("Time is not defined")
+    t2y = rotation.trs2yaw(trs.ref_pos, time)
     # TODO: verify this tranformation
     trs2yaw = np.block([[t2y, np.zeros(t2y.shape)], [np.zeros(t2y.shape), t2y]])
     return _matmul(trs2yaw, trs.mat)
 
 
-def delta_y2t_posvel(yaw: "YawPosVelDelta") -> "TrsPosVelDelta":
+def delta_y2t_posvel(yaw: "YawPosVelDelta", time: "Time" = None) -> "TrsPosVelDelta":
     """Convert position deltas from YAW to TRS"""
-    y2t = rotation.yaw2trs(yaw.ref_pos, yaw.time)
+    if time is None:
+        time = yaw.time
+        if time is None:
+            raise mg_exceptions.InitializationError("Time is not defined")
+    y2t = rotation.yaw2trs(yaw.ref_pos, time)
     # TODO: verify this tranformation
     yaw2trs = np.block([[y2t, np.zeros(y2t.shape)], [np.zeros(y2t.shape), y2t]])
     return _matmul(yaw2trs, yaw.mat)

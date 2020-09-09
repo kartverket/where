@@ -60,7 +60,8 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels
         if field_name in dset_out.fields:
             dset_out[field_name][:] = values
         else:
-            dset_out.add_float(field_name, values, write_level=write_levels.get(model_name, "analysis"), unit="meter")
+            unit = "meter/second" if dset_out.vars["pipeline"] == "gnss_vel" else "meter"
+            dset_out.add_float(field_name, values, write_level=write_levels.get(model_name, "analysis"), unit=unit)
         log.info(f"Average correction = {dset_out.rms(f'{config_key}.{model_name}'):14.5f} in {model_name} model")
 
 

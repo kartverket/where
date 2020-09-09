@@ -35,6 +35,9 @@ class Report:
             description: Short description of purpose of report (e.g. "RINEX navigation file analysis").
         """
         self.fid = fid
+        if type(rundate) is str: # Handle rundate string format yyyy-mm-dd
+            year, month, day = rundate.split("-")
+            rundate = datetime(int(year), int(month), int(day))
         self.rundate = rundate
         self.path = path
         self.description = description
@@ -70,7 +73,7 @@ class Report:
         """
         # Print the individual configuration options
         self.fid.write(
-            "#Configuration of {}\n__Located at {}__\n".format(self.description, ", ".join(config.tech.sources))
+            "# Configuration of {}\n\n__Located at {}__\n".format(self.description, ", ".join(config.tech.sources))
         )
         self.fid.write("```\n")
         self.fid.write(str(config.tech.as_str(key_width=25, width=70, only_used=True)))
@@ -162,7 +165,6 @@ class Report:
     def title_page(self):
         """Write title page
         """
-
         title = f"{self.description} for day {self.rundate:%Y-%m-%d}"
         user_info = util.get_user_info()
 

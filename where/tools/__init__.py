@@ -94,9 +94,11 @@ def main():
 
         if param.annotation == "datedoy":
             if util.check_options("--doy"):
-                date = util.parse_args("doy")  # TODO: Does not work ("doy", doc_module=__name__)
+                date = util.parse_args("doy", doc_module=__name__)
             else:
-                date = util.parse_args("date")  # TODO: Does not work ("date", doc_module=__name__)
+                date = util.parse_args(
+                    "date", doc_module=__name__
+                )
             tool_args[key] = date
 
         elif param.annotation == "pipeline":
@@ -108,6 +110,7 @@ def main():
 
         else:
             tool_args[key] = util.parse_args(param.annotation, doc_module=tool_module)
+
 
     # Call tool
     plugins.call(__name__, tool, **tool_args)

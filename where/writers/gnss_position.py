@@ -233,7 +233,7 @@ FIELDS = (
         "%13.8f",
         13,
         "COV_XX",
-        "meter^2",
+        "meter**2",
         "Variance of station position X-coordinate",
     ),
     WriterField(
@@ -244,7 +244,7 @@ FIELDS = (
         "%13.8f",
         13,
         "COV_XY",
-        "meter^2",
+        "meter**2",
         "XY-covariance of station position",
     ),
     WriterField(
@@ -255,7 +255,7 @@ FIELDS = (
         "%13.8f",
         13,
         "COV_XZ",
-        "meter^2",
+        "meter**2",
         "XZ-covariance of station position",
     ),
     WriterField(
@@ -266,7 +266,7 @@ FIELDS = (
         "%13.8f",
         13,
         "COV_YY",
-        "meter^2",
+        "meter**2",
         "Variance of station position Y-coordinate",
     ),
     WriterField(
@@ -277,7 +277,7 @@ FIELDS = (
         "%13.8f",
         13,
         "COV_YZ",
-        "meter^2",
+        "meter**2",
         "YZ-covariance of station position",
     ),
     WriterField(
@@ -288,7 +288,7 @@ FIELDS = (
         "%13.8f",
         13,
         "COV_ZZ",
-        "meter^2",
+        "meter**2",
         "Variance of station position Z-coordinate",
     ),
 )

@@ -45,6 +45,10 @@ Example:
   {exe:tools} write 2018 10 26 --sisre --stage=calculate --label=1 --id='grc_inav_e1_std_sat' --writers=sisre_plot
   {exe:tools} write 2019 2 1 --gnss --station=stas --stage=estimate --writers=gnss_report
 """
+# Standard library imports
+from typing import List
+import sys
+
 # Midgard imports
 from midgard.dev import plugins
 from midgard.writers import write as write_
@@ -68,6 +72,9 @@ def write(rundate: "datedoy", pipeline: "pipeline", stage: "option", writers: "o
     station = util.read_option_value("--station", default="")
     writers = writers.replace(",", " ").split()
 
+    # Update configuration of Where analysis
+    config.where.update_from_options(_clean_sys_argv(pipeline))
+
     dset_vars = dict(pipeline=pipeline, stage=stage, session=session, station=station, label=label, id=id_)
 
     try:
@@ -81,3 +88,13 @@ def write(rundate: "datedoy", pipeline: "pipeline", stage: "option", writers: "o
     for writer in writers:
         log.info(f"Apply writer '{writer}'.")
         write_(writer, dset=dset)
+
+
+#
+# AUXILIARY FUNCTIONS
+#
+def _clean_sys_argv(pipeline: str) -> List[str]:
+    """Values in sys.argv that are not valid option values in Where
+    """
+    reserved_opts = {pipeline, "label", "id", "session", "stage", "station", "writers"}
+    return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]

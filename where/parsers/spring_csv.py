@@ -26,6 +26,9 @@ from midgard.dev import plugins
 from midgard.math.unit import Unit
 from midgard.parsers.csv_ import CsvParser
 
+# Where imports
+from where.data import dataset3 as dataset
+
 
 @plugins.register
 class SpringCsvParser(CsvParser):
@@ -34,27 +37,28 @@ class SpringCsvParser(CsvParser):
     The Spring CSV data header line is used to define the keys of the **data** dictionary. The values of the **data** 
     dictionary are represented by the Spring CSV colum values.
 
+    Depending on the Spring CSV following dataset fields can be available:
+
+    | Field               | Description                                                                           |
+    |---------------------|---------------------------------------------------------------------------------------|
+    | acquiredsat         | Number of acquired satellites (TODO?)                                                 |
+    | gdop                | Geometric dilution of precision                                                       |
+    | hdop                | Horizontal dilution of precision                                                      |
+    | pdop                | Position (3D) dilution of precision                                                   |
+    | satinview           | Number of satellites in view                                                          |
+    | system              | GNSS identifier based on RINEX definition (e.g. G: GPS, E: Galileo)                   |
+    | tdop                | Time dilution of precision                                                            |
+    | time                | Observation time given as Time object                                                 |
+    | usedsat             | Number of used satellites                                                             |
+    | vdop                | Vertical dilution of precision                                                        |
+    | ...                 | ...                                                                                   |
     """
 
-    def write_to_dataset(self, dset) -> "Dataset":
+    def as_dataset(self) -> "Dataset":
         """Return the parsed data as a Dataset
 
-        Args:
-            dset (Dataset): The Dataset. Depending on the Spring CSV following dataset fields can be available:
-
-        | Field               | Description                                                                           |
-        |---------------------|---------------------------------------------------------------------------------------|
-        | acquiredsat         | Number of acquired satellites (TODO?)                                                 |
-        | gdop                | Geometric dilution of precision                                                       |
-        | hdop                | Horizontal dilution of precision                                                      |
-        | pdop                | Position (3D) dilution of precision                                                   |
-        | satinview           | Number of satellites in view                                                          |
-        | system              | GNSS identifier based on RINEX definition (e.g. G: GPS, E: Galileo)                   |
-        | tdop                | Time dilution of precision                                                            |
-        | time                | Observation time given as Time object                                                 |
-        | usedsat             | Number of used satellites                                                             |
-        | vdop                | Vertical dilution of precision                                                        |
-        | ...                 | ...                                                                                   |
+        Returns:
+            A dataset containing the data.
         """
         # Spring constellation definition
         system_def = {
@@ -68,8 +72,12 @@ class SpringCsvParser(CsvParser):
         }
 
         field_spring_to_where = {
+            "3DSpeed": "site_vel_3d",
             "Clock": "gnss_satellite_clock",
+            "EastSpeed": "site_vel_east",
             "GroupDelay": "gnss_total_group_delay",
+            "HSpeed": "site_vel_h",
+            "NorthSpeed": "site_vel_north",
             "PseudoRange": "gnss_range",
             "SatInView": "num_satellite_available",
             "TropoDelay": "troposphere_dT",
@@ -78,9 +86,14 @@ class SpringCsvParser(CsvParser):
             "EastvsRef": "site_pos_vs_ref_east",
             "NorthvsRef": "site_pos_vs_ref_north",
             "VerticalvsRef": "site_pos_vs_ref_up",
+            "VerticalSpeed": "site_vel_up",
+            "XSpeed": "site_vel_x",
+            "YSpeed": "site_vel_y",
+            "ZSpeed": "site_vel_z",
         }
 
         # Initialize dataset
+        dset = dataset.Dataset()
         if not self.data:
             log.warn("No data in {self.file_path}.")
             return dset
@@ -122,7 +135,7 @@ class SpringCsvParser(CsvParser):
                 dset.add_position("sat_pos", itrs=pos.trs, time="time")
             else:
                 dset.add_position("site_pos", itrs=pos.trs, time="time")
-
+     
         # Define fields to save in dataset
         remove_time_fields = {"Constellation", "GPSEpoch", "GPSWeek", "GPSSecond", "PRN", "", "UTCDateTime"}
         fields = set(self.data.keys()) - remove_time_fields

@@ -21,13 +21,14 @@ from datetime import timedelta
 from typing import List, Tuple
 
 # External library imports
-from midgard.math import interpolation
 import numpy as np
 import pandas as pd
 from scipy import interpolate
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.files import dependencies
+from midgard.math import interpolation
 
 # Where imports
 from where import cleaners
@@ -113,6 +114,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
             parser = parsers.parse(parser_name="orbit_sp3", file_path=file_path, rundate=date_to_read)
             parser.write_to_dataset(dset_temp)
             file_paths.append(str(parser.file_path))
+            dependencies.add(str(parser.file_path), label=self.file_key)  # Used for output writing
 
             # Extend Dataset dset_raw with temporary Dataset
             date = date_to_read.strftime("%Y-%m-%d")

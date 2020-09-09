@@ -1,4 +1,3 @@
-
 """Write  Doppler GNSS receiver velocity results
 
 Description:
@@ -71,7 +70,7 @@ FIELDS = (
     WriterField(
         "gpssec", "time", ("gps", "gps_ws", "seconds"), float, "%11.3f", 11, "GPSSEC", "second", "GPS seconds"
     ),
-    WriterField("3d_vel", "gnss_spv_vel", (), float, "%10.6f", 10, "3D_VEL", "m/s", ""),
+    WriterField("vel_3d", "gnss_spv_vel", (), float, "%10.6f", 10, "3D_VEL", "m/s", ""),
 )
 
 # ===========================================================================================

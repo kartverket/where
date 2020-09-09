@@ -26,6 +26,7 @@ import pandas as pd
 # Midgard imports
 from midgard.collections import enums
 from midgard.dev import plugins
+from midgard.files import dependencies
 from midgard.math.constant import constant
 from midgard.math.unit import Unit
 from midgard.parsers import rinex_nav
@@ -172,6 +173,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 parser = rinex_nav.get_rinex2_or_rinex3(file_path)
                 dset_temp.update_from(parser.as_dataset())
                 file_paths.append(str(parser.file_path))
+                dependencies.add(str(parser.file_path), label=self.file_key.format(system=sys))  # Used for output writing
 
                 # Extend Dataset dset_raw with temporary Dataset
                 if dset_raw.num_obs:
@@ -280,7 +282,9 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         dset_edit.meta.update(self.dset_raw.meta)
 
         for idx, field in enumerate(fields):
-            if field in ["time", "transmission_time", "toe"]:
+            if field.startswith("time_") or field.startswith("transmission_time_") or field.startswith("toe_"):
+                continue # Skip unnecessary fields
+            elif field in ["time", "transmission_time", "toe"]:
                 dset_edit.add_time(field, val=nav_np[:, idx], scale="gps", fmt="datetime")
             elif field in ["nav_type", "satellite", "system"]:
                 dset_edit.add_text(field, val=nav_np[:, idx])
@@ -410,15 +414,30 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         #                     dset_out.gnss_satellite_clock[num_obs],
         #                     dset_out.gnss_relativistic_clock[num_obs])
         # -DEBUG
+        
+        
+    def get_ephemeris_field(self, field, dset: "Dataset", time: str = "time") -> np.ndarray:
+        """Get given ephemeris field values for belonging navigation records
+
+        Args:
+            field:  Field name of navigation record.
+            dset:   A Dataset containing model data.
+            time:   Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
+                    observation time and 'sat_time' to satellite transmission time.
+
+        Returns:
+            Values for given field
+        """
+        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
+        # Dataset
+        dset_brdc_idx = self._get_brdc_block_idx(dset)
+
+        return self.dset_edit[field][dset_brdc_idx]
 
     def satellite_clock_correction(self, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Determine satellite clock correction
 
         The satellite clock correction is based on Section 20.3.3.3.3.1 in :cite:`is-gps-200h`.
-
-        TODO_Mohammed: If single frequencies are used, than TGD (self.dset.tgd) or BGD (self.dset.bgd_e1_e5a,
-                       self.dset.bgd_e1_e5b) has to be applied by satellite clock correction. Frequency type ('single'
-                       or 'dual') can be checked with 'config.tech.freq_type.str' and GNSS with 'config.tech.systems'.
 
         Args:
             dset: A Dataset containing model data.
@@ -445,6 +464,36 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             self.dset_edit.sat_clock_bias[dset_brdc_idx]
             + self.dset_edit.sat_clock_drift[dset_brdc_idx] * tk
             + self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk ** 2
+        ) * constant.c
+        
+    def satellite_clock_rate_correction(self, dset: "Dataset", time: str = "time") -> np.ndarray:
+        """Determine satellite clock rate correction
+
+        The satellite clock rate correction is based on Section 6.2.6.2 in :cite:`zhang2007`.
+
+        Args:
+            dset: A Dataset containing model data.
+            time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
+                  observation time and 'sat_time' to satellite transmission time.
+
+        Returns:
+            GNSS satellite clock rate corrections for each observation in [m]
+        """
+        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
+        # Dataset
+        dset_brdc_idx = self._get_brdc_block_idx(dset)
+
+        # Elapsed time referred to clock data reference epoch toc in [s]
+        # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
+        #     problem is that use of GPSSEC compared to MJD * Unit.day2second() is not consistent!!!!
+        gpsweek_diff = (
+            dset[time].gps.gps_ws.week - self.dset_edit.time.gps.gps_ws.week[dset_brdc_idx]
+        ) * Unit.week2second
+        tk = dset[time].gps.gps_ws.seconds - self.dset_edit.time.gps.gps_ws.seconds[dset_brdc_idx] + gpsweek_diff
+
+        return (
+            self.dset_edit.sat_clock_drift[dset_brdc_idx]
+            + 2 * self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk
         ) * constant.c
 
     def add_satellite_clock_parameter(self, dset: "Dataset", time: str = "time") -> np.ndarray:

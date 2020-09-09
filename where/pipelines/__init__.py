@@ -18,7 +18,6 @@ from functools import lru_cache
 # Midgard imports
 from midgard.dev import plugins
 from midgard.dev import exceptions as mg_exceptions
-from midgard.dev.timer import Timer
 from midgard.files import dependencies
 
 # Where imports
@@ -161,14 +160,14 @@ def file_vars():
 
     return _file_vars
 
+
 def make_map(dset):
     """Make and show a basic matplotlib plot relevant for the current pipeline"""
-    try: 
-        plugins.call(
-            package_name=__name__, plugin_name=dset.vars["pipeline"], part="make_map", dset=dset
-        )
+    try:
+        plugins.call(package_name=__name__, plugin_name=dset.vars["pipeline"], part="make_map", dset=dset)
     except mg_exceptions.UnknownPluginError:
         log.warn(f"Pipeline {dset.vars['pipeline']} has not defined function make_map")
+
 
 def paths(label_pattern, pipeline=None):
     """Get a list of dependent file paths with a given label

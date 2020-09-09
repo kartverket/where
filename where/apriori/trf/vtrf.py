@@ -119,7 +119,7 @@ class Vtrf(trf.TrfFactory):
         pos = np.zeros((self.time.size, 3))
         for pv in station_info["pos_vel"].values():
             idx = np.logical_and(self.time.utc.datetime >= pv["start"], self.time.utc.datetime < pv["end"])
-            if idx.size == 1:
+            if idx.ndim == 0:
                 idx = np.array([idx])
             if not any(idx):
                 continue

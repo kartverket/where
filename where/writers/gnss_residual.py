@@ -90,7 +90,6 @@ FIELDS = (
         "deg",
         "Elevation of satellite in relation to station position",
     ),
-    WriterField("residual", "residual", (), float, "%15.3f", 15, "RESIDUAL", "meter", "Post-fit residuals"),
 )
 
 
@@ -103,18 +102,33 @@ def gnss_residual(dset: "Dataset") -> None:
     """
 
     file_path = config.files.path("output_residual", file_vars=dset.vars)
+    
+    # Update WriterField depending on used pipeline
+    fields_def = list(FIELDS)
+    fields_def.append(WriterField(
+                        "residual", 
+                        "residual", 
+                        (), 
+                        float, 
+                        "%15.4f" if dset.vars["pipeline"] == "gnss_vel" else "%15.3f", 
+                        15, 
+                        "RESIDUAL", 
+                        "meter/second" if dset.vars["pipeline"] == "gnss_vel" else "meter", 
+                        "Post-fit residual",
+                      )
+    )
 
     # Add date field to dataset
     if "date" not in dset.fields:
         dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
 
     # Put together fields in an array as specified by the 'dtype' tuple list
-    output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in FIELDS)))
-    output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in FIELDS])
+    output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in fields_def)))
+    output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in fields_def])
 
     # Write to disk
     header = get_header(
-        FIELDS,
+        fields_def,
         pgm_version=f"where {where.__version__}",
         run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
         summary="GNSS post-fit residual results",
@@ -122,7 +136,7 @@ def gnss_residual(dset: "Dataset") -> None:
     np.savetxt(
         file_path,
         output_array,
-        fmt=tuple(f.format for f in FIELDS),
+        fmt=tuple(f.format for f in fields_def),
         header="\n".join(header),
         delimiter="",
         encoding="utf8",

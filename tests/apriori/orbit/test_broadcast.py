@@ -4,7 +4,7 @@
 
 
 $Revision: 19125 $
-$Date: 2020-03-03 14:39:13 +0100 (ti., 03 mars 2020) $
+$Date: 2020-03-03 14:39:13 +0100 (Tue, 03 Mar 2020) $
 $LastChangedBy: kirann $
 
 """

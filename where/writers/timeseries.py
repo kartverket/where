@@ -52,6 +52,7 @@ def add_to_full_timeseries(dset):
     session = dset.vars.get("session", "")
     status = dset.meta.get("analysis_status", "unchecked")
     session_type = dset.meta.get("input", dict()).get("session_type", "")
+    session_code = dset.meta.get("input", dict()).get("session_code", "")
 
     dset_session.num_obs = num_obs
     dset_session.add_time("time", val=[mean_epoch] * num_obs, scale=mean_epoch.scale, fmt=mean_epoch.fmt)
@@ -59,6 +60,7 @@ def add_to_full_timeseries(dset):
     dset_session.add_text("session", val=[session] * num_obs)
     dset_session.add_text("status", val=[status] * num_obs)
     dset_session.add_text("session_type", val=[session_type] * num_obs)
+    dset_session.add_text("session_code", val=[session_code] * num_obs)
 
     for field, value in idx_values.items():
         dset_session.add_text(field, val=value)
@@ -142,13 +144,13 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
     units = np.array(dset.meta["normal equation"]["unit"])
 
     # This code is terrible. TODO: Rewrite
+    idx_names = idx_values[list(idx_values.keys()).pop()]
+    num_obs = len(idx_names)
     fields = np.unique([n.split("-")[0] for n in names])
     for field in fields:
         if "vlbi_src_dir" in field or "vlbi_baseline" in field:
             # TODO
             continue
-        idx_names = idx_values[list(idx_values.keys()).pop()]
-        num_obs = len(idx_names)
         params = [f for f in names if f.startswith(field + "-")]
         param_units = [u for f, u in zip(names, units) if f.startswith(field + "-")]
         name2 = [p.split("-")[-1].split("_")[-1] for p in params]
@@ -165,18 +167,32 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
             for i, n in enumerate(idx_names):
                 if not idx[i]:
                     continue
-                idx_param = np.array([True if param in params and n in param else False for param in names], dtype=bool)
-                param_cov = Q[idx_param][:,idx_param]
+                idx_param = np.array(
+                    [True if param in params and n == param.split("-", maxsplit=1)[1].rsplit("_", maxsplit=1)[0] else False for param in names], dtype=bool
+                )
+                param_cov = Q[idx_param][:, idx_param]
                 val_cov[i] = param_cov
         else:
             val[0] = mean
-            idx_param = np.array([True if param in params else False for param in names ], dtype=bool)
-            mean_cov =  Q[idx_param][:,idx_param]
+            idx_param = np.array([True if param in params else False for param in names], dtype=bool)
+            mean_cov = Q[idx_param][:, idx_param]
             val_cov[0] = mean_cov
 
         # all fields of the same type share the same unit, only the first entry of param_units is needed
         dset_session.add_float("neq_" + field, val=val, unit=param_units[0])
         dset_session.add_float("neq_" + field + "_cov_", val=val_cov, unit=param_units[0])
+
+    # Add solution helmert parameters to timeseries
+    section = "helmert"
+    fields = ["T_X", "T_Y", "T_Z", "scale", "alpha", "beta", "gamma"]
+    for field in fields:
+        try:
+            value, unit = dset.meta[section][field]
+            data = np.full(num_obs, np.nan, dtype=float)
+            data[0] = value
+            dset_session.add_float(f"{section}_{field}", val=data, unit=unit)
+        except KeyError:
+            pass
 
 
 #

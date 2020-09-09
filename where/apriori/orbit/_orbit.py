@@ -31,11 +31,7 @@ class AprioriOrbit:
 
     name = "Overwritten by subclasses"
 
-    def __init__(
-        self,
-        rundate: datetime.date,
-        **kwargs: Dict[str, Any],
-    ) -> None:
+    def __init__(self, rundate: datetime.date, **kwargs: Dict[str, Any]) -> None:
         """Set up a new AprioriOrbit object, does not parse any data
 
         TODO: Remove dependency on rundate, use time to read correct files. (What to do with dataset?)
@@ -47,14 +43,39 @@ class AprioriOrbit:
         #       test_broadcast.py).
         try:
             pipeline = config.analysis.pipeline.str
-        except (AttributeError, exceptions.MissingSectionError):
+        except exceptions.MissingEntryError:
             pipeline = None
+
+        # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
+        try:
+            profile = config.analysis.profile.str
+        except exceptions.MissingEntryError:
+            profile = None
+
+        try:
+            id_ = config.analysis.id.str
+        except exceptions.MissingEntryError:
+            id_ = None
 
         self.rundate = rundate
         self.pipeline = pipeline
 
-        self._dset_raw = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage=self.name, label="raw")
-        self._dset_edit = dataset.Dataset(rundate=rundate, pipeline=pipeline, stage=self.name, label="edit")
+        self._dset_raw = dataset.Dataset(
+                                    rundate=rundate, 
+                                    pipeline=pipeline, 
+                                    stage=self.name, 
+                                    label="raw",
+                                    profile=profile,
+                                    id=id_,
+        )
+        self._dset_edit = dataset.Dataset(
+                                    rundate=rundate,
+                                    pipeline=pipeline,
+                                    stage=self.name, 
+                                    label="edit",
+                                    profile=profile,
+                                    id=id_,
+        )
         self._dset = None
 
     @property
@@ -102,7 +123,25 @@ class AprioriOrbit:
         if not dset.num_obs:
             log.fatal(f"Dataset is empty. No observation epochs given for calculating orbits.")
 
-        self._dset = dataset.Dataset(rundate=self.rundate, pipeline=self.pipeline, stage=self.name, label="orbit")
+        # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
+        try:
+            profile = config.analysis.profile.str
+        except exceptions.MissingEntryError:
+            profile = None
+
+        try:
+            id_ = config.analysis.id.str
+        except exceptions.MissingEntryError:
+            id_ = None
+
+        self._dset = dataset.Dataset(
+                            rundate=self.rundate, 
+                            pipeline=self.pipeline, 
+                            stage=self.name, 
+                            label="orbit",
+                            profile=profile,
+                            id=id_,
+        )
         self._calculate(self._dset, dset, time=time)
 
     #

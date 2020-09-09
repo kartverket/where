@@ -18,7 +18,6 @@ from midgard.math.rotation import *  # noqa
 from midgard.math.unit import Unit
 
 # Where imports
-from where import apriori
 from where.ext import sofa_wrapper as sofa
 
 #
@@ -81,6 +80,8 @@ def trs2yaw(sat_pos, time):
     The yaw-steering reference system given with x-axis lying in the Earth-Satellite-Sun plane, y-axis as the
     normal vector of the Earth-Satellite-Sun plane and the z-axis pointing to the Earth's center.
     """
+    # Local import to avoid circular imports
+    from where import apriori
     eph = apriori.get("ephemerides", time=time.tdb)
     z_unit = -sat_pos.trs.pos.unit_vector  # unit vector of z-axis
     sat_sun = eph.pos_itrs("sun") - sat_pos.trs.pos  # vector pointing from satellite position to Sun
@@ -198,6 +199,8 @@ def E(time):
 def xp(time):
     """X coordinate of the CIP in ITRS
     """
+    # Local import to avoid circular imports
+    from where import apriori
     eop = apriori.get("eop", time=time)
     return eop.x * Unit.arcsec2rad
 
@@ -206,6 +209,8 @@ def xp(time):
 def yp(time):
     """Y coordinate of the CIP in ITRS
     """
+    # Local import to avoid circular imports
+    from where import apriori
     eop = apriori.get("eop", time=time)
     return eop.y * Unit.arcsec2rad
 
@@ -217,6 +222,8 @@ def X(time):
     Returns:
         model + celestial pole offset
     """
+    # Local import to avoid circular imports
+    from where import apriori
     eop = apriori.get("eop", time=time)
     return sofa.X_model(time) + eop.dx * Unit.arcsec2rad
 
@@ -228,6 +235,8 @@ def Y(time):
     Returns:
         model + celestial pole offset
     """
+    # Local import to avoid circular imports
+    from where import apriori
     eop = apriori.get("eop", time=time)
     return sofa.Y_model(time) + eop.dy * Unit.arcsec2rad
 

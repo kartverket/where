@@ -37,16 +37,22 @@ from where.lib import log
 class VgosDbParser(Parser):
     """A parser for reading VLBI data from a VGOS database"""
 
-    # Dictionary stucture for each field: 
+    # Dictionary structure for each field:
     # filestub: name of netcdf file
     # variable: name of variable inside netcdf file
     # factor: used to convert from unit given in file to desired unit
     # nan_value: value used to indicate missing data
     # unit: desired unit after conversion
     _STATION_FIELDS = {
-        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1, "nan_value": -999, "unit":("Celcius", )},
-        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1, "nan_value": -999, "unit": ("hPa", )},
-        "cable_delay": {"filestub": "Cal-Cable", "variable": "Cal-Cable", "factor": constant.c, "nan_value": np.nan, "unit": ("meter", )},
+        "temperature": {"filestub": "Met", "variable": "TempC", "factor": 1, "nan_value": -999, "unit": ("Celcius",)},
+        "pressure": {"filestub": "Met", "variable": "AtmPres", "factor": 1, "nan_value": -999, "unit": ("hPa",)},
+        "cable_delay": {
+            "filestub": "Cal-Cable",
+            "variable": "Cal-Cable",
+            "factor": constant.c,
+            "nan_value": np.nan,
+            "unit": ("meter",),
+        },
     }
 
     def __init__(self, file_path, encoding=None):
@@ -130,7 +136,7 @@ class VgosDbParser(Parser):
         except KeyError:
             self.data["observed_delay_ferr"] = np.zeros(num_obs)
             log.error("Missing group delay formal error information")
-        units["observed_delay_ferr"] = ("meter", )
+        units["observed_delay_ferr"] = ("meter",)
 
         try:
             self.data["data_quality"] = self.raw["ObsEdit"]["Edit"]["DelayFlag"]
@@ -143,7 +149,7 @@ class VgosDbParser(Parser):
         except KeyError:
             self.data["observed_delay"] = np.full(num_obs, np.nan)
             log.error("Missing full group delay information")
-        units["observed_delay"] = ("meter", )
+        units["observed_delay"] = ("meter",)
 
         try:
             self.data["iono_delay"] = (
@@ -155,13 +161,15 @@ class VgosDbParser(Parser):
         except KeyError:
             try:
                 self.data["dtec"] = self.raw["Observables"]["DiffTec"]["diffTec"]
-                units["dtec"] = ("TECU", )
+                units["dtec"] = ("TECU",)
                 self.data["ref_freq"] = self.raw["Observables"]["RefFreq"]["X"]["RefFreq"] * Unit.MHz2Hz
-                units["ref_freq"] = ("Hz", )
+                units["ref_freq"] = ("Hz",)
             except KeyError:
-                self.data["iono_delay"] = np.full(num_obs, np.nan)
                 log.warn("Missing ionosphere delay information")
-        units["iono_delay"] = ("meter", )
+
+            self.data["iono_delay"] = np.full(num_obs, np.nan)
+
+        units["iono_delay"] = ("meter",)
 
         try:
             self.data["iono_delay_ferr"] = (
@@ -173,20 +181,23 @@ class VgosDbParser(Parser):
         except KeyError:
             try:
                 self.data["dtec_ferr"] = self.raw["Observables"]["DiffTec"]["diffTecStdDev"]  # Unit: TECU
-                units["dtec_ferr"] = ("TECU", )
+                units["dtec_ferr"] = ("TECU",)
             except KeyError:
-                self.data["iono_delay_ferr"] = np.full(num_obs, np.nan)
                 if not np.isnan(self.data["iono_delay"]).all():
                     log.warn("Missing ionosphere delay formal error information")
-        units["iono_delay_ferr"] = ("meter", )
+
+            self.data["iono_delay_ferr"] = np.full(num_obs, np.nan)
+
+        units["iono_delay_ferr"] = ("meter",)
 
         try:
             self.data["iono_quality"] = self.raw["ObsDerived"]["Cal-SlantPathIonoGroup"]["X"][
                 "Cal-SlantPathIonoGroupDataFlag"
             ]
         except KeyError:
-            self.data["iono_quality"] = np.full(num_obs, np.nan)
             log.warn("Missing ionosphere quality information")
+
+        self.data["iono_quality"] = np.full(num_obs, np.nan)
 
         # Station dependent info
         for field, params in self._STATION_FIELDS.items():

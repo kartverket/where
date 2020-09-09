@@ -16,10 +16,8 @@ This module will provide functions for GNSS modeling.
 TODO: How to move routines to Midgard?
 ========================================
 check_satellite_eclipse(dset)
-findsun(time)                                  -> Midgard: planetary_motion?
-gsdtime_sun(time)                              -> Midgard: planetary_motion?
 get_earth_rotation(dset)                       -> Midgard: PosVel (see function)
-get_code_observation(dset)                     -> Midgard: gnss
+get_observation(dset)                          -> Midgard: gnss
 get_flight_time(dset)                          -> Midgard: PosVel (see function)
 obstype_to_freq(sys, obstype)                  -> Midgard: gnss
 get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None)  -> Midgard: gnss
@@ -39,7 +37,7 @@ Should we more specific in using arguments, that instead of using 'dset'? -> May
 
 """
 # Standard library imports
-from typing import Tuple
+from typing import Dict, Tuple
 
 # External library imports
 import numpy as np
@@ -78,70 +76,6 @@ def check_satellite_eclipse(dset):
             satellites_in_eclipse.append(satellite)
 
     return satellites_in_eclipse
-
-
-def findsun(time):
-    """Obtains the position vector of the Sun in relation to Earth (in ECEF).
-
-    This routine is a reimplementation of routine findSun() in model.c of gLAB 3.0.0 software.
-
-    Args:
-        time(Time):    Time object
-
-    Returns:
-        numpy.ndarray:  Sun position vector given in ECEF [m]
-    """
-    AU = 1.495_978_70e8
-    gstr, slong, sra, sdec = gsdtime_sun(time)
-
-    sun_pos_x = np.cos(np.deg2rad(sdec)) * np.cos(np.deg2rad(sra)) * AU
-    sun_pos_y = np.cos(np.deg2rad(sdec)) * np.sin(np.deg2rad(sra)) * AU
-    sun_pos_z = np.sin(np.deg2rad(sdec)) * AU
-    sun_pos_eci = np.vstack((sun_pos_x, sun_pos_y, sun_pos_z)).T
-
-    # Rotate from inertial to non inertial system (ECI to ECEF)
-    sun_pos_ecef = (rotation.R3(np.deg2rad(gstr)) @ sun_pos_eci.T)[:, :, 0]  # remove 1 dimension
-
-    return sun_pos_ecef
-
-
-def gsdtime_sun(time):
-    """Get position of the sun (low-precision)
-
-    This routine is a reimplementation of routine GSDtime_sun() in model.c of gLAB 3.0.0 software.
-
-    Args:
-        time(Time):    Time object
-
-    Returns:
-        tuple:  with following entries
-
-    =============== =============== ==================================================================================
-     Elements        Type            Description
-    =============== =============== ==================================================================================
-     gstr            numpy.ndarray   GMST0 (to go from ECEF to inertial) [deg]
-     slong           numpy.ndarray   Sun longitude [deg]
-     sra             numpy.ndarray   Sun right Ascension [deg]
-     sdec            numpy.ndarray   Sun declination in [deg]
-    =============== =============== ==================================================================================
-    """
-    jd = time.mjd_int - 15019.5
-    frac = time.jd_frac
-    vl = np.mod(279.696_678 + 0.985_647_335_4 * jd, 360)
-    gstr = np.mod(279.690_983 + 0.985_647_335_4 * jd + 360 * frac + 180, 360)
-    g = np.deg2rad(np.mod(358.475_845 + 0.985_600_267 * jd, 360))
-
-    slong = vl + (1.91946 - 0.004_789 * jd / 36525) * np.sin(g) + 0.020_094 * np.sin(2 * g)
-    obliq = np.deg2rad(23.45229 - 0.013_012_5 * jd / 36525)
-
-    slp = np.deg2rad(slong - 0.005_686)
-    sind = np.sin(obliq) * np.sin(slp)
-    cosd = np.sqrt(1 - sind * sind)
-    sdec = np.rad2deg(np.arctan2(sind, cosd))
-
-    sra = 180 - np.rad2deg(np.arctan2(sind / cosd / np.tan(obliq), -np.cos(slp) / cosd))
-
-    return gstr, slong, sra, sdec
 
 
 # TODO: pv.trs.observed - pv.trs # calculate property 'observed' = rotation.R3(rotation_angle[idx]).dot(dset.sat_posvel.itrs_pos[idx])
@@ -183,8 +117,8 @@ def get_earth_rotation(dset):
     return sat_pos[:, :, 0], sat_vel[:, :, 0]
 
 
-def get_code_observation(dset):
-    """Get pseudo-range (code) observations depending on given observation types
+def get_observation(dset):
+    """Get observations depending on given observation types
 
     The first element of the observation type variable `dset.meta['obstypes'][sys]` is selected as observation for
     single frequency solution. The order of the observation type variable `dset.meta['obstypes'][sys]` depends on
@@ -196,20 +130,23 @@ def get_code_observation(dset):
         dset:    Dataset
 
     Returns:
-        numpy.ndarray:  Pseudo-range (code) observation choosen depending on priority list and for dual frequency
-                        solution given as ionospheric-free linear combination
+        numpy.ndarray:  Observation choosen depending on priority list and used pipeline. For dual frequency solution
+                        observations are given as ionospheric-free linear combination.
     """
+    # TODO: Function has to be more generalized. At the moment only SPV and SPP solutions can be handled.
     freq_type = config.tech.freq_type.str
-    code_obs = np.zeros(dset.num_obs)
+    observation = np.zeros(dset.num_obs)
 
     if freq_type == "single":
 
-        for sys in dset.unique("system"):
-            idx = dset.filter(system=sys)
-            obstypes = dset.meta["obstypes"][sys]
+        if dset.vars["pipeline"] == "gnss_spv":
+            for sys in dset.unique("system"):
+                idx = dset.filter(system=sys)
+                obstypes = dset.meta["obstypes"][sys]
 
-            # TODO: Exists a better solution. Complete routine should be named get_observation(dset).
-            if dset.vars["pipeline"] == "gnss_spv":
+                # Note: SPV solution needs pseudo-range observations for determination of flight time between satellite
+                #       and receiver. This pseudo-range observations are not used for further SPV calculation, only
+                #       Doppler observations are of interest.
                 obstype = None
                 for type_ in obstypes:
                     if type_.startswith("D"):
@@ -218,19 +155,28 @@ def get_code_observation(dset):
 
                 if not obstype:
                     log.fatal(f"No Doppler observations are defined for {sys}: {', '.join(obstypes)}")
-            else:
-                obstype = obstypes[0]
-            code_obs = dset.obs[obstype][idx]
+
+                # Doppler observations are given in Hz and has to be converted to meter.
+                # TODO: Conversion should be done by RINEX observation parser.
+                # MURKS observation[idx] = constant.c / obstype_to_freq(sys, obstype) * dset.obs[obstype][idx]
+                observation[idx] = dset.obs[obstype][idx]  # TODO midgard.gnss.rec_velocity_est.py has to be changed.
+
+        else:
+            for sys in dset.unique("system"):
+                idx = dset.filter(system=sys)
+                obstypes = dset.meta["obstypes"][sys]
+                observation[idx] = dset.obs[obstypes[0]][idx]
 
     elif freq_type == "dual":
-        code_obs, _ = linear_combination("ionosphere-free", dset)
+        linear_comb = linear_combination("ionosphere-free", dset)
+        observation = linear_comb["code"]
     else:
         log.fatal(
-            "Configuration option 'freq_type = {}' is not valid (Note: Triple frequency solution is not " "in use.).",
-            freq_type,
+            f"Configuration option 'freq_type = {freq_type}' is not valid (Note: Triple frequency solution is not "
+            f"in use.)."
         )
 
-    return code_obs
+    return observation
 
 
 # TODO: Connect needed between station and satellite position
@@ -252,15 +198,15 @@ def get_flight_time(dset):
     return geometric_range / constant.c
 
 
-def obstype_to_freq(sys, obstype):
+def obstype_to_freq(sys: str, obstype: str) -> float:
     """Get GNSS frequency based on given GNSS observation type
 
     Args:
-        sys(str):     GNSS identifier (e.g. 'E', 'G', ...)
-        obstype(str): Observation type (e.g. 'L1', 'P1', 'C1X', ...)
+        sys:     GNSS identifier (e.g. 'E', 'G', ...)
+        obstype: Observation type (e.g. 'L1', 'P1', 'C1X', ...)
 
     Return:
-        float:    GNSS frequency in [Hz]
+        GNSS frequency in [Hz]
     """
     try:
         freq = getattr(enums, "gnss_freq_" + sys)[getattr(enums, "gnss_num2freq_" + sys)["f" + obstype[1]]]
@@ -423,62 +369,183 @@ def jd2gps(jd):
     return wwww, wd, frac, gpssec
 
 
-def linear_combination(type_: str, dset: "Dataset") -> Tuple[np.ndarray]:
-    """Calculate linear combination of observations for given linear combination type
+def linear_combination(type_: str, dset: "Dataset") -> Dict[str, np.ndarray]:
+    """Calculate linear combination of observations for given linear combination type and same observation type
+    (code, phase, doppler, snr)
 
     Args:
         dset:    Dataset
-        type_:   Type of linear combination: 'ionosphere-free'
+        type_:   Type of linear combination, which can be 'geometry-free', 'ionosphere-free', 'narrow-lane' or 
+                 'wide-lane'.
 
     Returns:
-        Tuple  with following `numpy.ndarray` arrays
-
-    ===================  ============================================================================================
-     Elements             Description
-    ===================  ============================================================================================
-     code_obs_combined    Array with combined code observations in [m].
-     phase_obs_combined   Array with combined carrier phase observations in [m].
-    ===================  ============================================================================================
+        Dictionary with observation type as key (code, phase, doppler and/or snr) and array with linear combination
+        values as values in [m].
     """
-    code_obs_combined = np.zeros(dset.num_obs)
-    phase_obs_combined = np.zeros(dset.num_obs)
+    func = {
+        "geometry-free": geometry_free_linear_combination,
+        "ionosphere-free": ionosphere_free_linear_combination,
+        "narrow-lane": narrowlane_linear_combination,
+        "wide-lane": widelane_linear_combination,
+    }
+
+    cfg_obs_code = config.tech.gnss_select_obs.obs_code.list
+    linear_comb = dict()
+    for obs_code in cfg_obs_code:
+        linear_comb[obs_code] = np.zeros(dset.num_obs)
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
 
-        # Get pseudorange and carrier phase observations for the 1st and 2nd frequency
+        # Get observations for the 1st and 2nd frequency
         #
         # NOTE: The GNSS observation types defined in meta variable 'obstypes' has a defined order, which is determined
         #       by the given observation types for each GNSS and the priority list.
         #
-        #
-        observation_code = config.tech.gnss_select_obs.obs_code.str
-        if observation_code == "code":
-            C1 = dset.meta["obstypes"][sys][0]  # Pseudorange observation for 1st frequency
-            C2 = dset.meta["obstypes"][sys][1]  # Pseudorange observation for 2nd frequency
-        elif observation_code == "phase":
-            L1 = dset.meta["obstypes"][sys][0]  # Carrier phase observation for 1st frequency
-            L2 = dset.meta["obstypes"][sys][1]  # Carrier phase observation for 2nd frequency
-        elif observation_code == "code:phase":
-            C1 = dset.meta["obstypes"][sys][0]  # Pseudorange observation for 1st frequency
-            L1 = dset.meta["obstypes"][sys][1]  # Carrier phase observation for 1st frequency
-            C2 = dset.meta["obstypes"][sys][2]  # Pseudorange observation for 2nd frequency
-            L2 = dset.meta["obstypes"][sys][3]  # Carrier phase observation for 2nd frequency
-        else:
-            log.fatal(f"Linear combination determination is not defined for observation code {observation_code}.")
-        if type_ == "ionosphere-free":
-            if "code" in observation_code:
-                f1 = getattr(enums, "gnss_freq_" + sys)["f" + C1[1]]  # Frequency of 1st band
-                f2 = getattr(enums, "gnss_freq_" + sys)["f" + C2[1]]  # Frequency of 2nd band
-                code_obs_combined[idx] = ionosphere_free_linear_combination(dset.obs[C1][idx], dset.obs[C2][idx], f1, f2)
-            elif "phase" in observation_code:
-                f1 = getattr(enums, "gnss_freq_" + sys)["f" + L1[1]]  # Frequency of 1st band
-                f2 = getattr(enums, "gnss_freq_" + sys)["f" + L2[1]]  # Frequency of 2nd band
-                phase_obs_combind[idx] = ionosphere_free_linear_combination(dset.obs[L1][idx], dset.obs[L2][idx], f1, f2)
-        else:
-            log.fatal(f"Linear combination type '{type_}' is not defined.")
+        obs_num = 0
+        for obs_code in cfg_obs_code:
 
-    return code_obs_combined, phase_obs_combined
+            obs_1 = dset.meta["obstypes"][sys][obs_num]
+            obs_2 = dset.meta["obstypes"][sys][obs_num + 1]
+
+            log.debug(
+                f"Generate {type_} combination for GNSS '{sys}' and {obs_code} observations {obs_1} and " f"{obs_2}."
+            )
+
+            if type_ == "geometry-free":
+                linear_comb[obs_code][idx] = func[type_](dset.obs[obs_1][idx], dset.obs[obs_2][idx])
+            else:
+                f1 = getattr(enums, "gnss_freq_" + sys)["f" + obs_1[1]]  # Frequency of 1st band
+                f2 = getattr(enums, "gnss_freq_" + sys)["f" + obs_2[1]]  # Frequency of 2nd band
+
+                try:
+                    linear_comb[obs_code][idx] = func[type_](dset.obs[obs_1][idx], dset.obs[obs_2][idx], f1, f2)
+                except KeyError:
+                    log.fatal(f"Linear combination 'type_' is not defined.")
+
+            obs_num += 2
+
+    return linear_comb
+
+
+def linear_combination_cmc(dset: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
+    """Calculate code multipath linear combination (CMC) based on code and phase observations
+
+    Args:
+        dset:    Dataset
+
+    Returns:
+        Tuple with code multipath linear combination for frequency 1 og 2 in [m]
+    """
+    cmc1 = np.zeros(dset.num_obs)
+    cmc2 = np.zeros(dset.num_obs)
+
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
+
+        # Get observations for the 1st and 2nd frequency
+        #
+        # NOTE: The GNSS observation types defined in meta variable 'obstypes' has a defined order, which is determined
+        #       by the given observation types for each GNSS and the priority list.
+        #
+        code1 = dset.meta["obstypes"][sys][0]
+        code2 = dset.meta["obstypes"][sys][1]
+        phase1 = dset.meta["obstypes"][sys][2]
+        phase2 = dset.meta["obstypes"][sys][3]
+
+        f1 = getattr(enums, "gnss_freq_" + sys)["f" + code1[1]]  # Frequency of 1st band
+        f2 = getattr(enums, "gnss_freq_" + sys)["f" + code2[1]]  # Frequency of 2nd band
+
+        cmc1[idx], cmc2[idx] = code_multipath_linear_combination(
+            dset.obs[code1][idx], dset.obs[code2][idx], dset.obs[phase1][idx], dset.obs[phase2][idx], f1, f2
+        )
+
+    return cmc1, cmc2
+
+
+def linear_combination_melbourne(dset: "Dataset") -> np.ndarray:
+    """Calculate Melbourne-Wübbena linear combination based on code and phase observations
+
+    Args:
+        dset:    Dataset
+
+    Returns:
+        Melbourne-Wübbena linear combination
+    """
+    linear_comb = np.zeros(dset.num_obs)
+
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
+
+        # Get observations for the 1st and 2nd frequency
+        #
+        # NOTE: The GNSS observation types defined in meta variable 'obstypes' has a defined order, which is determined
+        #       by the given observation types for each GNSS and the priority list.
+        #
+        code1 = dset.meta["obstypes"][sys][0]
+        code2 = dset.meta["obstypes"][sys][1]
+        phase1 = dset.meta["obstypes"][sys][2]
+        phase2 = dset.meta["obstypes"][sys][3]
+
+        f1 = getattr(enums, "gnss_freq_" + sys)["f" + code1[1]]  # Frequency of 1st band
+        f2 = getattr(enums, "gnss_freq_" + sys)["f" + code2[1]]  # Frequency of 2nd band
+
+        linear_comb[idx] = melbourne_linear_combination(
+            dset.obs[code1][idx], dset.obs[code2][idx], dset.obs[phase1][idx], dset.obs[phase2][idx], f1, f2
+        )
+
+    return linear_comb
+
+
+def code_multipath_linear_combination(
+    code1: np.ndarray, code2: np.ndarray, phase1: np.ndarray, phase2: np.ndarray, f1: float, f2: float
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate code multipath linear combination (CMC)
+
+    Args:
+        code1:   1st code observation array 
+        code2:   2nd code observation array
+        phase1:  1st phase observation array 
+        phase2:  2nd phase observation array
+        f1:      frequency of 1st observation
+        f2:      frequency of 2nd observation
+        
+    Returns:
+        Tuple with code multipath linear combination for frequency 1 og 2
+    """
+    # Coefficient of linear combination
+    def _get_coefficents(f1, f2):
+        n = -(f1 ** 2 + f2 ** 2) / (f1 ** 2 - f2 ** 2)
+        m = 2 * f2 ** 2 / (f1 ** 2 - f2 ** 2)
+        return n, m
+
+    def _get_cmc(code, phase1, phase2, f1, f2):
+        n, m = _get_coefficents(f1, f2)
+        return code + n * phase1 + m * phase2
+
+    # Generate linear combination
+    cmc1 = _get_cmc(code1, phase1, phase2, f1, f2)
+    cmc2 = _get_cmc(code2, phase2, phase1, f2, f1)
+
+    return cmc1, cmc2
+
+
+def geometry_free_linear_combination(obs1: np.ndarray, obs2: np.ndarray) -> np.ndarray:
+    """Generate geometry-free linear combination
+
+    Args:
+        obs1:   1st observation array 
+        obs2:   2nd observation array
+        
+    Returns:
+        Geometry-free linear combination
+    """
+    # Coefficient of linear combination
+    n = 1
+    m = -1
+
+    # Generate linear combination
+    return n * obs1 + m * obs2
 
 
 def ionosphere_free_linear_combination(obs1: np.ndarray, obs2: np.ndarray, f1: float, f2: float) -> np.ndarray:
@@ -489,13 +556,81 @@ def ionosphere_free_linear_combination(obs1: np.ndarray, obs2: np.ndarray, f1: f
         obs2:   2nd observation array
         f1:     frequency of 1st observation
         f2:     frequency of 2nd observation
+        
+    Returns:
+        Ionosphere-free linear combination
     """
-
-    # Coefficient of ionospheric-free linear combination
+    # Coefficient of linear combination
     n = f1 ** 2 / (f1 ** 2 - f2 ** 2)
     m = -f2 ** 2 / (f1 ** 2 - f2 ** 2)
 
-    # Generate ionospheric-free linear combination
+    # Generate linear combination
+    return n * obs1 + m * obs2
+
+
+def melbourne_linear_combination(
+    code1: np.ndarray, code2: np.ndarray, phase1: np.ndarray, phase2: np.ndarray, f1: float, f2: float
+) -> np.ndarray:
+    """Generate Melbourne-Wübbena linear combination
+
+    Args:
+        code1:   1st code observation array 
+        code2:   2nd code observation array
+        phase1:  1st phase observation array 
+        phase2:  2nd phase observation array
+        f1:      frequency of 1st observation
+        f2:      frequency of 2nd observation
+        
+    Returns:
+        Melbourne-Wübbena linear combination
+    """
+    # Coefficient of linear combination
+    k = f1 / (f1 - f2)
+    l = -f2 / (f1 - f2)
+    n = -f1 / (f1 + f2)
+    m = -f2 / (f1 + f2)
+
+    # Generate linear combination
+    return k * phase1 + l * phase2 + n * code1 + m * code2
+
+
+def widelane_linear_combination(obs1: np.ndarray, obs2: np.ndarray, f1: float, f2: float) -> np.ndarray:
+    """Generate widelane linear combination
+
+    Args:
+        obs1:   1st observation array 
+        obs2:   2nd observation array
+        f1:     frequency of 1st observation
+        f2:     frequency of 2nd observation
+        
+    Returns:
+        Widelane linear combination
+    """
+    # Coefficient of linear combination
+    n = f1 / (f1 - f2)
+    m = -f2 / (f1 - f2)
+
+    # Generate linear combination
+    return n * obs1 + m * obs2
+
+
+def narrowlane_linear_combination(obs1: np.ndarray, obs2: np.ndarray, f1: float, f2: float) -> np.ndarray:
+    """Generate narrow-lane linear combination
+
+    Args:
+        obs1:   1st observation array 
+        obs2:   2nd observation array
+        f1:     frequency of 1st observation
+        f2:     frequency of 2nd observation
+        
+    Returns:
+        Narrow-lane linear combination
+    """
+    # Coefficient of linear combination
+    n = f1 / (f1 + f2)
+    m = f2 / (f1 + f2)
+
+    # Generate linear combination
     return n * obs1 + m * obs2
 
 

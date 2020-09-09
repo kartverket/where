@@ -57,7 +57,7 @@ setup(
         "folium",
         "IPython",
         "jplephem",
-        "matplotlib",
+        "matplotlib>=3.1.1",
         "midgard>=1.1.1",
         "numpy",
         "pandas",
@@ -69,7 +69,7 @@ setup(
     # following syntax, for example:
     #   $ pip install -e .[optional,dev_tools]
     extras_require={
-        "optional": ["colorama", "h5py", "netCDF4", "python-editor", "seaborn"],
+        "optional": ["colorama", "h5py", "netCDF4", "python-editor", "seaborn", "cartopy"],
         "dev_tools": ["black", "bumpversion", "flake8", "line_profiler", "mypy", "pytest"],
     },
     # If there are data files included in your packages that need to be installed, specify them here.  If using Python

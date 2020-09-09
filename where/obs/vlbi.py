@@ -36,7 +36,7 @@ def write_to_dataset(dset, rundate=None, session=None, obs_format=None, **obs_ar
 def _write_to_dataset(parser, dset, rundate, session):
 
     data = parser.as_dict()
-    units = data["meta"].get("units", {})
+    units = data.get("meta", {}).get("units", {})
 
     # Session meta
     dset.meta.add("tech", "vlbi")
@@ -68,7 +68,6 @@ def _write_to_dataset(parser, dset, rundate, session):
     data["station_2"] = np.char.replace(data["station_2"], " ", "_")
 
     dset.num_obs = len(data["time"])
-
     dset.add_time("time", val=data.pop("time"), scale="utc", fmt="isot", write_level="operational")
 
     for field, values in data.items():
@@ -110,7 +109,7 @@ def _write_to_dataset(parser, dset, rundate, session):
             cdp = trf_site.key
             ignore_stations = config.tech.ignore_station.stations.list
             logger = log.info if site in ignore_stations else log.warn
-            logger(f"Undefined station name {site}. Assuming station is {trf_site.name}.")
+            logger(f"Undefined station name {site}. Assuming station is {trf_site.name} to get a cdp number.")
 
         data["pos_" + site] = trf_site.pos.trs.val
         _site_pos = np.mean(data[f"pos_{site}"], axis=0)

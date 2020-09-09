@@ -81,11 +81,11 @@ def sisre_report(dset):
     write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
 
     # TODO: Better solution?
-    if "sampling_rate" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
-        dset.vars["sampling_rate"] = ""
+    if "sampling_rate" not in dset.analysis:  # necessary if called for example by ./where/tools/concatenate.py
+        dset.analysis["sampling_rate"] = ""
 
     # Generate SISRE report
-    path = config.files.path(f"output_sisre_report_{dset.vars['label']}", file_vars=dset.vars)
+    path = config.files.path(f"output_sisre_report_{dset.vars['label']}", file_vars={**dset.vars, **dset.analysis})
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="SISRE analysis")
         rpt.title_page()
@@ -97,7 +97,7 @@ def sisre_report(dset):
 
         # Generate figure directory to save figures generated for SISRE report
         fid.write("\n# SISRE analysis results\n\n")
-        figure_dir = config.files.path("output_sisre_report_figure", file_vars=dset.vars)
+        figure_dir = config.files.path("output_sisre_report_figure", file_vars={**dset.vars, **dset.analysis})
         figure_dir.mkdir(parents=True, exist_ok=True)
 
         _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
@@ -418,7 +418,7 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
             if np.sum(dset[field][idx]) != 0:
                 figure_path = figure_dir / f"plot_scatter_{field}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
                 plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], alpha=0.7)
-                plt.ylabel(f"{orbit} satellite bias [dset.unit(field)]")
+                plt.ylabel(f"{orbit} satellite bias [dset.unit(field)[0]]")
                 plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
                 plt.xlabel("Time [GPS]")
                 plt.title(f"{GNSS_NAME[sys]}")
@@ -461,11 +461,11 @@ def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
         if legend == True:
             plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
         text = (
-            f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ {dset.unit(field)}"
-            f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ {dset.unit(field)}"
+            f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ {dset.unit(field)[0]}"
+            f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ {dset.unit(field)[0]}"
         )
         fig.text(0.83, 0.9, text, horizontalalignment="right", verticalalignment="top", multialignment="left")
-        plt.ylabel(f"{field.upper()} [{dset.unit(field)}]")
+        plt.ylabel(f"{field.upper()} [{dset.unit(field)[0]}]")
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
         plt.xlabel("Time [GPS]")
         plt.title(f"{GNSS_NAME[sys]}")
@@ -689,20 +689,20 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset, rpt):
     # Write field Dataframes
     column = "rms"  # Column to plot
 
-    fid.write(f"\n\n#Statistics\n")
+    fid.write(f"\n\n# Statistics\n\n")
     fid.write(
         "In this Section statistics are represented for: \n\n{}".format(
             "".join(["* " + v + "\n" for v in FIELDS.values()])
         )
     )
     for field, df in field_dfs.items():
-        fid.write(f"\n\n##Statistic for {FIELDS[field]}\n")
-        fid.write(f"Unit: {dset.unit(field)}\n")
+        fid.write(f"\n\n## Statistic for {FIELDS[field]}\n\n")
+        fid.write(f"Unit: {dset.unit(field)[0]}\n")
         rpt.write_dataframe_to_markdown(df, format="6.3f")
         fid.write("  ")
 
-        # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column, unit=dset.unit(field))
-        _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column, unit=dset.unit(field))
+        # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column, unit=dset.unit(field)[0])
+        _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column, unit=dset.unit(field)[0])
 
 
 def _unhealthy_satellites(fid, dset):
@@ -737,7 +737,7 @@ def _write_information(fid):
 
     fid.write("\\newpage\n")
     fid.write(
-        """#SISRE analysis\n
+        """# SISRE analysis\n\n
 
 For the SISRE analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
 

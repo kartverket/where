@@ -1,4 +1,3 @@
-
 """Write  Doppler GNSS receiver velocity results
 
 Description:
@@ -79,7 +78,7 @@ FIELDS = (
         "%10d",
         10,
         "SOL_VAL",
-        "u/l",
+        "",
         "Solution validation indicator (0=test passed, 1: Not passed)",
     ),
     WriterField(
@@ -90,11 +89,11 @@ FIELDS = (
         "%10d",
         10,
         "SAT_USED",
-        "u/l",
+        "",
         "Number of satellites used in the computation",
     ),
-    WriterField("3d_vel", "3d_vel", (), float, "%15.6f", 15, "3DSpeed", "m/s", "Instantaneous 3D speed [m/s]"),
-    WriterField("2d_vel", "2d_vel", (), float, "%15.6f", 15, "HSpeed", "m/s", "Instantaneous horizontal speed [m/s]"),
+    WriterField("vel_3d", "vel_3d", (), float, "%15.6f", 15, "3DSpeed", "m/s", "Instantaneous 3D speed [m/s]"),
+    WriterField("vel_2d", "vel_2d", (), float, "%15.6f", 15, "HSpeed", "m/s", "Instantaneous horizontal speed [m/s]"),
     # GR-III
     ##WriterField("x_vel", "x_vel",  (), float, "%15.6f", 15, "XSpeed" , "m/s", "Instantaneous speed along WGS84 X axis [m/s]"),
     WriterField(
@@ -109,17 +108,23 @@ FIELDS = (
         "u_vel", "u_vel", (), float, "%15.6f", 15, "VerticalSpeed", "m/s", "Instantaneous vertical  speed  [m/s]"
     ),
     # GR-IV
-    WriterField("gdop", "gdop", (), float, "%10.2f", 10, "GDOP", "u/l", "Geometric Dilution of Precision"),
-    WriterField("pdop", "pdop", (), float, "%10.2f", 10, "PDOP", "u/l", "Position Dilution of Precision"),
-    WriterField("hdop", "hdop", (), float, "%10.2f", 10, "HDOP", "u/l", "Horizontal Dilution of Precision"),
-    WriterField("vdop", "vdop", (), float, "%10.2f", 10, "VDOP", "u/l", "Vertical Dilution of Precision"),
+    WriterField("gdop", "gdop", (), float, "%10.2f", 10, "GDOP", "", "Geometric Dilution of Precision"),
+    WriterField("pdop", "pdop", (), float, "%10.2f", 10, "PDOP", "", "Position Dilution of Precision"),
+    WriterField("hdop", "hdop", (), float, "%10.2f", 10, "HDOP", "", "Horizontal Dilution of Precision"),
+    WriterField("vdop", "vdop", (), float, "%10.2f", 10, "VDOP", "", "Vertical Dilution of Precision"),
     ## GR-V
-    WriterField("c_xx", "c_xx", (), float, "%10.3f", 10, "COV_XX", "m^2", "Variance of station position X-coordinate"),
-    WriterField("c_yy", "c_yy", (), float, "%10.3f", 10, "COV_YY", "m^2", "Variance of station position Y-coordinate"),
-    WriterField("c_zz", "c_zz", (), float, "%10.3f", 10, "COV_ZZ", "m^2", "Variance of station position Z-coordinate"),
-    WriterField("c_xy", "c_xy", (), float, "%10.3f", 10, "COV_XY", "m^2", "XY-covariance of station position"),
-    WriterField("c_xz", "c_xz", (), float, "%10.3f", 10, "COV_XZ", "m^2", "XZ-covariance of station position"),
-    WriterField("c_yz", "c_yz", (), float, "%10.3f", 10, "COV_YZ", "m^2", "YZ-covariance of station position"),
+    WriterField(
+        "c_xx", "c_xx", (), float, "%10.3f", 10, "COV_XX", "m**2", "Variance of station position X-coordinate"
+    ),
+    WriterField(
+        "c_yy", "c_yy", (), float, "%10.3f", 10, "COV_YY", "m**2", "Variance of station position Y-coordinate"
+    ),
+    WriterField(
+        "c_zz", "c_zz", (), float, "%10.3f", 10, "COV_ZZ", "m**2", "Variance of station position Z-coordinate"
+    ),
+    WriterField("c_xy", "c_xy", (), float, "%10.3f", 10, "COV_XY", "m**2", "XY-covariance of station position"),
+    WriterField("c_xz", "c_xz", (), float, "%10.3f", 10, "COV_XZ", "m**2", "XZ-covariance of station position"),
+    WriterField("c_yz", "c_yz", (), float, "%10.3f", 10, "COV_YZ", "m**2", "YZ-covariance of station position"),
 )
 
 
@@ -131,11 +136,9 @@ def gnss_receiver_velocity(dset: "Dataset") -> None:
     Args:
         dset:  A dataset containing the data.
     """
-
-    # File name generation
     file_path = config.files.path("output_receiver_velocity", file_vars=dset.vars)
 
-    # Handle GR-I: date field to dataset
+    # Add date field to dataset
     if "date" not in dset.fields:
         dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
 
@@ -146,7 +149,7 @@ def gnss_receiver_velocity(dset: "Dataset") -> None:
         for epoch in dset.unique("time"):
             idx = dset.filter(time=epoch)
 
-            # Append current epoch position solution to final output solution
+            # Append current epoch solution to final output solution
             output_list.append(tuple([get_field(dset, f.field, f.attrs, f.unit)[idx][0] for f in FIELDS]))
 
     else:

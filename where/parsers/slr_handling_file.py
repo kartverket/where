@@ -46,27 +46,26 @@ class SlrHandlingFileParser(SinexParser):
         """
 
         Example:
-            *CODE PT_ UNIT T _DATA_START_ __DATA_END__ M __E-VALUE___ STD_DEV ___COMMENTS______
-             7080 --- mm   A 16:106:00000 00:000:00000 E                      small remaining range bias
-                      1111111111222222222233333333334444444444555555555566666666667777777777
-            01234567890123456789012345678901234567890123456789012345678901234567890123456789
+            *CODE PT UNIT T _DATA_START_ __DATA_END__ M __E-VALUE___ STD_DEV _E-RATE__ CMNTS
+             1863 --      A 00:000:00000 94:001:00000 X
+             1864 --      A 02:070:00000 02:101:00000 X
         """
         return SinexBlock(
             marker="SOLUTION/DATA_HANDLING",
             fields=(
                 SinexField("site_code", 1, "U4"),
-                SinexField("point_code", 6, "U3"),  # TODO "---" means all satellites, not sure what L55 etc means.
-                SinexField("unit", 10, "U4"),
+                SinexField("point_code", 6, "U2"),  # TODO "---" means all satellites, not sure what L55 etc means.
+                SinexField("unit", 9, "U4"),
                 SinexField(
-                    "obs_code", 15, "U1"
+                    "obs_code", 14, "U1"
                 ),  # TODO: Indicates if information involves first or second wavelength?
-                SinexField("start_time", 17, "O", "epoch"),
-                SinexField("end_time", 30, "O", "epoch"),
-                SinexField("handling_code", 43, "U1"),  # Indicated what is to be done with the data.
-                SinexField("e_value", 45, "U12"),
-                SinexField("std_dev", 58, "U7"),
-                SinexField("comments1", 66, "U9"),
-                SinexField("comments2", 76, "U7"),
+                SinexField("start_time", 16, "O", "epoch"),
+                SinexField("end_time", 29, "O", "epoch"),
+                SinexField("handling_code", 42, "U1"),  # Indicated what is to be done with the data.
+                SinexField("e_value", 44, "U12"),
+                SinexField("std_dev", 57, "U7"),
+                SinexField("comments1", 65, "U9"),
+                SinexField("comments2", 75, "U7"),
             ),
             parser=self.parse_data_handling,
         )

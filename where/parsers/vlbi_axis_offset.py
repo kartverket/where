@@ -19,14 +19,14 @@ class VlbiAxisOffsetParser(LineParser):
     """A parser for reading VLBI axis offset"""
 
     def setup_parser(self):
-        return dict( 
-            names="ivsname, apriori_offset, aposteriori_offset, plussminus, ,ferr, comment", 
-            dtype=("U8", "f8", "f8", "U3", "f8", "U40"), 
-            delimiter=(8, 10, 10, 3, 8, 40), 
-            skip_header=1, 
-            skip_footer=1, 
-            comments="#", 
-            autostrip=True, 
+        return dict(
+            names="ivsname, apriori_offset, aposteriori_offset, plussminus, ,ferr, comment",
+            dtype=("U8", "f8", "f8", "U3", "f8", "U40"),
+            delimiter=(8, 10, 10, 3, 8, 40),
+            skip_header=1,
+            skip_footer=1,
+            comments="#",
+            autostrip=True,
         )
 
     def structure_data(self):

@@ -4,7 +4,7 @@
 
 
 $Revision: 18265 $
-$Date: 2019-09-20 12:52:36 +0200 (fr., 20 sep. 2019) $
+$Date: 2019-09-20 12:52:36 +0200 (Fri, 20 Sep 2019) $
 $LastChangedBy: kirann $
 
 """

@@ -7,6 +7,7 @@ Description:
 """
 # Standard library imports
 from collections import namedtuple
+from typing import List, Tuple
 
 # External library imports
 import numpy as np
@@ -18,6 +19,7 @@ from midgard.writers._writers import get_header
 # Where imports
 import where
 from where.lib import config
+from where.lib import log
 from where.lib import util
 
 WriterField = namedtuple(
@@ -72,23 +74,6 @@ FIELDS = (
         "sigma", "sigma", (), float, "%11.3e", 11, "SIGMA", "meter", "Standard deviation of estimated parameter value"
     ),
     WriterField("empty", "empty", (), str, "%2s", 2, "", "", ""),  # get spaces between 'sigma' and 'param_name' column
-    WriterField(
-        "param_name",
-        "param_name",
-        (),
-        object,
-        "%-20s",
-        20,
-        "PARAM_NAME",
-        "",
-        f"Parameter name: \n"
-        f"""
-{'': >38}gnss_rcv_clock   - GNSS receiver clock
-{'': >38}gnss_site_pos-x  - X-coordinate of site position
-{'': >38}gnss_site_pos-x  - Y-coordinate of site position
-{'': >38}gnss_site_pos-x  - Z-coordinate of site position
-""",
-    ),
 )
 
 
@@ -104,7 +89,53 @@ def estimate_solution(dset: "Dataset") -> None:
     # Add date field to dataset
     if "date" not in dset.fields:
         dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
-
+        
+    # Add states to WriterField depending on used pipeline
+    fields_def = list(FIELDS)
+    
+    if dset.vars["pipeline"] == "gnss":
+        
+        fields_def.append(WriterField(
+            "param_name",
+            "param_name",
+            (),
+            object,
+            "%-20s",
+            20,
+            "PARAM_NAME",
+            "",
+            f"Parameter name: \n"
+            f"""
+{'': >38}gnss_rcv_clock   - GNSS receiver clock
+{'': >38}gnss_site_pos-x  - X-coordinate of site position
+{'': >38}gnss_site_pos-y  - Y-coordinate of site position
+{'': >38}gnss_site_pos-z  - Z-coordinate of site position
+""",
+        ))
+        
+    elif dset.vars["pipeline"] == "gnss_vel":
+        
+        fields_def.append(WriterField(
+            "param_name",
+            "param_name",
+            (),
+            object,
+            "%-20s",
+            20,
+            "PARAM_NAME",
+            "",
+            f"Parameter name: \n"
+            f"""
+{'': >38}gnss_rcv_clock_drift   - GNSS receiver clock drift
+{'': >38}gnss_site_vel-x        - X-coordinate of site velocity
+{'': >38}gnss_site_vel-y        - Y-coordinate of site velocity
+{'': >38}gnss_site_vel-z        - Z-coordinate of site velocity
+""",
+        ))
+                
+    else:
+        log.fatal("Estimate solution writer is implemented only for 'gnss' and 'gnss_vel' pipeline.")
+        
     # Epochwise estimation or over whole time period
     if config.tech.estimate_epochwise.bool:
 
@@ -113,12 +144,12 @@ def estimate_solution(dset: "Dataset") -> None:
             idx = dset.time.gps.mjd == epoch
 
             # Append current epoch solution to final output solution for each estimated parameter
-            epoch_array = _get_epoch(dset, idx)
+            epoch_array = _get_epoch(dset, idx, fields_def)
             output_array = np.concatenate((output_array, epoch_array), axis=0) if output_array.size else epoch_array
     else:
         # Get solution for first observation
         idx = np.squeeze(np.array(np.nonzero(dset.time.gps.mjd)) == 0)  # first observation -> TODO: Better solution?
-        output_array = _get_epoch(dset, idx)
+        output_array = _get_epoch(dset, idx, fields_def)
 
     # Write to disk
     header = get_header(
@@ -130,19 +161,20 @@ def estimate_solution(dset: "Dataset") -> None:
     np.savetxt(
         file_path,
         output_array,
-        fmt=tuple(f.format for f in FIELDS),
+        fmt=tuple(f.format for f in fields_def),
         header="\n".join(header),
         delimiter="",
         encoding="utf8",
     )
 
 
-def _get_epoch(dset: "Dataset", idx: np.ndarray) -> np.ndarray:
+def _get_epoch(dset: "Dataset", idx: np.ndarray, fields_def: List[Tuple["WriterField"]]) -> np.ndarray:
     """Get estimation solution for given epoch indices
 
     Args:
-        dset:   A dataset containing the data.
-        idx:    Indices for epoch.
+        dset:       A dataset containing the data.
+        idx:        Indices for epoch.
+        fields_def: Writer field definition
 
     Returns:
         Estimation solution for given epoch indices
@@ -150,7 +182,7 @@ def _get_epoch(dset: "Dataset", idx: np.ndarray) -> np.ndarray:
     epoch_array = np.array([])
 
     # Put together fields in an array as specified by the 'dtype' tuple list
-    dtype = [(f.field, f.dtype) for f in FIELDS]
+    dtype = [(f.field, f.dtype) for f in fields_def]
 
     for param_name in dset.meta["param_names"]:
 

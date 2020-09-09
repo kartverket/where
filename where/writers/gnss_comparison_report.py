@@ -20,18 +20,18 @@ Example:
 """
 # Standard library imports
 from typing import Any, Dict
+from pathlib import PosixPath
 
 # External library imports
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 # Midgard imports
+from midgard.data import position
 from midgard.dev import plugins
 from midgard.plot.matplotlib_extension import plot
 
 # Where imports
-import where
 from where.lib import config
 from where.lib import log
 from where.writers._report import Report
@@ -61,7 +61,7 @@ def gnss_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     # Generate GNSS comparison report
     path = config.files.path("output_gnss_comparison_report", file_vars=dset_first.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
-        rpt = Report(fid, rundate=dset_first.rundate, path=path, description="Comparison of GNSS analyses")
+        rpt = Report(fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of GNSS analyses")
         rpt.title_page()
         _add_to_report(rpt, figure_dir, dfs_day, dfs_month, dset_first.vars)
         rpt.markdown_to_pdf()
@@ -69,7 +69,7 @@ def gnss_comparison_report(dset: Dict[str, "Dataset"]) -> None:
 
 def _add_to_report(
     rpt: "Report",
-    figure_dir: "pathlib.PosixPath",
+    figure_dir: PosixPath,
     dfs_day: Dict[str, pd.core.frame.DataFrame],
     dfs_month: Dict[str, pd.core.frame.DataFrame],
     file_vars: Dict[str, Any],
@@ -100,6 +100,9 @@ def _add_to_report(
             rpt.add_text("Daily 95th percentile VPE results in meter:")
             rpt.write_dataframe_to_markdown(dfs_day["vpe"], format="6.2f", statistic=True)
 
+            rpt.add_text("Daily 95th percentile 3D position results in meter:")
+            rpt.write_dataframe_to_markdown(dfs_day["pos_3d"], format="6.2f", statistic=True)
+
         elif sample_name == "Monthly":
             rpt.add_text("Monthly 95th percentile HPE results in meter:")
             rpt.write_dataframe_to_markdown(dfs_month["hpe"], format="6.2f")
@@ -107,7 +110,10 @@ def _add_to_report(
             rpt.add_text("Monthly 95th percentile VPE results in meter:")
             rpt.write_dataframe_to_markdown(dfs_month["vpe"], format="6.2f")
 
-        # Add HPE 95th and VPE 95th plots
+            rpt.add_text("Monthly 95th percentile 3D position results in meter:")
+            rpt.write_dataframe_to_markdown(dfs_month["pos_3d"], format="6.2f")
+
+        # Add HPE 95th, VPE 95th and 3D positon 95th plots
         rpt.add_figure(
             f"{figure_dir}/plot_hpe_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for horizontal position error (HPE).",
@@ -120,17 +126,24 @@ def _add_to_report(
             clearpage=True,
         )
 
+        rpt.add_figure(
+            f"{figure_dir}/plot_pos_3d_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            caption="95th percentile for 3D position error (3D).",
+            clearpage=True,
+        )
+
 
 def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.DataFrame]:
     """Generate dataframe based on station datasets
 
     The dataframe for each station in dictionary "dfs" has following columns:
 
-        east:  East-coordinate in topocentric system
-        north: North-coordinate in topocentric system
-        up:    Up-coordinate in topocentric system
-        hpe:   horizontal position error
-        vpe:   vertical position error
+        east:   East-coordinate in topocentric system
+        north:  North-coordinate in topocentric system
+        up:     Up-coordinate in topocentric system
+        hpe:    horizontal position error
+        vpe:    vertical position error
+        pos_3d: 3D position error
 
     Example for "dfs" dictionary:
      
@@ -175,7 +188,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         | Element              | Description                                                                          |
         |----------------------|--------------------------------------------------------------------------------------|
         | dfs                  | Dictionary with station name as keys and the belonging dataframe as value with       |
-        |                      | following dataframe columns: east, north, up, hpe, vpe                               |
+        |                      | following dataframe columns: east, north, up, hpe, vpe, pos_3d                       |
         | dfs_day              | Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value  |
         |                      | with DAILY samples of 95th percentile and stations as columns.                       |
         | dfs_month            | Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value  |
@@ -183,8 +196,8 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
     """
     dsets = dset
     dfs = {}
-    dfs_day = {"hpe": pd.DataFrame(), "vpe": pd.DataFrame()}
-    dfs_month = {"hpe": pd.DataFrame(), "vpe": pd.DataFrame()}
+    dfs_day = {"hpe": pd.DataFrame(), "vpe": pd.DataFrame(), "pos_3d": pd.DataFrame()}
+    dfs_month = {"hpe": pd.DataFrame(), "vpe": pd.DataFrame(), "pos_3d": pd.DataFrame()}
 
     for station, dset in dsets.items():
 
@@ -193,23 +206,34 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             continue
 
         # Determine topocentric coordinates (east, north, up)
-        ref_pos = np.array([dset.meta["pos_x"], dset.meta["pos_y"], dset.meta["pos_z"]])
-        enu = (dset.site_pos._itrs2enu @ (dset.site_pos.itrs_pos - ref_pos)[:, :, None])[:, :, 0]
-        hpe = np.sqrt(enu[:, 0] ** 2 + enu[:, 1] ** 2)
-        vpe = np.absolute(enu[:, 2])
+        ref_pos = position.Position(
+                            np.repeat(
+                                  np.array([dset.meta["pos_x"], dset.meta["pos_y"], dset.meta["pos_z"]])[None, :], 
+                                  dset.num_obs, 
+                                  axis=0,
+                            ), 
+                            system="trs",
+        )
+        dset.add_position_delta(
+            name="enu",
+            val=(dset.site_pos.trs - ref_pos).val,
+            system="trs",
+            ref_pos=ref_pos,
+        )
+        
+        hpe = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2)
+        vpe = np.absolute(dset.enu.enu.up)
+        pos_3d = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2 + dset.enu.enu.up ** 2)
 
         # TODO: Maybe it is not necessary to introduce enu, hpe and vpe to dataset
         #      Maybe better to introduce fields in estimate stage already.
-        dset.add_position("enu", time="time", itrs=enu)
         dset.add_float("hpe", val=hpe)
         dset.add_float("vpe", val=vpe)
+        dset.add_float("pos_3d", val=pos_3d)
 
-        # Determine dataframe with east, north, up, hpe and vpe columns
-        df = dset.as_dataframe(fields=["enu.itrs", "time.gps", "hpe", "vpe"])
-        df = df.drop(
-            columns=["enu_itrs_3", "enu_itrs_4", "enu_itrs_5"]
-        )  # TODO: workaround; check why as_dataframe introduce these columns
-        df = df.rename(columns={"enu_itrs_0": "east", "enu_itrs_1": "north", "enu_itrs_2": "up"})
+        # Determine dataframe with east, north, up, hpe, vpe and pos_3d columns
+        df = dset.as_dataframe(fields=["enu.enu", "time", "hpe", "vpe", "pos_3d"])
+        df = df.rename(columns={"enu_enu_0": "east", "enu_enu_1": "north", "enu_enu_2": "up"})
 
         if df.empty:
             continue
@@ -217,7 +241,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             # Save data in dictionaries
             dfs.update({station: df})
 
-            df_day = df.set_index("time.gps").resample("D", how=lambda x: np.nanpercentile(x, q=95))
+            df_day = df.set_index("time").resample("D", how=lambda x: np.nanpercentile(x, q=95))
             for field in dfs_day.keys():
                 if dfs_day[field].empty:
                     dfs_day[field][station] = df_day[field]
@@ -225,7 +249,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
                     dfs_day[field] = pd.concat([dfs_day[field], df_day[field]], axis=1)
                 dfs_day[field] = dfs_day[field].rename(columns={field: station})
 
-            df_month = df.set_index("time.gps").resample("M", how=lambda x: np.nanpercentile(x, q=95))
+            df_month = df.set_index("time").resample("M", how=lambda x: np.nanpercentile(x, q=95))
             df_month.index = df_month.index.strftime("%b-%Y")
             for field in dfs_month.keys():
                 dfs_month[field][station] = df_month[field]
@@ -239,7 +263,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 def _plot_position_error(
     dfs_day: Dict[str, pd.core.frame.DataFrame],
     dfs_month: Dict[str, pd.core.frame.DataFrame],
-    figure_dir: "pathlib.PosixPath",
+    figure_dir: PosixPath,
     file_vars: Dict[str, Any],
 ) -> None:
     """Plot horizontal and vertical position error plots (95th percentile) 
@@ -261,7 +285,7 @@ def _plot_position_error(
         "plot_to": "file",
         "plot_type": "plot",
         # "statistic": ["rms", "mean", "std", "min", "max", "percentile"], #TODO: Is only shown for data, which are plotted at last.
-        "title": file_vars["solution"].upper(),
+        "title": config.tech.gnss_comparison_report.title.str.upper(),
     }
 
     colors = (
@@ -281,12 +305,14 @@ def _plot_position_error(
     for sample_name, sample_data in samples.items():
 
         # Loop over fields to plot
-        for field in ["hpe", "vpe"]:
+        for field in ["hpe", "vpe", "pos_3d"]:
 
             if field == "hpe":
-                opt_args["ylim"] = [0.0, 8.0]
+                opt_args["ylim"] = [0.0, 4.0]
             elif field == "vpe":
-                opt_args["ylim"] = [0.0, 10.0]
+                opt_args["ylim"] = [0.0, 6.0]
+            elif field == "pos_3d":
+                opt_args["ylim"] = [0.0, 6.0]
 
             # Generate x- and y-arrays for plotting
             x_arrays = []
@@ -305,7 +331,7 @@ def _plot_position_error(
                 x_arrays=x_arrays,
                 y_arrays=y_arrays,
                 xlabel="Time [GPS]",
-                ylabel=f"{field.upper()} 95%",
+                ylabel="3D 95%" if field == "pos_3d" else f"{field.upper()} 95%",
                 y_unit="m",
                 labels=labels,
                 colors=colors,

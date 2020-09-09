@@ -9,7 +9,7 @@ precise orbit dataset with 5 min data interval. The comparison follows the examp
 -------
 
 $Revision: 18000 $
-$Date: 2019-06-28 14:20:19 +0200 (fr., 28 juni 2019) $
+$Date: 2019-06-28 14:20:19 +0200 (Fri, 28 Jun 2019) $
 $LastChangedBy: kirann $
 """
 

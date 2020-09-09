@@ -59,10 +59,19 @@ FIELDS = {
     "sat_pos_x": WriterField("X", "Satellite position", "m"),
     "sat_pos_y": WriterField("Y", "Satellite position", "m"),
     "sat_pos_z": WriterField("Z", "Satellite position", "m"),
-    "residual": WriterField("Residual", "Residual", "m"),
+    "residual": WriterField("Residual", "Residual", "m/s"),
     "site_pos_vs_ref_east": WriterField("East", "Site position vs. reference position", "m"),
     "site_pos_vs_ref_north": WriterField("North", "Site position vs. reference position", "m"),
     "site_pos_vs_ref_up": WriterField("Up", "Site position vs. reference position", "m"),
+    "site_vel_3d": WriterField("3D", "3D site velocity", "m/s"),
+    "site_vel_h": WriterField("HV", "Horizontal site velocity", "m/s"),
+    "site_vel_v": WriterField("VV", "Vertical site velocity", "m/s"),
+    "site_vel_x": WriterField("X", "Site velocity", "m/s"),
+    "site_vel_y": WriterField("Y", "Site velocity", "m/s"),
+    "site_vel_z": WriterField("Z", "Site velocity", "m/s"),
+    "site_vel_east": WriterField("East", "Site velocity", "m/s"),
+    "site_vel_north": WriterField("North", "Site velocity", "m/s"),
+    "site_vel_up": WriterField("Up", "Site velocity", "m/s"),
     "tdop": WriterField("TDOP", "Time dilution of precision", "m"),
     "troposphere_dT": WriterField("Delay", "Tropospheric delay", "m"),
     "vdop": WriterField("VDOP", "Vertical dilution of precision", "m"),
@@ -86,7 +95,7 @@ def gnss_compare_datasets(dset: Dict[str, "Dataset"]) -> None:
     # +MURKS
     vars_ = dset2.vars.copy()
     vars_["stage"] = vars_["stage"] + "x"
-    dset2_path = config.files.path("dataset_hdf5", file_vars=vars_)
+    dset2_path = config.files.path("dataset", file_vars=vars_)
     if dset2_path.exists():
         dset2_path.unlink()
     dset2.write_as(stage=vars_["stage"])
@@ -104,16 +113,16 @@ def gnss_compare_datasets(dset: Dict[str, "Dataset"]) -> None:
     ddiff = _difference_datasets(dset1, dset2, difference_by)
 
     # Generate figure directory to save figures generated for GNSS report
-    figure_dir = config.files.path("output_gnss_report_figure", file_vars=dset1.vars)
+    figure_dir = config.files.path("output_gnss_vel_report_figure", file_vars=dset1.vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
     _plot(dset1, dset2, ddiff, common_fields, figure_dir)
 
     # Generate report
-    path = config.files.path("output_gnss_report", file_vars=dset1.vars)
+    path = config.files.path("output_gnss_vel_report", file_vars=dset1.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
-        rpt = Report(fid, rundate=dset1.rundate, path=path, description="Comparison of two GNSS datasets")
+        rpt = Report(fid, rundate=dset1.vars["rundate"], path=path, description="Comparison of two GNSS datasets")
         rpt.title_page()
         _add_to_report(rpt, common_fields, figure_dir)
         rpt.markdown_to_pdf()
@@ -184,6 +193,7 @@ def _concatenate_fields(dset: "Dataset", fields: List[str]) -> List[str]:
         List with string lines, whereby each line represents concatenated fields
     """
     concatenated_fields = []
+    import IPython; IPython.embed()
     for values in dset.values(*fields):
         line = ""
         for value in values:
@@ -208,15 +218,27 @@ def _decimate_datasets(dset1: "Dataset", dset2: "Dataset", decimate_by: List[str
     keep_idx1 = np.zeros(dset1.num_obs, dtype=bool)
     keep_idx2 = np.zeros(dset2.num_obs, dtype=bool)
 
-    # Get common dataset data
-    hash1 = _concatenate_fields(dset1, decimate_by)
-    hash2 = _concatenate_fields(dset2, decimate_by)
-    hash_both = sorted(set(hash1) & set(hash2))
-    idx1 = [hash1.index(h) for h in hash_both]
-    idx2 = [hash2.index(h) for h in hash_both]
-    keep_idx1[idx1] = True
-    keep_idx2[idx2] = True
+    #+TODO
+    # Change time scale from GPS to UTC
+    dset1_utc = dset1.time.utc
+    del dset1.time
+    dset1.add_time("time", val= dset1_utc, scale="utc", fmt="datetime")
 
+    dset2_utc = dset2.time.utc
+    del dset2.time
+    dset2.add_time("time", val= dset2_utc, scale="utc", fmt="datetime")
+    #-TODO
+
+    # Get common dataset data   
+    dset1_index_data = [dset1[n.strip()] for n in decimate_by]
+    dset2_index_data = [dset2[n.strip()] for n in decimate_by]
+    A = np.rec.fromarrays(dset1_index_data)
+    B = np.rec.fromarrays(dset2_index_data)
+    common, dset1_idx, dset2_idx = np.intersect1d(A, B, return_indices=True)
+    
+    keep_idx1[dset1_idx] = True
+    keep_idx2[dset2_idx] = True
+    
     # Decimate datasets
     dset1.subset(keep_idx1)
     dset2.subset(keep_idx2)
@@ -233,8 +255,9 @@ def _difference_datasets(dset1: "Dataset", dset2: "Dataset", difference_by: List
     Returns:
         ddiff: Dataset containing the differences for each common field between Dataset 'dset1' and Dataset 'dset2'
     """
-    ddiff = dset1.difference_with(dset2, difference_by=difference_by)
-    ddiff.write_as(tech=dset1.vars["tech"], stage="dset_diff")
+    ddiff = dset1.difference(dset2, index_by=",".join(difference_by))
+    ddiff.vars.update(dset1.vars)
+    ddiff.write_as(pipeline=dset1.vars["pipeline"], stage="dset_diff")
     return ddiff
 
 

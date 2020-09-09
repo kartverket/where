@@ -12,11 +12,13 @@ import pathlib
 from typing import List, Tuple
 
 # External library imports
+import numpy as np
 import pandas as pd
 
 # Midgard imports
 from midgard.collections import enums
 from midgard.dev import plugins
+from midgard.gnss import gnss
 from midgard.plot.matplotlib_extension import plot_bar_dataframe_columns, plot
 
 # Where imports
@@ -47,7 +49,8 @@ def rinex_obs_report(dset: "Dataset") -> None:
 
     # Generate plots
     df_system, df_obstype = _generate_dataframes(dset)
-    _plot_scatter_satellite_availability(dset, figure_dir)
+    _plot_satellite_availability(dset, figure_dir)
+    _plot_number_of_satellites(dset, figure_dir)
     _plot_observation_system(df_system, figure_dir)
     _plot_observation_type(df_obstype, figure_dir)
 
@@ -79,10 +82,10 @@ def _add_figures(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath"
 
 
 def _add_to_report(
-        rpt: "Report", 
-        figure_dir: pathlib.PosixPath,
-        df_system: pd.core.frame.DataFrame,
-        df_obstype: pd.core.frame.DataFrame,
+    rpt: "Report",
+    figure_dir: pathlib.PosixPath,
+    df_system: pd.core.frame.DataFrame,
+    df_obstype: pd.core.frame.DataFrame,
 ) -> None:
     """Add figures and tables to report
 
@@ -95,37 +98,48 @@ def _add_to_report(
                      of GNSS identifier and observation type, e.g. 'G C1C' or 'E L8X'.
     """
 
+    # Generate satellite availability overview
+    rpt.add_text("\n# Satellite availability\n\n")
+    rpt.add_figure(
+        figure_path=figure_dir / f"plot_satellite_availability.{FIGURE_FORMAT}",
+        caption="Satellite availability.",
+        clearpage=True,
+    )
+
+    rpt.add_figure(
+        figure_path=figure_dir / f"plot_gnss_number_of_satellites_epoch.{FIGURE_FORMAT}",
+        caption="Number of satellites for each observation epoch per system.",
+        clearpage=True,
+    )
 
     # Generate GNSS observation overview by system
     rpt.add_text("\n# GNSS observation overview by system\n\n")
     rpt.write_dataframe_to_markdown(df_system, format="6.0f")
 
-    
     rpt.add_figure(
-            figure_path=figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}", 
-            caption="Number of satellites for each GNSS.",
+        figure_path=figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}",
+        caption="Number of satellites for each GNSS.",
     )
 
     rpt.add_figure(
-            figure_path=figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}", 
-            caption="Number of observations for each GNSS.", 
-            clearpage=True,
+        figure_path=figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}",
+        caption="Number of observations for each GNSS.",
+        clearpage=True,
     )
 
     # Generate GNSS observation overview by observation type
     rpt.add_text("\n# GNSS observation overview by observation type\n\n")
     rpt.write_dataframe_to_markdown(df_obstype, format="6.0f")
 
-
     rpt.add_figure(
-            figure_path=figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}",
-            caption="Number of satellites for each GNSS observation type.",
+        figure_path=figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}",
+        caption="Number of satellites for each GNSS observation type.",
     )
 
     rpt.add_figure(
-            figure_path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}", 
-            caption="Number of observations for each GNSS observation type.", 
-            clearpage=True,
+        figure_path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}",
+        caption="Number of observations for each GNSS observation type.",
+        clearpage=True,
     )
 
 
@@ -178,7 +192,6 @@ def _generate_dataframes(dset: "Dataset") -> Tuple[pd.core.frame.DataFrame, pd.c
             |   ... | ... |     ... |     ... |
       
     """
-    df = dset.as_dataframe()
     columns = ["sys", "num_sat", "num_obs"]
     df_obstype = pd.DataFrame(columns=columns)
     df_system = pd.DataFrame(columns=columns)
@@ -216,10 +229,7 @@ def _generate_dataframes(dset: "Dataset") -> Tuple[pd.core.frame.DataFrame, pd.c
 #
 # PLOT FUNCTIONS
 #
-def _plot_scatter_satellite_availability(
-        dset: "Dataset", 
-        figure_dir: pathlib.PosixPath,
-) -> None:
+def _plot_satellite_availability(dset: "Dataset", figure_dir: pathlib.PosixPath) -> None:
     """Generate GNSS satellite observation availability overview based on RINEX observation file
 
     Args:
@@ -227,105 +237,182 @@ def _plot_scatter_satellite_availability(
        figure_dir:  Figure directory
     """
 
-    # Generate x- and y-axis data per satellite
+    # Generate x- and y-axis data per system
     x_arrays = []
     y_arrays = []
     labels = []
-    for satellite in sorted(dset.unique("satellite"), reverse=True):
-        idx = dset.filter(satellite=satellite)
+
+    time, satellite, system = _sort_by_satellite(dset)
+
+    for sys in sorted(dset.unique("system"), reverse=True):
+        idx = system == sys
+        x_arrays.append(time[idx])
+        y_arrays.append(satellite[idx])
+        labels.append(enums.gnss_id_to_name[sys].value)
+
+    # Plot scatter plot
+    num_sat = len(dset.unique("satellite"))
+    plot(
+        x_arrays=x_arrays,
+        y_arrays=y_arrays,
+        xlabel="Time [GPS]",
+        ylabel="Satellite",
+        y_unit="",
+        # labels=labels,
+        figure_path=figure_dir / f"plot_satellite_availability.{FIGURE_FORMAT}",
+        opt_args={
+            "colormap": "tab20",
+            "figsize": (0.1 * num_sat, 0.2 * num_sat),
+            "fontsize": 10,
+            "legend": True,
+            "legend_location": "bottom",
+            "legend_ncol": len(dset.unique("system")),
+            "plot_to": "file",
+            "plot_type": "scatter",
+            # "title": "Satellite availability",
+        },
+    )
+
+
+def _plot_number_of_satellites(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
+    """Plot number of satellites based for each GNSS
+
+    Args:
+       dset:        A dataset containing the data.
+       figure_dir:  Figure directory
+    """
+
+    # Generate x- and y-axis data per system
+    x_arrays = []
+    y_arrays = []
+    labels = []
+
+    for sys in sorted(dset.unique("system")):
+        idx = dset.filter(system=sys)
         x_arrays.append(dset.time.gps.datetime[idx])
-        y_arrays.append(dset.satellite[idx])
-        labels.append(set(dset.system[idx]).pop())
+        y_arrays.append(
+            gnss.get_number_of_satellites(dset.system[idx], dset.satellite[idx], dset.time.gps.datetime[idx])
+        )
+        labels.append(enums.gnss_id_to_name[sys].value)
 
     # Plot scatter plot
     plot(
         x_arrays=x_arrays,
         y_arrays=y_arrays,
-        xlabel="",
-        ylabel="",
+        xlabel="Time [GPS]",
+        ylabel="# satellites",
         y_unit="",
         labels=labels,
-        figure_path=figure_dir / f"plot_satellite_availability.{FIGURE_FORMAT}",
+        figure_path=figure_dir / f"plot_gnss_number_of_satellites_epoch.{FIGURE_FORMAT}",
         opt_args={
-            "colormap": "tab20",
-            "figsize": (6.5, 6.5),
+            "figsize": (7, 4),
+            "marker": ",",
             "legend": True,
+            "legend_location": "bottom",
+            "legend_ncol": len(dset.unique("system")),
             "plot_to": "file",
-            "plot_type": "scatter",
-            "title": "Satellite availability",
+            "plot_type": "plot",
         },
     )
-    
-  
-def _plot_observation_system(
-        df_system: pd.core.frame.DataFrame,
-        figure_dir: pathlib.PosixPath,
-) -> None:
+
+
+def _plot_observation_system(df_system: pd.core.frame.DataFrame, figure_dir: pathlib.PosixPath) -> None:
     """Plot observation system plots
 
     Args:
        df_system:   Dataframe with GNSS observation overview in relation to GNSS. Indices are GNSS identifiers, e.g. 
                     E, G, ..., osv..                               
        figure_dir:  Figure directory
-    """ 
-     
+    """
+
     plot_bar_dataframe_columns(
         df_system,
         column="num_sat",
         path=figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}",
         xlabel="GNSS name",
-        ylabel="Number of satellites",
+        ylabel="# satellites",
         label="sys",
-        opt_args={"legend": False},
+        opt_args={"figsize": (8, 4), "legend": False},
     )
-    
+
     plot_bar_dataframe_columns(
         df_system,
         column="num_obs",
         path=figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}",
         xlabel="GNSS name",
-        ylabel="Number of observations",
+        ylabel="# observations",
         label="sys",
-        opt_args={"legend": False},
+        opt_args={"figsize": (8, 4), "legend": False},
     )
-    
-    
-def _plot_observation_type(
-        df_obstype: pd.core.frame.DataFrame,
-        figure_dir: pathlib.PosixPath,
-) -> None:
+
+
+def _plot_observation_type(df_obstype: pd.core.frame.DataFrame, figure_dir: pathlib.PosixPath) -> None:
     """Plot observation type plots
 
     Args:
        df_obstype:  Dataframe with GNSS observation overview in relation to observation type. Indices are combination
                     of GNSS identifier and observation type, e.g. 'G C1C' or 'E L8X'.
        figure_dir:  Figure directory
-    """    
+    """
+    num_sys = len(set(df_obstype.sys))
 
     plot_bar_dataframe_columns(
         df_obstype,
         column="num_sat",
         path=figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}",
         xlabel="Observation type",
-        ylabel="Number of satellites",
+        ylabel="# satellites",
         label="sys",
-        opt_args={"figsize": (15, 10), "fontsize": 16},
+        opt_args={
+            "figsize": (8, 4),
+            "fontsize": 17,
+            "legend": True,
+            "legend_location": "bottom",
+            "legend_ncol": num_sys,
+        },
     )
-    
+
     plot_bar_dataframe_columns(
         df_obstype,
         column="num_obs",
         path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}",
         xlabel="Observation type",
-        ylabel="Number of observations",
+        ylabel="# observations",
         label="sys",
-        opt_args={"figsize": (15, 10), "fontsize": 16},
+        opt_args={
+            "figsize": (8, 4),
+            "fontsize": 17,
+            "legend": True,
+            "legend_location": "bottom",
+            "legend_ncol": num_sys,
+        },
     )
 
 
 #
 # AUXILIARY FUNCTIONS
 #
+def _sort_by_satellite(dset: "Dataset") -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sort time and satellite fields of dataset by satellite order
+
+    Args: 
+       dset:        A dataset containing the data.
+
+    Returns:
+        Tuple with ordered time, satellite and system array
+    """
+    time = []
+    satellite = []
+    system = []
+    for sat in sorted(dset.unique("satellite"), reverse=True):
+        idx = dset.filter(satellite=sat)
+        time.extend(dset.time.gps.datetime[idx])
+        satellite.extend(dset.satellite[idx])
+        system.extend(dset.system[idx])
+
+    return np.array([time]), np.array([satellite]), np.array([system])
+
+
 def _sort_string_array(array: List[str]) -> List[str]:
     """Sort string array based on last two characters
 

@@ -9,6 +9,7 @@ Write data in the RINEX observations file format (see :cite:`rinex3`).
 
 # Standard library imports
 from datetime import datetime
+from math import isnan
 
 # Midgard imports
 from midgard.dev import plugins
@@ -333,11 +334,10 @@ def rinex3_obs(dset):
                 log.fatal(f"Satellite {dset.satellite[idx]} occurs twice in epoch {dset.time.gps.datetime[idx]}")
 
             for type_ in dset.meta["obstypes"][dset.system[idx]]:
-                lli = " " if dset.lli[type_][idx] == 0.0 else str(int(dset.lli[type_][idx]))
-                snr = " " if dset.snr[type_][idx] == 0.0 else str(int(dset.snr[type_][idx]))
-                obs_epoch_cache.setdefault(dset.satellite[idx], list()).append(
-                    {"obs": dset.obs[type_][idx], "lli": lli, "snr": snr}
-                )
+                obs = " " if isnan(dset.obs[type_][idx]) else f"{dset.obs[type_][idx]:>14.3f}"
+                lli = " " if isnan(dset.lli[type_][idx]) else str(int(dset.lli[type_][idx]))
+                snr = " " if isnan(dset.snr[type_][idx]) else str(int(dset.snr[type_][idx]))
+                obs_epoch_cache.setdefault(dset.satellite[idx], list()).append({"obs": obs, "lli": lli, "snr": snr})
             epoch_prev = epoch
 
         # Write last epoch
@@ -385,7 +385,7 @@ def _write_epoch(dset, fid, obs_epoch_cache, idx, num_sat, epoch):
                 fid.write("{:>16s}".format(""))  # Write blank if no observation is given.
             else:
                 fid.write(
-                    "{:>14.3f}{:1s}{:1s}".format(
+                    "{:>14s}{:1s}{:1s}".format(
                         obs_epoch_cache[sat][kk]["obs"],
                         obs_epoch_cache[sat][kk]["lli"],
                         obs_epoch_cache[sat][kk]["snr"],

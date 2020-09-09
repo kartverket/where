@@ -120,8 +120,8 @@ def gnss_position(dset: "Dataset") -> None:
 
     if "num_satellite_used" not in dset.fields:
         dset.add_float(
-                "num_satellite_used", 
-                val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time),
+            "num_satellite_used",
+            val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time.gps.datetime),
         )
 
     # Put together fields in an array as specified by the 'dtype' tuple list

@@ -118,6 +118,7 @@ def download_file(url: str, path: pathlib.Path) -> None:
     with open(path, mode="wb") as fid:
         c = pycurl.Curl()
         c.setopt(c.URL, url)
+        c.setopt(c.FOLLOWLOCATION, True)
         c.setopt(c.WRITEDATA, fid)
         c.perform()
         response_code = c.getinfo(c.RESPONSE_CODE)

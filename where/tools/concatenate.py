@@ -17,7 +17,7 @@ Command              Description
 ===================  ===========================================================
 from_date            The starting date in the format ``<year month day>``.
 to_date              The ending date in the format ``<year month day>``.
-{pipelines_doc:Plot results from}
+{pipelines_doc:Concatenate results from}
 --stage=             Stage of analysis.
 ===================  ===========================================================
 
@@ -156,7 +156,7 @@ def _concatenate_datasets(
             dset_merged.extend(dset)
         date_to_read += timedelta(days=1)
 
-    dset_merged.vars.update(id="_concatenated")
+    dset_merged.analysis.update(id=f"{dset_merged.analysis['id']}_concatenated")
     return dset_merged
 
 

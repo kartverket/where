@@ -8,6 +8,7 @@ Plots can be configured via configuration file where_pipeline_sisre.conf. See se
 """
 # Standard library imports
 from collections import namedtuple
+from pathlib import PosixPath
 import textwrap
 from typing import Any, Dict, List, Union
 
@@ -102,6 +103,7 @@ def sisre_plot(dset):
         if field == "age_of_ephemeris":
             dset[field][:] = dset[field] * Unit.second2minute
             dset.set_unit(field, "minute")
+
         _plot_scatter_field(dset, field, systems, satellites, options)
 
 
@@ -109,7 +111,7 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
     """Set matplotlib configuration by reading sisre_plot configuration
 
     Args:
-        title: Tilte given via option. Overwrites configuration file definition.
+        title: Title given via option. Overwrites configuration file definition.
     """
     # Change fontsize of labels
     fontsize = config.where.sisre_plot.get("fontsize", default=10).str
@@ -144,7 +146,7 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
 
 def _get_figure_path(
     dset: "Dataset", field: str, sys: str, satellite: Union[List[str], str] = "", subplot: bool = False
-) -> "PosixPath":
+) -> PosixPath:
     """Get figure path and generate figure directory
     Args:
        dset:       A dataset containing the data.
@@ -163,14 +165,14 @@ def _get_figure_path(
         {"field": field, "format": FIGURE_FORMAT, "system": GNSS_NAME[sys].lower(), "satellite": satellite.lower()}
     )
     file_key = "output_sisre_subplot" if subplot else "output_sisre_plot"
-    figure_path = config.files.path(file_key, file_vars=dset.vars)
+    figure_path = config.files.path(file_key, file_vars={**dset.vars, **dset.analysis})
     if not figure_path.parent.exists():
         figure_path.parent.mkdir(parents=True, exist_ok=True)
     log.info(f"Plot figure: {figure_path}")
     return figure_path
 
 
-def _get_statistic_text(data: "ndarray", unit: str = "", width: int = 150) -> str:
+def _get_statistic_text(data: np.ndarray, unit: str = "", width: int = 150) -> str:
     """Get statistical text string
 
     Args:
@@ -224,6 +226,8 @@ def _plot_scatter_subplots(
                 dset[field][:] = dset[field] * Unit.second2minute
                 dset.set_unit(field, "minute")
 
+            unit = "" if dset.unit(field) is None else dset.unit(field)[0]
+
             # Plot all satellites or only defined ones
             for sat, color in zip(sorted(dset.unique("satellite", idx=idx)), colors):
                 if sat not in satellites:
@@ -257,14 +261,14 @@ def _plot_scatter_subplots(
                         x_array=dset.time.gps.datetime[idx_sat],
                         y_array=dset[field][idx_sat],
                         ylabel=f"{PLOTCONFIG[field].label}",
-                        y_unit=dset.unit(field),
+                        y_unit=unit,
                         label=sat,
                         color=color,
                         opt_args=options,
                     )
 
             # Overwrite subtitle with statistical information over all satellites
-            statistic = _get_statistic_text(dset[field], unit=dset.unit(field))
+            statistic = _get_statistic_text(dset[field], unit=unit)
             ax.set_title(statistic, fontsize=options["fsize_subtitle"], horizontalalignment="center")
 
         # Plot x-axis label only once below the last subplot row
@@ -309,6 +313,7 @@ def _plot_scatter_field(
     Returns:
         None
     """
+    unit = "" if dset.unit(field) is None else dset.unit(field)[0]
 
     # Generate plot for each GNSS
     for sys in systems:
@@ -340,13 +345,13 @@ def _plot_scatter_field(
                     marker=options["marker"],
                     s=options["markersize"],
                 )
-            sat_statistic = _get_statistic_text(dset[field][idx_sat], unit=dset.unit(field))
+            sat_statistic = _get_statistic_text(dset[field][idx_sat], unit=unit)
 
         if options["legend"]:
             # plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
             plt.legend(bbox_to_anchor=(1.04, 1), borderaxespad=0.0, loc="upper left", ncol=1)
 
-        plt.ylabel(f"{PLOTCONFIG[field].label} {UNIT_YLABEL[dset.unit(field)]}")
+        plt.ylabel(f"{PLOTCONFIG[field].label} {UNIT_YLABEL[unit]}")
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
         plt.xlabel("Time [GPS]")
 
@@ -354,7 +359,7 @@ def _plot_scatter_field(
         if len(satellites) == 1:
             statistic = sat_statistic
         elif len(satellites) == len(dset.unique("satellite")):
-            statistic = _get_statistic_text(dset[field][idx], unit=dset.unit(field))
+            statistic = _get_statistic_text(dset[field][idx], unit=unit)
         else:
             statistic = ""
 

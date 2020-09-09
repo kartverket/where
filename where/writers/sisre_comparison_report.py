@@ -21,8 +21,7 @@ Example:
 
 """
 # Standard library imports
-from datetime import datetime
-import os
+from pathlib import PosixPath
 from typing import Any, Dict, List, Tuple, Union
 
 # External library imports
@@ -34,7 +33,6 @@ import pandas as pd
 from midgard.dev import plugins
 
 # Where imports
-import where
 from where.lib import config
 from where.lib import log
 from where.writers._report import Report
@@ -69,7 +67,7 @@ def sisre_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     path = config.files.path("output_sisre_comparison_report", file_vars=dset_first.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
 
-        rpt = Report(fid, rundate=dset_first.rundate, path=path, description="Comparison of SISRE analyses")
+        rpt = Report(fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of SISRE analyses")
         rpt.title_page()
 
         # +TODO: If possible should following lines added to _add_to_report().
@@ -90,7 +88,7 @@ def sisre_comparison_report(dset: Dict[str, "Dataset"]) -> None:
 
 def _add_to_report(
     rpt: "Report",
-    figure_dir: "pathlib.PosixPath",
+    figure_dir: PosixPath,
     df: pd.core.frame.DataFrame,
     df_month_perc: pd.core.frame.DataFrame,
     df_month_perc_rms: pd.core.frame.DataFrame,
@@ -155,7 +153,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
 
     The dataframe "df" has following columns:
 
-        time.gps:       Time in GPS time scale given as datetime objects
+        time_gps:       Time in GPS time scale given as datetime objects
         satellite:      Satellite identifiers
         system:         GNSS identifier
         <solution_1>:   First SISRE solution (e.g. E1)
@@ -164,7 +162,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
 
     Example for "df" dictionary:
      
-                           time.gps satellite system        E1    E1/E5b    E1/E5a
+                           time_gps satellite system        E1    E1/E5b    E1/E5a
         0       2019-01-01 00:00:00       E01      E  0.173793  0.123220  0.171849
         1       2019-01-01 00:00:00       E02      E  0.048395  0.127028  0.108108
         2       2019-01-01 00:00:00       E03      E  0.089328  0.121884  0.079576
@@ -203,6 +201,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
 
     """
     df = pd.DataFrame()
+    signal_types = list()
 
     for name, dset in dsets.items():
 
@@ -211,19 +210,20 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
             continue
 
         signal_type = _get_signal_type(dset.meta)
+        signal_types.append(signal_type)
         df_tmp = dset.as_dataframe(fields=["satellite", "system", "sisre", "time.gps"])  # , index="time.gps")
         df_tmp = df_tmp.rename(columns={"sisre": signal_type})
 
         if df.empty:
             df = df_tmp
             continue
-        df = df.merge(df_tmp, on=["satellite", "system", "time.gps"], how="outer")
+        df = df.merge(df_tmp, on=["satellite", "system", "time_gps"], how="outer")
 
     if df.empty:
         log.fatal(f"All given datasets are empty [{', '.join(dsets.keys())}].")
 
     # Generate monthly samples of 95th percentile SISRE (after SDD v1.0 version)
-    df_month_perc = df.set_index("time.gps").resample("M", how=lambda x: np.nanpercentile(x, q=95))
+    df_month_perc = df.set_index("time_gps").resample("M", how=lambda x: np.nanpercentile(x, q=95))
     df_month_perc.index = df_month_perc.index.strftime("%b-%Y")
 
     # Generate monthly samples of 95th percentile SISRE based on epochwise SISRE RMS solutions(after SDD v1.1 version)
@@ -234,14 +234,12 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
             f"Determination of 95th percentile SISRE based on epochwise SISRE RMS solutions can only be applied"
             f"for one given GNSS and not for {set(df['system'])} together."
         )
-    epochs = sorted(set(df["time.gps"]))
-    signal_types = list(set(df.columns) - set(("satellite", "system", "time.gps")))
-
+    epochs = sorted(set(df["time_gps"]))
     df_tmp = pd.DataFrame(index=epochs, columns=signal_types)
 
     ## Loop over observation epochs
     for epoch in epochs:
-        idx = df["time.gps"] == epoch
+        idx = df["time_gps"] == epoch
         row = dict()
 
         # Determine RMS for each signal type over all given SISRE satellite solutions in each epoch
@@ -253,7 +251,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
     df_month_perc_rms.index = df_month_perc_rms.index.strftime("%b-%Y")
 
     # Generate monthly samples of RMS SISRE
-    df_month_rms = df.set_index("time.gps").resample("M", how=lambda x: np.sqrt(np.nanmean(np.square(x))))
+    df_month_rms = df.set_index("time_gps").resample("M", how=lambda x: np.sqrt(np.nanmean(np.square(x))))
     df_month_rms.index = df_month_rms.index.strftime("%b-%Y")
 
     return df, df_month_perc.transpose(), df_month_perc_rms.transpose(), df_month_rms.transpose()
@@ -288,7 +286,7 @@ def _get_signal_type(meta: Dict[str, Any]) -> str:
 # PLOT FUNCTIONS
 #
 def _plot_bar_sisre_signal_combination_percentile(
-    df_month_perc: pd.core.frame.DataFrame, figure_dir: "pathlib.PosixPath", threshold: bool = False, suffix: str = ""
+    df_month_perc: pd.core.frame.DataFrame, figure_dir: PosixPath, threshold: bool = False, suffix: str = ""
 ) -> None:
     """Generate bar plot with monthly SISRE 95% percentile for each GNSS signal combination
 
@@ -318,7 +316,7 @@ def _plot_bar_sisre_signal_combination_percentile(
     plt.clf()  # clear the current figure
 
 
-def _plot_bar_sisre_signal_combination_rms(df_month_rms: pd.core.frame.DataFrame, figure_dir: "pathlib.PosixPath"):
+def _plot_bar_sisre_signal_combination_rms(df_month_rms: pd.core.frame.DataFrame, figure_dir: PosixPath):
     """Generate bar plot with monthly SISRE RMS for each GNSS signal combination
 
     Args:  
@@ -342,7 +340,7 @@ def _plot_bar_sisre_signal_combination_rms(df_month_rms: pd.core.frame.DataFrame
 def _plot_bar_sisre_satellite_percentile(
     rpt: "Report",
     df: pd.core.frame.DataFrame,
-    figure_dir: "pathlib.PosixPath",
+    figure_dir: PosixPath,
     threshold: bool = False,
     write_table: bool = False,
     yrange: Union[None, List[int]] = None,
@@ -359,7 +357,7 @@ def _plot_bar_sisre_satellite_percentile(
     """
     # Get user types by keeping order
     user_types = list(df.columns)
-    for value in ["satellite", "system", "time.gps"]:
+    for value in ["satellite", "system", "time_gps"]:
         user_types.remove(value)
 
     fig, axes = plt.subplots(len(user_types), 1, sharex=False, sharey=True)  # figsize=(6, 6));
@@ -380,7 +378,7 @@ def _plot_bar_sisre_satellite_percentile(
 
     # Generate subplots
     for ax, user in zip(axes, user_types):
-        df_user = df.pivot(index="time.gps", columns="satellite", values=user)
+        df_user = df.pivot(index="time_gps", columns="satellite", values=user)
         df_user_monthly_percentile = df_user.resample("M", how=lambda x: np.nanpercentile(x, q=95))
         df_user_monthly_percentile.index = df_user_monthly_percentile.index.strftime("%b-%Y")
         df_user_monthly_percentile.transpose().plot(kind="bar", ax=ax, legend=False, title=user)

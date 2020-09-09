@@ -111,7 +111,7 @@ class SinexBlocks:
         file_agency = config.tech.sinex.file_agency.str.upper()
         data_agency = config.tech.sinex.data_agency.str.upper()
 
-        num_params = self.dset.meta["statistics"]["number of unknowns"]
+        num_params = len(self.dset.meta["normal equation"]["names"])
         constraint = "2"
         self.fid.write(
             f"%=SNX 2.02 {file_agency:<3} {now} {data_agency:<3} {start} {end} R {num_params:>5} {constraint} S E C \n"

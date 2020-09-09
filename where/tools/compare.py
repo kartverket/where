@@ -47,6 +47,13 @@ The script compares different Where datasets based on given writers. The
 different datasets are identified by the given items. The optione 'specifier'
 defines, which kind of items are given.
 
+Defined 'writers' uses configuration given in general Where configuration. If
+needed each configuration option can be updated by adding command line options 
+like:
+
+    --<key>=<value>             # to update an entry in the 'pipeline' section
+    --<section>:<key>=<value>   # to update an entry in a specific section
+
 Examples:
 ---------
 Concatenate datasets from SISRE analysis by using 'id' items:
@@ -62,6 +69,10 @@ Concatenate datasets from SISRE analysis by using 'stage' items:
 
 """
 
+# Standard library imports
+import sys
+from typing import List
+
 # Midgard imports
 from midgard.dev import plugins
 from midgard.writers import write
@@ -74,7 +85,7 @@ from where.lib import util
 
 
 @plugins.register
-def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "option"):
+def compare(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "option"):
     log.init(log_level="info")
     dsets = dict()
 
@@ -88,6 +99,9 @@ def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "opt
     # TODO label = "last" if label == "last" else label
     station = util.read_option_value("--station", default="")
     id_ = util.read_option_value("--id", default="")
+
+    # Update configuration of Where analysis
+    config.where.update_from_options(_clean_sys_argv(pipeline))
 
     # Get dataset variables
     dset_vars = config.create_file_vars(rundate=date, pipeline=pipeline)
@@ -148,5 +162,11 @@ def main(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "opt
         write(writer, dset=dsets)
 
 
-if __name__ == "__main__":
-    main()
+#
+# AUXILIARY FUNCTIONS
+#
+def _clean_sys_argv(pipeline: str) -> List[str]:
+    """Values in sys.argv that are not valid option values in Where
+    """
+    reserved_opts = {pipeline, "id", "items", "label", "specifier", "stage", "station", "writers"}
+    return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]

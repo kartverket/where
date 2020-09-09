@@ -5,7 +5,7 @@ Description:
 
 """
 # Standard library imports
-from typing import Dict, List, Union
+from typing import Dict, List
 
 # External library imports
 import numpy as np
@@ -29,7 +29,6 @@ def partial_config_keys():
     Returns:
         Tuple: Strings with names of config keys listing which partial models to run.
     """
-    # TODO:
     return ("estimate_constant", "estimate_stochastic")
 
 
@@ -90,6 +89,9 @@ def estimate_lsq(dset: "Dataset", partial_vectors: Dict[str, List[str]], obs_noi
                 W=W[idx, weight_idx_col : weight_idx_col + num_obs],
                 param_names=param_names,
             )
+            # TODO: Not vectorized. Works only on epoch basis.
+            #from scipy.optimize import lsq_linear
+            #lsq2 = lsq_linear(H[idx], z[idx], lsmr_tol="auto", verbose=0)
 
             # Run the estimator
             lsq.estimate()
@@ -170,10 +172,18 @@ def _get_estimate(lsq: "LsqEstimator") -> np.ndarray:
     if "gnss_site_pos-x" in lsq.param_names:
         covariance_site_pos = _get_gnss_site_pos_covariance(lsq)
         estimate = merge_arrays([estimate, covariance_site_pos], flatten=True)
+        
+    if "gnss_site_vel-x" in lsq.param_names:
+        covariance_site_vel = _get_gnss_site_vel_covariance(lsq)
+        estimate = merge_arrays([estimate, covariance_site_vel], flatten=True)
 
     if "gnss_rcv_clock" in lsq.param_names:
         variance_rcv_clock = _get_gnss_rcv_clock_variance(lsq)
         estimate = merge_arrays([estimate, variance_rcv_clock], flatten=True)
+        
+    if "gnss_rcv_clock_drift" in lsq.param_names:
+        variance_rcv_clock_drift = _get_gnss_rcv_clock_drift_variance(lsq)
+        estimate = merge_arrays([estimate, variance_rcv_clock_drift], flatten=True)
 
     return estimate
 
@@ -218,6 +228,46 @@ def _get_gnss_site_pos_covariance(lsq: "LsqEstimator") -> np.ndarray:
     return np.array(values, dtype=dtype)
 
 
+def _get_gnss_site_vel_covariance(lsq: "LsqEstimator") -> np.ndarray:
+    """Get GNSS site velocity covariance matrix
+
+    Args:
+        lsq:  Least square estimator object.
+
+    Returns:
+        Covariance matrix of site position.
+    """
+    # Define field and data types of site velocity covariance solution
+    dtype = [
+        ("estimate_cov_site_vel_xx", float),
+        ("estimate_cov_site_vel_xy", float),
+        ("estimate_cov_site_vel_xz", float),
+        ("estimate_cov_site_vel_yy", float),
+        ("estimate_cov_site_vel_yz", float),
+        ("estimate_cov_site_vel_zz", float),
+    ]
+
+    # Get starting index of site velocity parameters in covariance matrix
+    idx = lsq.param_names.index("gnss_site_vel-x")
+
+    # Save defined covariance fields in numpy array
+    values = [
+        tuple(row)
+        for row in np.vstack(
+            (
+                np.repeat(lsq.Cx[idx, idx], lsq.num_obs, axis=0).T,
+                np.repeat(lsq.Cx[idx + 1, idx], lsq.num_obs, axis=0).T,
+                np.repeat(lsq.Cx[idx + 2, idx], lsq.num_obs, axis=0).T,
+                np.repeat(lsq.Cx[idx + 1, idx + 1], lsq.num_obs, axis=0).T,
+                np.repeat(lsq.Cx[idx + 2, idx + 1], lsq.num_obs, axis=0).T,
+                np.repeat(lsq.Cx[idx + 2, idx + 2], lsq.num_obs, axis=0).T,
+            )
+        ).T
+    ]
+
+    return np.array(values, dtype=dtype)
+
+
 def _get_gnss_rcv_clock_variance(lsq: "LsqEstimator") -> np.ndarray:
     """Get GNSS receiver clock variance 
 
@@ -239,6 +289,27 @@ def _get_gnss_rcv_clock_variance(lsq: "LsqEstimator") -> np.ndarray:
     return np.array(values, dtype=dtype)
 
 
+def _get_gnss_rcv_clock_drift_variance(lsq: "LsqEstimator") -> np.ndarray:
+    """Get GNSS receiver clock drift variance 
+
+    Args:
+        lsq:  Least square estimator object.
+
+    Returns:
+        Variance of receiver clock drift.
+    """
+    # Define field and data types of receiver clock drift variance solution
+    dtype = [("estimate_cov_rcv_clock_drift_tt", float)]
+
+    # Get starting index of receiver clock drift parameter in covariance matrix
+    idx = lsq.param_names.index("gnss_rcv_clock_drift")
+
+    # Save defined covariance fields in numpy array
+    values = [tuple(row) for row in np.vstack((np.repeat(lsq.Cx[idx, idx], lsq.num_obs, axis=0).T,)).T]
+
+    return np.array(values, dtype=dtype)
+
+
 def _apriori_values_for_unknowns(dset: "Dataset", param_names: List[str]) -> np.ndarray:
     """Get apriori values for unknowns
 
@@ -252,14 +323,26 @@ def _apriori_values_for_unknowns(dset: "Dataset", param_names: List[str]) -> np.
     Returns:
         Apriori values for unknowns
     """
-
     x0 = np.zeros((dset.num_obs, len(param_names)))
+
     apriori_val = {
         "gnss_rcv_clock": np.repeat(0.0, dset.num_obs),
-        "gnss_site_pos-x": np.repeat(dset.site_pos.trs.x[0], dset.num_obs),
-        "gnss_site_pos-y": np.repeat(dset.site_pos.trs.y[0], dset.num_obs),
-        "gnss_site_pos-z": np.repeat(dset.site_pos.trs.z[0], dset.num_obs),
+        "gnss_rcv_clock_drift": np.repeat(0.0, dset.num_obs),
     }
+    
+    if "gnss_site_pos-x" in param_names:
+        apriori_val.update({
+                "gnss_site_pos-x": np.repeat(dset.site_pos.trs.x[0], dset.num_obs),
+                "gnss_site_pos-y": np.repeat(dset.site_pos.trs.y[0], dset.num_obs),
+                "gnss_site_pos-z": np.repeat(dset.site_pos.trs.z[0], dset.num_obs),
+        })
+        
+    if "gnss_site_vel-x" in param_names:
+        apriori_val.update({
+                "gnss_site_vel-x": np.repeat(dset.site_vel[0][0], dset.num_obs),
+                "gnss_site_vel-y": np.repeat(dset.site_vel[0][1], dset.num_obs),
+                "gnss_site_vel-z": np.repeat(dset.site_vel[0][2], dset.num_obs),
+        })
 
     for idx, param_name in enumerate(param_names):
         field = f"estimate_{param_name}"
@@ -326,6 +409,17 @@ def _update_dataset(
         ).T
         dset.site_pos[:] = site_pos
         # MURKS: Is that needed again? -> dset.site_pos.other(dset.sat_posvel)
+        
+    # Update site velocity in Dataset
+    if "estimate_gnss_site_vel-x" in estimate.dtype.names:
+        site_vel = np.array(
+            [
+                estimate["estimate_gnss_site_vel-x"],
+                estimate["estimate_gnss_site_vel-y"],
+                estimate["estimate_gnss_site_vel-z"],
+            ]
+        ).T
+        dset.site_vel[:] = site_vel
 
 
 def _add_fields(dset: "Dataset", estimate: np.ndarray) -> None:
@@ -341,6 +435,10 @@ def _add_fields(dset: "Dataset", estimate: np.ndarray) -> None:
         if field in dset.fields:
             dset[field][:] = estimate[field]
         else:
+            if dset.vars["pipeline"] == "gnss_vel":
+                unit = "meter**2/second**2" if field.startswith("estimate_cov_site_vel") else "meter/second"
+            else:
+                unit = "meter**2" if field.startswith("estimate_cov_site_pos") else "meter"
             dset.add_float(
-                field, val=estimate[field], unit="meter", write_level="operational"  # TODO: Better solution for unit?
+                field, val=estimate[field], unit=unit, write_level="operational"  # TODO: Better solution for unit?
             )

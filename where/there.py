@@ -78,16 +78,17 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import console
+from midgard.dev import exceptions
 from midgard.math.unit import Unit
 
 # Where imports
 import where
-from where.lib import config
-from where.data import dataset3 as dataset
-from where.lib import log
 from where import pipelines
 from where import setup
+from where.data import dataset3 as dataset
 from where.data.time import Time
+from where.lib import config
+from where.lib import log
 from where.lib import util
 
 
@@ -814,7 +815,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
     @property
     def xlabel(self):
-        axis_unit = self.dataset.unit(self.vars["x_axis_name"])
+        try:
+            axis_unit = self.dataset.unit(self.vars["x_axis_name"])
+        except exceptions.UnitError:
+            axis_unit = None
         if self.vars["x_axis_columns"]:
             unit_str = ""
         else:
@@ -827,7 +831,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
     @property
     def ylabel(self):
-        axis_unit = self.dataset.unit(self.vars["y_axis_name"])
+        try:
+            axis_unit = self.dataset.unit(self.vars["y_axis_name"])
+        except exceptions.UnitError:
+            axis_unit = None
         if self.vars["y_axis_columns"]:
             unit_str = ""
         else:
@@ -884,11 +891,15 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             )
 
             for ind in self.event2dset(event.ind):
-                xstr = lambda s: s or ""  # print None as empty string
+                def unit(field):
+                    try:
+                        return dset.unit(field)
+                    except exceptions.UnitError:
+                        return ""
                 texts = [
-                    f"{f}: {dset.plot_values(f)[ind]} {xstr(dset.unit(f))}" for f in fields if f.startswith("time")
+                    f"{f}: {dset.plot_values(f)[ind]} {unit(f)}" for f in fields if f.startswith("time")
                 ]
-                texts += [f"{f}: {dset[f][ind]} {xstr(dset.unit(f))}" for f in fields if not f.startswith("time")]
+                texts += [f"{f}: {dset[f][ind]} {unit(f)}" for f in fields if not f.startswith("time")]
                 log.out("\n       ".join(texts))
                 self.master.status("  ".join(texts))
 
@@ -1165,12 +1176,18 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             ax.set_ylim(ylim)
             if self.vars["x_axis_columns"]:
                 column_field = f"{self.vars['x_axis_name']}.{self.vars['x_axis_columns'][num_x]}"
-                axis_unit = self.dataset.unit_short(column_field)
+                try:
+                    axis_unit = self.dataset.unit_short(column_field)
+                except exceptions.UnitError:
+                    axis_unit = ""
                 unit_str = " [{}]".format(axis_unit[0]) if axis_unit else ""
                 ax.set_xlabel(self.vars["x_axis_columns"][num_x] + unit_str)
             if self.vars["y_axis_columns"]:
                 column_field = f"{self.vars['y_axis_name']}.{self.vars['y_axis_columns'][num_y]}"
-                axis_unit = self.dataset.unit_short(column_field)
+                try:
+                    axis_unit = self.dataset.unit_short(column_field)
+                except exceptions.UnitError:
+                    axis_unit = ""
                 unit_str = " [{}]".format(axis_unit[0]) if axis_unit else ""
                 ax.set_ylabel(self.vars["y_axis_columns"][num_y] + unit_str)
             if num_x > 0:

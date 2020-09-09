@@ -167,13 +167,38 @@ class DirectionArray(np.ndarray):
 
         return _SYSTEMS[system](val, **dir_args)
 
-    @classmethod
-    def fieldnames(cls):
-        return cls._attributes() + cls._fields() + cls._system_columns() + cls._systems()
+    def fieldnames(self):
+        """Return list of valid attributes for this object"""
+        # Pick one element to avoid doing calculations on a large array 
+        obj = self if len(self) == 1 else self[0]
 
-    @classmethod
-    def plot_fields(cls):
-        return cls._fields() + cls._system_columns() + cls._systems()
+        systems_and_columns = []
+        for system in obj._systems():
+            try:
+                _find_conversion_hops((obj.system, system))
+                # Add systems
+                systems_and_columns.append(system)
+                for column in _SYSTEMS[system].column_names:
+                    # Add system columns
+                    systems_and_columns.append(f"{system}.{column}")
+            except exceptions.UnknownConversionError:
+                pass  # Skip systems that cannot be converted to
+
+        useable_fields = []
+        for field in self._fields():
+            try:
+                getattr(obj, field)
+                useable_fields.append(field)
+            except exceptions.InitializationError:
+                # This field cannot be computed. Skipping
+                pass
+
+        return self._attributes() + systems_and_columns + useable_fields
+
+    def plot_fields(self):
+        """Return list of plottable attributes for this object"""
+        valid_fields = set(self.fieldnames())
+        return list(valid_fields - set(self._attributes()))
 
     @classmethod
     def _attributes(cls):
@@ -398,10 +423,6 @@ class DirectionArray(np.ndarray):
                     dir_args[attr] = sliced_value
             return self.__class__(from_super, **dir_args)
 
-        # Get element
-        #        if len(item) == self.ndim:
-        #            return from_super
-
         return from_super
 
     @classmethod
@@ -549,15 +570,6 @@ class DirectionArray(np.ndarray):
             del self._dependent_objs[idx]
         except StopIteration:
             pass
-
-    # def __getitem__(self, item):
-    #    """TODO"""
-    #    #self._sigma_sliced = self.sigma[item]
-
-    # from_super = super().__getitem__(item)
-    # if isinstance(item, int):
-    #    return self.__class__(from_super, self._sigma_sliced)
-    # return from_super
 
     @classmethod
     def _read(cls, h5_group, memo):

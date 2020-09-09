@@ -27,13 +27,7 @@ def gnss_site_pos(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
-    partials = np.zeros((dset.num_obs, 3))
-    for obs, (sat_pos, site_pos, range_) in enumerate(
-        zip(dset.sat_posvel.pos.trs.val, dset.site_pos.pos.trs.val, dset.delay.gnss_range)
-    ):
-        partials[obs, 0] = (sat_pos[0] - site_pos[0]) / range_
-        partials[obs, 1] = (sat_pos[1] - site_pos[1]) / range_
-        partials[obs, 2] = (sat_pos[2] - site_pos[2]) / range_
+    partials = (dset.sat_posvel.pos.trs.val - dset.site_pos.pos.trs.val) / dset.delay.gnss_range[:, None]
     column_names = ["x", "y", "z"]
 
     return partials, column_names, "dimensionless"

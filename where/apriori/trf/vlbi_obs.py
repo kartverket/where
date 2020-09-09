@@ -51,7 +51,7 @@ class VlbiObsTrf(TrfFactory):
         station_codes = apriori.get("vlbi_station_codes")
         data = parsers.parse_key("vlbi_obs_stations_vgosdb").as_dict()
         try:
-            stations = data["AprioriStationList"]
+            stations = [s.strip().replace(" ", "_") for s in data["AprioriStationList"]]
             xyz = data["AprioriStationXYZ"]
         except KeyError:
             return {}

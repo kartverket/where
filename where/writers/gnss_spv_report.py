@@ -159,7 +159,7 @@ def _plot_velocity(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
 
     plot_scatter_subplots(
         x_array=dset.time.gps.datetime,
-        y_arrays=[dset.pdop, dset["2d_vel"], dset["3d_vel"]],
+        y_arrays=[dset.pdop, dset["vel_2d"], dset["vel_3d"]],
         xlabel="Time [GPS]",
         ylabels=["PDOP", "2D", "3D"],
         colors=["steelblue", "darkorange", "limegreen"],

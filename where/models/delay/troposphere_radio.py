@@ -43,7 +43,7 @@ MODEL = __name__.split(".")[-1]
 MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "vmf1_gridded"]
 METEOROLOGICAL_MODELS = ["vmf1_gridded", "gpt", "gpt2", "gpt2w", "site_pressure"]
 ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded"]
-ZENITH_HYDROSTATIC_MODELS = ["saastamoinen"]
+ZENITH_HYDROSTATIC_MODELS = ["saastamoinen", "vmf1_gridded"]
 GRADIENT_MODELS = ["none", "apg"]
 
 # Default relation between used mapping function model and zenith wet delay model
@@ -109,7 +109,7 @@ def troposphere(dset):
     pressure, temperature, e, tm, lambd = meteorological_data(dset)
     mh, mw = mapping_function(dset)
     mg, gn, ge = gradient_model(dset)
-    zhd = zenith_hydrostatic_delay(pressure, latitude, height)
+    zhd = zenith_hydrostatic_delay(dset, pressure, latitude, height)
     zwd = zenith_wet_delay(dset, temperature, e, tm, lambd)
 
     # Line of sight delay
@@ -277,7 +277,7 @@ def mapping_function(dset):
     return mh, mw
 
 
-def zenith_hydrostatic_delay(pressure, latitude, height):
+def zenith_hydrostatic_delay(dset, pressure, latitude, height):
     """Calculates zenith hydrostatic delay based on configuration file definition
 
     Args:
@@ -293,6 +293,8 @@ def zenith_hydrostatic_delay(pressure, latitude, height):
 
     if model == "saastamoinen":
         zhd = saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height)
+    elif model == "vmf1_gridded":
+        zhd = vmf1_zenith_hydrostatic_delay(dset)
     else:
         log.fatal(
             f"Unknown zenith hydrostatic troposphere delay model {model}. "
@@ -779,15 +781,16 @@ def pressure_zhd(zhd, latitude, height):
     Returns:
         numpy.ndarray:    Atmospheric pressure for each observation in [hPa]
     """
-    model = config.tech.get("zenith_hydrostatic_delay", section=MODEL, default="saastamoinen").str
+    #model = config.tech.get("zenith_hydrostatic_delay", section=MODEL, default="saastamoinen").str
 
-    if model == "saastamoinen":
-        pressure = saastamoinen_pressure(zhd, latitude, height)
-    else:
-        log.fatal(
-            f"Zenith troposphere delay definition {model!r} is not correct in configuration file. "
-            "It should be 'saastamoinen'"
-        )
+    #if model == "saastamoinen":
+    # TODO: model needs to in a different configuration parameter than zenith_hydrostatic_delay
+    pressure = saastamoinen_pressure(zhd, latitude, height)
+    #else:
+    #    log.fatal(
+    #        f"Zenith troposphere delay definition {model!r} is not correct in configuration file. "
+    #        "It should be 'saastamoinen'"
+    #    )
 
     return pressure
 
@@ -1083,6 +1086,26 @@ def vmf1_zenith_wet_delay(dset):
 
     return zwd
 
+
+def vmf1_zenith_hydrostatic_delay(dset):
+    """Calculates zenith hydrostatic delay based on gridded zenith wet delays from VMF1
+
+    Uses gridded zenith wet delays from VMF1, which are rescaled from the gridded height to actual station height by
+    using Equation (3) and (4) described in Kouba :cite:`kouba2007`.
+
+    Args:
+        dset (Dataset):    Model data.
+
+    Returns:
+        numpy.ndarray:     Zenith hydrostatic delay for each observation in [m]
+    """
+    # Gridded pressure rescaled to station height
+    pressure = vmf1_gridded_pressure(dset)
+    # Zenith hydrostatic delay. Eq. (4) in Kouba :cite:`kouba2007`
+    lat, _, height = dset.site_pos.pos.llh.T
+    zhd = saastamoinen_zenith_hydrostatic_delay(pressure, lat, height)
+
+    return zhd
 
 def _rounded_dates(datetimes):
     """Calculate days including the given datetimes

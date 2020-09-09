@@ -30,7 +30,6 @@ The file to be parsed should be specified like:
 
 # Midgard imports
 from midgard.dev import plugins
-from midgard.files import dependencies
 
 # Where imports
 from where.lib import config
@@ -50,7 +49,6 @@ def get_sp3c_or_sp3d(rundate, file_path=None, **kwargs):
         file_path (str):          Optional path to orbit-file to parse.
     """
     version = _get_sp3_file_version(file_path)
-    dependencies.add(file_path, label="gnss_orbit_sp3")  # MURKS_hjegei: Better solution?
 
     if version in "ac":
         return orbit_sp3c.OrbitSp3cParser(file_path=file_path, **kwargs)

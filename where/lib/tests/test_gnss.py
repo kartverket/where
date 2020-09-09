@@ -57,31 +57,6 @@ class TestGnss(unittest.TestCase):
 
         self.dset.add_position("site_pos", time="time", itrs=itrs)
 
-    def test_findsun(self):
-        sun_pos = gnss.findsun(self.dset.time)
-        expected_sun_pos = np.array([-148102175.801620, -7980320.884334, -19534142.160482])
-        np.testing.assert_allclose(sun_pos[0], expected_sun_pos, rtol=0, atol=1e-6)
-        # print('OUTPUT:\n sun_pos = {:f} {:f} {:f} \n'.format(sun_pos[0], sun_pos[1], sun_pos[2]))
-
-    def test_gsdtime_sun(self):
-
-        gstr, slong, sra, sdec = gnss.gsdtime_sun(self.dset.time)
-        expected_gstr = np.array([159.228953])
-        expected_slong = np.array([340.840280])
-        expected_sra = np.array([342.313290])
-        expected_sdec = np.array([-7.502975])
-
-        with self.subTest(msg="gstr"):
-            np.testing.assert_allclose(gstr, expected_gstr, rtol=0, atol=1e-6)
-        with self.subTest(msg="slong"):
-            np.testing.assert_allclose(slong, expected_slong, rtol=0, atol=1e-6)
-        with self.subTest(msg="sra"):
-            np.testing.assert_allclose(sra, expected_sra, rtol=0, atol=1e-6)
-        with self.subTest(msg="sdec"):
-            np.testing.assert_allclose(sdec, expected_sdec, rtol=0, atol=1e-6)
-
-        # print('OUTPUT:\n flight_time = {:f} {:f} {:f} {:f} \n'.format(gstr, slong, sra, sdec))
-
     def test_get_flight_time(self):
         flight_time = gnss.get_flight_time(self.dset)
         expected_flight_time = np.array([0.07893])

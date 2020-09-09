@@ -17,7 +17,6 @@ from where.data._direction import DirectionArray
 @plugins.register
 class DirectionField(FieldType):
 
-    _subfields = DirectionArray.fieldnames()
     _factory = staticmethod(Direction)
 
     def _post_init(self, val, **dir_args):
@@ -53,6 +52,10 @@ class DirectionField(FieldType):
             return values.val
         else:
             return values
+
+    def set_unit(self, subfield, new_unit):
+        """Update unit(s) of field"""
+        raise exceptions.UnitError(f"Can not change the unit of a direction field")
 
     def _prepend_empty(self, num_obs, memo):
         empty_shape = (num_obs, *self.data.shape[1:])

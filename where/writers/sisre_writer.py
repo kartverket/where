@@ -224,7 +224,7 @@ def sisre_writer(dset: "Dataset") -> None:
 
     # Write to disk
     # NOTE: np.savetxt is used instead of having a loop over all observation epochs, because the performance is better.
-    file_path = config.files.path(f"output_sisre_{dset.vars['label']}", file_vars=dset.vars)
+    file_path = config.files.path(f"output_sisre_{dset.vars['label']}", file_vars={**dset.vars, **dset.analysis})
     np.savetxt(
         file_path,
         output_array,

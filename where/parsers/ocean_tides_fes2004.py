@@ -38,4 +38,3 @@ class OceanTidesCoeffParser(Parser):
         self.data.setdefault(float(line[0:7]), {}).setdefault("C-", {}).setdefault((n, m), float(line[29:39]) * 1e-12)
         self.data.setdefault(float(line[0:7]), {}).setdefault("S+", {}).setdefault((n, m), float(line[41:51]) * 1e-12)
         self.data.setdefault(float(line[0:7]), {}).setdefault("S-", {}).setdefault((n, m), float(line[51:61]) * 1e-12)
-

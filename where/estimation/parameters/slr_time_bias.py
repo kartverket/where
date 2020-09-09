@@ -46,7 +46,7 @@ def slr_time_bias(dset):
 
     for site_idx, station in enumerate(stations):
         idx = dset.filter(station=station)
-        partials[idx, site_idx] = np.sum(unit_vector * dset.sat_vel, axis=1)[idx]
+        partials[idx, site_idx] = np.sum(unit_vector * dset.sat_pos.gcrs.vel.val, axis=1)[idx]
 
     column_names = [s + "_time_bias" for s in stations]
     return partials, column_names, "dimensionless"

@@ -54,11 +54,11 @@ def gnss_clean_obs(dset: "Dataset") -> np.ndarray:
 
     # +TODO: Workaround -> should be handled by parser or apriori step
     # Loop over GNSSs and observation types
-    for sys in dset.meta["obstypes"]:
-        for obstype in dset.meta["obstypes"][sys]:
-
-            # Remove observations with (close to) zero value
-            keep_idx = np.logical_and(keep_idx, dset.obs[obstype] > 10000)
+    #for sys in dset.meta["obstypes"]:
+    #    for obstype in dset.meta["obstypes"][sys]:
+    #
+    #        # Remove observations with (close to) zero value
+    #        keep_idx = np.logical_and(keep_idx, dset.obs[obstype] > 10000)
     # -TODO: Workaround
 
     return keep_idx

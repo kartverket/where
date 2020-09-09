@@ -6,6 +6,8 @@ By determination of UERE based on Where SISRE results and Terrapos UEE results i
 file. In the buffer file the path of the SISRE output file is written after successful processing of a day. The UERE
 programs can access this file to check, if something can be processed.
 """
+
+# Standard library imports
 import fcntl
 
 # Midgard imports
@@ -32,7 +34,7 @@ def sisre_output_buffer(dset):
             log.fatal("flock() failed to hold an exclusive lock.")
 
         # Append SISRE output file pathes SISRE buffer file
-        file_path = config.files.path(f"output_sisre_2", file_vars=dset.vars)
+        file_path = config.files.path(f"output_sisre_raw", file_vars=dset.vars)
         fid.write(f"{file_path}\n")
 
         # Unlock file

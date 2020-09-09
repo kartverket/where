@@ -59,9 +59,11 @@ import unittest
 # External library imports
 import numpy as np
 
+# Midgard imports
+from midgard.math import planetary_motion
+
 # Where imports
 from where import data
-from where.lib import gnss
 from where.lib import mathp
 
 
@@ -275,7 +277,7 @@ class TestPosVelTable(unittest.TestCase):
               :cite:`montenbruck2012`), whereas Where uses more sophisticated JPL ephemeris. The gLAB routine 'findsun'
               is implemented in Where and can be used for testing like
 
-                glab_sun_earth = gnss.findsun(self.dset3.time)
+                glab_sun_earth = planetary_motion.findsun(self.dset3.time)
                 glab_pos_sun = glab_sun_earth - self.dset3.sat_posvel.itrs_pos
                 glab_pos_sun_unit = mathp.unit_vector(glab_pos_sun)
         """

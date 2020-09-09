@@ -97,14 +97,47 @@ FIELDS = (
         "range", "delay", ("gnss_range",), float, "%15.3f", 15, "RANGE", "meter", "Station-satellite distance"
     ),
     WriterField(
+        "range_rate", 
+        "delay", 
+        ("gnss_range_rate",), 
+        float, 
+        "%15.4f", 
+        15, 
+        "RANGE_RATE", 
+        "m/s", 
+        "Rate of station-satellite distance",
+    ),
+    WriterField(
         "satellite_clock",
         "delay",
         ("gnss_satellite_clock",),
         float,
-        "%15.3f",
+        "%15.4f",
         15,
         "SAT_CLK",
         "meter",
+        "Satellite clock correction",
+    ),
+    WriterField(
+        "earth_rotation_drift",
+        "delay",
+        ("gnss_earth_rotation_drift",),
+        float,
+        "%15.4f",
+        15,
+        "ERTH_ROT_DRIFT",
+        "m/s",
+        "Earth rotation drift",
+    ),
+    WriterField(
+        "satellite_clock_rate",
+        "delay",
+        ("gnss_satellite_clock_rate",),
+        float,
+        "%15.4f",
+        15,
+        "SAT_CLK_RATE",
+        "m/s",
         "Satellite clock correction",
     ),
     WriterField(
@@ -120,6 +153,17 @@ FIELDS = (
         "REL_CLK",
         "meter",
         "Relativistic clock effect due to orbit eccentricity",
+    ),
+    WriterField(
+        "relativistic_clock_rate",
+        "delay",
+        ("gnss_relativistic_clock_rate",),
+        float,
+        "%15.4f",
+        15,
+        "REL_CLK_RATE",
+        "m/s",
+        "Relativistic clock rate effect due to orbit eccentricity",
     ),
     WriterField("ionosphere", "delay", ("gnss_ionosphere",), float, "%9.3f", 9, "IONO", "meter", "Ionosphere delay"),
     WriterField(
@@ -342,7 +386,6 @@ FIELDS = (
         "meter",
         "Z-coordinate of site displacement due to solid tides related to TRF",
     ),
-    WriterField("residual_prefit", "residual_prefit", (), float, "%15.3f", 15, "RES", "meter", "Pre-fit residual"),
 )
 
 
@@ -355,13 +398,28 @@ def calculate_solution(dset: "Dataset") -> None:
         dset:  A dataset containing the data.
     """
     file_path = config.files.path("output_calculate_solution", file_vars=dset.vars)
-
+    
+    # Update WriterField depending on used pipeline
+    fields_def = list(FIELDS)
+    fields_def.append(WriterField(
+                        "residual_prefit", 
+                        "residual_prefit", 
+                        (), 
+                        float, 
+                        "%15.4f" if dset.vars["pipeline"] == "gnss_vel" else "%15.3f", 
+                        15, 
+                        "RESIDUAL", 
+                        "m/s" if dset.vars["pipeline"] == "gnss_vel" else "meter", 
+                        "Pre-fit residual",
+                      )
+    )
+    
     # Add date field to dataset
     if "date" not in dset.fields:
         dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
 
     # Select fields available in Dataset
-    fields = get_existing_fields(dset, FIELDS)
+    fields = get_existing_fields(dset, fields_def)
 
     # Put together fields in an array as specified by the 'dtype' tuple list
     output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in fields)))
