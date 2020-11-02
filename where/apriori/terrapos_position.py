@@ -58,7 +58,7 @@ def get_terrapos_position():
         ====================  ==================  =================================================================
     """
     dset = parsers.parse_key("terrapos_output_position").as_dataset()
-    dset.add_time("time", val=_get_time(dset), scale="gps")
+    dset.add_time("time", val=dset.gpsweek, val2=dset.gpssec, scale="gps", fmt="gps_ws")
     dset.add_position("site_pos", time="time", itrs=_get_site_pos(dset))
 
     return dset
@@ -72,10 +72,3 @@ def _get_site_pos(dset):
     x, y, z = gnss.llh2xyz(np.deg2rad(dset.lat), np.deg2rad(dset.lon), dset.height)
     return np.stack((x, y, z), axis=1)
 
-
-def _get_time(dset):
-    """Determine time field
-    """
-    # TODO hjegei: Workaround -> better would it be if Time object can handle gpsweek as input format!!!
-    jd_day, jd_frac = gnss.gpssec2jd(dset.gpsweek, dset.gpssec)
-    return Time(val=jd_day, val2=jd_frac, fmt="jd", scale="gps")

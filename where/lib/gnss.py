@@ -23,12 +23,6 @@ obstype_to_freq(sys, obstype)                  -> Midgard: gnss
 get_initial_flight_time(dset, sat_clock_corr=None, rel_clock_corr=None)  -> Midgard: gnss
 get_line_of_sight(dset)                        -> Midgard: Position library
 get_rinex_file_version(file_key, file_vars)    -> Is that needed in the future?
-gpssec2jd(wwww, sec)                           -> in time.gps_ws
-Example:
-    from where.data import time
-    t = time.Time([2000, 2000, 2000, 2004], [0, 100000, 200000, 86400], fmt="gps_ws", scale="gps")
-    t.gps_ws
-jd2gps(jd)                                     -> in time
 linear_combination(dset)                       -> Midgard: gnss
 llh2xyz(lat, lon, h)                           -> midgard.math.transformation.llh2trs
 plot_skyplot(dset)                             -> Midgard: plot
@@ -37,7 +31,7 @@ Should we more specific in using arguments, that instead of using 'dset'? -> May
 
 """
 # Standard library imports
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 # External library imports
 import numpy as np
@@ -139,7 +133,7 @@ def get_observation(dset):
 
     if freq_type == "single":
 
-        if dset.vars["pipeline"] == "gnss_spv":
+        if dset.vars["pipeline"] == "gnss_vel":
             for sys in dset.unique("system"):
                 idx = dset.filter(system=sys)
                 obstypes = dset.meta["obstypes"][sys]
@@ -156,10 +150,7 @@ def get_observation(dset):
                 if not obstype:
                     log.fatal(f"No Doppler observations are defined for {sys}: {', '.join(obstypes)}")
 
-                # Doppler observations are given in Hz and has to be converted to meter.
-                # TODO: Conversion should be done by RINEX observation parser.
-                # MURKS observation[idx] = constant.c / obstype_to_freq(sys, obstype) * dset.obs[obstype][idx]
-                observation[idx] = dset.obs[obstype][idx]  # TODO midgard.gnss.rec_velocity_est.py has to be changed.
+                observation[idx] = dset.obs[obstype][idx]
 
         else:
             for sys in dset.unique("system"):
@@ -168,8 +159,8 @@ def get_observation(dset):
                 observation[idx] = dset.obs[obstypes[0]][idx]
 
     elif freq_type == "dual":
-        linear_comb = linear_combination("ionosphere-free", dset)
-        observation = linear_comb["code"]
+        linear_comb = linear_combination("ionosphere_free", dset)
+        observation = linear_comb["code"]["val"]
     else:
         log.fatal(
             f"Configuration option 'freq_type = {freq_type}' is not valid (Note: Triple frequency solution is not "
@@ -320,79 +311,30 @@ def get_rinex_file_version(file_key=None, file_vars=None, file_path=None):
     return version, file_path
 
 
-def gpssec2jd(wwww, sec):
-    """
-    FUNCTION: gpsSec2jd(wwww,sec)
-
-    PURPOSE:  Conversion from GPS week and second to Julian Date (JD)
-
-    RETURN:   (float) jd_day, jd_frac - Julian Day and fractional part
-
-    INPUT:    (int) wwww, (float) sec - GPS week and second
-    """
-    SEC_OF_DAY = 86400.0
-    JD_1980_01_06 = 2_444_244  # Julian date of 6-Jan-1980 + 0.5 d
-
-    # .. Determine GPS day
-    wd = np.floor((sec + 43200.0) / 3600.0 / 24.0)  # 0.5 d = 43200.0 s
-
-    # .. Determine remainder
-    fracSec = sec + 43200.0 - wd * 3600.0 * 24.0
-
-    # .. Conversion GPS week and day to from Julian Date (JD)
-    jd_day = wwww * 7.0 + wd + JD_1980_01_06
-    jd_frac = fracSec / SEC_OF_DAY
-
-    return jd_day, jd_frac
-
-
-def jd2gps(jd):
-    """
-    FUNCTION: jd2gps(jd)
-
-    PURPOSE:  Conversion from Julian Date (JD) to GPS week and day (started 6-Jan-1980).
-
-    RETURN:   (int) wwww, wd, frac - GPS week, GPS day and fractional part / GPS seconds
-
-    INPUT:    (float) jd - Julian Date
-    """
-    JD_1980_01_06 = 2_444_244.5  # Julian date of 6-Jan-1980
-    if np.any(jd < JD_1980_01_06):
-        log.fatal("Julian Day exceeds the GPS time start date of 6-Jan-1980 (JD 2444244.5).")
-
-    # .. Conversion from Julian Date (JD) to GPS week and day
-    wwww = np.floor((jd - JD_1980_01_06) / 7)
-    wd = np.floor(jd - JD_1980_01_06 - wwww * 7)
-    frac = jd - JD_1980_01_06 - wwww * 7 - wd
-    gpssec = (frac + wd) * 86400.0
-
-    return wwww, wd, frac, gpssec
-
-
-def linear_combination(type_: str, dset: "Dataset") -> Dict[str, np.ndarray]:
+def linear_combination(type_: str, dset: "Dataset") -> Dict[str, Dict[str, Any]]:
     """Calculate linear combination of observations for given linear combination type and same observation type
     (code, phase, doppler, snr)
 
     Args:
         dset:    Dataset
-        type_:   Type of linear combination, which can be 'geometry-free', 'ionosphere-free', 'narrow-lane' or 
-                 'wide-lane'.
+        type_:   Type of linear combination, which can be 'geometry_free', 'ionosphere_free', 'narrow_lane' or 
+                 'wide_lane'.
 
     Returns:
-        Dictionary with observation type as key (code, phase, doppler and/or snr) and array with linear combination
-        values as values in [m].
+        Dictionary with observation type as key (code, phase, doppler and/or snr) and dictionary with array with 
+        linear combination values as values in [m] and name of combined observations.
     """
     func = {
-        "geometry-free": geometry_free_linear_combination,
-        "ionosphere-free": ionosphere_free_linear_combination,
-        "narrow-lane": narrowlane_linear_combination,
-        "wide-lane": widelane_linear_combination,
+        "geometry_free": geometry_free_linear_combination,
+        "ionosphere_free": ionosphere_free_linear_combination,
+        "narrow_lane": narrowlane_linear_combination,
+        "wide_lane": widelane_linear_combination,
     }
 
     cfg_obs_code = config.tech.gnss_select_obs.obs_code.list
     linear_comb = dict()
     for obs_code in cfg_obs_code:
-        linear_comb[obs_code] = np.zeros(dset.num_obs)
+        linear_comb[obs_code] = dict(val = np.zeros(dset.num_obs))
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
@@ -407,19 +349,23 @@ def linear_combination(type_: str, dset: "Dataset") -> Dict[str, np.ndarray]:
 
             obs_1 = dset.meta["obstypes"][sys][obs_num]
             obs_2 = dset.meta["obstypes"][sys][obs_num + 1]
+            linear_comb[obs_code].update(name= {sys: f"{obs_1}_{obs_2}"})
 
             log.debug(
-                f"Generate {type_} combination for GNSS '{sys}' and {obs_code} observations {obs_1} and " f"{obs_2}."
+                f"Generate {type_} combination for GNSS '{sys}' and {obs_code} observations {obs_1} and {obs_2}."
             )
 
-            if type_ == "geometry-free":
-                linear_comb[obs_code][idx] = func[type_](dset.obs[obs_1][idx], dset.obs[obs_2][idx])
+            if type_ == "geometry_free":
+                linear_comb[obs_code]["val"][idx] = func[type_](dset.obs[obs_1][idx], dset.obs[obs_2][idx])
             else:
                 f1 = getattr(enums, "gnss_freq_" + sys)["f" + obs_1[1]]  # Frequency of 1st band
                 f2 = getattr(enums, "gnss_freq_" + sys)["f" + obs_2[1]]  # Frequency of 2nd band
+                log.debug(
+                    f"Frequencies for {type_} combination: f1 = {f1} Hz ({obs_1}), f2 = {f2} Hz ({obs_2})."
+                )
 
                 try:
-                    linear_comb[obs_code][idx] = func[type_](dset.obs[obs_1][idx], dset.obs[obs_2][idx], f1, f2)
+                    linear_comb[obs_code]["val"][idx] = func[type_](dset.obs[obs_1][idx], dset.obs[obs_2][idx], f1, f2)
                 except KeyError:
                     log.fatal(f"Linear combination 'type_' is not defined.")
 
@@ -428,21 +374,27 @@ def linear_combination(type_: str, dset: "Dataset") -> Dict[str, np.ndarray]:
     return linear_comb
 
 
-def linear_combination_cmc(dset: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
+def linear_combination_cmc(dset: "Dataset") -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Calculate code multipath linear combination (CMC) based on code and phase observations
 
     Args:
         dset:    Dataset
 
     Returns:
-        Tuple with code multipath linear combination for frequency 1 og 2 in [m]
+        Tuple with code multipath linear combination for frequency 1 og 2 in [m]. Each code linear combination is
+        saved in a dictionary with value of linear combination and name of combined observations.
     """
-    cmc1 = np.zeros(dset.num_obs)
-    cmc2 = np.zeros(dset.num_obs)
+    cmc1 = dict(val = np.zeros(dset.num_obs))
+    cmc2 = dict(val = np.zeros(dset.num_obs))
 
     for sys in dset.unique("system"):
+        
+        if len(dset.meta["obstypes"][sys]) < 4:
+            raise ValueError(f"Dual-frequency code and phase observations are needed for code multipath linear "
+                             f"combination.")
+        
         idx = dset.filter(system=sys)
-
+        
         # Get observations for the 1st and 2nd frequency
         #
         # NOTE: The GNSS observation types defined in meta variable 'obstypes' has a defined order, which is determined
@@ -452,18 +404,20 @@ def linear_combination_cmc(dset: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
         code2 = dset.meta["obstypes"][sys][1]
         phase1 = dset.meta["obstypes"][sys][2]
         phase2 = dset.meta["obstypes"][sys][3]
+        cmc1.update(name = {sys: f"{code1}_{phase1}_{phase2}"})
+        cmc2.update(name = {sys: f"{code2}_{phase2}_{phase1}"})
 
         f1 = getattr(enums, "gnss_freq_" + sys)["f" + code1[1]]  # Frequency of 1st band
         f2 = getattr(enums, "gnss_freq_" + sys)["f" + code2[1]]  # Frequency of 2nd band
 
-        cmc1[idx], cmc2[idx] = code_multipath_linear_combination(
+        cmc1["val"][idx], cmc2["val"][idx] = code_multipath_linear_combination(
             dset.obs[code1][idx], dset.obs[code2][idx], dset.obs[phase1][idx], dset.obs[phase2][idx], f1, f2
         )
 
     return cmc1, cmc2
 
 
-def linear_combination_melbourne(dset: "Dataset") -> np.ndarray:
+def linear_combination_melbourne(dset: "Dataset") -> Dict[str, Any]:
     """Calculate Melbourne-Wübbena linear combination based on code and phase observations
 
     Args:
@@ -472,10 +426,13 @@ def linear_combination_melbourne(dset: "Dataset") -> np.ndarray:
     Returns:
         Melbourne-Wübbena linear combination
     """
-    linear_comb = np.zeros(dset.num_obs)
+    linear_comb = dict(val = np.zeros(dset.num_obs))
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
+        
+        if len(dset.meta["obstypes"][sys]) < 4:
+            raise ValueError("Two code and two phase observations are needed for Melbourne-Wübbena linear combination.")
 
         # Get observations for the 1st and 2nd frequency
         #
@@ -486,11 +443,12 @@ def linear_combination_melbourne(dset: "Dataset") -> np.ndarray:
         code2 = dset.meta["obstypes"][sys][1]
         phase1 = dset.meta["obstypes"][sys][2]
         phase2 = dset.meta["obstypes"][sys][3]
+        linear_comb.update(name= {sys: f"{code1}_{code2}_{phase1}_{phase2}"})
 
         f1 = getattr(enums, "gnss_freq_" + sys)["f" + code1[1]]  # Frequency of 1st band
         f2 = getattr(enums, "gnss_freq_" + sys)["f" + code2[1]]  # Frequency of 2nd band
 
-        linear_comb[idx] = melbourne_linear_combination(
+        linear_comb["val"][idx] = melbourne_linear_combination(
             dset.obs[code1][idx], dset.obs[code2][idx], dset.obs[phase1][idx], dset.obs[phase2][idx], f1, f2
         )
 

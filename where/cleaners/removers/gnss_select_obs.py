@@ -47,6 +47,8 @@ def gnss_select_obs(dset: "Dataset") -> np.ndarray:
     """
     remove_obstypes = set()
     keep_idx = np.full(dset.num_obs, True, dtype=bool)
+    reject_nan = np.full(dset.num_obs, False, dtype=bool)
+    reject_nan_all_sys = None
     obstypes_all = dset.obs.fields
 
     cfg_obs_code = config.tech[_SECTION].obs_code.list
@@ -100,19 +102,38 @@ def gnss_select_obs(dset: "Dataset") -> np.ndarray:
     #       determine satellite transmission time.
     _remove_obstype_from_dset(dset, remove_obstypes)
     selected_obstypes, add_remove_obstypes = _select_observations(obstypes_all, dset.meta["obstypes"])
-    log.debug(f"Remove observation types after selection: {' '.join(add_remove_obstypes)}.")
     remove_obstypes.update(add_remove_obstypes)
+    log.debug(f"Remove observation types after selection: {' '.join(add_remove_obstypes)}.")
     _remove_obstype_from_dset(dset, remove_obstypes)
     dset.meta["obstypes"] = selected_obstypes.copy()
 
     # Remove NaN values of selected observation types
     if config.tech[_SECTION].remove_nan.bool:
+
+        # Note: An array 'reject_nan_all_sys' is created for all GNSS observation types. This array
+        #       shows, if some elements are set to NaN for a GNSS observation type. At the end only
+        #       NaN observations are removed, if these observations are NaN for all GNSS observation
+        #       types (see np.bitwise_and.reduce(reject_nan_all_sys, 1)).
         for sys in dset.meta["obstypes"]:
+
+            # Loop over selected observation types
             for type_ in dset.meta["obstypes"][sys]:
-                reject_nan = np.isnan(dset.obs[type_][keep_idx])
-                if np.any(reject_nan):
-                    keep_idx[keep_idx] = np.logical_not(reject_nan)
-                    log.debug(f"Remove {np.sum(reject_nan)} NaN values for GNSS '{sys}' observation type {type_}.")
+                reject_nan[keep_idx] = np.isnan(dset.obs[type_][keep_idx])
+
+                if reject_nan_all_sys is None:
+                    reject_nan_all_sys = reject_nan 
+                    continue
+                
+                if reject_nan_all_sys.ndim == 1:
+                    reject_nan_all_sys = np.hstack((reject_nan_all_sys[:, None],reject_nan[:,None]))
+                else:
+                    reject_nan_all_sys = np.hstack((reject_nan_all_sys,reject_nan[:,None]))
+
+        if reject_nan_all_sys.ndim > 1:
+            reject_nan_all_sys = np.bitwise_and.reduce(reject_nan_all_sys, 1)   
+        if np.any(reject_nan_all_sys):
+            keep_idx[keep_idx] = np.logical_not(reject_nan_all_sys)[keep_idx]
+            log.debug(f"Remove {np.sum(reject_nan_all_sys)} NaN values.")
         
     return keep_idx
 
@@ -157,6 +178,7 @@ def _select_observations(obstypes_all, obstypes):
     =================  ======  ==================================================================================
     """
     use_obstypes = dict()
+    keep_obstypes = list()
     remove_obstypes = set(obstypes_all)
     cfg_freq_type = config.tech.freq_type.str
     cfg_obs_code = config.tech[_SECTION].obs_code.list
@@ -178,11 +200,14 @@ def _select_observations(obstypes_all, obstypes):
 
             for freq_num in freq_numbers:
                 type_ = OBS_CODE_DEF[obs_code] + freq_num
-                use_obstypes[sys].append(_select_obstype(sys, type_, obstypes[sys]))
+                selected_obstypes = _select_obstype(sys, type_, obstypes[sys])
+                use_obstypes[sys].append(selected_obstypes)
+                keep_obstypes.append(selected_obstypes)
 
         log.info(f"Selected observation types for GNSS {sys!r}: {', '.join(use_obstypes[sys])}")
-        remove_obstypes.difference_update(use_obstypes[sys])
-
+        
+    remove_obstypes.difference_update(keep_obstypes)
+        
     return use_obstypes, remove_obstypes
 
 

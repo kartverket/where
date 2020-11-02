@@ -84,7 +84,7 @@ def thermal_deformation_station(dset, temp_funcs):
     for ivsname in dset.unique("ivsname"):
         site_id = dset.meta[ivsname]["site_id"] if ivsname in dset.meta else ""
         if ivsname not in antenna_info:
-            log.warn(f"Missing thermal deformation for ivsname {ivsname!r} ({site_id}). Correction set to zero")
+            log.warn(f"Missing antenna specifications for ivsname {ivsname!r} ({site_id}). Thermal deformation correction set to zero")
             continue
 
         idx = dset.filter(ivsname=ivsname)
@@ -185,7 +185,13 @@ def calculate_temperature_functions(dset):
         temp = np.append(temp_1, temp_2)
 
         if any(np.isnan(temp)):
-            log.warn(f"Missing temperature data for {ivsname} ({site_id}). Thermal deformation correction set to zero")
+            vmf1_sta = apriori.get("vmf1_station", time=dset.time)
+            try:
+                temperature_funcs[ivsname] = vmf1_sta[ivsname]["temp"]
+                log.warn(f"Missing temperature data for {ivsname} ({site_id}). Getting temperature from VMF1 station files")
+                continue
+            except KeyError:
+                log.warn(f"Missing temperature data for {ivsname} ({site_id}). No backup data source available")
 
         # Amplitude, phase, offset, trend
         guess = [3 * np.std(temp) / (2 ** 0.5), 0, np.mean(temp), 0]

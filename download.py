@@ -123,7 +123,7 @@ def download_file(url: str, path: pathlib.Path) -> None:
         c.perform()
         response_code = c.getinfo(c.RESPONSE_CODE)
         if not (200 <= response_code <= 299):
-            print(f"There was a problem downloading {c.getinfo(c.EFFECTIVE_URL)} ({response_code})")
+            help(f"There was a problem downloading {c.getinfo(c.EFFECTIVE_URL)} ({response_code})")
         c.close()
 
 
@@ -137,16 +137,15 @@ def process(cfg: ConfigParser, section: str) -> None:
     if section not in cfg:
         return
 
-    for command, hint in cfg[section].items():
+    for command in cfg[section].keys():
         if command.startswith("__"):
             continue
 
         print(f"# {command}")
         try:
             subprocess.run(command.split(), check=True)
-        except subprocess.CalledProcessError as err:
-            print(f"Command '{command}' failed.")
-            input(f"Please {hint} manually, and hit enter afterwards")
+        except subprocess.CalledProcessError:
+            help(f"Command '{command}' failed.")
 
 
 def help(error_msg: str = "") -> None:
@@ -155,12 +154,11 @@ def help(error_msg: str = "") -> None:
     Args:
         error_msg:  Optional extra error message that will be printed below the help message.
     """
-    print(__doc__)
     if error_msg:
         print(f"\nError: {error_msg}")
-
-    raise SystemExit
-
+        sys.exit(1)
+    else:
+        print(__doc__)
 
 if __name__ == "__main__":
     main()

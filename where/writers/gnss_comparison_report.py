@@ -1,4 +1,4 @@
-"""Compare different GNSS Where datasets
+"""Compare different GNSS Where datasets and write a report
 
 Description:
 ------------
@@ -88,8 +88,8 @@ def _add_to_report(
 
     for sample_name in ["Daily", "Monthly"]:
 
-        rpt.add_text(f"\n# {sample_name} 95th percentile HPE and VPE solutions\n\n")
-
+        rpt.add_text(f"\n# {sample_name} 95th percentile HPE, VPE, 3D position and DOP solutions\n\n")
+  
         if sample_name == "Daily":
             for field in dfs_day.keys():
                 dfs_day[field].index = dfs_day[field].index.strftime("%d-%m-%Y")
@@ -103,6 +103,15 @@ def _add_to_report(
             rpt.add_text("Daily 95th percentile 3D position results in meter:")
             rpt.write_dataframe_to_markdown(dfs_day["pos_3d"], format="6.2f", statistic=True)
 
+            rpt.add_text("Daily 95th percentile PDOP results:")
+            rpt.write_dataframe_to_markdown(dfs_day["pdop"], format="6.2f", statistic=True)
+
+            rpt.add_text("Daily 95th percentile HDOP results:")
+            rpt.write_dataframe_to_markdown(dfs_day["hdop"], format="6.2f", statistic=True)
+
+            rpt.add_text("Daily 95th percentile VDOP results:")
+            rpt.write_dataframe_to_markdown(dfs_day["vdop"], format="6.2f", statistic=True)
+
         elif sample_name == "Monthly":
             rpt.add_text("Monthly 95th percentile HPE results in meter:")
             rpt.write_dataframe_to_markdown(dfs_month["hpe"], format="6.2f")
@@ -113,7 +122,17 @@ def _add_to_report(
             rpt.add_text("Monthly 95th percentile 3D position results in meter:")
             rpt.write_dataframe_to_markdown(dfs_month["pos_3d"], format="6.2f")
 
-        # Add HPE 95th, VPE 95th and 3D positon 95th plots
+            rpt.add_text("Monthly 95th percentile PDOP results:")
+            rpt.write_dataframe_to_markdown(dfs_month["pdop"], format="6.2f")
+
+            rpt.add_text("Monthly 95th percentile HDOP results:")
+            rpt.write_dataframe_to_markdown(dfs_month["hdop"], format="6.2f")
+
+            rpt.add_text("Monthly 95th percentile VDOP results:")
+            rpt.write_dataframe_to_markdown(dfs_month["vdop"], format="6.2f")
+
+
+        # Add HPE 95th, VPE 95th, 3D positon 95th and DOP 95th plots
         rpt.add_figure(
             f"{figure_dir}/plot_hpe_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for horizontal position error (HPE).",
@@ -132,6 +151,24 @@ def _add_to_report(
             clearpage=True,
         )
 
+        rpt.add_figure(
+            f"{figure_dir}/plot_pdop_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            caption="95th percentile for position dilution of precision (PDOP).",
+            clearpage=True,
+        )
+
+        rpt.add_figure(
+            f"{figure_dir}/plot_hdop_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            caption="95th percentile for horizontal dilution of precision (HDOP).",
+            clearpage=True,
+        )
+
+        rpt.add_figure(
+            f"{figure_dir}/plot_vdop_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            caption="95th percentile for vertical dilution of precision (VDOP).",
+            clearpage=True,
+        )
+
 
 def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.DataFrame]:
     """Generate dataframe based on station datasets
@@ -144,6 +181,9 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         hpe:    horizontal position error
         vpe:    vertical position error
         pos_3d: 3D position error
+        pdop:   position dilution of precision
+        hdop:   horizontal dilution of precision
+        vdop:   vertical dilution of precision
 
     Example for "dfs" dictionary:
      
@@ -196,8 +236,22 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
     """
     dsets = dset
     dfs = {}
-    dfs_day = {"hpe": pd.DataFrame(), "vpe": pd.DataFrame(), "pos_3d": pd.DataFrame()}
-    dfs_month = {"hpe": pd.DataFrame(), "vpe": pd.DataFrame(), "pos_3d": pd.DataFrame()}
+    dfs_day = {
+        "hpe": pd.DataFrame(), 
+        "vpe": pd.DataFrame(), 
+        "pos_3d": pd.DataFrame(),
+        "pdop": pd.DataFrame(),
+        "hdop": pd.DataFrame(),
+        "vdop": pd.DataFrame(),
+    }
+    dfs_month = {
+        "hpe": pd.DataFrame(), 
+        "vpe": pd.DataFrame(), 
+        "pos_3d": pd.DataFrame(),
+        "pdop": pd.DataFrame(),
+        "hdop": pd.DataFrame(),
+        "vdop": pd.DataFrame(),
+    }
 
     for station, dset in dsets.items():
 
@@ -214,25 +268,30 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
                             ), 
                             system="trs",
         )
-        dset.add_position_delta(
-            name="enu",
-            val=(dset.site_pos.trs - ref_pos).val,
-            system="trs",
-            ref_pos=ref_pos,
-        )
-        
-        hpe = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2)
-        vpe = np.absolute(dset.enu.enu.up)
-        pos_3d = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2 + dset.enu.enu.up ** 2)
+        if not "enu" in dset.fields:
+            dset.add_position_delta(
+                name="enu",
+                val=(dset.site_pos.trs - ref_pos).val,
+                system="trs",
+                ref_pos=ref_pos,
+            )
 
         # TODO: Maybe it is not necessary to introduce enu, hpe and vpe to dataset
         #      Maybe better to introduce fields in estimate stage already.
-        dset.add_float("hpe", val=hpe)
-        dset.add_float("vpe", val=vpe)
-        dset.add_float("pos_3d", val=pos_3d)
+        if not "hpe" in dset.fields:
+            hpe = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2)
+            dset.add_float("hpe", val=hpe)
 
-        # Determine dataframe with east, north, up, hpe, vpe and pos_3d columns
-        df = dset.as_dataframe(fields=["enu.enu", "time", "hpe", "vpe", "pos_3d"])
+        if not "vpe" in dset.fields:
+            vpe = np.absolute(dset.enu.enu.up)
+            dset.add_float("vpe", val=vpe)
+
+        if not "pos_3d" in dset.fields:
+            pos_3d = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2 + dset.enu.enu.up ** 2)
+            dset.add_float("pos_3d", val=pos_3d)
+
+        # Determine dataframe 
+        df = dset.as_dataframe(fields=["enu.enu", "time", "hpe", "vpe", "pos_3d", "pdop", "vdop", "hdop"])
         df = df.rename(columns={"enu_enu_0": "east", "enu_enu_1": "north", "enu_enu_2": "up"})
 
         if df.empty:
@@ -305,14 +364,23 @@ def _plot_position_error(
     for sample_name, sample_data in samples.items():
 
         # Loop over fields to plot
-        for field in ["hpe", "vpe", "pos_3d"]:
+        for field in ["hpe", "vpe", "pos_3d", "pdop", "hdop", "vdop"]:
 
             if field == "hpe":
                 opt_args["ylim"] = [0.0, 4.0]
             elif field == "vpe":
-                opt_args["ylim"] = [0.0, 6.0]
+                opt_args["ylim"] = [0.0, 7.0]
             elif field == "pos_3d":
-                opt_args["ylim"] = [0.0, 6.0]
+                opt_args["ylim"] = [0.0, 7.0]
+            else:
+                opt_args["ylim"] = []
+
+            #elif field == "pdop":
+            #    opt_args["ylim"] = [1.0, 3.0]
+            #elif field == "hdop":
+            #    opt_args["ylim"] = [0.5, 1.5]
+            #elif field == "vdop":
+            #    opt_args["ylim"] = [1.0, 3.0]
 
             # Generate x- and y-arrays for plotting
             x_arrays = []
@@ -320,8 +388,8 @@ def _plot_position_error(
             labels = []
 
             for station in sample_data[field].columns:
-                if sample_name == "monthly":
-                    opt_args.update({"xlim": "auto", "ylim": [0.0, 3.0]})
+                #if sample_name == "monthly":
+                #    opt_args.update({"xlim": "auto", "ylim": "auto"})
                 x_arrays.append(list(sample_data[field].index))
                 y_arrays.append(list(sample_data[field][station]))
                 labels.append(station.upper())

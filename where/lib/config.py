@@ -144,7 +144,8 @@ def set_file_vars(file_vars=None):
 
 
 def program_vars(rundate, pipeline, use_options=True, **other_vars):
-    prg_vars = dict(rundate="" if rundate is None else rundate.strftime(FMT_date), pipeline=pipeline)
+    PIPELINE = None if pipeline is None else pipeline.upper()
+    prg_vars = dict(rundate="" if rundate is None else rundate.strftime(FMT_date), pipeline=pipeline, PIPELINE=PIPELINE)
     prg_vars.setdefault("user", getpass.getuser().lower())
     prg_vars.setdefault("id", "")
 

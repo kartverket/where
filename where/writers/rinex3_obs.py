@@ -226,8 +226,13 @@ def rinex3_obs(dset):
                             num_sats = len(sats)
                             if line == 0:
                                 num_sats_str = str(num_sats) if num_sats > 0 else ""
-                                phase_shift_str = "{:1s} {:>3s} {:>8.5f}{:>4s}" "".format(
-                                    sys, type_, float(meta["phase_shift"][sys][type_]["corr"]), num_sats_str
+                                correction = meta["phase_shift"][sys][type_]["corr"]
+                                correction = f"{float(correction):>8.5f}" if correction else f"{correction:>8s}"
+                                phase_shift_str = "{:1s} {:>3s} {}{:>4s}" "".format(
+                                    sys, 
+                                    type_, 
+                                    correction, 
+                                    num_sats_str,
                                 )
                             else:
                                 phase_shift_str = ""

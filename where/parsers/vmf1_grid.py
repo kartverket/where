@@ -26,7 +26,7 @@ from midgard.parsers._parser import Parser
 
 
 @plugins.register
-class Vmf1Parser(Parser):
+class Vmf1GridParser(Parser):
     """A parser for reading VMF1 files
     """
 

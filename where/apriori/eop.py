@@ -83,7 +83,7 @@ _EOP_DATA = dict()
 
 
 @plugins.register
-def get_eop(time, models=None, pole_model=None, window=4, sources=None):
+def get_eop(time, models=None, pole_model=None, window=4, sources=None, remove_leap_seconds=None):
     """Get EOP data for the given time epochs
 
     Args:
@@ -96,11 +96,11 @@ def get_eop(time, models=None, pole_model=None, window=4, sources=None):
     """
     if not _EOP_DATA:
 
-        sources = config.tech.get("eop_sources", value=sources).list
+        sources = sources if sources else config.tech.eop_sources.list
         for source in sources:
             _EOP_DATA.setdefault(source, {}).update(parsers.parse_key(file_key=f"eop_{source}").as_dict())
 
-    return Eop(_EOP_DATA, time, models=models, pole_model=pole_model, window=window)
+    return Eop(_EOP_DATA, time, models=models, pole_model=pole_model, window=window, sources=sources, remove_leap_seconds=remove_leap_seconds)
 
 
 class Eop:
@@ -115,7 +115,7 @@ class Eop:
 
     _correction_cache = dict()
 
-    def __init__(self, eop_data, time, models=None, pole_model=None, window=4, sources=None):
+    def __init__(self, eop_data, time, models=None, pole_model=None, window=4, sources=None, remove_leap_seconds=None):
         """Create an Eop-instance that calculates EOP corrections for the given time epochs
 
         The interpolation window is based on https://hpiers.obspm.fr/iers/models/interp.f which uses 4 days.
@@ -136,6 +136,9 @@ class Eop:
 
         # Figure out which correction models to use
         self.models = config.tech.eop_models.tuple if models is None else models
+
+        # Determines whether the interpolated values should contain the jump caused by leap seconds or not
+        self.remove_leap_seconds = remove_leap_seconds if remove_leap_seconds is not None else config.tech.eop_remove_leap_seconds.bool
 
         if "rg_zont2" in self.models:
             self.remove_low_frequency_tides()
@@ -178,7 +181,7 @@ class Eop:
             start_time = np.floor(time.utc.mjd.min()) - window // 2
             end_time = np.ceil(time.utc.mjd.max()) + window // 2
 
-        sources = config.tech.get("eop_sources", value=sources).list
+        sources = sources if sources else config.tech.eop_sources.list
         for source in sources:
             try:
                 picked_data = {d: eop_data[source][d].copy() for d in np.arange(start_time, end_time + 1)}
@@ -553,6 +556,8 @@ class Eop:
         offsets = range(int(-np.ceil(self.window / 2) + 1), int(np.floor(self.window / 2) + 1))
 
         if leap_second_correction:
+            leap_offsets = {d:self.data[d]["leap_offset"] for d in days}
+            first_leap_offset = leap_offsets[days[0]]
             leap = {
                 d: np.array(
                     [self.data[d + o].get("leap_offset", np.nan) - self.data[d]["leap_offset"] for o in offsets]
@@ -578,11 +583,15 @@ class Eop:
 
         if self.time.ndim == 0:
             return interp_values[self.time.utc.mjd_int]
-
+ 
         values = np.empty(self.time.size)
         for day in days:
             idx = self.time.utc.mjd_int == day
             values[idx] = interp_values[day][idx]
+            if leap_second_correction and self.remove_leap_seconds:
+                current_leap_offset = leap_offsets.get(day)
+                if first_leap_offset != current_leap_offset:
+                    values[idx] -= first_leap_offset - current_leap_offset
 
         return values
 

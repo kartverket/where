@@ -53,11 +53,14 @@ class Vtrf(trf.TrfFactory):
         self.solution, _, fmt = version.partition("_")
         self.format = fmt if fmt else "snx"  # Sinex is default format
         if self.solution == "last":
-            candidates = config.files.glob_variable(self.file_key_pattern.format(self.format), "version", r"[^._]*")
+            file_key = self.file_key_pattern.format(self.format)
+            candidates = config.files.glob_variable(file_key, "version", r"[^._]*")
             try:
                 self.solution = max(candidates)
             except ValueError:
-                log.fatal("No vtrf reference frame files found")
+                url = config.files.url(file_key).base
+                file_path = config.files.path(file_key)
+                log.fatal(f"No VTRF reference frame files found ({file_path}). Find and download one at {url}.")
         self.version = f"{self.solution}_{self.format}"
 
     @property

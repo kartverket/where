@@ -354,6 +354,8 @@ def calculate(stage, dset):
     store_outliers = config.tech.store_outliers.bool
 
     for iter_num in itertools.count(start=1):
+        if dset.num_obs == 0:
+            break
         delay.calculate_delay("delay_corr", dset)
         delta_correction = delay.add("delay_corr", dset)
 
@@ -419,7 +421,7 @@ def estimate(stage, dset):
         independent = config.tech.estimate_obs_rejectors_independent.bool
         dset = estimation.apply_observation_rejectors("estimate_obs_rejectors", dset, independent)
         log.blank()
-        if dset.num_obs == num_obs_before:
+        if dset.num_obs == num_obs_before or dset.num_obs == 0:
             break
 
     log.blank()

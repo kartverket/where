@@ -146,7 +146,7 @@ def main():
     config.read_pipeline(pipeline)
 
     # Add command line options to config
-    user = config.program_vars(rundate=None, pipeline=None)["user"]
+    user = config.program_vars(rundate=None, pipeline=pipeline)["user"]
     profile = util.read_option_value("--profile")
     config.there.update_from_options(profile="__opts__", allow_new=True)
     config.there.profiles = [p for p in ("__opts__", profile, pipeline, user) if p]
@@ -1139,17 +1139,6 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             xlim = self._pad_range(self.xlim if x_data.ndim == 1 else self.xlim[num_x])
             ylim = self._pad_range(self.ylim if y_data.ndim == 1 else self.ylim[num_y])
 
-            try:
-                ax.scatter(
-                    self.vars.get("x_axis_other")[idx_other][idx_x],
-                    self.vars.get("y_axis_other")[idx_other][idx_y],
-                    c=config.there.scatter.color_remember.str,
-                    s=self.vars.get("size_other")[idx_other],
-                    marker=config.there.scatter.marker_remember.str,
-                    alpha=config.there.scatter.alpha_remember.float,
-                )
-            except (IndexError, TypeError, ValueError):
-                log.debug("Not plotting other data")
             ax.scatter(
                 x_data[idx][idx_x],
                 y_data[idx][idx_y],
@@ -1160,6 +1149,27 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 cmap=self.cmap,
                 picker=True,
             )
+
+            try:
+                x_other = self.vars.get("x_axis_other")[idx_other][idx_x]
+                y_other = self.vars.get("y_axis_other")[idx_other][idx_y]
+                if x_data[idx][idx_x].dtype != x_other.dtype:
+                    log.warn("Cannot plot remembered data. X-axis data types are not compatible ")
+                    raise ValueError("Remebered data must be of same type as the new plot")
+                if y_data[idx][idx_y].dtype != y_other.dtype:
+                    log.warn("Cannot plot remembered data. Y-axis data types are not compatible ")
+                    raise ValueError("Remebered data must be of same type as the new plot")
+
+                ax.scatter(
+                    x_other,
+                    y_other,
+                    c=config.there.scatter.color_remember.str,
+                    s=self.vars.get("size_other")[idx_other],
+                    marker=config.there.scatter.marker_remember.str,
+                    alpha=config.there.scatter.alpha_remember.float,
+                )
+            except (IndexError, TypeError, ValueError):
+                log.debug("Not plotting other data")
 
             # Plot events
             for x in x_events:

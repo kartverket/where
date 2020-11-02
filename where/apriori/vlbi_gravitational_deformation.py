@@ -15,6 +15,7 @@ from midgard.dev import plugins
 # Where imports
 from where import parsers
 from where.lib import config
+from where.lib import log
 
 
 @plugins.register
@@ -34,6 +35,7 @@ def get_gravitational_deformation(rundate):
         file_vars = dict()
 
     parser = parsers.parse_key(file_key="vlbi_gravitational_deformation", file_vars=file_vars)
+    log.debug(f"Using {parser.file_path} as a priori gravitional deformation")
     data = parser.as_dict() if parser.data_available else dict()
 
     interpolators = dict()

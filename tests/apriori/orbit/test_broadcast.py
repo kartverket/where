@@ -3,9 +3,9 @@
 -------
 
 
-$Revision: 19125 $
-$Date: 2020-03-03 14:39:13 +0100 (Tue, 03 Mar 2020) $
-$LastChangedBy: kirann $
+$Revision: 19696 $
+$Date: 2020-10-26 22:48:44 +0100 (ma., 26 okt. 2020) $
+$LastChangedBy: dahmic $
 
 """
 # Standard library imports
@@ -17,10 +17,14 @@ import unittest
 import numpy as np
 import pytest
 
+# Midgard imports
+from midgard.math.constant import constant
+
 # Where imports
 from where import apriori
 from where.data import dataset3 as dataset
-from where.data.time import Time
+from where.lib import config
+from where.lib import log
 
 TEST = "test_3"
 
@@ -59,8 +63,8 @@ class TestBroadcast(unittest.TestCase):
             0.200000000000D+01 0.000000000000D+00-0.838190317154D-08 0.100000000000D+02
             0.172770000000D+06 0.400000000000D+01 0.000000000000D+00 0.000000000000D+00
 
-        The third test set up compares results from Where against CNES solution for satellite E11 and epoch
-        2016-03-01 00:00:00.0.
+        The third test set up compares results from Where against CNES solution for satellite E01 and epoch
+        2016-03-01 01:30:00.0.
 
         /* Sample Broadcast Message in unit of radians, seconds, meters for satellite E01 and
         /  epoch 2019-07-01 00:00:00.0
@@ -74,6 +78,8 @@ class TestBroadcast(unittest.TestCase):
              8.714000000000D+04 0.000000000000D+00 0.000000000000D+00 0.000000000000D+00 
 
         """
+        # Initialize logging
+        log.init(log_level="debug")
 
         # Get GNSS ephemeris data for testing
         if TEST == "test_1":
@@ -111,23 +117,27 @@ class TestBroadcast(unittest.TestCase):
             year = 2019
             month = 7
             day = 1
-            hour = 0
-            minute = 0
+            hour = 1
+            minute = 30
             second = 0
             satellite = "E01"
             self.system = "E"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat_gpsweek = 1886.0
-            self.t_sat_gpssec = 173699.999
+            self.t_sat_gpsweek = 2060.0
+            self.t_sat_gpssec = 91800.0
 
         rundate = datetime(year, month, day, hour, minute, second)
 
+        # Initialize configuration
+        config.init(rundate=rundate, pipeline="gnss")
+
         # Generate observation datast
         self.dset = dataset.Dataset(num_obs=1, rundate=rundate)
-        self.dset.add_time(
-            name="time", val=Time(val=[self.t_sat_gpsweek], val2=[self.t_sat_gpssec], fmt="gps_ws", scale="gps")
-        )
+        self.dset.add_time(name="time", val=rundate, scale="gps", fmt="datetime")
+        #self.dset.add_time(
+        #    name="time", val=Time(val=[self.t_sat_gpsweek], val2=[self.t_sat_gpssec], fmt="gps_ws", scale="gps")
+        #)
         self.dset.add_text(name="satellite", val=[satellite])
 
         # Get broadcast ephemeris
@@ -175,16 +185,16 @@ class TestBroadcast(unittest.TestCase):
             expected_vega = np.array([0.2559048275])  # True anomaly (fk)
 
         elif TEST == "test_3":
-            expected_a = np.array([29600262.4159])  # Semimajor axis (a^2)
+            expected_a = np.array([29600262.415948])  # Semimajor axis (a^2)
             expected_E = np.array([1.233802050337e00])  # Eccentric anomaly (E)
             expected_i = np.array([9.878574681865e-01])  # Inclination (i)
             expected_lambda = np.array(
                 [-6.451718161810]
             )  # Instantaneous Greenwich longitude of the ascending node (O)
             expected_n = np.array([1.239725533334e-04])  # Corrected mean motion (n)
-            expected_r = np.array([2.959844962154e07])  # Orbit radius (r)
+            expected_r = np.array([2.9598449621537e07])  # Orbit radius (r)
             expected_tk = np.array([5400.0])  # Eclapsed time referred to ephemeris reference epoch (diff)
-            expected_u = np.array([4.307121918851])  # Argument of latitude (u)
+            expected_u = np.array([4.30712042665])  # Argument of latitude (u)
             expected_vega = np.array([1.233978561432])  # True anomaly (fk)
 
         with self.subTest(msg="a"):
@@ -214,10 +224,19 @@ class TestBroadcast(unittest.TestCase):
         with self.subTest(msg="vega"):
             np.testing.assert_allclose(brdc_dict["vega"], expected_vega, rtol=0, atol=1e-6)
 
-        # print("OUTPUT:\n a = {:f} [m]\n E = {:15.12e} [rad]\n i = {:15.12e} [rad]\n lambda_ = {:15.12e} [rad]\n"
-        #      " n = {:15.12e} [rad/s]\n r = {:f} [m]\n tk = {:15.12e} [s]\n u = {:15.12e} [rad]\n vega = {:15.12e} [rad]\n"
-        #      ''.format(brdc_dict['a'], brdc_dict['E'], brdc_dict['i'], brdc_dict['lambda_'], brdc_dict['n'],
-        #                brdc_dict['r'], brdc_dict['tk'], brdc_dict['u'], brdc_dict['vega']))
+        log.debug(f"\nOUTPUT test_get_corrected_broadcast_ephemeris():\n"
+                  f"a =       {brdc_dict['a']:f} [m]\n"
+                  f"E =       {brdc_dict['E']:15.12e} [rad]\n"
+                  f"i =       {brdc_dict['i']:15.12e} [rad]\n"
+                  f"lambda_ = {brdc_dict['lambda_']:15.12e} [rad]\n"
+                  f"n =       {brdc_dict['n']:15.12e} [rad/s]\n" 
+                  f"r =       {brdc_dict['r']:f} [m]\n"
+                  f"tk =      {brdc_dict['tk']:f} [s]\n"
+                  f"u =       {brdc_dict['u']:15.12e} [rad]\n"
+                  f"vega =    {brdc_dict['vega']:15.12e} [rad]\n"
+        )
+
+
 
     def test_get_satellite_position_velocity(self):
         """
@@ -236,17 +255,20 @@ class TestBroadcast(unittest.TestCase):
             expected_sat_vel = np.array([-2632.8593, -735.4519, -69.6660])
 
         elif TEST == "test_3":
-            expected_sat_pos = np.array([-14015916.0717, -12803962.9430, -22708607.3907])
+            expected_sat_pos = np.array([-14015916.0717073, -12803962.9429849, -22708607.3906834])
             expected_sat_vel = np.array([0, 0, 0])  # TODO: Not known
 
         with self.subTest(msg="sat_pos"):
             np.testing.assert_allclose(sat_pos, expected_sat_pos, rtol=0, atol=1e-5)
 
-        with self.subTest(msg="sat_vel"):
-            np.testing.assert_allclose(sat_vel, expected_sat_vel, rtol=0, atol=1e-6)
+        if not TEST == "test_3":
+            with self.subTest(msg="sat_vel"):
+                np.testing.assert_allclose(sat_vel, expected_sat_vel, rtol=0, atol=1e-6)
 
-        # print("OUTPUT:\n sat_pos = {:20.8f} {:20.8f} {:20.8f} [m]\n sat_vel = {:15.8f} {:15.8f} {:15.8f} [m/s]\n"
-        #      ''.format(sat_pos[0], sat_pos[1], sat_pos[2], sat_vel[0], sat_vel[1], sat_vel[2]))
+        log.debug(f"OUTPUT test_get_satellite_position_velocity():\n"
+                  f"sat_pos = {sat_pos[0]:20.8f} {sat_pos[1]:20.8f} {sat_pos[2]:20.8f} [m]\n"
+                  f"sat_vel = {sat_vel[0]:20.8f} {sat_vel[1]:20.8f} {sat_vel[2]:20.8f} [m/s]\n"
+        )
 
     @pytest.mark.sisre
     @pytest.mark.gnss
@@ -260,9 +282,13 @@ class TestBroadcast(unittest.TestCase):
         elif TEST == "test_2":
             expected_sat_clk_corr = 118787.68054
         elif TEST == "test_3":
-            expected_sat_clk_corr = -6.375137103305e-04
+            expected_sat_clk_corr = -6.375137103305e-04 * constant.c # -191121.8022286806 -> conversion from s to m
 
         np.testing.assert_allclose(sat_clk_corr, expected_sat_clk_corr, rtol=0, atol=1e-5)
+        
+        log.debug(f"OUTPUT test_get_satellite_clock_correction():\n"
+                  f"sat_clk_corr = {sat_clk_corr[0]:12.10f} [m]\n"
+        )
 
     def test_get_relativistic_clock_correction(self):
         rel_clk_corr = self.brdc._get_relativistic_clock_correction(
@@ -274,9 +300,13 @@ class TestBroadcast(unittest.TestCase):
         elif TEST == "test_2":
             expected_rel_clk_corr = -0.83775
         elif TEST == "test_3":
-            expected_rel_clk_corr = 0  # TODO: Not known
+            expected_rel_clk_corr = -4.266422241696e-10 * constant.c # = -0.1279041211 -> conversion from s to m
 
         np.testing.assert_allclose(rel_clk_corr, expected_rel_clk_corr, rtol=0, atol=1e-6)
+
+        log.debug(f"OUTPUT test_get_relativistic_clock_correction():\n"
+                  f"rel_clk_corr = {rel_clk_corr:12.10f} [m]\n"
+        )
 
 
 if __name__ == "__main__":

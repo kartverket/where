@@ -196,8 +196,7 @@ class VgosDbParser(Parser):
             ]
         except KeyError:
             log.warn("Missing ionosphere quality information")
-
-        self.data["iono_quality"] = np.full(num_obs, np.nan)
+            self.data["iono_quality"] = np.full(num_obs, np.nan)
 
         # Station dependent info
         for field, params in self._STATION_FIELDS.items():

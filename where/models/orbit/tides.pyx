@@ -87,7 +87,7 @@ def tides_setup(
     # Ocean tides coefficients, corrections to the gravity coefficients C and S.
     # The dict containing the values Cp, Cm, Sp and Sm
     ocean_tides_coeffs = apriori.get("ocean_tides_orbit")
-    
+
     # The S1 wave is contained in a separate file
     s1_wave = apriori.get("ocean_tides_s1")
     CpS1 = s1_wave[164.556]["C+"]
@@ -115,8 +115,8 @@ def tides_setup(
     # Greenwich mean sidereal time in radians
     GMST = epochs.ut1.gmst
 
-    eop = apriori.get('eop', time=epochs) 
-   
+    eop = apriori.get('eop', time=epochs)
+
     # Equation (7.24) IERS Conventions 2010
     m_1 = eop.x - eop.x_pole
     m_2 = eop.y_pole - eop.y
@@ -315,19 +315,21 @@ cdef solid_earth_tides(int current_step):
     Returns:
         C,S:                 Solid earth tides part of Gravity coefficients at time t.
     """
-    # Elastic or anelastic earth?
-    k = k_elastic
-    #k = k_anelastic
+    # We want anelastic earth
+    # k = k_elastic
+    k = k_anelastic
 
     cdef int n, m
     cdef double[:, :] C, S
-    C = np.zeros((truncation_level, truncation_level))   
-    S = np.zeros((truncation_level, truncation_level)) 
+    C = np.zeros((truncation_level, truncation_level))
+    S = np.zeros((truncation_level, truncation_level))
     cdef complex factor_sun, factor_moon, correction
     V_sun, W_sun = compute_VW(sun_pos[current_step])
     V_moon, W_moon = compute_VW(moon_pos[current_step])
 
     # Compute the non-normalized coefficients here.
+
+    # STEP 1
     # Equation (6.6)
     for n in range(2, min(4, C.shape[0])):
         for m in range(0, n + 1):
@@ -351,6 +353,7 @@ cdef solid_earth_tides(int current_step):
             C[4, m] = correction.real * normalization_factor(2, m) * normalization_factor(4, m)
             S[4, m] = correction.imag * normalization_factor(2, m) * normalization_factor(4, m)
 
+    # STEP 2
     # Eqation (6.8a)
     C[2, 0] += normalization_factor(2, 0) * equation_68a(current_step)
 
@@ -390,7 +393,7 @@ def ocean_tides(int current_step):
 
     fundamental_waves_a = [3, 6, 17, 23]
     fundamental_waves_b = [0, 1, 2, 3, 8, 13, 17, 19]
-    
+
     # Equation 6.15
     for i in fundamental_waves_a:
         doodson = doodson_a[i]
@@ -401,17 +404,17 @@ def ocean_tides(int current_step):
         Sm = ocean_tides_coeffs[doodson]["S-"]
         for n in range(0, C.shape[0]):
             for m in range(0, n + 1):
- 
+
                 sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
                 cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
-                
+
                 C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
                            + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f
                            + Sm[n, m] * sin_theta_f)
                 S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
                            + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f
                            - Sm[n, m] * cos_theta_f)
-              
+
     for i in fundamental_waves_b:
         doodson = doodson_b[i]
         # Some of these are actually missing in FES2004
@@ -424,12 +427,12 @@ def ocean_tides(int current_step):
         Sm = ocean_tides_coeffs[doodson]["S-"]
 
         NF = np.dot(delaunay_multipliers_b[i], delaunay_variables[current_step])
-        
+
         for n in range(0, C.shape[0]):
             for m in range(0, n + 1):
                 sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
                 cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
-                
+
                 if (n, m) in Cp:
                     C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
                         + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f + Sm[n, m] * sin_theta_f)
@@ -439,7 +442,7 @@ def ocean_tides(int current_step):
     for i in range(0, len(doodson_c)):
         doodson = doodson_c[i]
         NF = np.dot(delaunay_multipliers_c[i], delaunay_variables[current_step])
-        
+
         Cp = ocean_tides_coeffs[doodson]["C+"]
         Cm = ocean_tides_coeffs[doodson]["C-"]
         Sp = ocean_tides_coeffs[doodson]["S+"]
@@ -448,13 +451,13 @@ def ocean_tides(int current_step):
             for m in range(0, n + 1):
                 sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
                 cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
-                
+
                 C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
                            + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f + Sm[n, m] * sin_theta_f)
                 S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
                            + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f - Sm[n, m] * cos_theta_f)
-   
- 
+
+
     #Treat the S1 case separately:
     NF = np.dot(delaunay_multipliers_a[19], delaunay_variables[current_step])
     for n in range(0, C.shape[0]):
@@ -469,10 +472,10 @@ def ocean_tides(int current_step):
                        + CmS1[n, m] * cos_theta_f)
             S[n, m] += normalization_factor(n, m) * (-CpS1[n, m] * sin_theta_f
                        + CmS1[n, m] * sin_theta_f)
- 
+
     return C, S
 
- 
+
 cdef solid_earth_pole_tides(int current_step):
     """Computing the time variable part of the gravity coefficients of the Earth due to solid earth pole tides
 
@@ -484,7 +487,7 @@ cdef solid_earth_pole_tides(int current_step):
     Returns:
         C21, S21:            Time variable part of (2,1)-gravity coefficients due to solid earth pole tides at time t.
     """
-    
+
     C21 = -1.333e-9 * (m_1[current_step] + 0.0115 * m_2[current_step])
     S21 = -1.333e-9 * (m_2[current_step] - 0.0115 * m_1[current_step])
 
@@ -510,42 +513,6 @@ cdef ocean_pole_tides(int current_step):
     return C21, S21
 
 
-
-cdef k_elastic(int n, int m):
-    """
-    The k coefficients are taken from IERS Conventions [2], table 6.3 on page 83, where Elastic Earth is assumed.
-
-    Args:
-        n, m:   Integers, degree and order.
-    Returns:
-        k:      Float, solid Earth tide external potential Love numbers.
-    """
-    cdef double k
-    if n == 2 and m == 0:
-        k = 0.29525
-    elif n == 4 and m == 0:
-        k = -0.00087
-    elif n == 2 and m == 1:
-        k = 0.29470
-    elif n == 4 and m == 1:
-        k = -0.00079
-    elif n == 2 and m == 2:
-        k = 0.29801
-    elif n == 4 and m == 2:
-        k = -0.00057
-    elif n == 3:
-        if 0 <= m <= 2:
-            k = 0.093
-        elif m == 3:
-            k = 0.094
-        else:
-            k = 0
-    else:
-        k = 0
-
-    return k
-
-
 cdef k_anelastic(int n, int m):
     """
     The k coefficients are taken from IERS Conventions [2], table 6.3 on page 83, where Anelastic Earth is assumed.
@@ -555,32 +522,19 @@ cdef k_anelastic(int n, int m):
     Returns:
         k:       Complex number, solid Earth tide external potential Love numbers.
     """
-    cdef complex k
+    #cdef complex k
 
-    if n == 2:
-        if m == 0:
-            k = 0.30190
-        elif m == 1:
-            k = equation_69(n)
-            k += 0.29830 - 0.00144 * 1j
-        elif m == 2:
-            k = 0.30102 - 0.0013 * 1j
-        else:
-            k = 0
-    elif n == 4:
-        if m == 0:
-            k = -0.00089
-        elif m == 1:
-            k = equation_69(n)
-            k += -0.0008
-        elif m == 2:
-            k = -0.00057
-        else:
-            k = 0
-    else:
-        k = 0
-
-    return k
+    k = {(2, 0): 0.3019,
+         (2, 1): 0.29830 - 0.00144 * 1j,
+         (2, 2): 0.30102 - 0.00130 * 1j,
+         (3, 0): 0.093,
+         (3, 1): 0.093,
+         (3, 2): 0.093,
+         (3, 3): 0.094,
+         (4, 0):-0.00089,
+         (4, 1):-0.0008,
+         (4, 2):-0.00057}
+    return k[(n, m)]
 
 
 cdef equation_68a(current_step):
@@ -588,7 +542,7 @@ cdef equation_68a(current_step):
     Equation (6.8a) in IERS Conventions [2].
 
     Args:
-    
+
     Returns:
         float:               Contribution to the gravity coefficient C20 from equation 6.8a.
     """
@@ -607,7 +561,7 @@ cdef equation_68a(current_step):
         cos_theta_f[i] = math.cos(argument)
 
 
-    return (np.dot(cos_theta_f, ip) - np.dot(sin_theta_f, op)) * math.sqrt(5)
+    return (np.dot(cos_theta_f, ip) - np.dot(sin_theta_f, op))
 
 
 cdef table_65b():
@@ -647,8 +601,8 @@ cdef table_65b():
 
     # Units: 10**-12
     for i in range(0, len(ip)):
-        ip[i] = ip[i] * 10e-12
-        op[i] = op[i] * 10e-12
+        ip[i] = ip[i] * 1e-12
+        op[i] = op[i] * 1e-12
 
     doodson = np.array([55.565, 55.575, 56.554, 57.555, 57.565, 58.554, 63.655, 65.445, 65.455, 65.465, 65.655, 73.555,
                         75.355, 75.555, 75.565, 75.575, 83.655, 85.455, 85.465, 93.555, 95.355])
@@ -656,7 +610,7 @@ cdef table_65b():
     return delaunay_multipliers, ip, op, doodson
 
 
-cdef equation_68b_m1(int current_step):
+def equation_68b_m1(int current_step):
     """
     Equation (6.8b) (with m=1) in the reference below.
 
@@ -665,19 +619,20 @@ cdef equation_68b_m1(int current_step):
     """
     cdef long[:, :] delaunay_multipliers
     cdef double[:] ip, op, sin_theta_f, cos_theta_f
- 
+
     delaunay_multipliers, ip, op, _ = table_65a()
 
     sin_theta_f = np.zeros(delaunay_multipliers.shape[0])
     cos_theta_f = np.zeros(delaunay_multipliers.shape[0])
 
     for i in range(0, delaunay_multipliers.shape[0]):
-        sin_theta_f[i] = math.sin(GMST[current_step] + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
-        cos_theta_f[i] = math.cos(GMST[current_step] + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
+        argument = GMST[current_step] + math.pi - np.dot(delaunay_multipliers[i], delaunay_variables[current_step])
+        sin_theta_f[i] = math.sin(argument)
+        cos_theta_f[i] = math.cos(argument)
 
     return (
         np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip),
-        -np.dot(cos_theta_f, ip) + np.dot(sin_theta_f, op)
+        np.dot(cos_theta_f, ip) - np.dot(sin_theta_f, op)
     )
 
 
@@ -719,8 +674,8 @@ cdef table_65a():
                    0.1, 0, 0, -0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0, 0.1, 0, 0, 0, 0, 0, 0, 0, 0])
 
     # Units: 10**-12
-    ip = ip * 10e-12
-    op = op * 10e-12
+    ip = ip * 1e-12
+    op = op * 1e-12
 
     doodson = np.array([125.755, 127.555, 135.645, 135.655, 137.455, 145.545,
                         145.555, 147.555, 153.655, 155.445, 155.455, 155.655,
@@ -747,8 +702,8 @@ cdef equation_68b_m2(int current_step):
         sin_theta_f[i] = math.sin(2*(GMST[current_step] + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
         cos_theta_f[i] = math.cos(2*(GMST[current_step] + math.pi) - np.dot(delaunay_multipliers[i], delaunay_variables[current_step]))
 
-    C_correction = np.dot(cos_theta_f, ip) 
-    S_correction = -np.dot(sin_theta_f, ip) 
+    C_correction = np.dot(cos_theta_f, ip)
+    S_correction = -np.dot(sin_theta_f, ip)
 
     return C_correction, S_correction
 
@@ -771,7 +726,7 @@ cdef table_65c():
     ip = np.array([-0.3, -1.2])
 
     # Units: 10**-12
-    ip = ip * 10e-12
+    ip = ip * 1e-12
 
     doodson = np.array([245.655, 255.555])
 
@@ -807,16 +762,16 @@ cdef delaunay():
     The Delaunay variables in all the relevant epochs for the integrator
 
     Input:
-        
+
 
     Returns:
         Five Delaunay variables, l, lprime, F, D, Omega, see section 5.7 in IERS Conventions [2] for their definition.
         One for each time in epoch_list
     """
-    fundamental_arguments = np.vstack((sofa_wrapper.vectorized_iau_fal03(epoch_list), 
-                                       sofa_wrapper.vectorized_iau_falp03(epoch_list), 
-                                       sofa_wrapper.vectorized_iau_faf03(epoch_list), 
-                                       sofa_wrapper.vectorized_iau_fad03(epoch_list), 
+    fundamental_arguments = np.vstack((sofa_wrapper.vectorized_iau_fal03(epoch_list),
+                                       sofa_wrapper.vectorized_iau_falp03(epoch_list),
+                                       sofa_wrapper.vectorized_iau_faf03(epoch_list),
+                                       sofa_wrapper.vectorized_iau_fad03(epoch_list),
                                        sofa_wrapper.vectorized_iau_faom03(epoch_list)))
 
     return fundamental_arguments.T

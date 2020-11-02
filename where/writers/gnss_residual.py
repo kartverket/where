@@ -133,11 +133,12 @@ def gnss_residual(dset: "Dataset") -> None:
         run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
         summary="GNSS post-fit residual results",
     )
+
     np.savetxt(
         file_path,
         output_array,
         fmt=tuple(f.format for f in fields_def),
-        header="\n".join(header),
+        header=header,
         delimiter="",
         encoding="utf8",
     )

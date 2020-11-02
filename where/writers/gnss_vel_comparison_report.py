@@ -1,4 +1,4 @@
-"""Compare different GNSS SPV Where datasets
+"""Compare different GNSS site velocity Where datasets
 
 Description:
 ------------
@@ -15,7 +15,7 @@ Example:
     dset = data.Dataset(rundate=rundate, tech=tech, stage=stage, dataset_name=name, dataset_id=dataset_id)
 
     # Write dataset
-    writers.write_one('gnss_spv_comparison_report', dset=dset, do_report=False)
+    writers.write_one('gnss_vel_comparison_report', dset=dset, do_report=False)
 
 """
 # Standard library imports
@@ -41,18 +41,18 @@ FILE_NAME = __name__.split(".")[-1]
 
 
 @plugins.register
-def gnss_spv_comparison_report(dset: Dict[str, "Dataset"]) -> None:
-    """Compare GNSS SPV datasets
+def gnss_vel_comparison_report(dset: Dict[str, "Dataset"]) -> None:
+    """Compare GNSS site velocity datasets
 
     Args:
         dset:  Dictionary with station name as keys and the belonging Dataset as value
     """
     dset_first = dset[list(dset.keys())[0]]
-    dset_first.vars["solution"] = config.tech.gnss_spv_comparison_report.solution.str.lower()
+    dset_first.vars["solution"] = config.tech.gnss_vel_comparison_report.solution.str.lower()
 
     # Generate figure directory to save figures generated for GNSS report
     figure_dir = config.files.path(
-        "output_gnss_spv_comparison_report_figure", file_vars={**dset_first.vars, **dset_first.analysis}
+        "output_gnss_vel_comparison_report_figure", file_vars={**dset_first.vars, **dset_first.analysis}
     )
     figure_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,7 +61,7 @@ def gnss_spv_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     _plot_velocity_error(dfs_day, dfs_month, figure_dir, dset_first.vars)
 
     # Generate GNSS comparison report
-    path = config.files.path("output_gnss_spv_comparison_report", file_vars={**dset_first.vars, **dset_first.analysis})
+    path = config.files.path("output_gnss_vel_comparison_report", file_vars={**dset_first.vars, **dset_first.analysis})
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(
             fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of GNSS SPV analyses"
@@ -83,10 +83,10 @@ def _add_to_report(
     Args:
         rpt:         Report object.
         figure_dir:  Figure directory.
-        dfs_day:     Dictionary with fields as keys (e.g. 2d_vel, 3d_vel) and the belonging dataframe as value with DAILY
-                     samples of 95th percentile and stations as columns.
-        dfs_month:   Dictionary with fields as keys (e.g. 2d_vel, 3d_vel) and the belonging dataframe as value with MONTHLY
-                     samples of 95th percentile and stations as columns.
+        dfs_day:     Dictionary with fields as keys (e.g. site_vel_h, site_vel_3d) and the belonging dataframe as value 
+                     with DAILY samples of 95th percentile and stations as columns.
+        dfs_month:   Dictionary with fields as keys (e.g. site_vel_h, site_vel_3d) and the belonging dataframe as value 
+                     with MONTHLY samples of 95th percentile and stations as columns.
         file_vars:   File variables used for file and plot title naming.
     """
 
@@ -97,29 +97,29 @@ def _add_to_report(
         if sample_name == "Daily":
             for field in dfs_day.keys():
                 dfs_day[field].index = dfs_day[field].index.strftime("%d-%m-%Y")
-
+  
             rpt.add_text("Daily 95th percentile 2D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_day["2d_vel"], format="6.3f", statistic=True)
+            rpt.write_dataframe_to_markdown(dfs_day["site_vel_h"], format="6.3f", statistic=True)
 
             rpt.add_text("Daily 95th percentile 3D velocity in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_day["3d_vel"], format="6.3f", statistic=True)
+            rpt.write_dataframe_to_markdown(dfs_day["site_vel_3d"], format="6.3f", statistic=True)
 
         elif sample_name == "Monthly":
             rpt.add_text("Monthly 95th percentile 2D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_month["2d_vel"], format="6.3f")
+            rpt.write_dataframe_to_markdown(dfs_month["site_vel_h"], format="6.3f")
 
             rpt.add_text("Monthly 95th percentile 3D velocity results in meter/second:")
-            rpt.write_dataframe_to_markdown(dfs_month["3d_vel"], format="6.3f")
+            rpt.write_dataframe_to_markdown(dfs_month["site_vel_3d"], format="6.3f")
 
         # Add 2D and 3D velocity plots
         rpt.add_figure(
-            f"{figure_dir}/plot_2d_vel_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            f"{figure_dir}/plot_site_vel_h_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for 2D velocity.",
             clearpage=True,
         )
 
         rpt.add_figure(
-            f"{figure_dir}/plot_3d_vel_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
+            f"{figure_dir}/plot_site_vel_3d_{sample_name.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
             caption="95th percentile for 3D velocity.",
             clearpage=True,
         )
@@ -138,34 +138,34 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
     Example for "dfs" dictionary:
      
-             'hons':                   time.gps       2d_vel    3d_vel 
-                        0      2019-03-01 00:00:00  0.301738  0.057244 
-                        1      2019-03-01 00:00:00  0.301738  0.057244 
+             'hons':                   time.gps     site_vel_h    site_vel_3d
+                        0      2019-03-01 00:00:00    0.301738       0.057244 
+                        1      2019-03-01 00:00:00    0.301738       0.057244 
 
-             'krss':                   time.gps       2d_vel    3d_vel    
-                        0      2019-03-01 00:00:00  0.710014  0.186791 
-                        1      2019-03-01 00:00:00  0.710014  0.186791 
+             'krss':                   time.gps     site_vel_h    site_vel_3d    
+                        0      2019-03-01 00:00:00    0.710014       0.186791 
+                        1      2019-03-01 00:00:00    0.710014       0.186791 
 
     Example for "dfs_day" dictionary:
 
-             '2d_vel':              nabf      vegs      hons      krss
+             'site_vel_h':              nabf      vegs      hons      krss
                         time.gps                                          
                         2019-03-01  1.368875  0.935687  1.136763  0.828754
                         2019-03-02  0.924839  0.728280  0.911677  0.854832
 
 
-             '3d_vel':              nabf      vegs      hons      krss
+             'site_vel_3d':             nabf      vegs      hons      krss
                         time.gps                                          
                         2019-03-01  1.715893  1.147265  1.600330  0.976541
                         2019-03-02  1.533437  1.307373  1.476295  1.136991
 
     Example for "dfs_month" dictionary:
 
-            '2d_vel':             nabf      vegs      hons      krss
+            'site_vel_h':             nabf      vegs      hons      krss
                         Mar-2019  1.186240  0.861718  1.095827  1.021354
                         Apr-2019  0.891947  0.850343  0.977908  0.971099
 
-            '3d_vel':             nabf      vegs      hons      krss
+            'site_vel_3d':            nabf      vegs      hons      krss
                         Mar-2019  1.854684  1.291406  1.450466  1.225467
                         Apr-2019  1.964404  1.706507  1.687994  1.500742
 
@@ -179,16 +179,16 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         | Element              | Description                                                                          |
         |----------------------|--------------------------------------------------------------------------------------|
         | dfs                  | Dictionary with station name as keys and the belonging dataframe as value with       |
-        |                      | following dataframe columns: 2d_vel, 3d_vel                                          |
-        | dfs_day              | Dictionary with fields as keys (e.g. 2d_vel, 3d_vel) and the belonging dataframe as  |
-        |                      | value with DAILY samples of 95th percentile and stations as columns.                 |
-        | dfs_month            | Dictionary with fields as keys (e.g. 2d_vel, 3d_vel) and the belonging dataframe as  |
-        |                      | value with MONTHLY samples of 95th percentile and stations as columns.               |
+        |                      | following dataframe columns: site_vel_h, site_vel_3d                                 |
+        | dfs_day              | Dictionary with fields as keys (e.g. site_vel_h, site_vel_3d) and the belonging      |
+        |                      | dataframe as value with DAILY samples of 95th percentile and stations as columns.    |
+        | dfs_month            | Dictionary with fields as keys (e.g. site_vel_h, site_vel_3d) and the belonging      |
+        |                      | dataframe as value with MONTHLY samples of 95th percentile and stations as columns.  |
     """
     dsets = dset
     dfs = {}
-    dfs_day = {"2d_vel": pd.DataFrame(), "3d_vel": pd.DataFrame()}
-    dfs_month = {"2d_vel": pd.DataFrame(), "3d_vel": pd.DataFrame()}
+    dfs_day = {"site_vel_h": pd.DataFrame(), "site_vel_3d": pd.DataFrame()}
+    dfs_month = {"site_vel_h": pd.DataFrame(), "site_vel_3d": pd.DataFrame()}
 
     for station, dset in dsets.items():
 
@@ -196,9 +196,9 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             log.warn(f"Dataset '{station}' is empty.")
             continue
 
-        # Determine dataframe with 2d_vel and 3d_vel columns
+        # Determine dataframe with site_vel_h and vel_3d columns
         # TODO: How to ensure that GPS time scale is used? fields=["time.gps", ...] does not work longer.
-        df = dset.as_dataframe(fields=["time", "2d_vel", "3d_vel"])
+        df = dset.as_dataframe(fields=["time", "site_vel_h", "site_vel_3d"])
         if df.empty:
             continue
         else:
@@ -235,12 +235,17 @@ def _plot_velocity_error(
     """Plot 2D and 3D velocity error plots (95th percentile) 
 
     Args:
-       dfs_day:     Dictionary with fields as keys (e.g. 2d_vel, 3d_vel) and the belonging dataframe as value with DAILY
-                    samples of 95th percentile and stations as columns.
+       dfs_day:     Dictionary with fields as keys (e.g. site_vel_h, site_vel_3d) and the belonging dataframe as value  
+                    with DAILY samples of 95th percentile and stations as columns.
        dfs_month:   Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value with MONTHLY
                     samples of 95th percentile and stations as columns.
        figure_dir:  Figure directory
     """
+    ylabel = {
+        "site_vel_h":   "2D VE 95%",
+        "site_vel_3d":  "3D VE 95%",
+    }
+
     opt_args = {
         "colormap": "tab20",
         "figsize": (7, 3),
@@ -255,14 +260,14 @@ def _plot_velocity_error(
     }
 
     colors = (
-        config.tech.gnss_spv_comparison_report.colors.list
-        if config.tech.gnss_spv_comparison_report.colors.list
+        config.tech.gnss_vel_comparison_report.colors.list
+        if config.tech.gnss_vel_comparison_report.colors.list
         else ["orange", "red", "violet", "blue", "green"]
     )
 
     colors = (
-        config.tech.gnss_spv_comparison_report.colors.list
-        if config.tech.gnss_spv_comparison_report.colors.list
+        config.tech.gnss_vel_comparison_report.colors.list
+        if config.tech.gnss_vel_comparison_report.colors.list
         else ["orange", "red", "violet", "blue", "green"]
     )
 
@@ -271,12 +276,12 @@ def _plot_velocity_error(
     for sample_name, sample_data in samples.items():
 
         # Loop over fields to plot
-        for field in ["2d_vel", "3d_vel"]:
+        for field in ["site_vel_h", "site_vel_3d"]:
 
-            # if field == "2d_vel":
-            #    opt_args["ylim"] = [0.0, 0.2]
-            # elif field == "3d_vel":
-            #    opt_args["ylim"] = [0.0, 0.2]
+            if field == "site_vel_h":
+                opt_args["ylim"] = [0.0, 0.03]
+            elif field == "site_vel_3d":
+                opt_args["ylim"] = [0.0, 0.07]
 
             # Generate x- and y-arrays for plotting
             x_arrays = []
@@ -299,8 +304,8 @@ def _plot_velocity_error(
                 x_arrays=x_arrays,
                 y_arrays=y_arrays,
                 xlabel="Time [GPS]",
-                ylabel=f"{field.upper()} 95%",
-                y_unit="m",
+                ylabel=f"{ylabel[field]}",
+                y_unit="m/s",
                 labels=labels,
                 colors=colors,
                 figure_path=figure_dir

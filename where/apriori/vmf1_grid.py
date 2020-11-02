@@ -40,11 +40,12 @@ from midgard.dev import plugins
 from where.lib import config
 from where import parsers
 
-DATATYPE = ("ah", "aw", "zh", "zw")
+# Lists of datatypes and their multipliers
+DATATYPE = {"ah": 1e-8, "aw": 1e-8, "zh": 1, "zw": 1}
 
 
 @plugins.register
-def get_vmf1(time):
+def get_vmf1_grid(time):
     """Read VMF1 gridded data files relevant for the given time epochs
 
     Args:
@@ -54,21 +55,21 @@ def get_vmf1(time):
         A dictionary of functions that can interpolate in the VMF1 dataset.
     """
     data = dict()
-    min_time = min(time.utc.datetime)
-    max_time = max(time.utc.datetime)
+    min_time = time.utc.datetime if len(time) == 1 else min(time.utc.datetime)
+    max_time = time.utc.datetime if len(time) == 1 else max(time.utc.datetime)
     start_hour = 6 * (min_time.hour // 6)
     start = min_time.replace(hour=start_hour, minute=0, second=0, microsecond=0)
     end_hour = 6 * (max_time.hour // 6)
     end = max_time.replace(hour=end_hour, minute=0, second=0, microsecond=0) + timedelta(hours=6)
 
-    for datatype in DATATYPE:
+    for datatype, multiplier in DATATYPE.items():
         dt_to_read = start
         vmf1_data = dict()
 
         while dt_to_read <= end:
             file_vars = dict(config.date_vars(dt_to_read), type=datatype)
-            data_chunk = parsers.parse_key(file_key="vmf1", file_vars=file_vars).as_dict()
-            vmf1_data[dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["values"])
+            data_chunk = parsers.parse_key(file_key="vmf1_grid", file_vars=file_vars).as_dict()
+            vmf1_data[dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["values"] * multiplier)
             dt_to_read += timedelta(hours=6)
         data[datatype] = vmf1_data
 

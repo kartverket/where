@@ -19,7 +19,6 @@ Read Terrapos residual output file and enable correct time to create a Dataset.
 from midgard.dev import plugins
 
 # Where imports
-from where.lib import gnss
 from where.data.time import Time
 from where import parsers
 
@@ -48,14 +47,7 @@ def get_terrapos_residual():
 
     """
     dset = parsers.parse_key("terrapos_output_residual").as_dataset()
-    dset.add_time("time", val=_get_time(dset), scale="gps")
+    dset.add_time("time", val=dset.gpsweek, val2=dset.gpssec, scale="gps", fmt="gps_ws")
 
     return dset
 
-
-def _get_time(dset):
-    """Determine time field
-    """
-    # TODO hjegei: Workaround -> better would it be if Time object can handle gpsweek as input format!!!
-    jd_day, jd_frac = gnss.gpssec2jd(dset.gpsweek, dset.gpssec)
-    return Time(val=jd_day, val2=jd_frac, fmt="jd", scale="gps")

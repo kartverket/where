@@ -22,6 +22,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.data.position import Position
+from midgard.dev import log
 from midgard.dev import plugins
 from midgard.math.unit import Unit
 from midgard.parsers.csv_ import CsvParser
@@ -73,15 +74,16 @@ class SpringCsvParser(CsvParser):
 
         field_spring_to_where = {
             "3DSpeed": "site_vel_3d",
-            "Clock": "gnss_satellite_clock",
+            "Clock": "delay.gnss_satellite_clock",
             "EastSpeed": "site_vel_east",
-            "GroupDelay": "gnss_total_group_delay",
+            "GroupDelay": "delay.gnss_total_group_delay",
             "HSpeed": "site_vel_h",
+            "IODE": "used_iode",
             "NorthSpeed": "site_vel_north",
-            "PseudoRange": "gnss_range",
+            "PseudoRange": "delay.gnss_range",
             "SatInView": "num_satellite_available",
             "TropoDelay": "troposphere_dT",
-            "UISD": "gnss_ionosphere",
+            "UISD": "delay.gnss_ionosphere",
             "UsedSat": "num_satellite_used",
             "EastvsRef": "site_pos_vs_ref_east",
             "NorthvsRef": "site_pos_vs_ref_north",
@@ -116,12 +118,19 @@ class SpringCsvParser(CsvParser):
         if "PRN" in self.data.keys():
             prn_data = []
             for prn in self.data["PRN"]:
-                if prn >= 71 and prn <= 140:  # Handling of Galileo satellites
+                if prn >= 1 and prn <= 32: # Handling of GPS satellites
+                    prn_data.append("G" + str(prn).zfill(2))
+                elif prn >= 38 and prn <= 70:  # Handling of GLONASS satellites
+                    prn_data.append("R" + str(prn - 38).zfill(2))
+                elif prn >= 71 and prn <= 140:  # Handling of Galileo satellites
                     prn_data.append("E" + str(prn - 70).zfill(2))
+                elif prn >= 191 and prn <= 222:  # Handling of BeiDou satellites
+                    prn_data.append("C" + str(prn - 191).zfill(2))
                 else:
                     log.fatal(f"Spring PRN number '{prn}' is unknown.")
-
+                    
             dset.add_text("satellite", val=prn_data)
+            dset.add_text("system", np.array(prn_data).astype("U1"))
 
         # Add position field based on Latitude, Longitude and Height column
         if "Latitude" in self.data.keys():
@@ -132,9 +141,9 @@ class SpringCsvParser(CsvParser):
                 system="llh",
             )
             if "XPos" in self.data.keys():
-                dset.add_position("sat_pos", itrs=pos.trs, time="time")
+                dset.add_position("sat_pos", val=pos.trs, system="trs", time=dset.time)
             else:
-                dset.add_position("site_pos", itrs=pos.trs, time="time")
+                dset.add_position("site_pos", val=pos.trs, system="trs", time=dset.time)
      
         # Define fields to save in dataset
         remove_time_fields = {"Constellation", "GPSEpoch", "GPSWeek", "GPSSecond", "PRN", "", "UTCDateTime"}

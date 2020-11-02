@@ -178,7 +178,7 @@ FIELDS = (
         11,
         "HV",
         "m/s",
-        "Horizontal velocity",
+        "Horizontal site velocity",
     ),
     WriterField(
         "site_vel_v",
@@ -189,7 +189,7 @@ FIELDS = (
         11,
         "VV",
         "m/s",
-        "Vertical velocity",
+        "Vertical site velocity",
     ),
     WriterField(
         "site_vel_3d",
@@ -200,7 +200,7 @@ FIELDS = (
         11,
         "3D",
         "m/s",
-        "3D velocity",
+        "3D site velocity",
     ),
     WriterField(
         "c_xx",
@@ -338,7 +338,7 @@ def gnss_velocity(dset: "Dataset") -> None:
         file_path,
         output_array,
         fmt=tuple(f.format for f in FIELDS),
-        header="\n".join(header),
+        header=header,
         delimiter="",
         encoding="utf8",
     )

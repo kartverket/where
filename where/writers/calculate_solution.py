@@ -436,7 +436,7 @@ def calculate_solution(dset: "Dataset") -> None:
         file_path,
         output_array,
         fmt=tuple(f.format for f in fields),
-        header="\n".join(header),
+        header=header,
         delimiter="",
         encoding="utf8",
     )

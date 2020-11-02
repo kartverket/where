@@ -40,10 +40,10 @@ from where.lib import log
 MODEL = __name__.split(".")[-1]
 
 # Available troposphere models
-MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "vmf1_gridded"]
-METEOROLOGICAL_MODELS = ["vmf1_gridded", "gpt", "gpt2", "gpt2w", "site_pressure"]
-ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded"]
-ZENITH_HYDROSTATIC_MODELS = ["saastamoinen", "vmf1_gridded"]
+MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "vmf1_gridded", "vmf1_station"]
+METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "site_pressure"]
+ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded", "vmf1_station"]
+ZENITH_HYDROSTATIC_MODELS = ["saastamoinen", "vmf1_gridded", "vmf1_station"]
 GRADIENT_MODELS = ["none", "apg"]
 
 # Default relation between used mapping function model and zenith wet delay model
@@ -189,7 +189,8 @@ def meteorological_data(dset):
 
     if model == "vmf1_gridded":
         pressure = vmf1_gridded_pressure(dset)
-
+    if model == "vmf1_station":
+        pressure = vmf1_station_pressure(dset)
     elif model == "gpt":
         pressure, temperature, _ = gpt(dset)
 
@@ -266,7 +267,9 @@ def mapping_function(dset):
         _, _, _, _, _, mh, mw, _, _ = gpt2w(dset)
 
     elif model == "vmf1_gridded":
-        mh, mw = vmf1_mapping_function(dset)
+        mh, mw = vmf1_gridded_mapping_function(dset)
+    elif model == "vmf1_station":
+        mh, mw = vmf1_station_mapping_function(dset)
 
     else:
         log.fatal(
@@ -294,7 +297,9 @@ def zenith_hydrostatic_delay(dset, pressure, latitude, height):
     if model == "saastamoinen":
         zhd = saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height)
     elif model == "vmf1_gridded":
-        zhd = vmf1_zenith_hydrostatic_delay(dset)
+        zhd = vmf1_gridded_zenith_hydrostatic_delay(dset)
+    elif model == "vmf1_station":
+        zhd = vmf1_station_zenith_hydrostatic_delay(dset)
     else:
         log.fatal(
             f"Unknown zenith hydrostatic troposphere delay model {model}. "
@@ -352,7 +357,9 @@ def zenith_wet_delay(dset, temperature, e, tm, lambd):
         #                 "zenith wet delay model. Use 'gpt2' or 'gpt2w' model")
 
     elif model == "vmf1_gridded":
-        zwd = vmf1_zenith_wet_delay(dset)
+        zwd = vmf1_gridded_zenith_wet_delay(dset)
+    elif model == "vmf1_station":
+        zwd = vmf1_station_zenith_wet_delay(dset)
     else:
         log.fatal(
             f"Unknown zenith wet troposphere delay model {model}. "
@@ -976,7 +983,7 @@ def site_pressure(dset):
 
     i_missing = np.logical_not(i_given)
     if i_missing.any():
-        pressure[i_missing] = vmf1_gridded_pressure(dset)[i_missing]
+        pressure[i_missing] = vmf1_station_pressure(dset)[i_missing]
 
     return pressure
 
@@ -996,7 +1003,7 @@ def vmf1_gridded_pressure(dset):
         numpy.ndarray:  Atmospheric pressure for each observation in [hPa].
     """
     # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1", time=dset.time)
+    vmf1 = apriori.get("vmf1_grid", time=dset.time)
 
     lat, lon, height = dset.site_pos.pos.llh.T
     grid_zhd = vmf1["zh"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
@@ -1008,15 +1015,33 @@ def vmf1_gridded_pressure(dset):
 
     return pressure
 
+def vmf1_station_pressure(dset):
+    """Calulates atmospheric pressure from station dependend VMF1 files
 
-def vmf1_mapping_function(dset):
-    """Calculates VMF1 hydrostatic and wet mapping functions
+    Args:
+        dset (Dataset):    Model data.
+
+    Returns:
+        numpy.ndarray:  Atmospheric pressure for each observation in [hPa].
+    """
+    vmf1 = apriori.get("vmf1_station", time=dset.time)
+    pressure = np.zeros(dset.num_obs)
+
+    for sta in dset.unique("station"):
+        idx = dset.station == sta
+        try:
+            pressure[idx] = vmf1[sta]["pressure"](dset.time.mjd[idx])
+        except KeyError:
+            # Station is missing, use grid as backup
+            pressure_grid = vmf1_gridded_pressure(dset)
+            pressure[idx] = pressure_grid[idx]
+    return pressure
+
+def vmf1_gridded_mapping_function(dset):
+    """Calculates VMF1 hydrostatic and wet mapping functions based on gridded VMF1 files
 
     This routine determines the VMF1 (Vienna Mapping Functions 1) described in Boehm et al. :cite:`boehm2006a` and
-    Kouba :cite:`kouba2007` and uses the 'vmf1_ht.f' from the IERS software library :cite:`iers2010`. The mapping
-    function coefficients 'ah' and 'aw' are taken from VMF1 gridded files.
-
-    TODO: Multiplication with 1.e-8 should maybe be handled when reading gridded VMF1-files and not here.
+    Kouba :cite:`kouba2007` and uses the 'vmf1_ht.f' from the IERS software library :cite:`iers2010`.
 
     Args:
         dset (Dataset):    Model data.
@@ -1032,7 +1057,7 @@ def vmf1_mapping_function(dset):
     ============  ===========  =======================================================
     """
     # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1", time=dset.time)
+    vmf1 = apriori.get("vmf1_grid", time=dset.time)
 
     mh = np.empty(dset.num_obs)
     mw = np.empty(dset.num_obs)
@@ -1041,18 +1066,9 @@ def vmf1_mapping_function(dset):
     zd = dset.site_pos.zenith_distance
 
     for obs in range(dset.num_obs):
-
-        # Interpolation in time and space in VMF1 grid
-        # t = dset.time[obs]
-        # TODO vlbi t_2
-        # if dset._default_field_suffix == '_2':
-        # baseline_gcrs = dset.site_pos_2.gcrs - dset.site_pos_1.gcrs
-        # delta_t = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs[:, :, None])[:, 0, 0] / constant.c
-
-        # t -= timedelta(seconds=delta_t[obs])
         mh[obs], mw[obs] = iers.vmf1_ht(
-            vmf1["ah"](dset.time[obs], lon[obs], lat[obs]) * 1e-8,
-            vmf1["aw"](dset.time[obs], lon[obs], lat[obs]) * 1e-8,
+            vmf1["ah"](dset.time[obs], lon[obs], lat[obs]),
+            vmf1["aw"](dset.time[obs], lon[obs], lat[obs]),
             dset.time.utc.mjd_int[obs],
             lat[obs],
             height[obs],
@@ -1061,8 +1077,55 @@ def vmf1_mapping_function(dset):
 
     return mh, mw
 
+def vmf1_station_mapping_function(dset):
+    """Calculates VMF1 hydrostatic and wet mapping functions based on station VMF1 files
 
-def vmf1_zenith_wet_delay(dset):
+    This routine determines the VMF1 (Vienna Mapping Functions 1) described in Boehm et al. :cite:`boehm2006a` and
+    Kouba :cite:`kouba2007` and uses the 'vmf1_ht.f' from the IERS software library :cite:`iers2010`.
+
+    Args:
+        dset (Dataset):    Model data.
+
+    Returns:
+        tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
+
+    ============  ===========  =======================================================
+     Element       Unit         Description
+    ============  ===========  =======================================================
+     mh                         Hydrostatic mapping function coefficient ah
+     mw                         Wet mapping function coefficient aw
+    ============  ===========  =======================================================
+    """
+    # Get gridded VMF1 data
+    vmf1 = apriori.get("vmf1_station", time=dset.time)
+
+    mh = np.empty(dset.num_obs)
+    mw = np.empty(dset.num_obs)
+
+    lat = dset.site_pos.pos.llh.lat
+    zd = dset.site_pos.zenith_distance
+    sta = dset.station
+    mjd = dset.time.mjd
+
+    for obs in range(dset.num_obs):
+        try:
+            mh[obs], mw[obs] = iers.vmf1(
+                vmf1[sta[obs]]["ah"](mjd[obs]),
+                vmf1[sta[obs]]["aw"](mjd[obs]),
+                mjd[obs],
+                lat[obs],
+                zd[obs],
+            )
+        except KeyError:
+            # Station is missing, use grid as backup
+            mh_grid, mw_grid = vmf1_gridded_mapping_function(dset)
+            mh[obs] = mh_grid[obs]
+            mw[obs] = mw_grid[obs]
+
+    return mh, mw
+
+
+def vmf1_gridded_zenith_wet_delay(dset):
     """Calculates zenith wet delay based on gridded zenith wet delays from VMF1
 
     Uses gridded zenith wet delays from VMF1, which are rescaled from the gridded height to actual station height by
@@ -1075,7 +1138,7 @@ def vmf1_zenith_wet_delay(dset):
         numpy.ndarray:     Zenith wet delay for each observation in [m]
     """
     # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1", time=dset.time)
+    vmf1 = apriori.get("vmf1_grid", time=dset.time)
 
     lat, lon, height = dset.site_pos.pos.llh.T
     grid_zwd = vmf1["zw"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
@@ -1086,8 +1149,30 @@ def vmf1_zenith_wet_delay(dset):
 
     return zwd
 
+def vmf1_station_zenith_wet_delay(dset):
+    """Calculates zenith wet delay based on station zenith wet delays from VMF1
 
-def vmf1_zenith_hydrostatic_delay(dset):
+    Args:
+        dset (Dataset):    Model data.
+
+    Returns:
+        numpy.ndarray:     Zenith wet delay for each observation in [m]
+    """
+    vmf1 = apriori.get("vmf1_station", time=dset.time)
+    zwd = np.zeros(dset.num_obs)
+
+    for sta in dset.unique("station"):
+        idx = dset.station == sta
+        try:
+            zwd[idx] = vmf1[sta]["zw"](dset.time.mjd[idx])
+        except KeyError:
+            # Station is missing, use grid as backup
+            zwd_grid = vmf1_gridded_zenith_wet_delay(dset)
+            zwd[idx] = zwd_grid[idx]
+
+    return zwd
+
+def vmf1_gridded_zenith_hydrostatic_delay(dset):
     """Calculates zenith hydrostatic delay based on gridded zenith wet delays from VMF1
 
     Uses gridded zenith wet delays from VMF1, which are rescaled from the gridded height to actual station height by
@@ -1106,6 +1191,30 @@ def vmf1_zenith_hydrostatic_delay(dset):
     zhd = saastamoinen_zenith_hydrostatic_delay(pressure, lat, height)
 
     return zhd
+
+def vmf1_station_zenith_hydrostatic_delay(dset):
+    """Calculates zenith hydrostatic delay based on station zenith hydrostatic delays from VMF1
+
+    Args:
+        dset (Dataset):    Model data.
+
+    Returns:
+        numpy.ndarray:     Zenith hydrostatic delay for each observation in [m]
+    """
+    vmf1 = apriori.get("vmf1_station", time=dset.time)
+    zhd = np.zeros(dset.num_obs)
+
+    for sta in dset.unique("station"):
+        idx = dset.station == sta
+        try:
+            zhd[idx] = vmf1[sta]["zh"](dset.time.mjd[idx])
+        except KeyError:
+            # Station is missing, use grid as backup
+            zhd_grid = vmf1_gridded_zenith_hydrostatic_delay(dset)
+            zhd[idx] = zhd_grid[idx]
+
+    return zhd
+
 
 def _rounded_dates(datetimes):
     """Calculate days including the given datetimes

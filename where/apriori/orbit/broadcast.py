@@ -456,9 +456,9 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
         #     problem is that use of GPSSEC compared to MJD * Unit.day2second() is not consistent!!!!
         gpsweek_diff = (
-            dset[time].gps.gps_ws.week - self.dset_edit.time.gps.gps_ws.week[dset_brdc_idx]
+            dset[time].gps.gps_ws.week - self._add_dim(self.dset_edit.time.gps.gps_ws.week)[dset_brdc_idx]
         ) * Unit.week2second
-        tk = dset[time].gps.gps_ws.seconds - self.dset_edit.time.gps.gps_ws.seconds[dset_brdc_idx] + gpsweek_diff
+        tk = dset[time].gps.gps_ws.seconds - self._add_dim(self.dset_edit.time.gps.gps_ws.seconds)[dset_brdc_idx] + gpsweek_diff
 
         return (
             self.dset_edit.sat_clock_bias[dset_brdc_idx]
@@ -513,6 +513,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx])
         dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx])
         dset.add_float("sat_clock_drift_rate", val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx])
+        
 
     def _galileo_signal_health_status(self):
         """Determine Galileo signal health status and add sis_status_<signal> fields to Dataset
@@ -705,6 +706,26 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                         tgd = f_E1 ** 2 / f_E5b ** 2 * self.dset_edit.bgd_e1_e5b[dset_brdc_idx][idx] * constant.c
 
         return tgd
+    
+
+    def _add_dim(self, array: np.ndarray) -> np.ndarray:
+        """Add dimension to 0 dimensional array
+        
+        If dimension of Numpy array is zero, then a dimension is added.
+        
+        Args:
+            array: Numpy array with 0 or higher dimension
+            
+        Returns:
+            Numpy array with at least 1 dimension
+        """
+        if type(array) == np.ndarray:  # Handling of numpy arrays
+            output = np.expand_dims(array, axis=0) if array.ndim == 0 else array
+        else: # Handling of scalar values
+            output = np.expand_dims(array, axis=0)
+            
+        return output
+
 
     def _get_brdc_block_idx(self, dset: "Dataset", time: str = "time") -> List[int]:
         """Get GNSS broadcast ephemeris block indices for given observation epochs
@@ -762,6 +783,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         positive = True if "positive" in brdc_block_nearest_to else False
 
         log.debug(f"Broadcast block is selected nearest to '{'+' if positive else '+/-'}{time_key}' time.")
+        
+        # Time of clock (TOC) is 'time' field
+        if time_key == "toc":
+            time_key = "time"
 
         # Check if broadcast orbits are available
         not_available_sat = sorted(set(dset.satellite) - set(self.dset_edit.satellite))
@@ -774,10 +799,11 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
 
         # Determine broadcast ephemeris block index for a given satellite and observation epoch
-        for sat, time in zip(dset.satellite, dset[time]):
+        for sat, obs_epoch in zip(dset.satellite, self._add_dim(dset[time].gps.mjd)):
 
             idx = self.dset_edit.filter(satellite=sat)
-            diff = time.gps.mjd - self.dset_edit[time_key].gps.mjd[idx]
+           
+            diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
             if positive:
                 nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
             else:
@@ -817,12 +843,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
          vega             rad     True anomaly
         ===============  ======  =============================================================
         """
-        # toe = self.dset_edit.toe.gps.gpssec[idx]  # Ephemeris reference epoch in [s]
-        toe = self.dset_edit.toe.gps.gps_ws.seconds[idx]  # Ephemeris reference epoch in [s]
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
         #     problem is that use of GPSSEC compared to MJD * Unit.day2second() is not consistent!!!!
-        # gpsweek_diff = (t_sat_gpsweek - self.dset_edit.toe.gps.gpsweek[idx]) * Unit.week2second
-        gpsweek_diff = (t_sat_gpsweek - self.dset_edit.toe.gps.gps_ws.week[idx]) * Unit.week2second
+        gpsweek_diff = (t_sat_gpsweek - self._add_dim(self.dset_edit.toe.gps.gps_ws.week)[idx]) * Unit.week2second
+        toe = self._add_dim(self.dset_edit.toe.gps.gps_ws.seconds)[idx] # Ephemeris reference epoch in [s]
         tk = t_sat_gpssec - toe + gpsweek_diff  # Eclapsed time referred to ephemeris reference epoch in [s]
 
         # Determine corrected Keplerian elements

@@ -95,7 +95,8 @@ def add_to_full_timeseries(dset):
             val, adder, unit = method_func(dsets[dset_str], field_in, idx_values, func)
             if adder:
                 add_func = getattr(dset_session, adder)
-                add_func(field_out, val=val, unit=unit)
+                add_func(field_out, val=val) if unit is None else add_func(field_out, val=val, unit=unit)
+                
 
     # hack to get solved neq data into the time series:
     # TODO: unhack this :P Add as a method_neq instead?
@@ -234,7 +235,7 @@ def method_text(dset, field, idx_values, func):
         return None, None, None
 
     text = np.array(["/".join(dset.unique(field, **f)) for f in _filter_each(idx_values)])
-    return text, "add_text", dset.unit(field)
+    return text, "add_text", None
 
 
 def method_state(dset, field, idx_values, func):

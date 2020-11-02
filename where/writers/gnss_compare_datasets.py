@@ -23,12 +23,12 @@ import numpy as np
 
 # Midgard imports
 from midgard.data._time import GpsTime, UtcTime
+from midgard.data import collection
 from midgard.dev import plugins
 from midgard.plot.matplotlib_extension import plot_scatter_subplots
 from midgard.math.unit import Unit
 
 # Where imports
-import where
 from where.lib import config
 from where.lib import log
 from where.writers._report import Report
@@ -48,33 +48,38 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
     """
 
 FIELDS = {
-    "gnss_ionosphere": WriterField("Delay", "Ionosphere delay", "m"),
-    "gnss_range": WriterField("Range", "Range between satellite and receiver", "m"),
-    "gnss_satellite_clock": WriterField("Clock", "Satellite clock correction", "m"),
-    "gnss_total_group_delay": WriterField("TGD", "Total group delay", "m"),
-    "gdop": WriterField("GDOP", "Geometric dilution of precision", "m"),
-    "hdop": WriterField("HDOP", "Horizontal dilution of precision", "m"),
+    "delay.gnss_ionosphere": WriterField("Delay", "Ionosphere delay", "m"),
+    "delay.gnss_range": WriterField("Range", "Range between satellite and receiver", "m"),
+    "delay.gnss_satellite_clock": WriterField("Clock", "Satellite clock correction", "m"),
+    "delay.gnss_total_group_delay": WriterField("TGD", "Total group delay", "m"),
+    "gdop": WriterField("GDOP", "Geometric dilution of precision", ""),
+    "hdop": WriterField("HDOP", "Horizontal dilution of precision", ""),
     "num_satellite_available": WriterField("#satellites", "Number of available satellites", ""),
     "num_satellite_used": WriterField("#satellites", "Number of used satellites", ""),
+    "pdop": WriterField("PDOP", "Position dilution of precision", ""),
+    "residual": WriterField("Residual", "Residual", "m"),
     "sat_pos_x": WriterField("X", "Satellite position", "m"),
     "sat_pos_y": WriterField("Y", "Satellite position", "m"),
     "sat_pos_z": WriterField("Z", "Satellite position", "m"),
-    "residual": WriterField("Residual", "Residual", "m/s"),
+    "sat_vel_x": WriterField("VX", "Satellite velocity", "m/s"),
+    "sat_vel_y": WriterField("VY", "Satellite velocity", "m/s"),
+    "sat_vel_z": WriterField("VZ", "Satellite velocity", "m/s"),
     "site_pos_vs_ref_east": WriterField("East", "Site position vs. reference position", "m"),
     "site_pos_vs_ref_north": WriterField("North", "Site position vs. reference position", "m"),
     "site_pos_vs_ref_up": WriterField("Up", "Site position vs. reference position", "m"),
     "site_vel_3d": WriterField("3D", "3D site velocity", "m/s"),
     "site_vel_h": WriterField("HV", "Horizontal site velocity", "m/s"),
     "site_vel_v": WriterField("VV", "Vertical site velocity", "m/s"),
-    "site_vel_x": WriterField("X", "Site velocity", "m/s"),
-    "site_vel_y": WriterField("Y", "Site velocity", "m/s"),
-    "site_vel_z": WriterField("Z", "Site velocity", "m/s"),
+    "site_vel_x": WriterField("VX", "Site velocity", "m/s"),
+    "site_vel_y": WriterField("VY", "Site velocity", "m/s"),
+    "site_vel_z": WriterField("VZ", "Site velocity", "m/s"),
     "site_vel_east": WriterField("East", "Site velocity", "m/s"),
     "site_vel_north": WriterField("North", "Site velocity", "m/s"),
     "site_vel_up": WriterField("Up", "Site velocity", "m/s"),
-    "tdop": WriterField("TDOP", "Time dilution of precision", "m"),
+    "tdop": WriterField("TDOP", "Time dilution of precision", ""),
     "troposphere_dT": WriterField("Delay", "Tropospheric delay", "m"),
-    "vdop": WriterField("VDOP", "Vertical dilution of precision", "m"),
+    "used_iode": WriterField("IODE", "Issue of ephemeris data", ""),
+    "vdop": WriterField("VDOP", "Vertical dilution of precision", ""),
 }
 
 
@@ -105,22 +110,22 @@ def gnss_compare_datasets(dset: Dict[str, "Dataset"]) -> None:
             f"Nothing to compare. Number of observations are zero at least for one dataset "
             f"(dset1: {dset1.num_obs}, dset2: {dset2.num_obs})."
         )
-
-    # Get common fields in both Datasets
+        
+    # Get common fields in both Datasets (+ adding of necessary fields)
     common_fields = _get_common_fields(dset1, dset2)
 
     # Generate difference of datasets
     ddiff = _difference_datasets(dset1, dset2, difference_by)
 
     # Generate figure directory to save figures generated for GNSS report
-    figure_dir = config.files.path("output_gnss_vel_report_figure", file_vars=dset1.vars)
+    figure_dir = config.files.path(f"output_{dset1.vars['pipeline']}_report_figure", file_vars=dset1.vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
     _plot(dset1, dset2, ddiff, common_fields, figure_dir)
 
     # Generate report
-    path = config.files.path("output_gnss_vel_report", file_vars=dset1.vars)
+    path = config.files.path(f"output_{dset1.vars['pipeline']}_report", file_vars=dset1.vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset1.vars["rundate"], path=path, description="Comparison of two GNSS datasets")
         rpt.title_page()
@@ -139,7 +144,7 @@ def _add_to_report(rpt: "Report", common_fields: Set[str], figure_dir: "pathlib.
     dset1_name = config.where.gnss_compare_datasets.get("dset1_name", default="dset1").str
     dset2_name = config.where.gnss_compare_datasets.get("dset2_name", default="dset2").str
 
-    for field in common_fields:
+    for field in sorted(common_fields):
         rpt.add_figure(
             f"{figure_dir}/plot_{field}.{FIGURE_FORMAT}",
             caption=f"Difference between {dset1_name} and {dset2_name} dataset field **{field}**.",
@@ -165,7 +170,7 @@ def _plot(
     for field in common_fields:
         ylabel = FIELDS[field].label if field in FIELDS.keys() else field.lower()
         title = FIELDS[field].title if field in FIELDS.keys() else ""
-        unit = Unit(FIELDS[field].unit).units if field in FIELDS.keys() else Unit(dset1.unit(field)).units
+        unit = Unit(FIELDS[field].unit).units if field in FIELDS.keys() else Unit(dset1.unit(field)[0]).units
         options = _set_plot_config(title=title)
 
         plot_scatter_subplots(
@@ -180,35 +185,8 @@ def _plot(
         )
 
 
-def _concatenate_fields(dset: "Dataset", fields: List[str]) -> List[str]:
-    """Concatenate fields to string lines
-
-    Args:
-        dset:    A dataset containing data.
-        fields:  Name of fields to be concatenated
-
-    TODO: Write a general routine like Dataframe function "to_string()".
-
-    Returns:
-        List with string lines, whereby each line represents concatenated fields
-    """
-    concatenated_fields = []
-    import IPython; IPython.embed()
-    for values in dset.values(*fields):
-        line = ""
-        for value in values:
-            if isinstance(value, (GpsTime, UtcTime)):  # TODO: Check if more time datatypes should be defined.
-                line = f"{line}{value.gps.isot}"
-            else:
-                line = f"{line}{value}"
-
-        concatenated_fields.append(line.strip())
-
-    return concatenated_fields
-
-
 def _decimate_datasets(dset1: "Dataset", dset2: "Dataset", decimate_by: List[str]) -> None:
-    """Decimate given datasets, that they only incluce corresponding observations
+    """Decimate given datasets, that they only include corresponding observations
 
     Args:
         dset1:        First dataset containing the data.
@@ -217,7 +195,7 @@ def _decimate_datasets(dset1: "Dataset", dset2: "Dataset", decimate_by: List[str
     """
     keep_idx1 = np.zeros(dset1.num_obs, dtype=bool)
     keep_idx2 = np.zeros(dset2.num_obs, dtype=bool)
-
+    
     #+TODO
     # Change time scale from GPS to UTC
     dset1_utc = dset1.time.utc
@@ -229,7 +207,7 @@ def _decimate_datasets(dset1: "Dataset", dset2: "Dataset", decimate_by: List[str
     dset2.add_time("time", val= dset2_utc, scale="utc", fmt="datetime")
     #-TODO
 
-    # Get common dataset data   
+    # Get common dataset data
     dset1_index_data = [dset1[n.strip()] for n in decimate_by]
     dset2_index_data = [dset2[n.strip()] for n in decimate_by]
     A = np.rec.fromarrays(dset1_index_data)
@@ -242,7 +220,7 @@ def _decimate_datasets(dset1: "Dataset", dset2: "Dataset", decimate_by: List[str
     # Decimate datasets
     dset1.subset(keep_idx1)
     dset2.subset(keep_idx2)
-
+    
 
 def _difference_datasets(dset1: "Dataset", dset2: "Dataset", difference_by: List[str]) -> "Dataset":
     """Generate difference between given datasets by using defined fields
@@ -281,30 +259,66 @@ def _get_common_fields(dset1: "Dataset", dset2: "Dataset") -> Set[str]:
     # Remove Time object and text fields
     remove_fields = set()
     for field in common_fields:
-        if "." in field:
-            remove_fields.add(field)
-            continue
-        elif isinstance(dset1[field], (GpsTime, UtcTime)):  # TODO: Check if more time datatypes should be defined.
+        #if "." in field:
+        #    remove_fields.add(field)
+        #    continue
+        if isinstance(dset1[field], (GpsTime, UtcTime, collection.Collection)):  # TODO: Check if more time datatypes should be defined.
             remove_fields.add(field)
             continue
         elif field in ["satellite", "system"]:
             remove_fields.add(field)
             continue
+        
+    # Add site position coordinate fields to dataset
+    if "site_pos" in common_fields:
+        dset1.add_float("site_pos_x", val=dset1.site_pos.trs.x, unit="meter")
+        dset1.add_float("site_pos_y", val=dset1.site_pos.trs.y, unit="meter")
+        dset1.add_float("site_pos_z", val=dset1.site_pos.trs.z, unit="meter")
+        del dset1.site_pos
+
+        dset2.add_float("site_pos_x", val=dset2.site_pos.trs.x, unit="meter")
+        dset2.add_float("site_pos_y", val=dset2.site_pos.trs.y, unit="meter")
+        dset2.add_float("site_pos_z", val=dset2.site_pos.trs.z, unit="meter")
+        del dset2.site_pos
+
+        remove_fields.add("site_pos")
+        common_fields.update(("site_pos_x", "site_pos_y", "site_pos_z"))
 
     # Add satellite position coordinate fields to dataset
     if "sat_pos" in common_fields:
-        dset1.add_float("sat_pos_x", val=dset1.sat_pos.itrs[:, 0])
-        dset1.add_float("sat_pos_y", val=dset1.sat_pos.itrs[:, 1])
-        dset1.add_float("sat_pos_z", val=dset1.sat_pos.itrs[:, 2])
+        dset1.add_float("sat_pos_x", val=dset1.sat_pos.trs.x)
+        dset1.add_float("sat_pos_y", val=dset1.sat_pos.trs.y)
+        dset1.add_float("sat_pos_z", val=dset1.sat_pos.trs.z)
         del dset1.sat_pos
 
-        dset2.add_float("sat_pos_x", val=dset2.sat_pos.itrs[:, 0])
-        dset2.add_float("sat_pos_y", val=dset2.sat_pos.itrs[:, 1])
-        dset2.add_float("sat_pos_z", val=dset2.sat_pos.itrs[:, 2])
+        dset2.add_float("sat_pos_x", val=dset2.sat_pos.trs.x)
+        dset2.add_float("sat_pos_y", val=dset2.sat_pos.trs.y)
+        dset2.add_float("sat_pos_z", val=dset2.sat_pos.trs.z)
         del dset2.sat_pos
 
         remove_fields.add("sat_pos")
         common_fields.update(("sat_pos_x", "sat_pos_y", "sat_pos_z"))
+     
+    if "sat_posvel" in common_fields:
+        
+        dset1.add_float("sat_pos_x", val=dset1.sat_posvel.pos.trs.x)
+        dset1.add_float("sat_pos_y", val=dset1.sat_posvel.pos.trs.y)
+        dset1.add_float("sat_pos_z", val=dset1.sat_posvel.pos.trs.z)
+        dset1.add_float("sat_vel_x", val=dset1.sat_posvel.vel.trs.x)
+        dset1.add_float("sat_vel_y", val=dset1.sat_posvel.vel.trs.y)
+        dset1.add_float("sat_vel_z", val=dset1.sat_posvel.vel.trs.z)
+        del dset1.sat_posvel
+
+        dset2.add_float("sat_pos_x", val=dset2.sat_posvel.pos.trs.x)
+        dset2.add_float("sat_pos_y", val=dset2.sat_posvel.pos.trs.y)
+        dset2.add_float("sat_pos_z", val=dset2.sat_posvel.pos.trs.z)
+        dset2.add_float("sat_vel_x", val=dset2.sat_posvel.vel.trs.x)
+        dset2.add_float("sat_vel_y", val=dset2.sat_posvel.vel.trs.y)
+        dset2.add_float("sat_vel_z", val=dset2.sat_posvel.vel.trs.z)
+        del dset2.sat_posvel
+
+        remove_fields.add("sat_posvel")
+        common_fields.update(("sat_pos_x", "sat_pos_y", "sat_pos_z", "sat_vel_x", "sat_vel_y", "sat_vel_z"))
 
     # Remove unnecessary fields
     common_fields -= remove_fields
@@ -328,7 +342,7 @@ def _get_difference_by(fields1: List[str], fields2: List[str]) -> List[str]:
     difference_by = []
     common_fields = set(fields1) & set(fields2)
 
-    for field in ["time", "satellite"]:
+    for field in ["time", "satellite", "system"]:
         if field in common_fields:
             difference_by.append(field)
 
