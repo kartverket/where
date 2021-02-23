@@ -41,19 +41,19 @@ def rinex_obs_report(dset: "Dataset") -> None:
     Args:
         dset:        A dataset containing the data.
     """
+    file_vars = {**dset.vars,**dset.analysis}
 
     # TODO: Better solution?
-    if "station" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
-        dset.vars["station"] = ""
-        dset.vars["STATION"] = ""
+    if "station" not in file_vars:  # necessary if called for example by ./where/tools/concatenate.py
+        file_vars["station"] = ""
+        file_vars["STATION"] = ""
 
     # Generate figure directory to save figures generated for RINEX observation file report
-    figure_dir = config.files.path("output_rinex_obs_report_figure", file_vars={**dset.vars,**dset.analysis})
+    figure_dir = config.files.path("output_rinex_obs_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Get 'read' Dataset
-    dset_vars = {**dset.vars, **dset.analysis}
-    dset_read = dataset.Dataset.read(**dict(dset_vars, stage="read"))
+    dset_read = dataset.Dataset.read(**dict(file_vars, stage="read"))
 
     # Generate plots based on 'read' stage data
     df_system, df_obstype = _generate_dataframes(dset_read)
@@ -61,7 +61,7 @@ def rinex_obs_report(dset: "Dataset") -> None:
     _plot_observation_type(df_obstype, figure_dir)
     
     # Generate RINEX observation file report
-    path = config.files.path("output_rinex_obs_report", file_vars={**dset.vars, **dset.analysis})
+    path = config.files.path("output_rinex_obs_report", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="RINEX observation file analysis")
         rpt.title_page()
@@ -128,7 +128,7 @@ def _add_to_report(
         rpt.add_figure(
                 figure_path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}", 
                 caption="Number of observations for each GNSS observation type.", 
-                clearpage=False,
+                clearpage=True,
         )
      
     if "obstype_availability" in config.tech[_SECTION].add_to_report.list:
@@ -174,16 +174,61 @@ def _add_to_report(
             rpt.add_figure(
                     figure_path=figure_path,
                     caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
-                    clearpage=False,
+                    clearpage=True,
             )
     
     #
     # Linear combination 
     #
-    if "linear_combination" in config.tech[_SECTION].add_to_report.list:
-        
-        rpt.add_text("\n# Linear combination\n\n") 
+    if "gnss_linear_combination" in config.tech.postprocessors.list:
+        if config.tech.gnss_linear_combination.linear_combination.list:
+            rpt.add_text("\n# Linear combination\n\n") 
+            for fig in plt_edit.plot_linear_combinations():
+                
+                lin_comb = fig.name.replace("_", "-").capitalize() 
+                system = enums.gnss_id_to_name[fig.system]
+                rpt.add_figure(
+                        figure_path=fig.file_path,
+                        caption=f"{lin_comb} linear combination for {system} observations ({', '.join(fig.obstype)})", 
+                        clearpage=True,
+                )
+            
+            
+    #
+    # Epoch by epoch difference
+    #
+    if "gnss_epoch_by_epoch_difference" in config.tech.postprocessors.list:
+        rpt.add_text("\n# Epoch by epoch difference\n\n")          
+        for figure_path in plt_edit.plot_epoch_by_epoch_difference():
+            system, obstype = figure_path.stem.split("_")[5:7] 
+            rpt.add_figure(
+                figure_path=figure_path, 
+                caption=f"Epoch by epoch difference for {enums.gnss_id_to_name[system].value} observation {obstype}", 
+                clearpage=True,
+            )
 
+    #
+    # Fields to plot
+    #
+    fields_to_plot = config.tech[_SECTION].fields_to_plot.list
+    if fields_to_plot:
+
+        for field in fields_to_plot:
+            
+            if "." in field:
+                collection, field = field.split(".")
+            else:
+                collection = None
+                    
+            for figure_path in plt_edit.plot_field(field, collection):
+                system, field = figure_path.stem.split("_")[2:4] 
+                rpt.add_figure(
+                    figure_path=figure_path, 
+                    caption=f"Field {field} for {enums.gnss_id_to_name[system].value} observation", 
+                    clearpage=True,
+                )
+        
+        
 
 #
 # GENERATE DATAFRAMES

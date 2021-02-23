@@ -4,7 +4,7 @@ Description:
 ------------
 
 Reads station positions and velocities from SLRF files in SNX format. The velocity model is a simple linear offset
-based on the reference epoch. SLRF is normally released a few times per year by the ILRS. 
+based on the reference epoch. SLRF is normally released a few times per year by the ILRS.
 
 References:
 -----------
@@ -43,7 +43,7 @@ class Slrf(TrfFactory):
 
         Args:
             time (Time):    Time epochs for which to calculate positions.
-            version (Str):  Version string, can be used to differentiate for instance 
+            version (Str):  Version string, can be used to differentiate for instance
                             SLRF2014_POS+VEL_2030.0_171024.snx from SLRF2014_POS+VEL_2030.0_180504.snx
                             By adding a _snx or _ssc suffix to the version number the format can be specificed.
         """
@@ -58,7 +58,11 @@ class Slrf(TrfFactory):
             try:
                 self.solution = max(candidates)
             except ValueError:
-                log.fatal("No slrf reference frame files found")
+                self.solution = "{latest_solution}"
+                log.info("No slrf reference frame files found")
+                log.info("Download the latest from {https://cddis.nasa.gov/archive/slr/products/resource/}")
+                log.fatal(f"Save missing file as {self.file_paths[self.format]} and rerun!")
+
         self.version = f"{self.solution}_{self.format}"
 
     @property
@@ -70,7 +74,7 @@ class Slrf(TrfFactory):
         file_vars = dict(version=self.solution) if self.solution else None
         return {
             self.format: config.files.path(
-                self.file_key_pattern.format(self.format), file_vars=file_vars, download_missing=True
+                self.file_key_pattern.format(self.format), file_vars=file_vars, download_missing=False
             )
         }
 

@@ -79,13 +79,14 @@ def sisre_report(dset):
         dset (Dataset):       A dataset containing the data.
     """
     write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
+    file_vars = {**dset.vars, **dset.analysis}
 
     # TODO: Better solution?
     if "sampling_rate" not in dset.analysis:  # necessary if called for example by ./where/tools/concatenate.py
         dset.analysis["sampling_rate"] = ""
 
     # Generate SISRE report
-    path = config.files.path(f"output_sisre_report_{dset.vars['label']}", file_vars={**dset.vars, **dset.analysis})
+    path = config.files.path(f"output_sisre_report_{dset.vars['label']}", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="SISRE analysis")
         rpt.title_page()
@@ -97,7 +98,7 @@ def sisre_report(dset):
 
         # Generate figure directory to save figures generated for SISRE report
         fid.write("\n# SISRE analysis results\n\n")
-        figure_dir = config.files.path("output_sisre_report_figure", file_vars={**dset.vars, **dset.analysis})
+        figure_dir = config.files.path("output_sisre_report_figure", file_vars=file_vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
 
         _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
@@ -360,7 +361,7 @@ def _plot_histogram_subplot(data, axis, system):
        axis (AxesSubplot):      Subplot axes.
        system (str):            GNSS system identifier (e.g. E, G, ...)
     """
-    axis.hist(data, normed=True, bins=30)
+    axis.hist(data, density=True, bins=30)
     axis.set(xlabel="SISRE [m]", ylabel="Frequency")
     axis.set_title(f"{GNSS_NAME[system]}")
     mean = np.mean(data)

@@ -101,7 +101,7 @@ def gnss_residual(dset: "Dataset") -> None:
         dset:  A dataset containing the data.
     """
 
-    file_path = config.files.path("output_residual", file_vars=dset.vars)
+    file_path = config.files.path("output_residual", file_vars={**dset.vars, **dset.analysis})
     
     # Update WriterField depending on used pipeline
     fields_def = list(FIELDS)

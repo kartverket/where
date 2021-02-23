@@ -25,7 +25,7 @@ def sisre_output_buffer(dset):
     Args:
         dset:       Dataset, a dataset containing the data.
     """
-    with config.files.open("output_sisre_buffer", file_vars=dset.vars, mode="at") as fid:
+    with config.files.open("output_sisre_buffer", file_vars={**dset.vars, **dset.analysis}, mode="at") as fid:
 
         # Allow only one process to hold an exclusive lock for a given file at a given time
         try:

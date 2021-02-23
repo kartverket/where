@@ -17,9 +17,9 @@ References:
 
 
 
-$Revision: 17285 $
-$Date: 2019-02-12 14:54:02 +0100 (Tue, 12 Feb 2019) $
-$LastChangedBy: fauing $
+$Revision$
+$Date$
+$LastChangedBy$
 """
 
 #Midgard imports

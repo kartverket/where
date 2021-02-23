@@ -107,7 +107,7 @@ def gnss_position(dset: "Dataset") -> None:
     Args:
         dset:  A dataset containing the data.
     """
-    file_path = config.files.path("output_dilution_of_precision", file_vars=dset.vars)
+    file_path = config.files.path("output_dilution_of_precision", file_vars={**dset.vars, **dset.analysis})
 
     # Add date and DOPs fields to dataset
     if "date" not in dset.fields:

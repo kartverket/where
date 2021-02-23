@@ -55,7 +55,7 @@ Version: {version}
 """
 # Standard library imports
 import atexit
-from datetime import timedelta
+from datetime import datetime, timedelta
 import subprocess
 import sys
 
@@ -95,10 +95,19 @@ def main():
         from_date = util.parse_args("date", doc_module=__name__)
         to_date = util.parse_args("date", doc_module=__name__)
 
+    id_ = util.read_option_value("--id", default="")
+
     setup.set_profile(pipeline)
 
+    # Initialize file variables
+    file_vars = dict(
+        pipeline=pipeline,
+        id=id_,  
+        **util.get_user_info(), 
+        time=datetime.now().strftime("%Y%m%d%H%M%S"),
+    )
+
     # Start logging
-    file_vars = dict(**util.get_user_info())
     log.file_init(
         file_path=config.files.path("log_runner", file_vars=file_vars),
         log_level=config.where.log.default_level.str,

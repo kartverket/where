@@ -149,7 +149,7 @@ def validate_args(rundate, session=None, **kwargs):
 
 
 @plugins.register_named("file_vars")
-def file_vars():
+def file_vars(file_vars=None):
     """File variables that will be available during the running of this technique
 
     In addition, date and analysis variables are available.
@@ -200,7 +200,7 @@ def file_vars():
     if "sinex" in config.tech.section_names:
         _file_vars["solution"] = config.tech.sinex.solution.str
         _file_vars["file_agency"] = config.tech.sinex.file_agency.str.lower()
-
+        _file_vars["session_"] = file_vars["session"][:2].ljust(2, "_")
     return _file_vars
 
 
@@ -247,7 +247,7 @@ def _matplotlib_map(dset):
             transform=ccrs.Geodetic(),
             zorder=0,
         )
-    plt.scatter(lon, lat, c=rms, transform=ccrs.Geodetic(), cmap=cmap, s=s_size, zorder=10)
+    plt.scatter(lon, lat, c=rms, transform=ccrs.PlateCarree(), cmap=cmap, s=s_size, zorder=10)
     plt.title(f"{dset.meta['input']['session_code']}")
     plt.figtext(0.99, 0.01, "Size: number of observations", horizontalalignment="right")
     if rms is not None:
@@ -425,7 +425,8 @@ def estimate(stage, dset):
             break
 
     log.blank()
-    estimation.solve_neq(dset)
+    if dset.num_obs > 0:
+        estimation.solve_neq(dset)
     dset.write()
 
 

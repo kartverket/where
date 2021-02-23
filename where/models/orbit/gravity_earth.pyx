@@ -77,7 +77,7 @@ def gravity_earth_setup(
     if "c20" in force_parameters:
         C[2, 0] = force_parameters["c20"]
         c20_index = list(force_parameters.keys()).index("c20")
-    
+
     eop = apriori.get('eop', time=epochs)
     xp = eop.x_mean_2010() * Unit.arcsec2rad
     yp = eop.y_mean_2010() * Unit.arcsec2rad
@@ -125,11 +125,6 @@ def gravity_earth(double[:] sat_pos_itrs, force_parameters, int current_step, **
 
     V = VW[:, :, 0]
     W = VW[:, :, 1]
-
-    # Equation 6.5 in IERS Conventions [2]
-    C[2, 1] = math.sqrt(3) * xp[current_step] * C[2, 0] - xp[current_step] * C[2, 2] + yp[current_step] * S[2, 2]
-    S[2, 1] = -math.sqrt(3) * yp[current_step] * C[2, 0] - yp[current_step] * C[2, 2] - xp[current_step] * S[2, 2]
-
 
     # Acceleration forces, equation (3.33)
     # Transition matrix, equations (7.65) - (7.70)

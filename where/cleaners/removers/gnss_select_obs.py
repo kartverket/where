@@ -9,6 +9,8 @@ Description:
         2. Use of both code and phase observation or only code observation.
         3. Selection of observation types after a GNSS dependent priority list.
         4. Selection depending on using single-, dual- or triple-frequencies.
+        5. Remove NaN (not a number) values from observation types. This is done only if NaN is valid for all
+           GNSS observation types.
 
 """
 # Standard library imports
@@ -29,7 +31,7 @@ from where.lib import log
 _SECTION = "_".join(__name__.split(".")[-1:])
 
 
-OBS_CODE_DEF = dict(code="C", doppler="D", phase="L", snr="S")
+OBS_CODE_DEF = dict(code="C", phase="L", snr="S", doppler="D")
 
 FREQ_NUMBER_DEF = dict(single=["1"], dual=["1", "2"], triple=["1", "2", "3"])
 
@@ -47,7 +49,6 @@ def gnss_select_obs(dset: "Dataset") -> np.ndarray:
     """
     remove_obstypes = set()
     keep_idx = np.full(dset.num_obs, True, dtype=bool)
-    reject_nan = np.full(dset.num_obs, False, dtype=bool)
     reject_nan_all_sys = None
     obstypes_all = dset.obs.fields
 
@@ -85,14 +86,15 @@ def gnss_select_obs(dset: "Dataset") -> np.ndarray:
             log.fatal(f"Observation code '{obs_code}' is not valid in option 'obs_code='.")
         keep_obs_code.append(OBS_CODE_DEF[obs_code])
 
-    log.debug(f"Remove undefined observation codes: {' '.join(set(OBS_CODE_DEF.values()) - set(keep_obs_code))}.")
     remove_obs_code = set(OBS_CODE_DEF.values()) - set(keep_obs_code)
-    remove_obs_pattern = f"^{'|^'.join(remove_obs_code)}"
-
-    for type_ in obstypes_all:
-        search_obj = re.search(remove_obs_pattern, type_)
-        if search_obj is not None:
-            remove_obstypes.add(search_obj.string)
+    if remove_obs_code:
+        log.debug(f"Remove undefined observation codes: {' '.join(set(OBS_CODE_DEF.values()) - set(keep_obs_code))}.")
+        remove_obs_pattern = f"^{'|^'.join(remove_obs_code)}"
+    
+        for type_ in obstypes_all:
+            search_obj = re.search(remove_obs_pattern, type_)
+            if search_obj is not None:
+                remove_obstypes.add(search_obj.string)
 
     # Select observations based on priority list
     #   -> 1st step remove already unused observation types from Dataset to determine the basis for the priority list
@@ -100,25 +102,33 @@ def gnss_select_obs(dset: "Dataset") -> np.ndarray:
 
     # Note: The order of the selected observations is important for selection of GNSS code observation type to
     #       determine satellite transmission time.
-    _remove_obstype_from_dset(dset, remove_obstypes)
+    if remove_obstypes:
+        _remove_obstype_from_dset(dset, remove_obstypes)
+        
     selected_obstypes, add_remove_obstypes = _select_observations(obstypes_all, dset.meta["obstypes"])
-    remove_obstypes.update(add_remove_obstypes)
-    log.debug(f"Remove observation types after selection: {' '.join(add_remove_obstypes)}.")
-    _remove_obstype_from_dset(dset, remove_obstypes)
+    
+    if add_remove_obstypes:
+        remove_obstypes.update(add_remove_obstypes)
+        log.debug(f"Remove observation types after selection: {' '.join(add_remove_obstypes)}.")
+        _remove_obstype_from_dset(dset, remove_obstypes)
+        
     dset.meta["obstypes"] = selected_obstypes.copy()
 
     # Remove NaN values of selected observation types
     if config.tech[_SECTION].remove_nan.bool:
 
-        # Note: An array 'reject_nan_all_sys' is created for all GNSS observation types. This array
-        #       shows, if some elements are set to NaN for a GNSS observation type. At the end only
-        #       NaN observations are removed, if these observations are NaN for all GNSS observation
-        #       types (see np.bitwise_and.reduce(reject_nan_all_sys, 1)).
+        # Note: An array 'reject_nan_all_sys' is created for all GNSS observation types. This array shows, if some 
+        #       elements are set to NaN for a GNSS observation type. At the end only NaN observations are removed, if
+        #       these observations are NaN for all GNSS observation types (see np.bitwise_and.reduce(reject_nan_all_sys, 1)).
+        #       An exception is if only one GNSS is selected, then all NaN values are removed (see 
+        #       np.bitwise_or.reduce(reject_nan_all_sys, 1)).
         for sys in dset.meta["obstypes"]:
 
             # Loop over selected observation types
             for type_ in dset.meta["obstypes"][sys]:
-                reject_nan[keep_idx] = np.isnan(dset.obs[type_][keep_idx])
+
+                reject_nan = np.full(dset.num_obs, False, dtype=bool)           # Initialize reject_nan
+                reject_nan[keep_idx] = np.isnan(dset.obs[type_][keep_idx])      # Determine NaN values
 
                 if reject_nan_all_sys is None:
                     reject_nan_all_sys = reject_nan 
@@ -130,11 +140,14 @@ def gnss_select_obs(dset: "Dataset") -> np.ndarray:
                     reject_nan_all_sys = np.hstack((reject_nan_all_sys,reject_nan[:,None]))
 
         if reject_nan_all_sys.ndim > 1:
-            reject_nan_all_sys = np.bitwise_and.reduce(reject_nan_all_sys, 1)   
+            if len(cfg_systems) == 1: # only one GNSS is selected
+                reject_nan_all_sys = np.bitwise_or.reduce(reject_nan_all_sys, 1)  
+            else:
+                reject_nan_all_sys = np.bitwise_and.reduce(reject_nan_all_sys, 1) 
         if np.any(reject_nan_all_sys):
             keep_idx[keep_idx] = np.logical_not(reject_nan_all_sys)[keep_idx]
             log.debug(f"Remove {np.sum(reject_nan_all_sys)} NaN values.")
-        
+
     return keep_idx
 
 
@@ -194,16 +207,21 @@ def _select_observations(obstypes_all, obstypes):
         use_obstypes.update({sys: list()})
 
         # Loop over observation code
-        for obs_code in sorted(cfg_obs_code):
+        # TODO: order obs codes after ordered pattern f.eks. code, phase, snr and doppler.
+        for obs_code in cfg_obs_code:
             if obs_code not in OBS_CODE_DEF:
                 log.fatal(f"Configuration option 'obs_code= {obs_code}' is not valid.")
 
             for freq_num in freq_numbers:
                 type_ = OBS_CODE_DEF[obs_code] + freq_num
                 selected_obstypes = _select_obstype(sys, type_, obstypes[sys])
-                use_obstypes[sys].append(selected_obstypes)
-                keep_obstypes.append(selected_obstypes)
-
+                if selected_obstypes:
+                    use_obstypes[sys].append(selected_obstypes)
+                    keep_obstypes.append(selected_obstypes)
+                else:
+                    log.warn(f"No {obs_code.upper()} observations available for GNSS '{sys}' and frequency " 
+                             f"'{freq_num}'.")
+                    
         log.info(f"Selected observation types for GNSS {sys!r}: {', '.join(use_obstypes[sys])}")
         
     remove_obstypes.difference_update(keep_obstypes)

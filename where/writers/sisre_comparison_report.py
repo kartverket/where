@@ -50,21 +50,25 @@ def sisre_comparison_report(dset: Dict[str, "Dataset"]) -> None:
               the belonging Dataset as value
     """
     dset_first = dset[list(dset.keys())[0]]
+    file_vars = {**dset_first.vars, **dset_first.analysis}
 
     # Generate figure directory to save figures generated for SISRE report
-    figure_dir = config.files.path("output_sisre_comparison_report_figure", file_vars=dset_first.vars)
+    figure_dir = config.files.path("output_sisre_comparison_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
     df, df_month_perc, df_month_perc_rms, df_month_rms = _generate_dataframe(dset)
     _plot_bar_sisre_signal_combination_percentile(df_month_perc, figure_dir, threshold=False)
     _plot_bar_sisre_signal_combination_percentile(df_month_perc, figure_dir, threshold=True)
-    _plot_bar_sisre_signal_combination_percentile(df_month_perc_rms, figure_dir, threshold=False, suffix="_rms")
-    _plot_bar_sisre_signal_combination_percentile(df_month_perc_rms, figure_dir, threshold=True, suffix="_rms")
     _plot_bar_sisre_signal_combination_rms(df_month_rms, figure_dir)
 
+    if df_month_perc_rms is not None:
+        _plot_bar_sisre_signal_combination_percentile(df_month_perc_rms, figure_dir, threshold=False, suffix="_rms")
+        _plot_bar_sisre_signal_combination_percentile(df_month_perc_rms, figure_dir, threshold=True, suffix="_rms")
+
+
     # Generate SISRE comparison report
-    path = config.files.path("output_sisre_comparison_report", file_vars=dset_first.vars)
+    path = config.files.path("output_sisre_comparison_report", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
 
         rpt = Report(fid, rundate=dset_first.analysis["rundate"], path=path, description="Comparison of SISRE analyses")
@@ -82,7 +86,7 @@ def sisre_comparison_report(dset: Dict[str, "Dataset"]) -> None:
         _plot_bar_sisre_satellite_percentile(rpt, df, figure_dir, threshold=True, write_table=False)
         # -TODO
 
-        _add_to_report(rpt, figure_dir, df, df_month_perc, df_month_perc_rms, df_month_rms, dset_first.vars)
+        _add_to_report(rpt, figure_dir, df, df_month_perc, df_month_perc_rms, df_month_rms, file_vars)
         rpt.markdown_to_pdf()
 
 
@@ -123,20 +127,21 @@ def _add_to_report(
         clearpage=True,
     )
 
-    rpt.add_text(
-        "95th percentile SISE results for signal combinations in meter based on epochwise RMS SISRE solutions: "
-    )
-    rpt.write_dataframe_to_markdown(df_month_perc_rms, format="6.2f")
-    rpt.add_figure(
-        f"{figure_dir}/plot_bar_sisre_signal_combination_percentile_rms.{FIGURE_FORMAT}\n",
-        caption="Monthly 95th percentile of global average SISE for single- and dual-frequency users based on epochwise RMS SISRE solutions",
-        clearpage=True,
-    )
-    rpt.add_figure(
-        f"{figure_dir}/plot_bar_sisre_signal_combination_percentile_rms_threshold.{FIGURE_FORMAT}\n",
-        caption="Monthly 95th percentile of global average SISE for single- and dual-frequency users based on epochwise RMS SISRE solutions with red MPL threshold line",
-        clearpage=True,
-    )
+    if df_month_perc_rms is not None:
+        rpt.add_text(
+            "95th percentile SISE results for signal combinations in meter based on epochwise RMS SISRE solutions: "
+        )
+        rpt.write_dataframe_to_markdown(df_month_perc_rms, format="6.2f")
+        rpt.add_figure(
+            f"{figure_dir}/plot_bar_sisre_signal_combination_percentile_rms.{FIGURE_FORMAT}\n",
+            caption="Monthly 95th percentile of global average SISE for single- and dual-frequency users based on epochwise RMS SISRE solutions",
+            clearpage=True,
+        )
+        rpt.add_figure(
+            f"{figure_dir}/plot_bar_sisre_signal_combination_percentile_rms_threshold.{FIGURE_FORMAT}\n",
+            caption="Monthly 95th percentile of global average SISE for single- and dual-frequency users based on epochwise RMS SISRE solutions with red MPL threshold line",
+            clearpage=True,
+        )
 
     rpt.add_text("RMS SISE results for signal combinations in meter: ")
     rpt.write_dataframe_to_markdown(df_month_rms, format="6.2f")
@@ -202,6 +207,8 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
     """
     df = pd.DataFrame()
     signal_types = list()
+    df_month_perc_rms = None
+    df_month_rms = None
 
     for name, dset in dsets.items():
 
@@ -223,38 +230,41 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
         log.fatal(f"All given datasets are empty [{', '.join(dsets.keys())}].")
 
     # Generate monthly samples of 95th percentile SISRE (after SDD v1.0 version)
-    df_month_perc = df.set_index("time_gps").resample("M", how=lambda x: np.nanpercentile(x, q=95))
+    df_month_perc = df.drop(columns=["satellite", "system"]).set_index("time_gps").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
     df_month_perc.index = df_month_perc.index.strftime("%b-%Y")
+
+    # Generate monthly samples of RMS SISRE
+    df_month_rms = df.drop(columns=["satellite", "system"]).set_index("time_gps").resample("M").apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
+    df_month_rms.index = df_month_rms.index.strftime("%b-%Y")
 
     # Generate monthly samples of 95th percentile SISRE based on epochwise SISRE RMS solutions(after SDD v1.1 version)
     #
     # NOTE: Following solutions assumes that SISRE solution in dataframe 'df' is only given for one GNSS
-    if len(set(df["system"])) > 1:
-        log.fatal(
-            f"Determination of 95th percentile SISRE based on epochwise SISRE RMS solutions can only be applied"
+    if len(set(df["system"])) == 1:
+        epochs = sorted(set(df["time_gps"]))
+        df_tmp = pd.DataFrame(index=epochs, columns=signal_types)
+
+        ## Loop over observation epochs
+        for epoch in epochs:
+            idx = df["time_gps"] == epoch
+            row = dict()
+
+            # Determine RMS for each signal type over all given SISRE satellite solutions in each epoch
+            for signal_type in signal_types:
+                row[signal_type] = np.sqrt(np.nanmean(np.square(df[signal_type][idx])))
+            df_tmp.loc[epoch] = pd.Series(row)
+
+        df_month_perc_rms = df_tmp.resample("M").apply(lambda x: np.nanpercentile(list(x), q=95))
+        df_month_perc_rms.index = df_month_perc_rms.index.strftime("%b-%Y")
+        df_month_perc_rms = df_month_perc_rms.transpose()
+ 
+    else:
+        log.warn(
+            f"Determination of 95th percentile SISRE based on epochwise SISRE RMS solutions can only be applied "
             f"for one given GNSS and not for {set(df['system'])} together."
         )
-    epochs = sorted(set(df["time_gps"]))
-    df_tmp = pd.DataFrame(index=epochs, columns=signal_types)
 
-    ## Loop over observation epochs
-    for epoch in epochs:
-        idx = df["time_gps"] == epoch
-        row = dict()
-
-        # Determine RMS for each signal type over all given SISRE satellite solutions in each epoch
-        for signal_type in signal_types:
-            row[signal_type] = np.sqrt(np.nanmean(np.square(df[signal_type][idx])))
-        df_tmp.loc[epoch] = pd.Series(row)
-
-    df_month_perc_rms = df_tmp.resample("M", how=lambda x: np.nanpercentile(list(x), q=95))
-    df_month_perc_rms.index = df_month_perc_rms.index.strftime("%b-%Y")
-
-    # Generate monthly samples of RMS SISRE
-    df_month_rms = df.set_index("time_gps").resample("M", how=lambda x: np.sqrt(np.nanmean(np.square(x))))
-    df_month_rms.index = df_month_rms.index.strftime("%b-%Y")
-
-    return df, df_month_perc.transpose(), df_month_perc_rms.transpose(), df_month_rms.transpose()
+    return df, df_month_perc.transpose(), df_month_perc_rms, df_month_rms.transpose()
 
 
 def _get_signal_type(meta: Dict[str, Any]) -> str:
@@ -379,7 +389,7 @@ def _plot_bar_sisre_satellite_percentile(
     # Generate subplots
     for ax, user in zip(axes, user_types):
         df_user = df.pivot(index="time_gps", columns="satellite", values=user)
-        df_user_monthly_percentile = df_user.resample("M", how=lambda x: np.nanpercentile(x, q=95))
+        df_user_monthly_percentile = df_user.resample("M").apply(lambda x: np.nanpercentile(x, q=95))
         df_user_monthly_percentile.index = df_user_monthly_percentile.index.strftime("%b-%Y")
         df_user_monthly_percentile.transpose().plot(kind="bar", ax=ax, legend=False, title=user)
         ax.set_ylabel("SISE [m] (95th percentile)")

@@ -129,6 +129,7 @@ def _concatenate_datasets(
         dset_vars:         Common Dataset variables.
         only_for_rundate:  Concatenate only data for given rundate.
     """
+    dset_merged = None
 
     def read_dset(rundate):
         with Timer(f"Finish read of day {rundate} in", logger=log.time):
@@ -139,21 +140,32 @@ def _concatenate_datasets(
                 log.warn(f"Unable to read data for {rundate}: {err}")
                 return dataset.Dataset()
 
-    dset_merged = read_dset(from_date)
-
-    date_to_read = from_date + timedelta(days=1)
+    date_to_read = from_date
     while date_to_read <= to_date:
 
         dset = read_dset(date_to_read)
+        if dset: # Skip extension if dataset is empty
+            
+            # Initialize merged dataset
+            if dset_merged is None:  
 
-        if only_for_rundate:
-            _keep_data_only_for_rundate(dset)
+                dset_merged = dset
 
-            if dset.num_obs == 0:
-                log.warn(f"No data to for {date_to_read} in dataset")
+                # Merged dataset should be related to start date
+                if date_to_read != from_date:
+                    dset.vars["rundate"] = from_date.strftime("%Y-%m-%d")
+                    dset.analysis["rundate"] = from_date
+                    dset.analysis.update(config.date_vars(from_date))
 
-        with Timer(f"Finish extend for day {date_to_read} in", logger=log.time):
-            dset_merged.extend(dset)
+            if only_for_rundate:
+                _keep_data_only_for_rundate(dset)
+
+                if dset.num_obs == 0:
+                    log.warn(f"No data to for {date_to_read} in dataset")
+
+            with Timer(f"Finish extend for day {date_to_read} in", logger=log.time):
+                dset_merged.extend(dset)
+
         date_to_read += timedelta(days=1)
 
     dset_merged.analysis.update(id=f"{dset_merged.analysis['id']}_concatenated")

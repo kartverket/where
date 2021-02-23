@@ -983,6 +983,7 @@ def site_pressure(dset):
 
     i_missing = np.logical_not(i_given)
     if i_missing.any():
+        log.warn(f"No pressure data for some epochs in dataset. Using VMF1 station data as backup")
         pressure[i_missing] = vmf1_station_pressure(dset)[i_missing]
 
     return pressure
@@ -1004,15 +1005,17 @@ def vmf1_gridded_pressure(dset):
     """
     # Get gridded VMF1 data
     vmf1 = apriori.get("vmf1_grid", time=dset.time)
-
     lat, lon, height = dset.site_pos.pos.llh.T
-    grid_zhd = vmf1["zh"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
-    grid_height = vmf1["ell"](lon, lat, grid=False)
-    grid_pressure = pressure_zhd(grid_zhd, lat, grid_height)
+    try:
+        grid_zhd = vmf1["zh"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
+        grid_height = vmf1["ell"](lon, lat, grid=False)
+        grid_pressure = pressure_zhd(grid_zhd, lat, grid_height)
 
-    # Rescale gridded pressure to station pressure
-    pressure = pressure_height_correction(grid_pressure, grid_height, height)
-
+        # Rescale gridded pressure to station pressure
+        pressure = pressure_height_correction(grid_pressure, grid_height, height)
+    except KeyError:
+        log.warn("No VMF1 grid data available. Unable to compute pressure value. Setting pressure to 1 atm (1013.25hPa). ")
+        pressure = np.full(len(lat), fill_value=1013.25)
     return pressure
 
 def vmf1_station_pressure(dset):
@@ -1033,6 +1036,7 @@ def vmf1_station_pressure(dset):
             pressure[idx] = vmf1[sta]["pressure"](dset.time.mjd[idx])
         except KeyError:
             # Station is missing, use grid as backup
+            log.warn(f"No data for station {sta} in VMF1 station data. Using VMF1 grid as backup")
             pressure_grid = vmf1_gridded_pressure(dset)
             pressure[idx] = pressure_grid[idx]
     return pressure
@@ -1064,16 +1068,26 @@ def vmf1_gridded_mapping_function(dset):
 
     lat, lon, height = dset.site_pos.pos.llh.T
     zd = dset.site_pos.zenith_distance
+    idx_missing = np.zeros(dset.num_obs, dtype=bool)
 
     for obs in range(dset.num_obs):
-        mh[obs], mw[obs] = iers.vmf1_ht(
-            vmf1["ah"](dset.time[obs], lon[obs], lat[obs]),
-            vmf1["aw"](dset.time[obs], lon[obs], lat[obs]),
-            dset.time.utc.mjd_int[obs],
-            lat[obs],
-            height[obs],
-            zd[obs],
-        )
+        try:
+            mh[obs], mw[obs] = iers.vmf1_ht(
+                vmf1["ah"](dset.time[obs], lon[obs], lat[obs]),
+                vmf1["aw"](dset.time[obs], lon[obs], lat[obs]),
+                dset.time.utc.mjd_int[obs],
+                lat[obs],
+                height[obs],
+                zd[obs],
+            )
+        except KeyError:
+            idx_missing[obs] = True
+    
+    if idx_missing.any():
+        log.warn(f"No VMF1 grid data available. Using GMF mapping function.")
+        mh_gmf, mw_gmf = gmf_mapping_function(dset)
+        mh[idx_missing] = mh_gmf[idx_missing]
+        mw[idx_missing] = mw_gmf[idx_missing]
 
     return mh, mw
 
@@ -1106,6 +1120,7 @@ def vmf1_station_mapping_function(dset):
     zd = dset.site_pos.zenith_distance
     sta = dset.station
     mjd = dset.time.mjd
+    missing_idx = np.zeros(dset.num_obs, dtype=bool)
 
     for obs in range(dset.num_obs):
         try:
@@ -1118,9 +1133,13 @@ def vmf1_station_mapping_function(dset):
             )
         except KeyError:
             # Station is missing, use grid as backup
-            mh_grid, mw_grid = vmf1_gridded_mapping_function(dset)
-            mh[obs] = mh_grid[obs]
-            mw[obs] = mw_grid[obs]
+            missing_idx[obs] = True
+
+    if missing_idx.any():
+        log.warn(f"No data for some epochs in VMF1 station data. Using VMF1 grid as backup")
+        mh_grid, mw_grid = vmf1_gridded_mapping_function(dset)
+        mh[missing_idx] = mh_grid[missing_idx]
+        mw[missing_idx] = mw_grid[missing_idx]
 
     return mh, mw
 
@@ -1141,11 +1160,15 @@ def vmf1_gridded_zenith_wet_delay(dset):
     vmf1 = apriori.get("vmf1_grid", time=dset.time)
 
     lat, lon, height = dset.site_pos.pos.llh.T
-    grid_zwd = vmf1["zw"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
-    grid_height = vmf1["ell"](lon, lat, grid=False)
+    try:
+        grid_zwd = vmf1["zw"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
+        grid_height = vmf1["ell"](lon, lat, grid=False)
 
-    # Zenith Wet delay. Eq. (5) in Kouba :cite:`kouba2007`
-    zwd = grid_zwd * np.exp(-(height - grid_height) / 2000)
+        # Zenith Wet delay. Eq. (5) in Kouba :cite:`kouba2007`
+        zwd = grid_zwd * np.exp(-(height - grid_height) / 2000)
+    except KeyError:
+        log.warn(f"No VMF1 grid data available. Setting zenith wet delay to 0.")
+        zwd = np.zeros(dset.num_obs)
 
     return zwd
 
@@ -1167,6 +1190,7 @@ def vmf1_station_zenith_wet_delay(dset):
             zwd[idx] = vmf1[sta]["zw"](dset.time.mjd[idx])
         except KeyError:
             # Station is missing, use grid as backup
+            log.warn(f"No data for station {sta} in VMF1 station data. Using VMF1 grid as backup")
             zwd_grid = vmf1_gridded_zenith_wet_delay(dset)
             zwd[idx] = zwd_grid[idx]
 
@@ -1210,6 +1234,7 @@ def vmf1_station_zenith_hydrostatic_delay(dset):
             zhd[idx] = vmf1[sta]["zh"](dset.time.mjd[idx])
         except KeyError:
             # Station is missing, use grid as backup
+            log.warn(f"No data for station {sta} in VMF1 station data. Using VMF1 grid as backup")
             zhd_grid = vmf1_gridded_zenith_hydrostatic_delay(dset)
             zhd[idx] = zhd_grid[idx]
 

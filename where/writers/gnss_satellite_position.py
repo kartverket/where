@@ -200,7 +200,7 @@ def gnss_satellite_position(dset: "Dataset") -> None:
     Args:
         dset:  A dataset containing the data.
     """
-    file_path = config.files.path("output_satellite_position", file_vars=dset.vars)
+    file_path = config.files.path("output_satellite_position", file_vars={**dset.vars, **dset.analysis})
 
     # Add date field to dataset
     if "date" not in dset.fields:

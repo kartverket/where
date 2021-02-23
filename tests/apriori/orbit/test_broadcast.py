@@ -3,9 +3,9 @@
 -------
 
 
-$Revision: 19696 $
-$Date: 2020-10-26 22:48:44 +0100 (ma., 26 okt. 2020) $
-$LastChangedBy: dahmic $
+$Revision$
+$Date$
+$LastChangedBy$
 
 """
 # Standard library imports

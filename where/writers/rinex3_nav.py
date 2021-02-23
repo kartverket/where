@@ -67,7 +67,7 @@ def rinex3_nav(dset: "Dataset"):
     )
     rinex_version = "3.03"
 
-    with config.files.open("output_rinex3_nav", file_vars=dset.vars, mode="wt") as fid:
+    with config.files.open("output_rinex3_nav", file_vars={**dset.vars, **dset.analysis}, mode="wt") as fid:
 
         #
         # Write RINEX navigation header

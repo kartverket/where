@@ -201,6 +201,33 @@ FIELDS_SUM = (
         "meter",
         "Maximal value for given column",
     ),
+    WriterField(
+        "std",
+        float,
+        "%9.4f",
+        9,
+        "STD",
+        "meter",
+        "Standard deviation for given column",
+    ),
+    WriterField(
+        "percentile",
+        float,
+        "%9.4f",
+        9,
+        "95TH",
+        "meter",
+        "95th percentile for given column",
+    ),
+    WriterField(
+        "rms",
+        float,
+        "%9.4f",
+        9,
+        "RMS",
+        "meter",
+        "Root mean square for given column",
+    ),
 )
 
 
@@ -213,7 +240,8 @@ def gnss_comparison(dset: "Dataset") -> None:
     """
 
     dset_first = dset[list(dset.keys())[0]]
-    dset_first.vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
+    file_vars = {**dset_first.vars, **dset_first.analysis}
+    file_vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
     
      # Get dataframes for writing
     _, df_day, df_month, _, _ = _generate_dataframes(dset)
@@ -234,9 +262,9 @@ def gnss_comparison(dset: "Dataset") -> None:
     
     for type_, output_array in output_defs.items():
         
-        file_vars = dset_first.vars.copy()
-        file_vars.update(solution=f"{file_vars['solution']}_{type_}")
-        file_path = config.files.path("output_gnss_comparison", file_vars=file_vars)
+        file_vars_tmp = file_vars.copy()
+        file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}")
+        file_path = config.files.path("output_gnss_comparison", file_vars=file_vars_tmp)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
         log.info(f"Write '{type_}' comparison file {file_path}.")
@@ -271,9 +299,9 @@ def _generate_dataframe_summary(df: pd.core.frame.DataFrame, index: str) -> pd.c
         index:   Chosen column of dataframe used for indexing (e.g. "station")
         
     Returns:
-        Dataframe with statistics (mean, min and max) based on given numeric dataframe columns
+        Dataframe with statistics (mean, min, max, std, percentile, rms) based on given numeric dataframe columns
     """
-    functions = ["mean", "min", "max"]
+    functions = ["mean", "min", "max", "std", "percentile", "rms"]
     ncols = df.select_dtypes("number").columns  # only use of numeric columns
     items = df[index].unique()
     
@@ -293,7 +321,13 @@ def _generate_dataframe_summary(df: pd.core.frame.DataFrame, index: str) -> pd.c
         idx_sum = summary[index] == item
         
         for func in functions:
-            summary[func][idx_sum] = getattr(df[ncols][idx_df], func)().values
+            if func == "rms":
+                summary[func][idx_sum] = df[ncols][idx_df].apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
+            elif func == "percentile":
+                summary[func][idx_sum] = df[ncols][idx_df].apply(lambda x: np.nanpercentile(x, q=95))
+            else:
+                summary[func][idx_sum] = getattr(df[ncols][idx_df], func)().values  # mean, max, min and std dataframe
+                                                                                    # functions skip NaN values
             
     return summary
               
@@ -381,7 +415,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         |----------------------|--------------------------------------------------------------------------------------|
         | dfs                  | Dictionary with station name as keys and the belonging dataframe as value with       |
         |                      | following dataframe columns: east, north, up, hpe, vpe, pos_3d                       |
-        | df_day               | Dataframe with daily entries with columns like date, stationm hpe, vpe, ...          |
+        | df_day               | Dataframe with daily entries with columns like date, station, hpe, vpe, ...          |
         | df_month             | Dataframe with monthly entries with columns like date, stationm hpe, vpe, ...        |
         | dfs_day_field        | Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value  |
         |                      | with DAILY samples of 95th percentile and stations as columns.                       |
@@ -456,8 +490,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         else:
             # Save data in dictionaries
             dfs.update({station: df})
-
-            df_day_tmp = df.set_index("date").resample("D", how=lambda x: np.nanpercentile(x, q=95))
+            df_day_tmp = df.set_index("date").resample("D").apply(lambda x: np.nanpercentile(x, q=95))
             for field in dfs_day_field.keys():
                 if dfs_day_field[field].empty:
                     dfs_day_field[field][station] = df_day_tmp[field]
@@ -468,7 +501,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             df_day_tmp["station"] = np.repeat(station, df_day_tmp.shape[0])
             df_day = pd.concat([df_day, df_day_tmp], axis=0)
 
-            df_month_tmp = df.set_index("date").resample("M", how=lambda x: np.nanpercentile(x, q=95))
+            df_month_tmp = df.set_index("date").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
             df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
             for field in dfs_month_field.keys():
                 dfs_month_field[field][station] = df_month_tmp[field]

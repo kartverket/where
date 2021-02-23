@@ -4,13 +4,14 @@ Description:
 ------------
 
 Depending on the configuration, following linear combination can be added:
+    code_multipath
+    code_phase
     geometry_free
     ionosphere_free
-    wide_lane
-    narrow_lane
     melbourne_wuebbena
-    code_multipath
-
+    narrow_lane
+    wide_lane
+    
 """
 # Midgard imports
 from midgard.dev import plugins
@@ -18,7 +19,7 @@ from midgard.dev import plugins
 # Where imports
 from where.lib import config
 from where.lib import log
-from where.lib.gnss import linear_combination, linear_combination_cmc, linear_combination_melbourne
+from where.lib.gnss import code_phase_difference, linear_combination, linear_combination_cmc, linear_combination_melbourne
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -34,6 +35,7 @@ def gnss_linear_combination(dset: "Dataset") -> None:
     
     func = {
         "code_multipath": linear_combination_cmc,
+        "code_phase": code_phase_difference,
         "geometry_free": linear_combination,
         "ionosphere_free": linear_combination,
         "melbourne_wuebbena": linear_combination_melbourne,
@@ -54,9 +56,26 @@ def gnss_linear_combination(dset: "Dataset") -> None:
                          f"observations are needed.")
                 continue 
             
-            dset.add_float(f"lin.{comb_name}", val=cmc1["val"], unit="meter")
-            dset.add_float(f"lin.{comb_name}", val=cmc2["val"], unit="meter")
-        
+            dset.add_float(f"lin.{comb_name}_f1", val=cmc1["val"], unit="meter")
+            dset.add_float(f"lin.{comb_name}_f2", val=cmc2["val"], unit="meter")
+            dset.meta.setdefault("linear_combination", dict()).update({f"{comb_name}_f1": cmc1["sys_obs"]})
+            dset.meta["linear_combination"][f"{comb_name}_f2"] = cmc2["sys_obs"]
+            
+        # Code-phase difference
+        elif comb_name == "code_phase":
+            try:
+                code_phase_1, code_phase_2 = func[comb_name](dset)
+            except ValueError:
+                log.warn(f"Code-phase difference is not added to dataset. Dual-frequency code and phase observations "
+                         f"are needed.")
+                continue 
+            
+            dset.add_float(f"lin.{comb_name}_f1", val=code_phase_1["val"], unit="meter")
+            dset.add_float(f"lin.{comb_name}_f2", val=code_phase_2["val"], unit="meter")
+            dset.meta.setdefault("linear_combination", dict()).update({f"{comb_name}_f1": code_phase_1["sys_obs"]})
+            dset.meta["linear_combination"][f"{comb_name}_f2"] = code_phase_2["sys_obs"]
+
+        # Melbourne-Wuebbena linear combination
         elif comb_name == "melbourne_wuebbena":
             try:
                 linear_comb = func[comb_name](dset)
@@ -70,15 +89,16 @@ def gnss_linear_combination(dset: "Dataset") -> None:
                 val=linear_comb["val"], 
                 unit="meter",
             )
+            dset.meta.setdefault("linear_combination", dict()).update({f"{comb_name}": linear_comb["sys_obs"]})
         
         else:
             linear_comb = func[comb_name](comb_name, dset)
             for obs_code in linear_comb.keys():
                 dset.add_float(
-                        f"lin.{comb_name}", 
+                        f"lin.{comb_name}_{obs_code}", 
                         val=linear_comb[obs_code]["val"], 
                         unit="meter",
                 )
- 
+                dset.meta.setdefault("linear_combination", dict()).update({f"{comb_name}_{obs_code}": linear_comb[obs_code]["sys_obs"]}) 
 
             

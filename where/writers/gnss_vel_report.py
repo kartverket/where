@@ -88,13 +88,14 @@ def gnss_vel_report(dset: "Dataset") -> None:
     Args:
         dset:        A dataset containing the data.
     """
+    file_vars = {**dset.vars, **dset.analysis}
     # TODO: Better solution?
-    if "station" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
-        dset.vars["station"] = ""
-        dset.vars["STATION"] = ""
+    if "station" not in file_vars:  # necessary if called for example by ./where/tools/concatenate.py
+        file_vars["station"] = ""
+        file_vars["STATION"] = ""
 
     # Generate figure directory to save figures generated for GNSS report
-    figure_dir = config.files.path("output_gnss_vel_report_figure", file_vars={**dset.vars, **dset.analysis})
+    figure_dir = config.files.path("output_gnss_vel_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
@@ -110,7 +111,7 @@ def gnss_vel_report(dset: "Dataset") -> None:
         _plot_dop(dset, figure_dir)
 
     # Generate GNSS velocity report
-    path = config.files.path("output_gnss_vel_report", file_vars={**dset.vars, **dset.analysis})
+    path = config.files.path("output_gnss_vel_report", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="GNSS analysis")
         rpt.title_page()

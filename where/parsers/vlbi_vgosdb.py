@@ -16,7 +16,7 @@ References:
 
 """
 # Standard library imports
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # External library imports
 import numpy as np
@@ -74,7 +74,7 @@ class VgosDbParser(Parser):
             if not line or line.startswith("!"):
                 continue
             line = line.split()
-            if "begin" in line[0].lower():
+            if line and "begin" in line[0].lower():
                 self._parse_block(fid, line[1], name=" ".join(line[2:]))
 
     def _parse_block(self, fid, block, name="", directory=""):
@@ -238,9 +238,13 @@ class VgosDbParser(Parser):
     def _parse_time(self, time_dict):
         part1 = time_dict.pop("YMDHM")
         part2 = time_dict.pop("Second")
-        time_dict["time"] = ["{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{}".format(*t1, t2) for t1, t2 in zip(part1, part2)]
 
-        self.raw["dt_0"] = datetime(*part1[0], int(part2[0]))
-        time_dict["sec_since_ref"] = np.array(
-            [(datetime(*t1, int(t2)) - self.raw["dt_0"]).total_seconds() for t1, t2 in zip(part1, part2)]
-        )
+        # For a few older sessions the time is given as 24:00 current day instead of 00:00 next day. Datetime does not support this 
+        idx_wrong_date_format = part1[:, 3] == 24
+        part1[idx_wrong_date_format, 3] = 0
+        epochs_dt = np.array([datetime(*t) + timedelta(seconds=dt) for t, dt in zip(part1,part2)])
+        epochs_dt[idx_wrong_date_format]+=timedelta(days=1)
+
+        time_dict["time"] = [d.strftime("%Y-%m-%dT%H:%M:%S.%f") for d in epochs_dt]
+        self.raw["dt_0"] = epochs_dt[0]
+        time_dict["sec_since_ref"] = np.array([(dt - self.raw["dt_0"]).total_seconds() for dt in epochs_dt])

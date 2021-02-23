@@ -63,7 +63,7 @@ class SinexBlocks:
         self.ids = {sta: self.dset.meta[sta].get("site_id", "----") for sta in stations}
         try:
             sources1 = set(self.dset.unique("source"))
-            sources2 = {param[13:21] for param in parameters if param.startswith("vlbi_src_dir")}
+            sources2 = {param[13:].rsplit("_", maxsplit=1)[0] for param in parameters if param.startswith("vlbi_src_dir")}
             self.sources = sources1 | sources2
             self.ids.update({src: "{:0>4}".format(i) for i, src in enumerate(self.sources, start=1)})
         except AttributeError:
@@ -72,9 +72,9 @@ class SinexBlocks:
 
         self.state_vector = list()
         for parameter in parameters:
-            partial_type, name = parameter.split("-", 1)
+            partial_type, name = parameter.split("-", maxsplit=1)
             partial_type = partial_type.replace(self.tech_prefix, "")
-            name = name.split("_")
+            name = name.rsplit("_", maxsplit=1)
 
             if len(name) == 2:
                 ident, name = (name[0], name[1])
@@ -215,11 +215,17 @@ class SinexBlocks:
         Content:
         *CODE IERS des ICRF designation Comments
         """
+        source_names = apriori.get("vlbi_source_names")
         crf = apriori.get("crf", time=self.dset.time)
         self.fid.write("+SOURCE/ID\n")
         self.fid.write("*Code IERS nam ICRF designator  number of observations per source \n")
         for iers_name in self.sources:
-            icrf_name = crf[iers_name].meta["icrf_name"] if "icrf_name" in crf[iers_name].meta else ""
+            if iers_name in source_names:
+                icrf_name = source_names[iers_name]["icrf_name_long"]
+            else:
+                icrf_name = crf[iers_name].meta["icrf_name"] if "icrf_name" in crf[iers_name].meta else ""
+            if not icrf_name:
+                log.warn(f"Missing ICRF designation for {iers_name}")
             num_obs = self.dset.num(source=iers_name)
             self.fid.write(" {:0>4} {:<8} {:<16} {:04}\n".format(self.ids[iers_name], iers_name, icrf_name, num_obs))
         self.fid.write("-SOURCE/ID\n")
@@ -435,6 +441,7 @@ class SinexBlocks:
         self.fid.write("+SOLUTION/APRIORI\n")
         self.fid.write("*Index Type__ CODE PT SOLN Ref_epoch___ Unit S Apriori_value________ _Std_dev___\n")
         sol_id = 1
+
         for i, param in enumerate(self.state_vector, start=1):
             point_code = "A" if param["type"] == "site_pos" else "--"
             try:

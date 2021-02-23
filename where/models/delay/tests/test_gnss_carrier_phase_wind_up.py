@@ -3,9 +3,9 @@
 The test set up compares results from Where against gLAB solution for satellite G07 and epoch 2016-03-01 00:00:00.0,
 whereby precise orbits are used.
 
-$Revision: 15940 $
-$Date: 2018-09-11 16:32:58 +0200 (ti., 11 sep. 2018) $
-$LastChangedBy: hjegei $
+$Revision$
+$Date$
+$LastChangedBy$
 """
 
 # Standard library imports

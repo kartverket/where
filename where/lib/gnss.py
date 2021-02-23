@@ -349,7 +349,7 @@ def linear_combination(type_: str, dset: "Dataset") -> Dict[str, Dict[str, Any]]
 
             obs_1 = dset.meta["obstypes"][sys][obs_num]
             obs_2 = dset.meta["obstypes"][sys][obs_num + 1]
-            linear_comb[obs_code].update(name= {sys: f"{obs_1}_{obs_2}"})
+            linear_comb[obs_code].setdefault("sys_obs", dict()).update({sys: [obs_1, obs_2]})
 
             log.debug(
                 f"Generate {type_} combination for GNSS '{sys}' and {obs_code} observations {obs_1} and {obs_2}."
@@ -381,7 +381,7 @@ def linear_combination_cmc(dset: "Dataset") -> Tuple[Dict[str, Any], Dict[str, A
         dset:    Dataset
 
     Returns:
-        Tuple with code multipath linear combination for frequency 1 og 2 in [m]. Each code linear combination is
+        Tuple with code multipath linear combination for frequency 1 and 2 in [m]. Each code linear combination is
         saved in a dictionary with value of linear combination and name of combined observations.
     """
     cmc1 = dict(val = np.zeros(dset.num_obs))
@@ -404,8 +404,8 @@ def linear_combination_cmc(dset: "Dataset") -> Tuple[Dict[str, Any], Dict[str, A
         code2 = dset.meta["obstypes"][sys][1]
         phase1 = dset.meta["obstypes"][sys][2]
         phase2 = dset.meta["obstypes"][sys][3]
-        cmc1.update(name = {sys: f"{code1}_{phase1}_{phase2}"})
-        cmc2.update(name = {sys: f"{code2}_{phase2}_{phase1}"})
+        cmc1.setdefault("sys_obs", dict()).update({sys: [code1, phase1, phase2]})
+        cmc2.setdefault("sys_obs", dict()).update({sys: [code2, phase2, phase1]})
 
         f1 = getattr(enums, "gnss_freq_" + sys)["f" + code1[1]]  # Frequency of 1st band
         f2 = getattr(enums, "gnss_freq_" + sys)["f" + code2[1]]  # Frequency of 2nd band
@@ -415,6 +415,45 @@ def linear_combination_cmc(dset: "Dataset") -> Tuple[Dict[str, Any], Dict[str, A
         )
 
     return cmc1, cmc2
+
+
+def code_phase_difference(dset: "Dataset") -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Calculate code-phase difference based on code and phase observations
+
+    Args:
+        dset:    Dataset
+
+    Returns:
+        Tuple with code-phase difference for frequency 1 and 2 in [m]. Each code-phase difference is saved in a 
+        dictionary with value of linear combination and name of combined observations.
+    """
+    code_phase_1 = dict(val = np.zeros(dset.num_obs))
+    code_phase_2 = dict(val = np.zeros(dset.num_obs))
+
+    for sys in dset.unique("system"):
+        
+        # TODO: This is not correct for single-frequency solutions. 
+        if len(dset.meta["obstypes"][sys]) < 4:
+            raise ValueError(f"Dual-frequency code and phase observations are needed for code-phase difference.")
+        
+        idx = dset.filter(system=sys)
+        
+        # Get observations for the 1st and 2nd frequency
+        #
+        # NOTE: The GNSS observation types defined in meta variable 'obstypes' has a defined order, which is determined
+        #       by the given observation types for each GNSS and the priority list.
+        #
+        code1 = dset.meta["obstypes"][sys][0]
+        code2 = dset.meta["obstypes"][sys][1]
+        phase1 = dset.meta["obstypes"][sys][2]
+        phase2 = dset.meta["obstypes"][sys][3]
+        code_phase_1.setdefault("sys_obs", dict()).update({sys: [code1, phase1]})
+        code_phase_2.setdefault("sys_obs", dict()).update({sys: [code2, phase2]})
+
+        code_phase_1["val"][idx] = dset.obs[code1][idx] - dset.obs[phase1][idx]
+        code_phase_2["val"][idx] = dset.obs[code1][idx] - dset.obs[phase1][idx]
+
+    return code_phase_1, code_phase_2
 
 
 def linear_combination_melbourne(dset: "Dataset") -> Dict[str, Any]:
@@ -443,7 +482,7 @@ def linear_combination_melbourne(dset: "Dataset") -> Dict[str, Any]:
         code2 = dset.meta["obstypes"][sys][1]
         phase1 = dset.meta["obstypes"][sys][2]
         phase2 = dset.meta["obstypes"][sys][3]
-        linear_comb.update(name= {sys: f"{code1}_{code2}_{phase1}_{phase2}"})
+        linear_comb.setdefault("sys_obs", dict()).update({sys: [code1, code2, phase1, phase2]})
 
         f1 = getattr(enums, "gnss_freq_" + sys)["f" + code1[1]]  # Frequency of 1st band
         f2 = getattr(enums, "gnss_freq_" + sys)["f" + code2[1]]  # Frequency of 2nd band

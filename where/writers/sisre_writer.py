@@ -229,7 +229,7 @@ def sisre_writer(dset: "Dataset") -> None:
         file_path,
         output_array,
         fmt=tuple(f.format for f in FIELDS),
-        header="\n".join(_get_header(dset)),
+        header=_get_header(dset),
         delimiter="",
         encoding="utf8",
     )

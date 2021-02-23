@@ -120,7 +120,8 @@ def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, **pars
 
     # Figure out the file path
     file_vars = dict() if file_vars is None else file_vars
-    file_path = config.files.path(file_key, file_vars=file_vars, download_missing=True, use_aliases=True)
+    download_missing = config.where.files.download_missing.bool
+    file_path = config.files.path(file_key, file_vars=file_vars, download_missing=download_missing, use_aliases=True)
     dependencies.add(file_path, label=file_key)
     parser_args.setdefault("encoding", config.files.encoding(file_key))
 

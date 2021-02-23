@@ -115,7 +115,7 @@ def rinex_nav_writer(dset: "Dataset") -> None:
     Args:
         dset:   A dataset containing the data.
     """
-    file_path = config.files.path(f"output_rinex_nav", file_vars=dset.vars)
+    file_path = config.files.path(f"output_rinex_nav", file_vars={**dset.vars, **dset.analysis})
 
     # Add additional fields used by the writer
     dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])

@@ -154,7 +154,7 @@ def file_vars():
     """
     _file_vars = dict(config.analysis.config.as_dict(), **config.date_vars(config.analysis.rundate.date))
     pipeline_file_vars = plugins.call(
-        package_name=__name__, plugin_name=config.analysis.pipeline.str, part="file_vars"
+        package_name=__name__, plugin_name=config.analysis.pipeline.str, part="file_vars", file_vars=_file_vars
     )
     _file_vars.update(pipeline_file_vars)
 

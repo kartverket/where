@@ -51,9 +51,9 @@ def get_ephemeris(rundate, sat_name):
         else:
             log.fatal(f"No valid provider found: {', '.join(providers)}")
     except IndexError:
-        log.info(f"Pattern: '{config.files.path(file_key)}'")
-        log.info(f"No ephemeris data found")
-        log.fatal(f"Download manually from ftp://cddis.nasa.gov/slr/cpf_predicts/")
+        log.info("No ephemeris data found")
+        log.info(f"Download manually from https://cddis.nasa.gov/archive/slr/cpf_predicts/{rundate.year}/{sat_name}")
+        log.fatal(f"Please save missing file as '{config.files.path(file_key)}' !")
     eph_parser = parsers.parse_key(file_key, file_vars=ephemeris_data)
     eph = calculate_initial_values(eph_parser.as_dict(), rundate)
 
@@ -72,8 +72,6 @@ def calculate_initial_values(eph, rundate):
     Returns:
         eph:  Dict where the initial position and velocity is added
     """
-
-    times = np.empty((0))
     data = sorted(eph["positions"].items())
     pos_itrs = np.zeros((len(data), 3))
     mjd1, mjd2 = zip(*[t for t, d in data])

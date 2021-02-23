@@ -193,7 +193,8 @@ class Ephemerides:
         self.ephemerides = ephemerides
 
         # Open the SPK-file corresponding to the ephemerides
-        eph_filepath = config.files.path("ephemerides", file_vars=dict(ephemerides=ephemerides), download_missing=True)
+        download_missing = config.where.files.download_missing.bool
+        eph_filepath = config.files.path("ephemerides", file_vars=dict(ephemerides=ephemerides), download_missing=download_missing)
         self._spk = SPK.open(eph_filepath)  # TODO: Close file in destructor
         dependencies.add(eph_filepath, label="ephemerides")
 

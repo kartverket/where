@@ -13,9 +13,9 @@ Satellite phase center correction returned by routine satellitePhaseCenterCorrec
     pc = -0.802373 m
 
 
-$Revision: 15940 $
-$Date: 2018-09-11 16:32:58 +0200 (ti., 11 sep. 2018) $
-$LastChangedBy: hjegei $
+$Revision$
+$Date$
+$LastChangedBy$
 """
 
 # Standard library imports

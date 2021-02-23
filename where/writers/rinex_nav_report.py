@@ -36,14 +36,15 @@ def rinex_nav_report(dset: "Dataset") -> None:
     Args:
         dset:        A dataset containing the data.
     """
+    file_vars = {**dset.vars, **dset.analysis}
 
     # TODO: Better solution?
-    if "station" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
-        dset.vars["station"] = ""
-        dset.vars["STATION"] = ""
+    if "station" not in file_vars:  # necessary if called for example by ./where/tools/concatenate.py
+        file_vars["station"] = ""
+        file_vars["STATION"] = ""
 
     # Generate figure directory to save figures generated for RINEX navigation file report
-    figure_dir = config.files.path("output_rinex_nav_report_figure", file_vars=dset.vars)
+    figure_dir = config.files.path("output_rinex_nav_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
@@ -51,7 +52,7 @@ def rinex_nav_report(dset: "Dataset") -> None:
     _plot_galileo_signal_in_space_status(dset, figure_dir)
 
     # Generate RINEX navigation file report
-    path = config.files.path("output_rinex_nav_report", file_vars=dset.vars)
+    path = config.files.path("output_rinex_nav_report", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="RINEX navigation file analysis")
         rpt.title_page()

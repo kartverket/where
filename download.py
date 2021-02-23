@@ -96,7 +96,7 @@ def download(cfg_path: pathlib.Path) -> None:
         for file_name, lib_directory in cfg[section].items():
             if file_name.startswith("__"):
                 continue
-            if not lib_directory.endswith("/"):
+            if lib_directory and not lib_directory.endswith("/"):
                 lib_directory += "/"
 
             target_path = target_dir / target_directory / file_name

@@ -117,5 +117,5 @@ gpt2w:	$(EXTDIR)/gpt2w$(F2PYEXTENSION)
 $(GPT2WDIR)/gpt2w.pyf:
 	python download.py gpt2w
 
-$(EXTDIR)/gpt2w$(F2PYEXTENSION):	$(GPT2WDIR)/gpt2w.pyf $(shell find $(GPT2WDIR) -type f)
+$(EXTDIR)/gpt2w$(F2PYEXTENSION):	$(GPT2WDIR)/gpt2w.pyf $(shell find $(GPT2WDIR) -type f -name *.f)
 	( cd $(EXTDIR) && $(F2PY) -c $(GPT2WDIR)/gpt2w.pyf $(GPT2WDIR)/*.f )

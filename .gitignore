@@ -5,6 +5,7 @@ publish/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+build
 *.py[cod]
 
 # C/Cython extensions
@@ -14,6 +15,21 @@ __pycache__/
 
 # Distribution / packaging
 *.egg-info/
+
+# Local config files
+*_local.conf
+
+# Cython html files
+where/integrators/*.html
+where/models/orbit/*.html
+
+# External libraries source
+external/gpt2w/src/
+external/iers/hfeop/
+external/iers/src_2010/
+external/sofa/00READ.ME
+external/sofa/doc/
+external/sofa/src/
 
 # Unit test / coverage reports
 htmlcov/
@@ -34,3 +50,7 @@ htmlcov/
 
 # mypy
 .mypy_cache/
+
+# website
+documents/website/pelican-plugins
+documents/website/output

@@ -397,7 +397,7 @@ def calculate_solution(dset: "Dataset") -> None:
     Args:
         dset:  A dataset containing the data.
     """
-    file_path = config.files.path("output_calculate_solution", file_vars=dset.vars)
+    file_path = config.files.path("output_calculate_solution", file_vars={**dset.vars, **dset.analysis})
     
     # Update WriterField depending on used pipeline
     fields_def = list(FIELDS)

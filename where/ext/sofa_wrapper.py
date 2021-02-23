@@ -130,7 +130,7 @@ def vectorized_gmst06(time):
     if time.size == 1:
         return sofa.iau_gmst06(time.ut1.jd_int, time.ut1.jd_frac, time.tt.jd_int, time.tt.jd_frac)
 
-    return np.array([sofa.iau_gmst06(t.ut1.jd_int, t.ut1.jd_frac, t.tt.jd_int, t.tt.jd_frac) for t in time])
+    return np.array([sofa.iau_gmst06(t1.jd_int, t1.jd_frac, t2.jd_int, t2.jd_frac) for t1, t2 in zip(time.ut1, time.tt)])
 
 
 @lru_cache()

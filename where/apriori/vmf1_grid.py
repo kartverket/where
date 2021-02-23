@@ -69,7 +69,8 @@ def get_vmf1_grid(time):
         while dt_to_read <= end:
             file_vars = dict(config.date_vars(dt_to_read), type=datatype)
             data_chunk = parsers.parse_key(file_key="vmf1_grid", file_vars=file_vars).as_dict()
-            vmf1_data[dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["values"] * multiplier)
+            if data_chunk:
+                vmf1_data[dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["values"] * multiplier)
             dt_to_read += timedelta(hours=6)
         data[datatype] = vmf1_data
 

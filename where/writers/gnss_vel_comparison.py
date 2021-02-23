@@ -173,7 +173,8 @@ def gnss_comparison(dset: "Dataset") -> None:
     """
 
     dset_first = dset[list(dset.keys())[0]]
-    dset_first.vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
+    file_vars = {**dset_first.vars, **dset_first.analysis}
+    file_vars["solution"] = config.tech.gnss_vel_comparison_report.solution.str.lower()
     
      # Get dataframes for writing
     _, df_day, df_month, _, _ = _generate_dataframes(dset)
@@ -194,9 +195,9 @@ def gnss_comparison(dset: "Dataset") -> None:
     
     for type_, output_array in output_defs.items():
         
-        file_vars = dset_first.vars.copy()
-        file_vars.update(solution=f"{file_vars['solution']}_{type_}")
-        file_path = config.files.path("output_gnss_vel_comparison", file_vars=file_vars)
+        file_vars_tmp = file_vars.copy()
+        file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}")
+        file_path = config.files.path("output_gnss_vel_comparison", file_vars=file_vars_tmp)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
         log.info(f"Write '{type_}' comparison file {file_path}.")
@@ -231,9 +232,9 @@ def _generate_dataframe_summary(df: pd.core.frame.DataFrame, index: str) -> pd.c
         index:   Chosen column of dataframe used for indexing (e.g. "station")
         
     Returns:
-        Dataframe with statistics (mean, min and max) based on given numeric dataframe columns
+        Dataframe with statistics (mean, min, max, std, percentile, rms) based on given numeric dataframe columns
     """
-    functions = ["mean", "min", "max"]
+    functions = ["mean", "min", "max", "std", "percentile", "rms"]
     ncols = df.select_dtypes("number").columns  # only use of numeric columns
     items = df[index].unique()
     
@@ -253,7 +254,13 @@ def _generate_dataframe_summary(df: pd.core.frame.DataFrame, index: str) -> pd.c
         idx_sum = summary[index] == item
         
         for func in functions:
-            summary[func][idx_sum] = getattr(df[ncols][idx_df], func)().values
+            if func == "rms":
+                summary[func][idx_sum] = df[ncols][idx_df].apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
+            elif func == "percentile":
+                summary[func][idx_sum] = df[ncols][idx_df].apply(lambda x: np.nanpercentile(x, q=95))
+            else:
+                summary[func][idx_sum] = getattr(df[ncols][idx_df], func)().values  # mean, max, min and std dataframe
+                                                                                    # functions skip NaN values
             
     return summary
               
@@ -263,15 +270,8 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
     The dataframe for each station in dictionary "dfs" has following columns:
 
-        east:   East-coordinate in topocentric system
-        north:  North-coordinate in topocentric system
-        up:     Up-coordinate in topocentric system
-        hpe:    horizontal position error
-        vpe:    vertical position error
-        pos_3d: 3D position error
-        pdop:   position dilution of precision
-        hdop:   horizontal dilution of precision
-        vdop:   vertical dilution of precision
+        site_vel_h:   Horizontal site velocity
+        site_vel_3d:  3D site velocity
 
     Example for "dfs" dictionary:
      

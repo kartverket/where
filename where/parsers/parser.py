@@ -118,7 +118,8 @@ class Parser(object):
         log.dev(f"where.parsers.parser is deprecated. Use where.parsers._parser or one of it's subclasses instead.")
 
         if self.file_path is None:
-            self.file_path = config.files.path(self.file_key, file_vars=self.vars, download_missing=True)
+            download_missing = config.where.files.download_missing.bool
+            self.file_path = config.files.path(self.file_key, file_vars=self.vars, download_missing=download_missing)
 
         parser_package, parser_name = self.__module__.rsplit(".", maxsplit=1)
         with Timer("Finish {} ({}) - {} in".format(parser_name, parser_package, self.file_key)):

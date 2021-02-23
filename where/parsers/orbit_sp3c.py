@@ -25,9 +25,9 @@ TODO:
 Important: Bad satellites has to be removed from observation Dataset!!!! E.g. indicated by bad satellite clock values.
 
 
-$Revision: 18916 $
-$Date: 2020-01-21 14:50:27 +0100 (Tue, 21 Jan 2020) $
-$LastChangedBy: kirann $
+$Revision$
+$Date$
+$LastChangedBy$
 
 """
 

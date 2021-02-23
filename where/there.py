@@ -72,6 +72,7 @@ from tkinter import font as tk_font
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib import cm
+import matplotlib.dates as mdates
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D  # noqa (Needed for projection='3d')
 import numpy as np
@@ -965,7 +966,8 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         if self.vars["filter_station"] == "no filter":
             log.error("Choose a station to add a clock break")
         else:
-            time = Time(mouse_event.xdata, fmt="plot_date", scale="utc")
+            d = mdates.num2date(mouse_event.xdata).replace(tzinfo=None)
+            time = Time(d, fmt="datetime", scale="utc")
 
             # Check if there is a suspected clock break nearby
             all_data = self.vars["x_axis_data"]
@@ -1116,7 +1118,8 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 if mouse_event.dblclick:
                     return False, dict(ind=list())
                 mouse_time = getattr(mouse_event, axis + "data")
-                if mouse_time and abs(e_time.plot_date - mouse_time) < threshold:
+                event_time = mdates.date2num(e_time.datetime)
+                if mouse_time and abs(event_time - mouse_time) < threshold:
                     log.out(f"Event: {e_time.datetime:{config.FMT_datetime}} - {e_type}\n       {e_description}")
                     self.master.status(f"Event: {e_time.datetime:{config.FMT_datetime}} {e_type}: {e_description}")
                     return True, dict(ind=list())

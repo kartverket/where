@@ -46,7 +46,7 @@ def write_one_day(dset, date):
 
     meta = brdc.dset_edit.meta[date.strftime("%Y-%m-%d")]
     data = brdc.dset_edit  # TODO: Another possibility: brdc.dset_raw
-    file_vars = dset.vars
+    file_vars = {**dset.vars, **dset.analysis}
     file_vars["doy"] = config.date_vars(date)[
         "doy"
     ]  # TODO: workaround, so that all files are written in the same working directory -> does not work if year is changed.

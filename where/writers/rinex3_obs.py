@@ -362,8 +362,9 @@ def _write_epoch(dset, fid, obs_epoch_cache, idx, num_sat, epoch):
         epoch:           Current epoch given as Datetime object
     """
     # Write epoch record
-    if dset.meta["rcv_clk_offset_flag"] and dset.meta["rcv_clk_offset_flag"] == "0":
-        rcv_clk_offset = "{:15s}".format("")  # Blank if receiver clock offset is not given.
+    if "rcv_clk_offset_flag" in dset.meta:
+        if dset.meta["rcv_clk_offset_flag"] == "0":
+            rcv_clk_offset = "{:15s}".format("")  # Blank if receiver clock offset is not given.
     else:
         rcv_clk_offset = "{:>15.12f}".format(dset.rcv_clk_offset[idx])
     fid.write(

@@ -70,7 +70,7 @@ def validate_args(rundate, **kwargs):
 
 
 @plugins.register_named("file_vars")
-def file_vars():
+def file_vars(file_vars=None):
     """File variables that will be available during the running of this technique
 
     In addition, date and analysis variables are available.

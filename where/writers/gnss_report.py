@@ -9,8 +9,7 @@ Description:
 # Standard library imports
 from enum import Enum
 from collections import namedtuple
-from datetime import datetime
-from typing import List, Tuple, Union
+from typing import Union
 
 # External library imports
 import numpy as np
@@ -19,77 +18,64 @@ import pandas as pd
 # Midgard imports
 from midgard.collections import enums 
 from midgard.dev import plugins
-from midgard.gnss import gnss
 from midgard.plot.matplotlib_extension import plot_scatter_subplots, plot
-from midgard.writers._writers import get_existing_fields_by_attrs, get_field_by_attrs
 
 # Where imports
 from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import log
 from where.data import position
+from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
 
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
 
-PlotField = namedtuple("PlotField", ["name", "attrs", "unit", "ylabel", "caption"])
+PlotField = namedtuple("PlotField", ["name", "collection", "caption"])
 PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
 PlotField.__doc__ = """A convenience class for defining a output field for plotting
 
     Args:
-        name  (str):             Unique name
-        attrs (Tuple[str]):      Dataset field attributes
-        unit (str):              Unit of field
-        ylabel (str):            Y-axis label description
-        caption (str):           Caption of plot
+        name  (str):              Unique name
+        collection (Tuple[str]):  Collection name
+        caption (str):            Caption of plot
     """
 
 FIELDS = (
     PlotField(
-        "gnss_range", ("delay", "gnss_range"), "m", "Range", "Correction of range between satellite and receiver"
+        "gnss_range", 
+        "delay", 
+        "Correction of range between satellite and receiver",
     ),
     PlotField(
         "gnss_satellite_clock",
-        ("delay", "gnss_satellite_clock"),
-        "m",
-        "Satellite clock",
+        "delay",
         "Correction of satellite clock",
     ),
     PlotField(
         "troposphere_radio",
-        ("delay", "troposphere_radio"),
-        "m",
-        "Troposphere delay",
+        "delay",
         "Correction of tropospheric delay",
     ),
     PlotField(
         "gnss_total_group_delay",
-        ("delay", "gnss_total_group_delay"),
-        "m",
-        "Total group delay",
+        "delay",
         "Correction of total group delay",
     ),
     PlotField(
         "gnss_ionosphere",
-        ("delay", "gnss_ionosphere"),
-        "m",
-        "Ionospheric delay",
+        "delay",
         "Correction of ionospheric delay",
     ),
     PlotField(
         "gnss_relativistic_clock",
-        ("delay", "gnss_relativistic_clock"),
-        "m",
-        "Relativistic clock",
+        "delay",
         "Correction of relativistic clock effect due to orbit eccentricity",
     ),
    # PlotField(
    #     "estimate_gnss_rcv_clock",
    #     ("estimate_gnss_rcv_clock",),
-   #     "m",
-   #     "Receiver clock estimate",
    #     "Estimate of receiver clock",
    # ),
 )
@@ -102,29 +88,26 @@ def gnss_report(dset: "Dataset") -> None:
     Args:
         dset:        A dataset containing the data.
     """
+    file_vars={**dset.vars, **dset.analysis}
+
     # TODO: Better solution?
-    if "station" not in dset.vars:  # necessary if called for example by ./where/tools/concatenate.py
-        dset.vars["station"] = ""
-        dset.vars["STATION"] = ""
+    if "station" not in file_vars:  # necessary if called for example by ./where/tools/concatenate.py
+        file_vars["station"] = ""
+        file_vars["STATION"] = ""
 
     # Generate figure directory to save figures generated for GNSS report
-    figure_dir = config.files.path("output_gnss_report_figure", file_vars={**dset.vars, **dset.analysis})
+    figure_dir = config.files.path("output_gnss_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate plots
-    _plot_position(dset, figure_dir)
+    if config.tech.gnss_report.kinematic.bool:
+        _plot_position_kinematic(dset, figure_dir)
+    else:
+        _plot_position(dset, figure_dir)
     _plot_residual(dset, figure_dir)
-    _plot_number_of_satellites(dset, figure_dir)
-    _plot_satellite_overview(dset, figure_dir)
-    _plot_skyplot(dset, figure_dir)
-    _plot_satellite_elevation(dset, figure_dir)
-    _plot_model(dset, figure_dir)
-
-    if "pdop" in dset.fields:
-        _plot_dop(dset, figure_dir)
 
     # Generate GNSS report
-    path = config.files.path("output_gnss_report", file_vars={**dset.vars, **dset.analysis})
+    path = config.files.path("output_gnss_report", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="GNSS analysis")
         rpt.title_page()
@@ -141,32 +124,50 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
         rpt:         Report object.
         figure_dir:  Figure directory.
     """
-
+    plt = GnssPlot(dset, figure_dir)
+    
     #
     # Position
     #
     rpt.add_text("\n# GNSS site position analysis\n\n")
 
-    # Plot site position vs. reference position timeseries
-    rpt.add_figure(
-        f"{figure_dir}/plot_timeseries_enu.{FIGURE_FORMAT}",
-        caption="Site position vs. reference position given in topocentric coordinates (East, North, Up).",
-        clearpage=True,
-    )
+    if config.tech.gnss_report.kinematic.bool:
 
-    # Plot horizontal error
-    rpt.add_figure(
-        f"{figure_dir}/plot_horizontal_error.{FIGURE_FORMAT}",
-        caption="Horizontal error of site position vs. reference position",
-        clearpage=True,
-    )
+        # Plot site position 
+        rpt.add_figure(
+            f"{figure_dir}/plot_timeseries_llh.{FIGURE_FORMAT}",
+            caption="Site position given in geodetic coordinates (latitude, longitude, height).",
+            clearpage=True,
+        )
 
-    # Plot HPE and VPE timeseries
-    rpt.add_figure(
-        f"{figure_dir}/plot_timeseries_pdop_hpe_vpe.{FIGURE_FORMAT}",
-        caption="Horizontal and vertical position error of site position in relation to reference position.",
-        clearpage=True,
-    )
+        # Plot horizontal error
+        rpt.add_figure(
+            f"{figure_dir}/plot_horizontal_position.{FIGURE_FORMAT}",
+            caption="Horizontal position",
+            clearpage=True,
+        )
+
+    else:
+        # Plot site position vs. reference position timeseries
+        rpt.add_figure(
+            f"{figure_dir}/plot_timeseries_enu.{FIGURE_FORMAT}",
+            caption="Site position vs. reference position given in topocentric coordinates (East, North, Up).",
+            clearpage=True,
+        )
+
+        # Plot horizontal error
+        rpt.add_figure(
+            f"{figure_dir}/plot_horizontal_error.{FIGURE_FORMAT}",
+            caption="Horizontal error of site position vs. reference position",
+            clearpage=True,
+        )
+
+        # Plot HPE and VPE timeseries
+        rpt.add_figure(
+            f"{figure_dir}/plot_timeseries_pdop_hpe_vpe.{FIGURE_FORMAT}",
+            caption="Horizontal and vertical position error of site position in relation to reference position.",
+            clearpage=True,
+        )
 
     #
     # Residual
@@ -192,7 +193,11 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
         rpt.add_text("\n# Dilution of precision\n\n")
 
         # Plot DOP
-        rpt.add_figure(f"{figure_dir}/plot_dop.{FIGURE_FORMAT}", caption="Dilution of precision.", clearpage=True)
+        rpt.add_figure(
+                figure_path=plt.plot_dop(), 
+                caption="Dilution of precision.", 
+                clearpage=True,
+        )
 
     #
     # Satellite plots
@@ -200,32 +205,47 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     rpt.add_text("\n# Satellite plots\n\n")
 
     rpt.add_figure(
-        f"{figure_dir}/plot_number_of_satellites.{FIGURE_FORMAT}",
+        figure_path=plt.plot_number_of_satellites_used(),
         caption="Number of satellites for each observation epoch",
         clearpage=False,
     )
 
-    figure_path = figure_path = figure_dir / f"plot_satellite_overview.{FIGURE_FORMAT}"
-    if figure_path.exists():  # Note: Does not exists for concatenated Datasets.
+    figure_path = plt.plot_satellite_overview()
+    if figure_path is not None:  # Note: Does not exists for concatenated Datasets.
         rpt.add_figure(
-            figure_path,
+            figure_path=figure_path,
             caption="Overview over satellite observations. Red coloured: Observation rejected in orbit stage (e.g. unhealthy satellites, exceeding validity length, no orbit data available); Orange coloured: Observation rejected in edit stage; Green coloured: Kept observations after edit stage.",
             clearpage=False,
         )
+    
+    for figure_path in plt.plot_skyplot():
+        rpt.add_figure(
+                figure_path=figure_path, 
+                caption=f"Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                clearpage=False,
+        )
 
-    rpt.add_figure(f"{figure_dir}/plot_skyplot.{FIGURE_FORMAT}", caption="Skyplot", clearpage=False)
-
-    rpt.add_figure(
-        f"{figure_dir}/plot_satellite_elevation.{FIGURE_FORMAT}", caption="Satellite elevation", clearpage=True
-    )
-
+    for figure_path in plt.plot_satellite_elevation():
+        rpt.add_figure(
+                figure_path=figure_path,
+                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                clearpage=True,
+        )
+        
     #
     # Model parameter plots
     #
     rpt.add_text("\n# Plots of model parameters\n\n")
-
-    for f in get_existing_fields_by_attrs(dset, FIELDS):
-        rpt.add_figure(f"{figure_dir}/plot_{f.name}.{FIGURE_FORMAT}", caption=f.caption, clearpage=False)
+      
+    for field in FIELDS:
+               
+        for figure_path in plt.plot_field(field.name, field.collection):
+            system, _ = figure_path.stem.split("_")[2:4] 
+            rpt.add_figure(
+                figure_path=figure_path, 
+                caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
+                clearpage=True,
+            )
 
 
 #
@@ -245,6 +265,8 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     )
     enu = (dset.site_pos.trs.pos - ref_pos).enu
 
+    figure_path = figure_dir / f"plot_timeseries_enu.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
     plot_scatter_subplots(
         x_array=dset.time.gps.datetime,
         y_arrays=[enu.east, enu.north, enu.up],
@@ -252,7 +274,7 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         ylabels=["East", "North", "Up"],
         colors=["steelblue", "darkorange", "limegreen"],
         y_units=["meter", "meter", "meter"],
-        figure_path=figure_dir / f"plot_timeseries_enu.{FIGURE_FORMAT}",
+        figure_path=figure_path,
         opt_args={
             "figsize": (6, 6.8),
             "plot_to": "file",
@@ -266,6 +288,8 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     hpe = np.sqrt(enu.east ** 2 + enu.north ** 2)
     vpe = np.absolute(enu.up)
 
+    figure_path = figure_dir / f"plot_timeseries_pdop_hpe_vpe.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
     plot_scatter_subplots(
         x_array=dset.time.gps.datetime,
         y_arrays=[dset.pdop, hpe, vpe],
@@ -273,7 +297,7 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         ylabels=["PDOP", "HPE", "VPE"],
         colors=["steelblue", "darkorange", "limegreen"],
         y_units=[None, "meter", "meter"],
-        figure_path=figure_dir / f"plot_timeseries_pdop_hpe_vpe.{FIGURE_FORMAT}",
+        figure_path=figure_path,
         opt_args={
             "figsize": (6, 5),
             "plot_to": "file",
@@ -283,13 +307,15 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         },
     )
 
+    figure_path = figure_dir / f"plot_horizontal_error.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
     plot_scatter_subplots(
         x_array=enu.east,
         y_arrays=[enu.north],
         xlabel="East [meter]",
         ylabels=["North"],
         y_units=["meter"],
-        figure_path=figure_dir / f"plot_horizontal_error.{FIGURE_FORMAT}",
+        figure_path=figure_path,
         opt_args={
             "grid": True,
             "figsize": (6, 6),
@@ -302,6 +328,73 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     )
 
 
+def _plot_position_kinematic(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
+    """Plot site position plots for kinematic solution
+
+    Args:
+       dset:        A dataset containing the data.
+       figure_dir:  Figure directory
+    """
+
+    figure_path = figure_dir / f"plot_timeseries_llh.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
+    plot_scatter_subplots(
+        x_array=dset.time.gps.datetime,
+        y_arrays=[np.rad2deg(dset.site_pos.llh.lat), np.rad2deg(dset.site_pos.llh.lon), dset.site_pos.llh.height],
+        xlabel="Time [GPS]",
+        ylabels=["Latitude", "Longitude", "Height"],
+        colors=["steelblue", "darkorange", "limegreen"],
+        y_units=["degree", "degree", "meter"],
+        figure_path=figure_path,
+        opt_args={
+            "figsize": (6, 6.8),
+            "plot_to": "file",
+            "sharey": False,
+            "title": "Site position",
+            "statistic": ["min", "max"],
+        },
+    )
+
+
+    figure_path = figure_dir / f"plot_horizontal_position.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
+    lon = np.rad2deg(dset.site_pos.llh.lon)
+    lat = np.rad2deg(dset.site_pos.llh.lat)
+
+    # Determine range
+    dx = np.abs(np.max(lon) - np.min(lon))
+    dy = np.abs(np.max(lat) - np.min(lat))
+    incr = np.max([dx, dy])/2 # increment
+
+    plot_scatter_subplots(
+        x_array=lon,
+        y_arrays=[lat],
+        xlabel="Longitude [degree]",
+        ylabels=["Latitude"],
+        y_units=["degree"],
+        figure_path=figure_path,
+        opt_args={
+            "grid": True,
+            "figsize": (6, 6),
+            "plot_to": "file",
+            "title": "Horizontal position",
+            "xlim": [np.mean(lon) - incr, np.mean(lon) + incr],
+            "ylim": [np.mean(lat) - incr, np.mean(lat) + incr],
+        },
+    )
+
+    # TODO: Determine speed - this is wrong
+    #for epoch in dset.time.gps.gps_seconds:
+    #    idx = dset.time.gps.gps_seconds == epoch
+    #
+    #    dx = np.insert(np.diff(dset.site_pos.trs.x[idx]), 0, float('nan'))
+    #    dy = np.insert(np.diff(dset.site_pos.trs.y[idx]), 0, float('nan'))
+    #    dz = np.insert(np.diff(dset.site_pos.trs.z[idx]), 0, float('nan'))
+    #    dt = np.insert(np.diff(dset.time.gps.gps_seconds[idx]), 0, float('nan'))
+    #    speed = np.sqrt(np.power(dx, 2) * np.power(dy, 2) * np.power(dz, 2)) / dt
+        
+
+
 def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     """Plot residual plot
 
@@ -310,6 +403,8 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
        figure_dir:  Figure directory
     """
     figure_path = figure_dir / f"plot_residual.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}")
+
     dset_outlier = _get_outliers_dataset(dset)
 
     if dset_outlier == enums.ExitStatus.error:
@@ -345,263 +440,7 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
         },
     )
-
-
-def _plot_dop(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
-    """Plot DOP
-
-    Args:
-       dset:        A dataset containing the data.
-       figure_dir:  Figure directory
-    """
-    plot(
-        x_arrays=[
-            dset.time.gps.datetime,
-            dset.time.gps.datetime,
-            dset.time.gps.datetime,
-            dset.time.gps.datetime,
-            dset.time.gps.datetime,
-        ],
-        y_arrays=[dset.gdop, dset.pdop, dset.vdop, dset.hdop, dset.tdop],
-        xlabel="Time [GPS]",
-        ylabel="Dilution of precision",
-        y_unit="",
-        labels=["GDOP", "PDOP", "VDOP", "HDOP", "TDOP"],
-        figure_path=figure_dir / f"plot_dop.{FIGURE_FORMAT}",
-        opt_args={"figsize": (7, 4), "legend": True, "plot_to": "file"},
-    )
-
-
-def _plot_number_of_satellites(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
-    """Plot number of satellites
-
-    Args:
-       dset:        A dataset containing the data.
-       figure_dir:  Figure directory
-    """
-
-    if "num_satellite_used" not in dset.fields:
-        dset.add_float(
-            "num_satellite_used",
-            val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time.gps.datetime),
-        )
-
-    plot(
-        x_arrays=[dset.time.gps.datetime, dset.time.gps.datetime],
-        y_arrays=[dset.num_satellite_available, dset.num_satellite_used],
-        xlabel="Time [GPS]",
-        ylabel="Number of satellites",
-        y_unit="",
-        labels=["Available", "Used"],
-        figure_path=figure_dir / f"plot_number_of_satellites.{FIGURE_FORMAT}",
-        opt_args={"figsize": (7, 4), "legend": True, "marker": ",", "plot_to": "file", "plot_type": "plot"},
-    )
-
-
-def _plot_skyplot(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
-    """Plot skyplot
-
-    Args:
-       dset:        A dataset containing the data.
-       figure_dir:  Figure directory
-    """
-
-    # Convert azimuth to range 0-360 degree
-    azimuth = dset.site_pos.azimuth
-    idx = azimuth < 0
-    azimuth[idx] = 2 * np.pi + azimuth[idx]
-
-    # Convert zenith distance from radian to degree
-    zenith_distance = np.rad2deg(dset.site_pos.zenith_distance)
-
-    # Generate x- and y-axis data per satellite
-    x_arrays = []
-    y_arrays = []
-    labels = []
-    for sat in dset.unique("satellite"):
-        idx = dset.filter(satellite=sat)
-        x_arrays.append(azimuth[idx])
-        y_arrays.append(zenith_distance[idx])
-        labels.append(sat)
-
-    # Plot with polar projection
-    # TODO: y-axis labels are overwritten after second array plot. Why? What to do?
-    plot(
-        x_arrays=x_arrays,
-        y_arrays=y_arrays,
-        xlabel="",
-        ylabel="",
-        y_unit="",
-        labels=labels,
-        figure_path=figure_dir / f"plot_skyplot.{FIGURE_FORMAT}",
-        opt_args={
-            "colormap": "tab20",
-            "figsize": (7, 7.5),
-            "legend": True,
-            "legend_ncol": 6,
-            "legend_location": "bottom",
-            "plot_to": "file",
-            "plot_type": "scatter",
-            "projection": "polar",
-            "title": "Skyplot\n Azimuth [deg] / Elevation[deg]",
-            "xlim": [0, 2 * np.pi],
-            "ylim": [0, 90],
-            "yticks": (range(0, 90, 30)),  # sets 3 concentric circles
-            "yticklabels": (map(str, range(90, 0, -30))),  # reverse labels from zenith distance to elevation
-        },
-    )
-
-
-def _plot_satellite_elevation(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
-    """Plot satellite elevation
-
-    Args:
-       dset:        A dataset containing the data.
-       figure_dir:  Figure directory
-    """
-
-    # Convert elevation from radian to degree
-    elevation = np.rad2deg(dset.site_pos.elevation)
-
-    # Limit x-axis range to rundate
-    day_start, day_end = _get_day_limits(dset)
-
-    # Generate x- and y-axis data per satellite
-    x_arrays = []
-    y_arrays = []
-    labels = []
-
-    for sat in dset.unique("satellite"):
-        idx = dset.filter(satellite=sat)
-        x_arrays.append(dset.time.gps.datetime[idx])
-        y_arrays.append(elevation[idx])
-        labels.append(sat)
-
-    # Plot with scatter plot
-    plot(
-        x_arrays=x_arrays,
-        y_arrays=y_arrays,
-        xlabel="Time [GPS]",
-        ylabel="Elevation [deg]",
-        y_unit="",
-        labels=labels,
-        figure_path=figure_dir / f"plot_satellite_elevation.{FIGURE_FORMAT}",
-        opt_args={
-            "colormap": "tab20",
-            "figsize": (7, 8),
-            "legend": True,
-            "legend_ncol": 6,
-            "legend_location": "bottom",
-            "plot_to": "file",
-            "plot_type": "scatter",
-            "title": "Satellite elevation",
-            "xlim": [day_start, day_end],
-        },
-    )
-
-
-def _plot_satellite_overview(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> Union[None, Enum]:
-    """Plot satellite observation overview
-
-    Args:
-       dset:        A dataset containing the data.
-       figure_dir:  Figure directory
-       
-    Returns:
-       Error exit status if necessary datasets could not be read
-    """
-    figure_path = figure_dir / f"plot_satellite_overview.{FIGURE_FORMAT}"
-
-    # Limit x-axis range to rundate
-    day_start, day_end = _get_day_limits(dset)
-
-    # Get time and satellite data from read and orbit stage
-    file_vars = {**dset.vars, **dset.analysis}
-    file_vars["stage"] = "read"
-    file_path = config.files.path("dataset", file_vars=file_vars)
-    if file_path.exists(): 
-        time_read, satellite_read = _sort_by_satellite(
-            _get_dataset(dset, stage="read", systems=dset.meta["obstypes"].keys())
-        )
-        time_orbit, satellite_orbit = _sort_by_satellite(
-            _get_dataset(dset, stage="orbit", systems=dset.meta["obstypes"].keys())
-        )
-        time_edit, satellite_edit = _sort_by_satellite(
-            _get_dataset(dset, stage="edit", systems=dset.meta["obstypes"].keys())
-        )
-        
-    else:
-        # NOTE: This is the case for concatencated Datasets, where "read" and "edit" stage data are not available.
-        log.warn(f"Read dataset does not exists: {file_path}. Plot {figure_path} can not be plotted.")
-        return enums.ExitStatus.error
-
-    # Generate plot
-    plot(
-        x_arrays=[time_read, time_orbit, time_edit],
-        y_arrays=[satellite_read, satellite_orbit, satellite_edit],
-        xlabel="Time [GPS]",
-        ylabel="Satellite",
-        y_unit="",
-        # labels = ["Rejected in orbit stage", "Rejected in edit stage", "Kept observations"],
-        colors=["red", "orange", "green"],
-        figure_path=figure_path,
-        opt_args={
-            "colormap": "tab20",
-            "figsize": (7, 6),
-            "marker": "|",
-            "plot_to": "file",
-            "plot_type": "scatter",
-            "title": "Overview over satellites",
-            "xlim": [day_start, day_end],
-        },
-    )
-
-
-def _plot_model(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
-    """Plot model parameters
-
-    Args:
-       dset:        A dataset containing the data.
-       figure_dir:  Figure directory
-    """
-
-    # Limit x-axis range to rundate
-    day_start, day_end = _get_day_limits(dset)
-
-    for f in get_existing_fields_by_attrs(dset, FIELDS):
-
-        # Generate x- and y-axis data per satellite
-        x_arrays = []
-        y_arrays = []
-        labels = []
-
-        for sat in dset.unique("satellite"):
-            idx = dset.filter(satellite=sat)
-            x_arrays.append(dset.time.gps.datetime[idx])
-            y_arrays.append(get_field_by_attrs(dset, f.attrs, f.unit)[idx])
-            labels.append(sat)
-
-        # Plot with scatter plot
-        plot(
-            x_arrays=x_arrays,
-            y_arrays=y_arrays,
-            xlabel="Time [GPS]",
-            ylabel=f.ylabel,
-            y_unit=f.unit,
-            labels=labels,
-            figure_path=figure_dir / f"plot_{f.name}.{FIGURE_FORMAT}",
-            opt_args={
-                "colormap": "tab20",
-                "figsize": (7, 6),
-                "legend": True,
-                "legend_ncol": 6,
-                "legend_location": "bottom",
-                "plot_to": "file",
-                "plot_type": "scatter",
-                "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
-                "xlim": [day_start, day_end],
-            },
-        )
+    
 
 
 #
@@ -655,23 +494,10 @@ def _table_outlier_overview(dset: "Dataset"):
     return df
 
 
+
 #
 # AUXILIARY FUNCTIONS
 #
-def _get_day_limits(dset: "Dataset") -> Tuple[datetime, datetime]:
-    """Get start and end time for given run date
-
-        Args:
-            dset: A dataset containing the data.
-
-        Returns:
-            Start and end date. 
-        """
-    day_start = min(dset.time.datetime)
-    day_end = max(dset.time.datetime)
-
-    return day_start, day_end
-
 
 def _get_outliers_dataset(dset: "Dataset") -> Union["Dataset", Enum]:
     """Get dataset with outliers
@@ -699,54 +525,3 @@ def _get_outliers_dataset(dset: "Dataset") -> Union["Dataset", Enum]:
 
     return dset_outliers
 
-
-def _get_dataset(dset: "Dataset", stage: str, systems: Union[List[str], None] = None) -> Union["Dataset", Enum]:
-    """Get dataset for given stage
-
-    Args:
-       dset:        A dataset containing the data.
-       systems:     List with GNSS identifiers (e.g. E, G, ...)
-
-    Returns:
-       Dataset for given stage or error exit status if dataset could not be read
-    """
-
-    # Get Dataset
-    # TODO: "label" should have a default value.
-    file_vars = {**dset.vars, **dset.analysis}
-    file_vars["stage"] = stage
-    try:
-        dset_out = dataset.Dataset.read(**file_vars)
-    except OSError:
-        log.warn("Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
-        return enums.ExitStatus.error
-
-    # Reject not defined GNSS observations
-    if systems:
-        systems = [systems] if isinstance(systems, str) else systems
-        keep_idx = np.zeros(dset_out.num_obs, dtype=bool)
-        for sys in systems:
-            idx = dset_out.filter(system=sys)
-            keep_idx[idx] = True
-        dset_out.subset(keep_idx)
-
-    return dset_out
-
-
-def _sort_by_satellite(dset: "Dataset") -> Tuple[List[datetime], List[str]]:
-    """Sort time and satellite fields of dataset by satellite order
-
-    Args: 
-       dset:        A dataset containing the data.
-
-    Returns:
-        Tuple with ordered time array and satellite array
-    """
-    time = []
-    satellite = []
-    for sat in sorted(dset.unique("satellite"), reverse=True):
-        idx = dset.filter(satellite=sat)
-        time.extend(dset.time.gps.datetime[idx])
-        satellite.extend(dset.satellite[idx])
-
-    return time, satellite

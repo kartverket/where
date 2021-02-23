@@ -58,18 +58,24 @@ setup(
         "IPython",
         "jplephem",
         "matplotlib>=3.1.1",
-        "midgard>=1.1.1",
+        "midgard>=1.1.3",
         "numpy",
         "pandas",
         "pint",
         "pycurl",
         "scipy",
+        "colorama",
+        "h5py",
+        "netCDF4",
+        "python-editor",
+        "seaborn",
+        "cartopy",
     ],
     # List additional groups of dependencies here (e.g. development dependencies). You can install these using the
     # following syntax, for example:
     #   $ pip install -e .[optional,dev_tools]
     extras_require={
-        "optional": ["colorama", "h5py", "netCDF4", "python-editor", "seaborn", "cartopy"],
+        "optional": [],
         "dev_tools": ["black", "bumpversion", "flake8", "line_profiler", "mypy", "pytest"],
     },
     # If there are data files included in your packages that need to be installed, specify them here.  If using Python

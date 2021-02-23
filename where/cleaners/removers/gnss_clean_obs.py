@@ -2,7 +2,7 @@
 
 Description:
 ------------
-Keep only choosen GNSS observations and observation epochs, which at least 4 satellites.
+Keep only choosen GNSS observations and observation epochs, which at least 4 satellites. 
 
 """
 # External library imports
@@ -21,7 +21,7 @@ from where.lib import config
 def gnss_clean_obs(dset: "Dataset") -> np.ndarray:
     """Clean GNSS observations
 
-    Keep only choosen GNSS observations and observation epochs, which at least 4 satellites.
+    Keep only choosen GNSS observations and observation epochs, which at least 4 satellites. 
 
     NOTE: This only a workaround and works only if observations from one GNSS are used. If several GNSSs are used then
           it can happen that due to the fact that some observation type are only given for a certain GNSS, that all
@@ -52,13 +52,15 @@ def gnss_clean_obs(dset: "Dataset") -> np.ndarray:
         # Update final solution
         keep_idx[idx] = keep_epoch_idx
 
-    # +TODO: Workaround -> should be handled by parser or apriori step
-    # Loop over GNSSs and observation types
+    ## Loop over GNSSs and observation types
+    ## NOTE: Remove NaN values in observation types. Note, that is critical if several GNSS are selected, due to the 
+    ## fact that they do not use identical observation types, which can lead to that all observations are deleted. 
+    ## Removing of NaN values is also done by 'gnss_select_obs' remover.
+    #
     #for sys in dset.meta["obstypes"]:
     #    for obstype in dset.meta["obstypes"][sys]:
     #
-    #        # Remove observations with (close to) zero value
-    #        keep_idx = np.logical_and(keep_idx, dset.obs[obstype] > 10000)
-    # -TODO: Workaround
+    #        # Remove observations with NaN value
+    #        keep_idx = np.isnan(dset.obs[obstype])
 
     return keep_idx

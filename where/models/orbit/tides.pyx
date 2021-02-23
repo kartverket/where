@@ -354,7 +354,7 @@ cdef solid_earth_tides(int current_step):
             S[4, m] = correction.imag * normalization_factor(2, m) * normalization_factor(4, m)
 
     # STEP 2
-    # Eqation (6.8a)
+    # Equation (6.8a)
     C[2, 0] += normalization_factor(2, 0) * equation_68a(current_step)
 
     # Equation (6.8b) with m=1.
@@ -380,100 +380,89 @@ def ocean_tides(int current_step):
 
     Returns:
         C, S:                Time variable part of gravity coefficients due to ocean tides at time t.
+
+    NB. This uses Doodson arguments and multipliers to compute the angular argument NF below
     """
-    delaunay_multipliers_a, _, _, doodson_a = table_65a()
-    delaunay_multipliers_b, _, _, doodson_b = table_65b()
-    delaunay_multipliers_c, _, doodson_c = table_65c()
     C = np.zeros((truncation_level, truncation_level))
     S = np.zeros((truncation_level, truncation_level))
 
-    # Pick the waves from the tables 6.5a and 6.5b that are fundamental in FES.
-    # The two waves in table 6.5c are both fundamental.
-    # Ref table 6.7, where the fundamental waves are in bold.
-
-    fundamental_waves_a = [3, 6, 17, 23]
-    fundamental_waves_b = [0, 1, 2, 3, 8, 13, 17, 19]
-
     # Equation 6.15
-    for i in fundamental_waves_a:
-        doodson = doodson_a[i]
-        NF = np.dot(delaunay_multipliers_a[i], delaunay_variables[current_step])
-        Cp = ocean_tides_coeffs[doodson]["C+"]
-        Cm = ocean_tides_coeffs[doodson]["C-"]
-        Sp = ocean_tides_coeffs[doodson]["S+"]
-        Sm = ocean_tides_coeffs[doodson]["S-"]
-        for n in range(0, C.shape[0]):
-            for m in range(0, n + 1):
-
-                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
-                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
-
-                C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
-                           + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f
-                           + Sm[n, m] * sin_theta_f)
-                S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
-                           + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f
-                           - Sm[n, m] * cos_theta_f)
-
-    for i in fundamental_waves_b:
-        doodson = doodson_b[i]
-        # Some of these are actually missing in FES2004
-        if doodson not in ocean_tides_coeffs:
-            continue
-
+    for doodson in ocean_tides_coeffs.keys():
+        doodson_mul = doodson_multipliers(doodson)
+        doodson_vars = doodson_args(delaunay_variables[current_step], GMST[current_step])
+        NF = np.dot(doodson_mul, doodson_vars)
         Cp = ocean_tides_coeffs[doodson]["C+"]
         Cm = ocean_tides_coeffs[doodson]["C-"]
         Sp = ocean_tides_coeffs[doodson]["S+"]
         Sm = ocean_tides_coeffs[doodson]["S-"]
 
-        NF = np.dot(delaunay_multipliers_b[i], delaunay_variables[current_step])
-
-        for n in range(0, C.shape[0]):
+        for n in range(2, C.shape[0]):
             for m in range(0, n + 1):
-                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
-                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
+                if (n,m) not in Cp:     # skip coeffs. excluded because of amplitude limit
+                    continue
 
-                if (n, m) in Cp:
-                    C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
-                        + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f + Sm[n, m] * sin_theta_f)
-                    S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
-                        + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f - Sm[n, m] * cos_theta_f)
+                sin_theta_f = math.sin(NF)
+                cos_theta_f = math.cos(NF)
 
-    for i in range(0, len(doodson_c)):
-        doodson = doodson_c[i]
-        NF = np.dot(delaunay_multipliers_c[i], delaunay_variables[current_step])
-
-        Cp = ocean_tides_coeffs[doodson]["C+"]
-        Cm = ocean_tides_coeffs[doodson]["C-"]
-        Sp = ocean_tides_coeffs[doodson]["S+"]
-        Sm = ocean_tides_coeffs[doodson]["S-"]
-        for n in range(0, C.shape[0]):
-            for m in range(0, n + 1):
-                sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
-                cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
-
-                C[n, m] += normalization_factor(n, m) * (Cp[n, m] * cos_theta_f
-                           + Sp[n, m] * sin_theta_f + Cm[n, m] * cos_theta_f + Sm[n, m] * sin_theta_f)
-                S[n, m] += normalization_factor(n, m) * (-Cp[n, m] * sin_theta_f
-                           + Sp[n, m] * cos_theta_f + Cm[n, m] * sin_theta_f - Sm[n, m] * cos_theta_f)
-
-
-    #Treat the S1 case separately:
-    NF = np.dot(delaunay_multipliers_a[19], delaunay_variables[current_step])
-    for n in range(0, C.shape[0]):
-        for m in range(0, n + 1):
-            if n == 0 and m == 0:
-                continue
-
-            sin_theta_f = math.sin(m * (GMST[current_step] + math.pi) - NF)
-            cos_theta_f = math.cos(m * (GMST[current_step] + math.pi) - NF)
-
-            C[n, m] += normalization_factor(n, m) * (CpS1[n, m] * cos_theta_f
-                       + CmS1[n, m] * cos_theta_f)
-            S[n, m] += normalization_factor(n, m) * (-CpS1[n, m] * sin_theta_f
-                       + CmS1[n, m] * sin_theta_f)
-
+                C[n, m] += normalization_factor(n, m) * (cos_theta_f * (Cp[n, m] + Cm[n, m]) +
+                                                         sin_theta_f * (Sp[n, m] + Sm[n, m]))
+                if (m > 0):
+                    S[n, m] += normalization_factor(n, m) * (cos_theta_f * (Sp[n, m] - Sm[n, m]) -
+                                                             sin_theta_f * (Cp[n, m] - Cm[n, m]))
     return C, S
+
+
+def doodson_args(delaunay_vars, GMST):
+    """Delaunay arguments to Doodson arguments.
+    Reference for these operations:
+    IERS Conventions 1992, chapter 7, Solid Earth tides
+    """
+    l, lp, F, D, Omg = delaunay_vars
+    s  = F + Omg
+    h = s - D
+    p = s - l
+    Np = -Omg
+    pl = s - D - lp
+    tau = GMST + np.pi - s
+    return [tau, s, h, p, Np, pl]
+
+
+def doodson2delaunay_multipliers(doodson):
+    """Computes Delaunay multipliers from Doodson number.
+
+    Conversion from Doodson multipliers to Delaunay multipliers taken from
+    Orekit code. Note that the sign convention is different for tides and
+    nutation work: the Delaunay multipliers obtained here match those
+    shown in tables 5.1a and 5.1b of IERS Conventions, but have the
+    opposite sign to those found in tables 6.5a, 6.5b, and 6.5c.
+    """
+    # Doodson multipliers from Doodson number
+    tau, s, h, p, Np, ps = doodson_multipliers(doodson)
+    # Delaunay multipliers from Doodson multipliers
+    cGamma =  tau
+    cl     = -p
+    clp    = -ps
+    cF     = -tau + s + h + p + ps
+    cD     = -h - ps
+    cOmg   =  cF - Np
+    return [cGamma, cl, clp, cF, cD, cOmg]
+
+
+def doodson_multipliers(doodson):
+    """Computes Doodson multipliers from Doodson number.
+
+    Doodson's multipliers are encoded in the Doodson number, where each
+    digit represents the frequency multiplier of the wave in terms of each
+    Doodson fundamental argument (all digits offset by 5 except first one).
+    """
+    doodson = int(doodson * 1000)
+    ps =  doodson % 10 - 5
+    Np =  doodson // 10 % 10 - 5
+    p  =  doodson // 100 % 10 - 5
+    h  =  doodson // 1000 % 10 - 5
+    s  =  doodson // 10000 % 10 - 5
+    tau = doodson // 100000 % 10
+    return [tau, s, h, p, Np, ps]
 
 
 cdef solid_earth_pole_tides(int current_step):
@@ -522,7 +511,6 @@ cdef k_anelastic(int n, int m):
     Returns:
         k:       Complex number, solid Earth tide external potential Love numbers.
     """
-    #cdef complex k
 
     k = {(2, 0): 0.3019,
          (2, 1): 0.29830 - 0.00144 * 1j,
@@ -559,7 +547,6 @@ cdef equation_68a(current_step):
         argument = np.dot(delaunay_multipliers[i], delaunay_variables[current_step])
         sin_theta_f[i] = math.sin(argument)
         cos_theta_f[i] = math.cos(argument)
-
 
     return (np.dot(cos_theta_f, ip) - np.dot(sin_theta_f, op))
 
@@ -631,7 +618,7 @@ def equation_68b_m1(int current_step):
         cos_theta_f[i] = math.cos(argument)
 
     return (
-        np.dot(cos_theta_f, op) + np.dot(sin_theta_f, ip),
+        np.dot(sin_theta_f, ip) + np.dot(cos_theta_f, op),
         np.dot(cos_theta_f, ip) - np.dot(sin_theta_f, op)
     )
 
