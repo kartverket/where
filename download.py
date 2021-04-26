@@ -101,6 +101,7 @@ def download(cfg_path: pathlib.Path) -> None:
 
             target_path = target_dir / target_directory / file_name
             print(f"+ {file_name:<20} -> {target_path}")
+            #import IPython; IPython.embed()
             download_file(f"{lib_url}/{lib_directory}{file_name}", target_path)
 
     # Do postprocessing

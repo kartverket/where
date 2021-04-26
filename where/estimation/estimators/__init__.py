@@ -128,6 +128,8 @@ def solve_neq(dset):
             if "_src_dir-" not in column:
                 continue
             source = column.split("-", maxsplit=1)[-1].split("_")[0]
+            # Sourcenames are saved internally in Where with the letters "dot" instead of the character "." which is originally in the source name
+            source = source.replace("dot", ".")
             if source in crf:
                 ra = crf[source].pos.right_ascension
                 dec = crf[source].pos.declination

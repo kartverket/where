@@ -24,7 +24,6 @@ from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import log
 
-FIGURE_FORMAT = "png"
 
 class GnssPlot:
     """Class for GNSS plots
@@ -34,15 +33,18 @@ class GnssPlot:
         self, 
         dset: "Dataset",
         figure_dir: pathlib.PosixPath,
+        figure_format: str="png",
     ) -> None:
         """Set up a new GNSS plot object
 
         Args:
             dset:          A dataset containing the data.
             figure_dir:    Figure directory.
+            figure_format: Figure format.
         """
         self.dset = dset
         self.figure_dir = figure_dir
+        self.figure_format = figure_format
         
         
     def plot_dop(self,
@@ -53,7 +55,7 @@ class GnssPlot:
         Args:
             figure_name: File name of figure.
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
         log.debug(f"Plot {figure_path}.")
     
         plot(
@@ -110,7 +112,7 @@ class GnssPlot:
                 if np.all(np.isnan(self.dset.diff_epo[field][idx_sys])):
                     continue
                                   
-                figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}").replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+                figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}").replace("{FIGURE_FORMAT}", self.figure_format)
                 figure_paths.append(figure_path)
                 log.debug(f"Plot {figure_path}.")
     
@@ -186,7 +188,7 @@ class GnssPlot:
             if np.all(np.isnan(self.dset[fieldname][idx_sys])):
                 continue
                               
-            figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}").replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+            figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}").replace("{FIGURE_FORMAT}", self.figure_format)
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
 
@@ -219,6 +221,182 @@ class GnssPlot:
             )
                 
         return figure_paths
+    
+    
+    
+    def plot_gnss_signal_in_space_status(
+                        self,
+                        figure_name: str="plot_signal_in_space_status_{solution}.{FIGURE_FORMAT}",
+    ) -> List[pathlib.PosixPath]:
+        """Generate GNSS Signal-in-Space (SIS) status plot for each GNSS based on GNSS signal health status (SHS) 
+        and for Galileo in addition based on SIS Accuracy (SISA) and data validity status (DVS) given in RINEX 
+        navigation file.
+    
+        The SIS status can be:
+    
+         | CODE | SIS STATUS      | PLOTTED COLOR | DESCRIPTION                     |
+         |------|-----------------|---------------|---------------------------------|
+         |   0  | healthy         |         green | SIS status used by all GNSS     |
+         |   1  | marginal (SISA) |        yellow | SIS status only used by Galileo |
+         |   2  | marignal (DVS)  |        orange | SIS status only used by Galileo |
+         |   3  | unhealthy       |           red | SIS status used by all GNSS     |
+    
+        Args:
+            figure_name: File name of figure.
+        """
+        figure_paths = list()
+        colors = {
+                "C": ["green", "red"],
+                "E": ["green", "yellow", "orange", "red"],
+                "G": ["green", "red"],
+                "I": ["green", "red"],
+                "J": ["green", "red"],
+        }
+        labels = {
+                "C": ["healthy", "unhealthy"],
+                "E": ["healthy", "marginal (sisa)", "marginal (dvs)", "unhealthy"],
+                "G": ["healthy", "unhealthy"],
+                "I": ["healthy", "unhealthy"],
+                "J": ["healthy", "unhealthy"],
+        }
+        status_def = {
+                "C": [0, 3],
+                "E": [0, 1, 2, 3],
+                "G": [0, 3],
+                "I": [0, 3],
+                "J": [0, 3],
+        }
+        
+        # Loop over GNSSs
+        for sys in self.dset.unique("system"):
+
+            signals = self._select_gnss_signal(sys)
+            
+            # Generate plot for each given navigation type and in case of Galileo in addition for each signal 
+            # (e.g. E1, E5a, E5b)
+            for signal, nav_type in sorted(signals.items()):
+                x_arrays = []
+                y_arrays = []
+                
+                solution = f"{enums.gnss_id_to_name[sys].value.lower()}_{signal}" if signal else f"{enums.gnss_id_to_name[sys].value.lower()}"
+                figure_path=self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
+                figure_paths.append(figure_path)
+                
+                for status in status_def[sys]:
+                    if sys == "E":
+                        time, satellite = self._get_gnss_signal_in_space_status_data(status, signal, system=sys)
+                    else:
+                        time, satellite = self._get_gnss_signal_in_space_status_data(status, system=sys)
+        
+                    x_arrays.append(time)
+                    y_arrays.append(satellite)
+        
+                # Limit x-axis range to rundate
+                day_start, day_end = self._get_day_limits()
+                
+                # Title
+                if sys == "E":
+                    title = f"{enums.gnss_id_to_name[sys].value.upper()} signal-in-space status for signal {signal.upper()} ({nav_type})"
+                else:    
+                    title = f"{enums.gnss_id_to_name[sys].value.upper()} signal-in-space status ({nav_type})"
+                    
+                # Generate plot
+                plot(
+                    x_arrays=x_arrays,
+                    y_arrays=y_arrays,
+                    xlabel="Time [GPS]",
+                    ylabel="Satellite",
+                    y_unit="",
+                    labels=labels[sys],
+                    colors=colors[sys],
+                    figure_path=figure_path,
+                    opt_args={
+                        "figsize": (7, 8),
+                        "marker": "s",
+                        "marksersize": 10,
+                        "legend_ncol": 4,
+                        "legend_location": "bottom",
+                        "plot_to": "file",
+                        "plot_type": "scatter",
+                        "title": title,
+                        "xlim": [day_start, day_end],
+                    },
+                )
+            
+        return figure_paths
+    
+    
+    def plot_gnss_signal_in_space_status_overview(
+                    self,
+                    figure_name: str="plot_gnss_signal_in_space_status.{FIGURE_FORMAT}",
+    ) -> pathlib.PosixPath:
+        """Generate GNSS Signal-in-Space (SIS) status overview plot based on SIS status given in RINEX navigation file
+    
+        The SIS status can be:
+    
+         | CODE | SIS STATUS      | PLOTTED COLOR | DESCRIPTION                     |
+         |------|-----------------|---------------|---------------------------------|
+         |   0  | healthy         |         green | SIS status used by all GNSS     |
+         |   1  | marginal (SISA) |        yellow | SIS status only used by Galileo |
+         |   2  | marignal (DVS)  |        orange | SIS status only used by Galileo |
+         |   3  | unhealthy       |           red | SIS status used by all GNSS     |
+    
+        Args:
+            figure_name: File name of figure.
+        """
+        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        colors = ["green", "yellow", "orange", "red"]
+        labels = ["healthy", "marginal (sisa)", "marginal (dvs)", "unhealthy"]
+        status_def = [0, 1, 2, 3]
+        signal = None
+    
+        # Select only one Galileo signal
+        # Note: Navigation message for Galileo can include I/NAV and F/NAV messages for different signals (E1, E5a, E5b).
+        #       For plotting we choose only one of them.
+        if "E" in self.dset.unique("system"):
+            signal, _ = self.get_first_galileo_signal()
+    
+        # Generate time and satellite data for given SIS status
+        x_arrays = []
+        y_arrays = []
+        for status in status_def:
+            time, satellite = self._get_gnss_signal_in_space_status_data(status, signal)
+            x_arrays.append(time)
+            y_arrays.append(satellite)
+    
+        # Limit x-axis range to rundate
+        day_start, day_end = self._get_day_limits()
+    
+        # Generate plot
+        plot(
+            x_arrays=x_arrays,
+            y_arrays=y_arrays,
+            xlabel="Time [GPS]",
+            ylabel="Satellite",
+            y_unit="",
+            labels=labels,
+            colors=colors,
+            figure_path=figure_path,
+            opt_args={
+                "figsize": (7, 12),
+                "marker": "s",
+                "marksersize": 10,
+                "legend_ncol": 4,
+                "legend_location": "bottom",
+                "plot_to": "file",
+                "plot_type": "scatter",
+                "tick_labelsize": ("y", 7),  # specify labelsize 7 for y-axis
+                "title": f"GNSS signal-in-space status",
+                "xlim": [day_start, day_end],
+            },
+        )
+        # TODO: Legend has to be improved. Old configuration:
+        # figsize = (7, 10)
+        # loc="lower center",
+        # bbox_to_anchor=(0.5, -0.01),
+        # frameon=True,
+        
+        return figure_path
    
          
     def plot_linear_combinations(
@@ -250,7 +428,7 @@ class GnssPlot:
                     y_arrays = []
                     labels = []                    
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
                     log.debug(f"Plot {figure_path}.")
                     figure_info.append(FigureInfo(
                                         figure_path, 
@@ -295,7 +473,7 @@ class GnssPlot:
                     y_arrays = []
                     labels = []
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
                     figure_info.append(FigureInfo(
                                         figure_path, 
                                         field.replace("_f1", " ").replace("_f2", " "), 
@@ -339,7 +517,7 @@ class GnssPlot:
                     y_arrays = []
                     labels = []
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
                     log.debug(f"Plot {figure_path}.")
                     figure_info.append(FigureInfo(
                                         figure_path, 
@@ -384,7 +562,7 @@ class GnssPlot:
                     y_arrays = []
                     labels = []
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
                     log.debug(f"Plot {figure_path}.")
                     figure_info.append(FigureInfo(
                                         figure_path, 
@@ -430,7 +608,7 @@ class GnssPlot:
 
     def plot_number_of_satellites(
                         self, 
-                        figure_name: str=f"plot_gnss_number_of_satellites_epoch.{FIGURE_FORMAT}",
+                        figure_name: str="plot_gnss_number_of_satellites_epoch.{FIGURE_FORMAT}",
     ) -> pathlib.PosixPath:
         """Plot number of satellites based for each GNSS
         
@@ -445,7 +623,7 @@ class GnssPlot:
         x_arrays = []
         y_arrays = []
         labels = []
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
         log.debug(f"Plot {figure_path}.")
     
         for sys in sorted(self.dset.unique("system")):
@@ -483,7 +661,7 @@ class GnssPlot:
     
     def plot_number_of_satellites_used(
             self, 
-            figure_name: str=f"plot_number_of_satellites_used.{FIGURE_FORMAT}",
+            figure_name: str="plot_number_of_satellites_used.{FIGURE_FORMAT}",
     ) -> pathlib.PosixPath:
         """Plot available number of satellites against used number
     
@@ -493,7 +671,7 @@ class GnssPlot:
         Returns:
             Figure path.
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
         log.debug(f"Plot {figure_path}.")
     
         if "num_satellite_used" not in self.dset.fields:
@@ -549,7 +727,7 @@ class GnssPlot:
             idx_sys = self.dset.filter(system=sys)
             num_sat = len(set(self.dset.satellite[idx_sys]))
             
-            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", self.figure_format)
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
             
@@ -592,7 +770,7 @@ class GnssPlot:
 
     def plot_satellite_availability(
                             self, 
-                            figure_name: str=f"plot_satellite_availability.{FIGURE_FORMAT}",
+                            figure_name: str="plot_satellite_availability.{FIGURE_FORMAT}",
     ) -> pathlib.PosixPath:
         """Generate GNSS satellite observation availability overview based on RINEX observation file
  
@@ -607,7 +785,7 @@ class GnssPlot:
         x_arrays = []
         y_arrays = []
         labels = []
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
         log.debug(f"Plot {figure_path}.")
     
         time, satellite, system = self._sort_by_satellite()
@@ -674,7 +852,7 @@ class GnssPlot:
             y_arrays = []
             labels = []
            
-            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", self.figure_format)
             figure_paths.append(figure_path)
             
             for sat in sorted(self.dset.unique("satellite")):
@@ -742,7 +920,7 @@ class GnssPlot:
             y_arrays = []
             labels = []
             
-            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", self.figure_format)
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
     
@@ -793,7 +971,7 @@ class GnssPlot:
         Returns:
            Figure path or None if necessary datasets could not be read
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT)
+        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
         log.debug(f"Plot {figure_path}.")
     
         # Limit x-axis range to rundate
@@ -841,8 +1019,24 @@ class GnssPlot:
         )
         
         return figure_path
-    
 
+
+    #        
+    # ADDITIONAL PUBLIC FUNCTIONS
+    # 
+    def get_first_galileo_signal(self):
+        """Get first Galileo signal given in the navigation message based on ordered list
+       
+        Returns:
+           Tuple with chosen Galileo signal and navigation message type
+        """        
+        signals = self._select_gnss_signal(system="E")
+        signal = next(iter(sorted(signals)))
+        nav_type = signals[signal]
+    
+        return signal, nav_type
+    
+    
     #        
     # AUXILIARY FUNCTIONS
     # 
@@ -892,6 +1086,100 @@ class GnssPlot:
         day_end = max(self.dset.time.datetime)
     
         return day_start, day_end
+    
+    
+    def _get_gnss_signal_in_space_status_data(
+                self,
+                status: int, 
+                signal: Union[str, None]=None,
+                system: Union[str, None]=None,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Get GNSS signal in space status (SIS) time and satellite data based on a given SIS status
+    
+        The SIS status can be:
+    
+         | CODE | SIS STATUS      | 
+         |------|-----------------|
+         |   0  | healthy         |
+         |   1  | marginal (SISA) | 
+         |   2  | marignal (DVS)  |
+         |   3  | unhealthy       |
+    
+        The SIS status code is used for representing the SIS status in the dataset fields "sis_status_<signal>" (with 
+        <signal>: e1, e5a or e5b).
+    
+        Args:
+           status:        Signal in space status.   
+           signal:        Galileo signal for which SIS status should be determined. The signal can be e1, e5a or e5b.
+           system:        Get only signal in space status for selected system identifier.
+    
+        Returns:
+            Tuple with time and satellite data for a given SIS status and ordered by satellite
+        """
+        # TODO: order of satellites is not correct. Maybe to save the data in a dataframe could help?
+    
+        # Generate x- and y-axis data
+        time = []
+        satellite = []
+    
+        for sat in sorted(self.dset.unique("satellite"), reverse=True):
+            
+            if system: # Skip GNSS, which are not selected
+                if not sat.startswith(system):
+                    continue
+                
+            idx = self.dset.filter(satellite=sat)
+    
+            if sat.startswith("E"):
+                idx_status = getattr(self.dset, "sis_status_" + signal)[idx] == status
+            else:
+                if status == 0:  # healthy status
+                    idx_status = self.dset.sv_health[idx] == 0
+                elif status == 3:  # unhealthy status
+                    idx_status = self.dset.sv_health[idx] > 0
+                else:
+                    continue
+    
+            time.extend(self.dset.time.gps.datetime[idx][idx_status])
+            satellite.extend(self.dset.satellite[idx][idx_status])
+    
+        return time, satellite
+        
+        
+    def _select_gnss_signal(self, system: Union[str, None]=None) -> Tuple[List[str], str]:
+        """Select GNSS signal depending on given data in Dataset
+    
+        Args:
+            system:  System identifier
+            
+        Returns:
+            Selected GNSS signal
+        """
+        nav_type_def = {
+                "FNAV_E5a": {"e5a": "F/NAV"},
+                "INAV_E1": {"e1": "I/NAV"},
+                "INAV_E5b": {"e5b": "I/NAV"},
+                "INAV_E1E5b": {"e1": "I/NAV", "e5b": "I/NAV"},
+                "LNAV": {None: "L/NAV"},
+                "D1/D2": {None: "D1/D2"},
+                "NAV": {None: "NAV"},
+        }
+        
+        signals = dict()
+        
+        if system:
+            idx = self.dset.filter(system=system)
+            nav_types = set(self.dset.nav_type[idx])
+        else:
+            nav_types = self.dset.unique("nav_type")
+            
+        for nav_type in nav_types:
+            try:
+                signals.update(nav_type_def[nav_type])
+            except KeyError:
+                log.error(f"GNSS navigation message {nav_type} is not defined.")
+                
+        return signals
     
       
     def _sort_by_satellite(self, dset: Union["Dataset", None]=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:

@@ -31,6 +31,9 @@ import numpy as np
 from midgard.dev import plugins
 from midgard.parsers._parser import Parser
 
+# Where imports
+from where.lib import log
+
 
 class HeaderField(NamedTuple):
     name: str
@@ -38,9 +41,12 @@ class HeaderField(NamedTuple):
 
 
 HEADER_FIELDS = (
+    HeaderField("product_type", str),
+    HeaderField("modelname", str),
     HeaderField("earth_gravity_constant", float),
     HeaderField("radius", float),
     HeaderField("max_degree", int),
+    HeaderField("errors", str),
 )
 
 
@@ -61,14 +67,11 @@ class GravityIcgemParser(Parser):
         """
         super().__init__(file_path, encoding=encoding)
         self.num_degrees = num_degrees
-        self.raw = None
 
     def read_data(self):
         with open(self.file_path, mode="rt", encoding=self.file_encoding) as fid:
             self._read_header(fid)
             self._read_coeffs(fid)
-
-        self._organize_data()
 
     def _read_header(self, fid):
         header_fields = {h.name: h for h in HEADER_FIELDS}
@@ -86,23 +89,42 @@ class GravityIcgemParser(Parser):
         if self.num_degrees is None:
             self.num_degrees = self.meta["max_degree"]
 
-        # Skip orders below 2
-        fid = itertools.dropwhile(lambda line: int(line.split()[1]) < 2, fid)
-
-        # Read coefficient lines
-        num_coeffs = int((self.num_degrees + 1) * (self.num_degrees + 2) / 2) - 3  # Skipping orders 00, 10, 11
-        coeff_lines = itertools.islice(fid, num_coeffs)
-        self.raw = np.genfromtxt(
-            coeff_lines,
-            names=("key", "degree", "order", "C", "S", "sigma_C", "sigma_S"),
-            dtype=("U4", "i8", "i8", "f8", "f8", "f8", "f8"),
+        # Skip high orders
+        fid = itertools.filterfalse(
+            lambda line: (int(line.split()[1]) > self.num_degrees) or (int(line.split()[2]) > self.num_degrees), fid
         )
 
-    def _organize_data(self):
-        self.data["C"] = np.zeros((self.num_degrees + 1, self.num_degrees + 1))
-        self.data["S"] = np.zeros((self.num_degrees + 1, self.num_degrees + 1))
-        self.data["C"][0, 0] = 1  # C[0, 0] is always 1
+        # The EGM2008 file has some numbers in "fortran" format. Converter to correct for this:
+        converter = lambda s: 1.0 if s == "1.0d0" else (0.0 if s == "0.0d0" else float(s))
 
-        # Add data to matrices
-        self.data["C"][self.raw["degree"], self.raw["order"]] = self.raw["C"]
-        self.data["S"][self.raw["degree"], self.raw["order"]] = self.raw["S"]
+        # Read coefficient lines
+        for k, coeff_lines in itertools.groupby(sorted(fid), lambda line: line.split()[0]):
+
+            if k == "gfc":
+                self.data[k] = np.genfromtxt(
+                    coeff_lines,
+                    names=("key", "degree", "order", "C", "S", "sigma_C", "sigma_S"),
+                    dtype=("U4", "i8", "i8", "U30", "U30", "U30", "U30"),
+                    encoding="UTF-8",
+                    converters={3: converter, 4: converter, 5: converter, 6: converter},
+                )
+            elif k == "trnd":
+                self.data[k] = np.genfromtxt(
+                    coeff_lines,
+                    names=("key", "degree", "order", "C", "S", "sigma_C", "sigma_S", "t0", "t1"),
+                    dtype=("U4", "i8", "i8", "f8", "f8", "f8", "f8", "U13", "U13"),
+                )
+            elif k == "gfct" and self.meta["errors"] in ("formal", "calibrated"):
+                self.data[k] = np.genfromtxt(
+                    coeff_lines,
+                    names=("key", "degree", "order", "C", "S", "sigma_C", "sigma_S", "t0", "t1"),
+                    dtype=("U4", "i8", "i8", "f8", "f8", "f8", "f8", "U13", "U13"),
+                )
+            elif k in ("asin", "acos") and self.meta["errors"] in ("formal", "calibrated"):
+                self.data[k] = np.genfromtxt(
+                    coeff_lines,
+                    names=("key", "degree", "order", "C", "S", "sigma_C", "sigma_S", "t0", "t1", "period"),
+                    dtype=("U4", "i8", "i8", "f8", "f8", "f8", "f8", "U13", "U13", "f8"),
+                )
+            else:
+                log.warn("Unknown gravity coefficient type")

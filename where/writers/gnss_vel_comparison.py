@@ -47,17 +47,28 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
 
 # Define fields to plot
 #
-# # PGM: where 0.21.2/midgard 0.3.0  RUN_BY: NMA  DATE: 20190604 135301 UTC
-# #
-# #       DATE STAT       EAST      NORTH         UP        HPE        VPE     3D POS   PDOP   HDOP   VDOP
-# #                      meter      meter      meter      meter      meter      meter                     
-# # ______________________________________________________________________________________________________
+# # PGM: where 1.1.0/midgard 1.1.2  RUN_BY:   DATE: 20210204 143718 UTC
+# # DESCRIPTION: GNSS site velocity comparison results
 # # 
-#   2020-07-01 krss     0.3300     0.4861     0.5581     0.6001     0.7522     0.8708   2.52   1.37   2.14
-#   2020-07-01 vegs     0.2912     0.6225     0.6658     0.6739     0.9984     1.0891   2.57   1.25   2.31
-#   2020-07-01 hons     0.4452     0.9165     0.8257     0.9482     1.0449     1.2662   2.70   1.25   2.46
-# ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8----+----9----+----0----+----
+# # 
+# # 
+# # HEADER         UNIT                   DESCRIPTION
+# # _____________________________________________________________________________________________________________________
+# # DATE                                  Date in format yyyy-mm-dd or mmm-yyyy
+# # STAT                                  Station name
+# # HV             m/s                    Horizontal site velocity
+# # 3D             m/s                    3D site velocity
+# # 
+# #       DATE STAT         HV         3D
+# #                        m/s        m/s
+# # _____________________________________
+# # 
+#   2020-10-01 krss     0.0215     0.0369
+#   2020-10-02 krss     0.0216     0.0347
 #
+# ----+----1----+----2----+----3----+----4----
+#
+
 FIELDS = (
     WriterField(
         "date",
@@ -76,6 +87,33 @@ FIELDS = (
         "STAT",
         "",
         "Station name",
+    ),
+    WriterField(
+        "site_vel_east",
+        float,
+        "%11.4f",
+        11,
+        "EAST",
+        "m/s",
+        "East component of site velocity",
+    ),
+    WriterField(
+        "site_vel_north",
+        float,
+        "%11.4f",
+        11,
+        "NORTH",
+        "m/s",
+        "North component of site velocity",
+    ),
+    WriterField(
+        "site_vel_up",
+        float,
+        "%11.4f",
+        11,
+        "UP",
+        "m/s",
+        "Up component of site velocity",
     ),
     WriterField(
         "site_vel_h",
@@ -99,20 +137,26 @@ FIELDS = (
 
 
 
-
-# # PGM: where 1.0.4/midgard 1.1.1  RUN_BY: NMA  DATE: 20201022 203257 UTC
-# # DESCRIPTION: Summary of GNSS comparison results
+# # PGM: where 1.1.0/midgard 1.1.2  RUN_BY:   DATE: 20210204 143718 UTC
+# # DESCRIPTION: Summary of GNSS site velocity comparison results
 # # 
-# #  STAT  COLUMN     MEAN      MIN      MAX
-# #                  meter    meter    meter
-# # ________________________________________
+# # HEADER         UNIT                   DESCRIPTION
+# # _____________________________________________________________________________________________________________________
+# # STAT                                  Station name
+# # COLUMN                                Column name for which statistical analysis is carried out (e.g. site_vel_3d)
+# # MEAN           m/s                    Mean for given column
+# # MIN            m/s                    Minimal value for given column
+# # MAX            m/s                    Maximal value for given column
 # # 
-#    krss    pdop   2.5236   2.5236   2.5236
-#    krss    hdop   1.3720   1.3720   1.3720
-#    krss    vdop   2.1351   2.1351   2.1351
-#    krss    east   0.3300   0.3300   0.3300
-#    krss   north   0.4861   0.4861   0.4861
-#    krss      up   0.5581   0.5581   0.5581
+# #  STAT       COLUMN     MEAN      MIN      MAX
+# #                         m/s      m/s      m/s
+# # _____________________________________________
+# # 
+#    krss   site_vel_h   0.0210   0.0192   0.0243
+#    krss  site_vel_3d   0.0359   0.0330   0.0405
+#    vegs   site_vel_h   0.0167   0.0158   0.0192
+#    vegs  site_vel_3d   0.0318   0.0294   0.0357
+#
 # ----+----1----+----2----+----3----+----4----
 #
 FIELDS_SUM = (
@@ -128,8 +172,8 @@ FIELDS_SUM = (
     WriterField(
         "column",
         float,
-        "%13s",
-        13,
+        "%16s",
+        16,
         "COLUMN",
         "",
         "Column name for which statistical analysis is carried out (e.g. site_vel_3d)",
@@ -161,6 +205,33 @@ FIELDS_SUM = (
         "m/s",
         "Maximal value for given column",
     ),
+    WriterField(
+        "std",
+        float,
+        "%9.4f",
+        9,
+        "STD",
+        "m/s",
+        "Standard deviation for given column",
+    ),
+    #WriterField(
+    #    "percentile",
+    #    float,
+    #    "%9.4f",
+    #    9,
+    #    "95TH",
+    #    "meter",
+    #    "95th percentile for given column",
+    #),
+    #WriterField(
+    #    "rms",
+    #    float,
+    #    "%9.4f",
+    #    9,
+    #    "RMS",
+    #    "meter",
+    #    "Root mean square for given column",
+    #),
 )
 
 
@@ -171,7 +242,7 @@ def gnss_comparison(dset: "Dataset") -> None:
     Args:
         dset:  Dictionary with station name as keys and the belonging Dataset as value
     """
-
+    output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
     file_vars["solution"] = config.tech.gnss_vel_comparison_report.solution.str.lower()
@@ -186,12 +257,19 @@ def gnss_comparison(dset: "Dataset") -> None:
     df_month = df_month.reset_index()
  
     # Write files for daily and monthly solutions
-    output_defs = {
-          "day": df_day,
-          "month": df_month, 
-          "day_summary": _generate_dataframe_summary(df_day, index="station"), 
-          "month_summary": _generate_dataframe_summary(df_month, index="station"), 
-    }
+    samples = config.tech.gnss_vel_comparison.samples.list
+    if "daily" in samples:
+        output_defs.update({
+              "day": df_day,
+              "day_summary": _generate_dataframe_summary(df_day, index="station"),
+        })
+
+    if "monthly" in samples:
+        output_defs.update({
+              "month": df_month, 
+              "month_summary": _generate_dataframe_summary(df_month, index="station"), 
+        })
+
     
     for type_, output_array in output_defs.items():
         
@@ -203,7 +281,7 @@ def gnss_comparison(dset: "Dataset") -> None:
         log.info(f"Write '{type_}' comparison file {file_path}.")
         
         fields = FIELDS_SUM if "summary" in type_ else FIELDS
-        summary = "Summary of GNSS site velocity comparison results" if "summary" in type_ else "GNSS site velocity comparison results"
+        summary = "Summary of GNSS site velocity comparison results (95th percentile)" if "summary" in type_ else "GNSS site velocity comparison results (95th percentile)"
             
         # Get header
         header = get_header(
@@ -275,46 +353,45 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
     Example for "dfs" dictionary:
      
-            'hons':                   date       hpe       vpe      east     north        up
-                    0      2019-03-01 00:00:00  0.301738  0.057244  0.113758  0.279472  0.057244
-                    1      2019-03-01 00:00:00  0.301738  0.057244  0.113758  0.279472  0.057244
+             'nabd':                       date  site_vel_h  site_vel_3d
+                     0      2020-10-01 00:00:00    0.005622     0.005932
+                     1      2020-10-01 00:00:00    0.005622     0.005932
 
-            'krss':                   date       hpe       vpe      east     north        up
-                    0      2019-03-01 00:00:00  0.710014  0.186791 -0.235267  0.669903  0.186791
-                    1      2019-03-01 00:00:00  0.710014  0.186791 -0.235267  0.669903  0.186791
-
+             'vegs':                      date  site_vel_h  site_vel_3d
+                    0      2020-10-01 00:00:00    0.005730     0.009568
+                    1      2020-10-01 00:00:00    0.005730     0.009568
+                      
 
     Example for "df_day" dictionary:
 
-                            pdop      hdop      vdop  ...       vpe    pos_3d  station
-            date                                      ...                             
-            2020-07-01  2.523569  1.371987  2.135124  ...  0.752227  0.870759     krss
-            2020-07-01  2.571588  1.247443  2.308469  ...  0.998428  1.089063     vegs
-            2020-07-01  2.622492  1.289113  2.330969  ...  1.084772  1.220454     hofs
-            2020-07-01  2.699645  1.246052  2.456847  ...  1.044877  1.266227     hons
-            2020-07-01  2.695779  1.156999  2.448314  ...  1.461449  1.619489     nabd
+            date        site_vel_h  site_vel_3d station
+            2020-10-01    0.021493     0.036855    krss
+            2020-10-02    0.021583     0.034718    krss
+               ...
+            2020-10-30    0.018063     0.048820    nabd
+            2020-10-31    0.019100     0.051127    nabd
 
 
     Example for "df_month" dictionary:
 
-                          pdop      hdop      vdop  ...       vpe    pos_3d  station
-            date
-            Jul-2020  2.523569  1.371987  2.135124  ...  0.752227  0.870759     krss
-            Jul-2020  2.571588  1.247443  2.308469  ...  0.998428  1.089063     vegs
-            Jul-2020  2.622492  1.289113  2.330969  ...  1.084772  1.220454     hofs
-            Jul-2020  2.699645  1.246052  2.456847  ...  1.044877  1.266227     hons
-            Jul-2020  2.695779  1.156999  2.448314  ...  1.461449  1.619489     nabd
+                      site_vel_h  site_vel_3d station
+            date                                     
+            Oct-2020    0.020967     0.035847    krss
+            Oct-2020    0.016721     0.031787    vegs
+            Oct-2020    0.022508     0.042471    hofs
+            Oct-2020    0.020653     0.043239    hons
+            Oct-2020    0.018989     0.050360    nabd
 
 
     Example for "dfs_day_field" dictionary:
 
-            'hpe':                 nabf      vegs      hons      krss
+            'site_vel_h':          nabf      vegs      hons      krss
                     date                                          
                     2019-03-01  1.368875  0.935687  1.136763  0.828754
                     2019-03-02  0.924839  0.728280  0.911677  0.854832
 
 
-            'vpe':                 nabf      vegs      hons      krss
+            'site_vel_3d':         nabf      vegs      hons      krss
                     date                                          
                     2019-03-01  1.715893  1.147265  1.600330  0.976541
                     2019-03-02  1.533437  1.307373  1.476295  1.136991
@@ -322,11 +399,13 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
     Example for "dfs_month_field" dictionary:
 
-            'hpe':                nabf      vegs      hons      krss
+            'site_vel_h':
+                        date      nabf      vegs      hons      krss
                         Mar-2019  1.186240  0.861718  1.095827  1.021354
                         Apr-2019  0.891947  0.850343  0.977908  0.971099
 
-            'vpe':                nabf      vegs      hons      krss
+            'site_vel_3d':
+                        date      nabf      vegs      hons      krss
                         Mar-2019  1.854684  1.291406  1.450466  1.225467
                         Apr-2019  1.964404  1.706507  1.687994  1.500742
 
@@ -352,11 +431,17 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
     dfs = {}
     df_day = pd.DataFrame()
     dfs_day_field = {
+        "site_vel_east": pd.DataFrame(),
+        "site_vel_north": pd.DataFrame(),
+        "site_vel_up": pd.DataFrame(),
         "site_vel_h": pd.DataFrame(), 
         "site_vel_3d": pd.DataFrame(), 
     }
     df_month = pd.DataFrame()
     dfs_month_field = {
+        "site_vel_east": pd.DataFrame(),
+        "site_vel_north": pd.DataFrame(),
+        "site_vel_up": pd.DataFrame(),
         "site_vel_h": pd.DataFrame(), 
         "site_vel_3d": pd.DataFrame(), 
     }
@@ -368,16 +453,15 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             continue
 
         # Determine dataframe with site_vel_h and vel_3d columns
-        # TODO: How to ensure that GPS time scale is used? fields=["time.gps", ...] does not work longer.
-        df = dset.as_dataframe(fields=["time", "site_vel_h", "site_vel_3d"])
-        df = df.rename(columns={"time": "date"})
+        df = dset.as_dataframe(fields=["time.gps", "site_vel_east", "site_vel_north", "site_vel_up", "site_vel_h", "site_vel_3d"])
+        df = df.rename(columns={"time_gps": "date"})
         if df.empty:
             continue
         else:
             # Save data in dictionaries
             dfs.update({station: df})
 
-            df_day_tmp = df.set_index("date").resample("D", how=lambda x: np.nanpercentile(x, q=95))
+            df_day_tmp = df.set_index("date").resample("D").apply(lambda x: np.nanpercentile(x, q=95))
             for field in dfs_day_field.keys():
                 if dfs_day_field[field].empty:
                     dfs_day_field[field][station] = df_day_tmp[field]
@@ -388,7 +472,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             df_day_tmp["station"] = np.repeat(station, df_day_tmp.shape[0])
             df_day = pd.concat([df_day, df_day_tmp], axis=0)
 
-            df_month_tmp = df.set_index("date").resample("M", how=lambda x: np.nanpercentile(x, q=95))
+            df_month_tmp = df.set_index("date").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
             df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
             for field in dfs_month_field.keys():
                 dfs_month_field[field][station] = df_month_tmp[field]

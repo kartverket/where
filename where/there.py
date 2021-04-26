@@ -1074,6 +1074,16 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 current = cfg.vlbi_ignore_baseline.baselines.as_list(", *")
                 updated = ", ".join(sorted(current + [self.vars["filter_baseline"]]))
                 cfg.update("vlbi_ignore_baseline", "baselines", updated, source=util.get_program_name())
+    
+    def button_add_baseline_clock_offset(self):
+        if "filter_baseline" not in self.vars or self.vars["filter_baseline"] == "no filter":
+            log.error("Choose a baseline in the filter menu to estimate the baseline clock offset")
+        else:
+            log.info(f"Adding {self.vars['filter_baseline']} to baseline_clock_offsets")
+            with config.update_tech_config(use_options=False, **self.vars) as cfg:
+                current = cfg.vlbi_clock_poly.baseline_clock_offsets.as_list(", *")
+                updated = ", ".join(sorted(current + [self.vars["filter_baseline"]]))
+                cfg.update("vlbi_clock_poly", "baseline_clock_offsets", updated, source=util.get_program_name())
 
     def button_ignore_station(self):
         if "filter_station" not in self.vars or self.vars["filter_station"] == "no filter":

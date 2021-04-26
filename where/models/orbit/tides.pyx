@@ -79,8 +79,13 @@ def tides_setup(
     global ocean_tides_coeffs
     epoch_list = epochs
 
-    GM_earth = constant.get("GM", source="egm_2008")
-    R_earth = constant.get("a", source="egm_2008")
+    # Read the value of constants GM and r from gravity file
+    gravity_field = config.tech.gravity_field.str
+    truncation_level = config.tech.gravity_truncation_level.int
+    _, GM_earth, R_earth = apriori.get("gravity", gravity_field=gravity_field, truncation_level=truncation_level,
+                                       rundate=rundate)
+
+    # Read the value of constants GM_moon and GM_sun from midgard constants
     GM_moon = constant.get("GM_moon")
     GM_sun = constant.get("GM_sun")
 

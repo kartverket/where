@@ -28,7 +28,6 @@ def parameter_corrections(dset):
         dset:   Dataset, information about model run.
     """
     state_vector_fields = sorted(["state." + field for field in dset["state"].fields if not field.endswith("_sigma")])
-
     print_data = OrderedDict()
     for field in state_vector_fields:
         param_type, name = field[6:].split("-", maxsplit=1)

@@ -36,6 +36,8 @@ Option               Description
 --profile=name       Use config settings specfied for a given profile, for
                      instance --profile=vascc for a VLBI analysis.
 --session=session    Run analysis for the given session.
+--station=station    Run analysis for the given station. This is only valid for
+                     GNSS, GNSS_OBS and GNSS_VEL pipeline.
 --user=username      Run as username. Does not need to be an existing username
                      on the system.
 --debug, ...         Show additional debug information. Other flags such as
@@ -69,9 +71,9 @@ Run an SLR analysis for September 1 2015 using day-of-year:
 
     {exe} 2015 242 --slr --doy
 
-Change the spam option of the GNSS analysis:
+Change the sampling_rate option of the GNSS analysis:
 
-    {exe} 2016 3 1 -g --spam=ham
+    {exe} 2016 3 1 -g --station=stas --sampling_rate=30
 
 Look at the configuration of all VLBI analyses set up for November 2 2009:
 

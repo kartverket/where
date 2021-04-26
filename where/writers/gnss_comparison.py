@@ -210,24 +210,24 @@ FIELDS_SUM = (
         "meter",
         "Standard deviation for given column",
     ),
-    WriterField(
-        "percentile",
-        float,
-        "%9.4f",
-        9,
-        "95TH",
-        "meter",
-        "95th percentile for given column",
-    ),
-    WriterField(
-        "rms",
-        float,
-        "%9.4f",
-        9,
-        "RMS",
-        "meter",
-        "Root mean square for given column",
-    ),
+    #WriterField(
+    #    "percentile",
+    #    float,
+    #    "%9.4f",
+    #    9,
+    #    "95TH",
+    #    "meter",
+    #    "95th percentile for given column",
+    #),
+    #WriterField(
+    #    "rms",
+    #    float,
+    #    "%9.4f",
+    #    9,
+    #    "RMS",
+    #    "meter",
+    #    "Root mean square for given column",
+    #),
 )
 
 
@@ -238,7 +238,7 @@ def gnss_comparison(dset: "Dataset") -> None:
     Args:
         dset:  Dictionary with station name as keys and the belonging Dataset as value
     """
-
+    output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
     file_vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
@@ -253,12 +253,18 @@ def gnss_comparison(dset: "Dataset") -> None:
     df_month = df_month.reset_index()
  
     # Write files for daily and monthly solutions
-    output_defs = {
-          "day": df_day,
-          "month": df_month, 
-          "day_summary": _generate_dataframe_summary(df_day, index="station"), 
-          "month_summary": _generate_dataframe_summary(df_month, index="station"), 
-    }
+    samples = config.tech.gnss_comparison.samples.list
+    if "daily" in samples:
+        output_defs.update({
+              "day": df_day,
+              "day_summary": _generate_dataframe_summary(df_day, index="station"),
+        })
+
+    if "monthly" in samples:
+        output_defs.update({
+              "month": df_month, 
+              "month_summary": _generate_dataframe_summary(df_month, index="station"), 
+        })
     
     for type_, output_array in output_defs.items():
         
@@ -270,7 +276,7 @@ def gnss_comparison(dset: "Dataset") -> None:
         log.info(f"Write '{type_}' comparison file {file_path}.")
         
         fields = FIELDS_SUM if "summary" in type_ else FIELDS
-        summary = "Summary of GNSS comparison results" if "summary" in type_ else "GNSS comparison results"
+        summary = "Summary of GNSS comparison results (95th percentile)" if "summary" in type_ else "GNSS comparison results (95th percentile)"
             
         # Get header
         header = get_header(
@@ -482,8 +488,8 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             dset.add_float("pos_3d", val=pos_3d)
 
         # Determine dataframe 
-        df = dset.as_dataframe(fields=["enu.enu", "time", "hpe", "vpe", "pos_3d", "pdop", "vdop", "hdop"])
-        df = df.rename(columns={"enu_enu_0": "east", "enu_enu_1": "north", "enu_enu_2": "up", "time": "date"})
+        df = dset.as_dataframe(fields=["enu.enu", "time.gps", "hpe", "vpe", "pos_3d", "pdop", "vdop", "hdop"])
+        df = df.rename(columns={"enu_enu_0": "east", "enu_enu_1": "north", "enu_enu_2": "up", "time_gps": "date"})
 
         if df.empty:
             continue

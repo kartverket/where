@@ -44,9 +44,10 @@ def get_non_tidal_atmospheric_loading(time):
         file_vars = dict(config.date_vars(dt_to_read))
 
         data_chunk = parsers.parse_key(file_key="non_tidal_atmospheric_loading", file_vars=file_vars).as_dict()
-        data["up"][dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["up"])
-        data["east"][dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["east"])
-        data["north"][dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["north"])
+        if data_chunk:
+            data["up"][dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["up"])
+            data["east"][dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["east"])
+            data["north"][dt_to_read] = (data_chunk["lat"], data_chunk["lon"], data_chunk["north"])
         dt_to_read += timedelta(hours=6)
 
     return {k: create_interpolator(v) for k, v in data.items()}

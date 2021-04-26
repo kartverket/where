@@ -340,11 +340,13 @@ def calculate(stage, dset):
     # Run models for each term of the observation equation
     log.info(f"Calculating theoretical delays")
     delay.calculate_delay("delay", dset)
+    
+    delay_unit = "meter"
 
     delta_delay = delay.add("delay", dset)
-    dset.add_float("obs", val=dset.observed_delay, unit="meter", write_level="operational")
-    dset.add_float("calc", val=delta_delay, unit="meter", write_level="operational")
-    dset.add_float("residual", val=dset.obs - dset.calc, unit="meter", write_level="operational")
+    dset.add_float("obs", val=dset.observed_delay, unit=delay_unit, write_level="operational")
+    dset.add_float("calc", val=delta_delay, unit=delay_unit, write_level="operational")
+    dset.add_float("residual", val=dset.obs - dset.calc, unit=delay_unit, write_level="operational")
     log.blank()
 
     # Estimate clock polynomial
@@ -353,23 +355,40 @@ def calculate(stage, dset):
     outlier_limit = config.tech.calculate_outlier_limit.float
     store_outliers = config.tech.store_outliers.bool
 
+    bco_baselines = set()
     for iter_num in itertools.count(start=1):
         if dset.num_obs == 0:
             break
-        delay.calculate_delay("delay_corr", dset)
+        
+        delay.calculate_delay("delay_corr", dset, bco_baselines=bco_baselines)
         delta_correction = delay.add("delay_corr", dset)
 
         dset.calc[:] = dset.calc + delta_correction
         dset.residual[:] = dset.obs - dset.calc
         rms = dset.rms("residual")
-        log.info(f"{dset.num_obs} observations, residual = {rms:.4f}")
+        log.info(f"{dset.num_obs} observations, rms of residuals = {rms:.4f} {delay_unit} ")
 
         # Store results
         dset.write_as(stage=stage, label=iter_num - 1)
 
+        additional_bco_baselines = set()
+        if "vlbi_clock_poly" in config.tech.delay_corr.list:
+            bco_limit = config.tech.vlbi_clock_poly.bco_limit.float
+            # See if any baseline clock offsets should be estimated
+            for bl in dset.unique("baseline"):
+                bl_mean = dset.mean("residual", baseline=bl)
+                bl_num_obs = dset.num(baseline=bl)
+                
+                if np.abs(bl_mean) > bco_limit * rms and bl_num_obs > 5:
+                    additional_bco_baselines.add(bl)
+                    log.info(f"Adding {bl:17} (mean of residuals = {bl_mean: 6.4f} {delay_unit}) to baseline clock offset list")
+            
+            if additional_bco_baselines:
+                bco_baselines = bco_baselines.union(additional_bco_baselines)
+
         # Detect and remove extreme outliers
         idx = np.abs(dset.residual) < outlier_limit * rms
-        if iter_num > max_iterations or idx.all():
+        if iter_num > max_iterations or (idx.all() and not additional_bco_baselines):
             break
 
         if store_outliers:
@@ -382,7 +401,7 @@ def calculate(stage, dset):
                 cfg.update("ignore_observation", "observations", updated, source=util.get_program_name())
 
         dset.subset(idx)
-        log.info(f"Removing {sum(~idx)} observations with residuals bigger than {outlier_limit * rms}")
+        log.info(f"Removing {sum(~idx)} observations with residuals bigger than {(outlier_limit * rms):6.4f} {delay_unit}")
         log.blank()
 
     # Try to detect clock breaks
@@ -402,6 +421,7 @@ def estimate(stage, dset):
         stage (String):      Name of current stage.
     """
     max_iterations = config.tech.estimate_max_iterations.int
+    delay_unit = "meter"
 
     for iter_num in itertools.count(start=1):
         partial_vectors = estimation.partial_vectors(dset, "estimate_method")
@@ -411,7 +431,7 @@ def estimate(stage, dset):
         )
         estimation.call("estimate_method", dset=dset, partial_vectors=partial_vectors, obs_noise=obs_noise)
         rms = dset.rms("residual")
-        log.info(f"{dset.num_obs} observations, postfit residual = {rms:.4f}")
+        log.info(f"{dset.num_obs} observations, rms of postfit residuals = {rms:.4f} {delay_unit}")
         dset.write_as(stage=stage, label=iter_num - 1)
         if iter_num >= max_iterations:
             break

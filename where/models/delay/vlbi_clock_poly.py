@@ -29,8 +29,12 @@ MODEL = __name__.split(".")[-1]
 
 
 @plugins.register
-def clock_correction(dset):
+def clock_correction(dset, bco_baselines):
     """Estimate clock polynomial
+    
+    Args:
+        dset:    dataset
+        bco:     estimate baseline clock offsets if True
     """
     # Take previous clock corrections into account
     try:
@@ -39,15 +43,14 @@ def clock_correction(dset):
         output = np.zeros(dset.num_obs)
 
     # Read order of clock polynomial from config file
-    terms = 1 + config.tech.get("order_of_polynomial", section=MODEL, default=2).int
+    terms = 1 + config.tech.get("order_of_polynomial", section=MODEL).int
 
     # Read clock breaks from session config, only split on commas (and commas followed by whitespace)
-    clock_breaks = config.tech.get("clock_breaks", section=MODEL, default="").as_list(split_re=", *")
-    stations, time_intervals = parse_clock_breaks(dset, clock_breaks)
+    
+    stations, time_intervals = parse_clock_breaks(dset)
 
     # Read reference clock from edit file and store in dataset
-    ref_clock_str = config.tech.get("reference_clock", section=MODEL, default="").str
-    ref_clock = parse_reference_clock(stations, ref_clock_str)
+    ref_clock = parse_reference_clock(stations)
     dset.meta["ref_clock"] = ref_clock
 
     # Remove reference clock from list of clocks to be estimated
@@ -55,13 +58,17 @@ def clock_correction(dset):
     del stations[idx]
     del time_intervals[idx]
 
+    bco_baselines = parse_baseline_clock_offsets(dset, bco_baselines, ref_clock)
+    
+
     # Number of clock polynomial coefficients
-    num_coefficients = len(stations) * terms
+    num_coefficients = len(stations) * terms + len(bco_baselines)
     param_names = [
         sta + " clk_a" + str(t) + " " + time_intervals[i][0].utc.iso + " " + time_intervals[i][1].utc.iso
         for i, sta in enumerate(stations)
         for t in range(terms)
     ]
+    param_names.append([f"bco_{bl}" for bl in bco_baselines])
     dset.meta["num_clock_coeff"] = num_coefficients
 
     # Set up matrices for estimation
@@ -78,6 +85,12 @@ def clock_correction(dset):
         A[filter_1, idx * terms : (idx + 1) * terms, 0] = poly[filter_1]
         filter_2 = np.logical_and(dset.filter(station_2=station), filter_time)
         A[filter_2, idx * terms : (idx + 1) * terms, 0] = -poly[filter_2]
+
+    # Add baseline clock offsets
+    idx_start = num_coefficients - len(bco_baselines)
+    for i, bl in enumerate(bco_baselines):
+        offset_partial = np.array(dset.baseline == bl, dtype=float)
+        A[:, idx_start + i, 0] = offset_partial
 
     # Calculate normal matrix N and the moment vector U
     U = np.sum(A @ dset.residual[:, None, None], axis=0)
@@ -107,16 +120,8 @@ def clock_correction(dset):
     return output
 
 
-def parse_clock_breaks(dset, clock_breaks):
+def parse_clock_breaks(dset):
     """Parses the clock breaks string from the edit file
-
-    Examples:
-        > parse_clock_breaks(dset, '')
-        (OrderedDict(), 0)
-        > parse_clock_breaks(dset, 'SVETLOE 2015/01/23 05:36:00,
-                                    SVETLOE 2015/01/23 16:53:00,
-                                    SVETLOE 2015/01/23 12:30:00')
-        (OrderedDict([(5, [106560.0, 131400.0, 147180.0])]), 3)
 
     Args:
         dset:                A Dataset containing model data.
@@ -125,11 +130,13 @@ def parse_clock_breaks(dset, clock_breaks):
     Returns:
         OrderedDict with clock breaks and total number of clock breaks
      """
-    # Parse clock breaks from file and store in the station_breaks dictionary
     station_breaks = {
         s: [min(dset.time.utc), max(dset.time.utc) + TimeDelta(1, fmt="seconds", scale="utc")]
         for s in dset.unique("station")
     }
+    
+    clock_breaks = config.tech.get("clock_breaks", section=MODEL).as_list(split_re=", *")
+    
     if clock_breaks:
         log.info(f"Applying clock breaks: {', '.join(clock_breaks)}")
 
@@ -138,7 +145,6 @@ def parse_clock_breaks(dset, clock_breaks):
         cb = cb.split()
         cb_date = cb[-2:]
         cb_station = " ".join(cb[:-2])
-        # cb_station, *cb_date = cb.split()
         cb_time = Time(" ".join(cb_date), scale="utc", fmt="iso")
         if cb_station not in station_breaks:
             log.warn(
@@ -160,16 +166,16 @@ def parse_clock_breaks(dset, clock_breaks):
     return stations, time_intervals
 
 
-def parse_reference_clock(stations, ref_clock_str):
-    """Parses the reference clock string from the edit file
+def parse_reference_clock(stations):
+    """Parses the reference clock string from the configuration file
 
     Args:
         dset:              A Dataset containing model data
-        ref_clock_str:     IVS name of reference clock station
 
     Returns:
         String: IVS name of reference clock station in Dataset
     """
+    ref_clock_str = config.tech.get("reference_clock", section=MODEL).str
     if ref_clock_str not in stations:
         if ref_clock_str:
             log.warn(f"Reference clock {ref_clock_str!r} unknown. Available options are {', '.join(stations)}")
@@ -178,3 +184,51 @@ def parse_reference_clock(stations, ref_clock_str):
         ref_clock_str = stations[-1]
     log.info(f"Reference clock is {ref_clock_str!r}")
     return ref_clock_str
+
+def parse_baseline_clock_offsets(dset, baseline_clock_offsets, ref_clock):
+    """Parsers and validate the baseline clock offsets from the configuration file and add them to list
+    
+    Args:
+        dset:    Dataset
+        bco:     Baseline clock offsets detected automatically
+    
+    Returns:
+        list: baselines to estimate baseline clock offsets for
+    """
+    baselines = dset.unique("baseline")
+    man_bco = config.tech.get("baseline_clock_offsets", section=MODEL).list
+    
+    for bl in man_bco:
+        if bl not in baselines:
+            log.warn(f"Baseline {bl} in baseline_clock_offsets is unknown. Available options are {', '.join(baselines)}")
+        else:
+            baseline_clock_offsets.add(bl)
+    
+    for bl in list(baseline_clock_offsets):
+        if ref_clock in bl:
+            sta_1, _, sta_2 = bl.partition("/")
+            other_sta = sta_1 if sta_2 == ref_clock else sta_2
+            other_baselines = dset.unique("baseline", idx=dset.filter(station=other_sta))
+            if all([other_bl in baseline_clock_offsets for other_bl in other_baselines]):
+                # Remove the bco for the baseline to the reference clock of all other baselines
+                # for the same station is also estimated
+                baseline_clock_offsets.remove(bl)
+
+    store_bco = config.tech.get("store_bco", section=MODEL).bool
+
+    if store_bco:
+        rundate = dset.analysis["rundate"]
+        pipeline = dset.vars["pipeline"]
+        session = session=dset.vars["session"]
+        with config.update_tech_config(rundate, pipeline, session=session) as cfg:
+            cfg.update(MODEL, "baseline_clock_offsets",
+                       ", ".join(baseline_clock_offsets), 
+                       source=MODEL)
+
+    log.info(f"Estimating baseline clock offsets for:  {', '.join(baseline_clock_offsets)}")
+    return baseline_clock_offsets
+
+
+
+
+

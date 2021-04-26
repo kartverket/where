@@ -27,7 +27,7 @@ from where.lib import config
 from where.lib import log
 
 
-def calculate_delay(config_key, dset_in, dset_out=None, write_levels=None):
+def calculate_delay(config_key, dset_in, dset_out=None, write_levels=None, **kwargs):
     """Call delay models and store output in dataset
 
     Args:
@@ -35,10 +35,10 @@ def calculate_delay(config_key, dset_in, dset_out=None, write_levels=None):
         dset_in (Dataset):    Dataset to read data from.
         dset_out (Dataset):   Dataset to store data to.
     """
-    _calculate_model(calculate, config_key, dset_in, dset_out, write_levels)
+    _calculate_model(calculate, config_key, dset_in, dset_out, write_levels, **kwargs)
 
 
-def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels=None):
+def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels=None, **kwargs):
     """Call models and store output in dataset
 
     If the model output is empty, we still create a dummy field in the table only containing zeros. This is done to
@@ -53,7 +53,7 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels
     dset_out = dset_in if dset_out is None else dset_out
     write_levels = dict() if write_levels is None else write_levels
 
-    model_output = calculate_func(config_key, dset_in)
+    model_output = calculate_func(config_key, dset_in, **kwargs)
 
     for model_name, values in sorted(model_output.items()):
         field_name = f"{config_key}.{model_name}"
@@ -74,6 +74,6 @@ def add(config_key, dset):
     return delta_delay
 
 
-def calculate(config_key, dset):
+def calculate(config_key, dset, **kwargs):
     prefix = dset.vars["pipeline"]
-    return plugins.call_all(package_name=__name__, plugins=config.tech[config_key].list, prefix=prefix, dset=dset)
+    return plugins.call_all(package_name=__name__, plugins=config.tech[config_key].list, prefix=prefix, dset=dset, **kwargs)

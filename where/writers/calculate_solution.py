@@ -200,7 +200,7 @@ FIELDS = (
         "X-coordinate of site displacement due to atmospheric loading tides related to TRF",
     ),
     WriterField(
-        "atm_tides_x",
+        "atm_tides_y",
         "site",
         ("atm_tides", "trs", "y"),
         float,

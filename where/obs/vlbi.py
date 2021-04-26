@@ -61,6 +61,7 @@ def _write_to_dataset(parser, dset, rundate, session):
     # Convert source names to official IERS names
     source_names = apriori.get("vlbi_source_names")
     iers_source_names = [source_names[src]["iers_name"] if src in source_names else src for src in data["source"]]
+    # Replace the characeter "." with the letters "dot" in source names because "." has a special meaning in where
     data["source"] = iers_source_names
 
     # Replace spaces in station names with underscores to match official IVS name
@@ -69,6 +70,15 @@ def _write_to_dataset(parser, dset, rundate, session):
 
     dset.num_obs = len(data["time"])
     dset.add_time("time", val=data.pop("time"), scale="utc", fmt="isot", write_level="operational")
+
+    # Source directions
+    crf = apriori.get("crf", time=dset.time)
+    ra = np.array([crf[s].pos.right_ascension if s in crf else 0 for s in data["source"]])
+    dec = np.array([crf[s].pos.declination if s in crf else 0 for s in data["source"]])
+    dset.add_direction("src_dir", ra=ra, dec=dec, time=dset.time, write_level="operational")
+    # Replace the characeter "." with the letters "dot" in source names because "." has a special meaning in where
+    data["source"] = [s.replace(".", "dot") for s in iers_source_names]
+
 
     for field, values in data.items():
         values = np.array(values)
@@ -84,11 +94,6 @@ def _write_to_dataset(parser, dset, rundate, session):
         else:
             log.warn(f"Unknown datatype {values.dtype} for field {field}")
 
-    # Source directions
-    crf = apriori.get("crf", time=dset.time)
-    ra = np.array([crf[s].pos.right_ascension if s in crf else 0 for s in data["source"]])
-    dec = np.array([crf[s].pos.declination if s in crf else 0 for s in data["source"]])
-    dset.add_direction("src_dir", ra=ra, dec=dec, time=dset.time, write_level="operational")
 
     # Station information
     log.info(f"Found stations: {', '.join(dset.unique('station'))}")

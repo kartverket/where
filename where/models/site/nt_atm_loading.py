@@ -15,7 +15,7 @@ from midgard.dev import plugins
 # Where imports
 from where import apriori
 from where.data import position
-
+from where.lib import log
 
 @plugins.register
 def non_tidal_atmospheric_loading(dset):
@@ -52,10 +52,15 @@ def non_tidal_atmospheric_loading_station(ntapl, dset):
         Numpy array: GCRS corrections in meters.
     """
     lat, lon, _ = dset.site_pos.pos.llh.T
-
-    dup = ntapl["up"](dset.time, lon, lat)
-    deast = ntapl["east"](dset.time, lon, lat)
-    dnorth = ntapl["north"](dset.time, lon, lat)
+    try:
+        dup = ntapl["up"](dset.time, lon, lat)
+        deast = ntapl["east"](dset.time, lon, lat)
+        dnorth = ntapl["north"](dset.time, lon, lat)
+    except KeyError:
+        log.warn(f"No non-tidal atmospheric loading available for {dset.rundate}")
+        dup = np.zeros(len(dset.time))
+        deast = np.zeros(len(dset.time))
+        dnorth = np.zeros(len(dset.time))
 
     denu = np.stack((deast, dnorth, dup), axis=1)
     if position.is_position(dset.site_pos):

@@ -28,10 +28,13 @@ References:
 """
 
 # Standard library imports
+import math
 from datetime import datetime
+import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.data import time
 
 # Where imports
 from where.lib import log
@@ -64,10 +67,105 @@ def get_gravity_coefficients(gravity_field, truncation_level, rundate):
         log.fatal(f"Unknown gravity field {gravity_field}, exiting!")
 
     gravity_coefficients = gravity_parser.as_dict()
-    if gravity_field == "egm2008":  # TODO: Why do we treat this differently ... Should be done by properties not name
-        apply_rates(gravity_coefficients, truncation_level, rundate)
+    GM = gravity_parser.meta["earth_gravity_constant"]
+    r = gravity_parser.meta["radius"]
 
-    return gravity_coefficients
+    gr = dict()
+    gr["C"] = np.zeros((truncation_level + 1, truncation_level + 1))
+    gr["S"] = np.zeros((truncation_level + 1, truncation_level + 1))
+    rundate = time.Time(rundate, fmt="datetime", scale="utc")
+
+    if gravity_coefficients["gfc"].shape == ():
+        gr["C"][gravity_coefficients["gfc"]["degree"], gravity_coefficients["gfc"]["order"]] = gravity_coefficients[
+            "gfc"
+        ]["C"]
+        gr["S"][gravity_coefficients["gfc"]["degree"], gravity_coefficients["gfc"]["order"]] = gravity_coefficients[
+            "gfc"
+        ]["S"]
+    else:
+        for l in gravity_coefficients["gfc"]:
+            gr["C"][l["degree"], l["order"]] = l["C"]
+            gr["S"][l["degree"], l["order"]] = l["S"]
+
+    if not "gfct" in gravity_coefficients:
+        # Rates not contained in gravity file, apply rates from IERS
+        apply_rates(gr, truncation_level, rundate)
+        return gr, GM, r
+
+    for l in gravity_coefficients["gfct"]:
+        # TODO: Not sure what the xxxx in t0[yyyymmdd.xxxx] actually means (see e.g. EIGEN-6S4)
+        # Maybe hours and minutes, but in that case the minutes should have been between 0..59.
+        # They are not.
+        # It doesn't seem to matter for the orbit determination process,
+        # so I set hours = 0 for now
+
+        t0 = time.Time(
+            datetime(int(l["t0"][0:4]), int(l["t0"][4:6]), int(l["t0"][6:8]), int(l["t0"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+        t1 = time.Time(
+            datetime(int(l["t1"][0:4]), int(l["t1"][4:6]), int(l["t1"][6:8]), int(l["t1"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+
+        if t0 <= rundate < t1:
+            gr["C"][l["degree"], l["order"]] += l["C"]
+            gr["S"][l["degree"], l["order"]] += l["S"]
+
+    for l in gravity_coefficients["trnd"]:
+        t0 = time.Time(
+            datetime(int(l["t0"][0:4]), int(l["t0"][4:6]), int(l["t0"][6:8]), int(l["t0"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+        t1 = time.Time(
+            datetime(int(l["t1"][0:4]), int(l["t1"][4:6]), int(l["t1"][6:8]), int(l["t1"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+
+        if t0 <= rundate < t1:
+            years = (rundate.mjd - t0.mjd) / 365.25
+            gr["C"][l["degree"], l["order"]] += l["C"] * years
+            gr["S"][l["degree"], l["order"]] += l["S"] * years
+
+    for l in gravity_coefficients["asin"]:
+        t0 = time.Time(
+            datetime(int(l["t0"][0:4]), int(l["t0"][4:6]), int(l["t0"][6:8]), int(l["t0"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+        t1 = time.Time(
+            datetime(int(l["t1"][0:4]), int(l["t1"][4:6]), int(l["t1"][6:8]), int(l["t1"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+
+        if t0 <= rundate < t1:
+            years = (rundate.mjd - t0.mjd) / 365.25
+            gr["C"][l["degree"], l["order"]] += l["C"] * math.sin(2 * math.pi * years / l["period"])
+            gr["S"][l["degree"], l["order"]] += l["S"] * math.sin(2 * math.pi * years / l["period"])
+
+    for l in gravity_coefficients["acos"]:
+        t0 = time.Time(
+            datetime(int(l["t0"][0:4]), int(l["t0"][4:6]), int(l["t0"][6:8]), int(l["t0"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+        t1 = time.Time(
+            datetime(int(l["t1"][0:4]), int(l["t1"][4:6]), int(l["t1"][6:8]), int(l["t1"][9:11]), 0),
+            scale="utc",
+            fmt="datetime",
+        )
+
+        if t0 <= rundate < t1:
+            years = (rundate.mjd - t0.mjd) / 365.25
+            gr["C"][l["degree"], l["order"]] += l["C"] * math.cos(2 * math.pi * years / l["period"])
+            gr["S"][l["degree"], l["order"]] += l["S"] * math.cos(2 * math.pi * years / l["period"])
+
+    return gr, GM, r
 
 
 def apply_rates(coefficients, truncation_level, rundate):
@@ -83,8 +181,8 @@ def apply_rates(coefficients, truncation_level, rundate):
     Returns:
         None. Coefficients are changed in place.
     """
-
-    years = (rundate - datetime(2000, 1, 1)).days / 365.25
+    ref_date = time.Time(datetime(2000, 1, 1, 0, 0), fmt="datetime", scale="utc")
+    years = (rundate.mjd - ref_date.mjd) / 365.25
 
     if truncation_level >= 2:
         # Note that the C20- value is the tide free value on page 89 in [4],

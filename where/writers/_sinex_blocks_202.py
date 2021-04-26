@@ -220,14 +220,16 @@ class SinexBlocks:
         self.fid.write("+SOURCE/ID\n")
         self.fid.write("*Code IERS nam ICRF designator  number of observations per source \n")
         for iers_name in self.sources:
-            if iers_name in source_names:
-                icrf_name = source_names[iers_name]["icrf_name_long"]
+            # Sourcenames are saved internally with the letters "dot" instead of the character "." which have a special meaning in Where
+            real_iers_name = iers_name.replace("dot", ".")
+            if real_iers_name in source_names:
+                icrf_name = source_names[real_iers_name]["icrf_name_long"]
             else:
-                icrf_name = crf[iers_name].meta["icrf_name"] if "icrf_name" in crf[iers_name].meta else ""
+                icrf_name = crf[real_iers_name].meta["icrf_name"] if "icrf_name" in crf[real_iers_name].meta else ""
             if not icrf_name:
-                log.warn(f"Missing ICRF designation for {iers_name}")
+                log.warn(f"Missing ICRF designation for {real_iers_name}")
             num_obs = self.dset.num(source=iers_name)
-            self.fid.write(" {:0>4} {:<8} {:<16} {:04}\n".format(self.ids[iers_name], iers_name, icrf_name, num_obs))
+            self.fid.write(" {:0>4} {:<8} {:<16} {:04}\n".format(self.ids[iers_name], real_iers_name, icrf_name, num_obs))
         self.fid.write("-SOURCE/ID\n")
 
     def site_id(self):
@@ -560,7 +562,8 @@ class SinexBlocks:
 
         if param["type"] == "src_dir":
             crf = apriori.get("crf", time=self.dset.time)
-            src = crf[param["id"]]
+            # Sourcenames are saved internally with the letters "dot" instead of the character "." which have a special meaning in Where
+            src = crf[param["id"].replace("dot",".")]
             if param["partial"] == "ra":
                 pos = src.pos.right_ascension
             elif param["partial"] == "dec":

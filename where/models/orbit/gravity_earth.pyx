@@ -20,7 +20,6 @@ import math
 
 # Where imports
 from where.lib import config
-from midgard.math.constant import constant
 from where.lib import log
 from where import apriori
 
@@ -62,11 +61,9 @@ def gravity_earth_setup(
     global c20_index
     global xp, yp
 
-    GM = constant.get("GM", source="egm_2008")
-    R = constant.get("a", source="egm_2008")
     gravity_field = config.tech.gravity_field.str
     truncation_level = config.tech.gravity_truncation_level.int
-    gravity_coeffs = apriori.get("gravity", gravity_field=gravity_field, truncation_level=truncation_level,
+    gravity_coeffs, GM, R = apriori.get("gravity", gravity_field=gravity_field, truncation_level=truncation_level,
                                  rundate=rundate)
     C = gravity_coeffs["C"]
     S = gravity_coeffs["S"]
