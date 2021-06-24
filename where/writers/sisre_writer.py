@@ -185,22 +185,41 @@ def sisre_writer(dset: "Dataset") -> None:
     # Add additional fields used by the writer
     dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
     dset.add_text(
-        "time_gpsweek", val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.time]
+        "time_gpsweek", 
+        val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.time],
+        write_level="detail",
     )
     dset.add_text(
         "trans_time_gpsweek",
         val=[
             f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_transmission_time
         ],
+        write_level="detail",
     )
     dset.add_text(
         "toe_gpsweek",
         val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_toe],
+        write_level="detail",
     )
     # dset.add_float("diff_time_trans", val=(dset.time.mjd - dset.used_transmission_time.mjd) * Unit.day2second, Unit="second")
-    dset.add_float("dalong_track", val=dset.orb_diff.acr.along, unit=dset.unit("orb_diff.acr.along"))
-    dset.add_float("dcross_track", val=dset.orb_diff.acr.cross, unit=dset.unit("orb_diff.acr.cross"))
-    dset.add_float("dradial", val=dset.orb_diff.acr.radial, unit=dset.unit("orb_diff.acr.radial"))
+    dset.add_float(
+        "dalong_track", 
+        val=dset.orb_diff.acr.along, 
+        unit=dset.unit("orb_diff.acr.along"), 
+        write_level="detail",
+    )
+    dset.add_float(
+        "dcross_track", 
+        val=dset.orb_diff.acr.cross, 
+        unit=dset.unit("orb_diff.acr.cross"), 
+        write_level="detail",
+    )
+    dset.add_float(
+        "dradial", 
+        val=dset.orb_diff.acr.radial, 
+        unit=dset.unit("orb_diff.acr.radial"),
+        write_level="detail",
+    )
 
     ## Add 'detail' fields used by the writer
     # write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
@@ -213,7 +232,7 @@ def sisre_writer(dset: "Dataset") -> None:
     #        WriterField("dt_mean", "dt_mean", (), float, "%10.4f", 10, "dt_MEAN", ""),
     #    )
     #
-    #    dset.add_float("dt_mean", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter")
+    #    dset.add_float("dt_mean", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter", write_level="detail")
 
     # List epochs ordered by satellites
     idx = np.concatenate([np.where(dset.filter(satellite=s))[0] for s in dset.unique("satellite")])

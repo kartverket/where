@@ -120,7 +120,7 @@ def gnss_residual(dset: "Dataset") -> None:
 
     # Add date field to dataset
     if "date" not in dset.fields:
-        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
+        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], write_level="detail")
 
     # Put together fields in an array as specified by the 'dtype' tuple list
     output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in fields_def)))

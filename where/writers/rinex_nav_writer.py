@@ -122,6 +122,7 @@ def rinex_nav_writer(dset: "Dataset") -> None:
     dset.add_text(
         "time_gpsweek",
         val=[f"{t.gps.gps_ws.week:04.0f}{t.gps.gps_ws.day:1.0f}:{t.gps.gps_ws.seconds:06.0f}" for t in dset.time],
+        write_level="detail",
     )
     dset.add_text(
         "trans_time_gpsweek",
@@ -129,13 +130,19 @@ def rinex_nav_writer(dset: "Dataset") -> None:
             f"{t.gps.gps_ws.week:04.0f}{t.gps.gps_ws.day:1.0f}:{t.gps.gps_ws.seconds:06.0f}"
             for t in dset.transmission_time
         ],
+        write_level="detail",
     )
     dset.add_text(
         "toe_gpsweek",
         val=[f"{t.gps.gps_ws.week:04.0f}{t.gps.gps_ws.day:1.0f}:{t.gps.gps_ws.seconds:06.0f}" for t in dset.toe],
+        write_level="detail",
     )
 
-    dset.add_float("diff_trans_toe", val=(dset.transmission_time.mjd - dset.toe.mjd) * Unit.day2second)
+    dset.add_float(
+        "diff_trans_toe", 
+        val=(dset.transmission_time.mjd - dset.toe.mjd) * Unit.day2second, 
+        write_level="detail",
+    )
 
     # Select fields available in Dataset (e.g. DVS and SHS fields are only given for Galileo)
     fields = get_existing_fields(dset, FIELDS)

@@ -286,21 +286,22 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
                 val=(dset.site_pos.trs - ref_pos).val,
                 system="trs",
                 ref_pos=ref_pos,
+                write_level="operational",
             )
 
         # TODO: Maybe it is not necessary to introduce enu, hpe and vpe to dataset
         #      Maybe better to introduce fields in estimate stage already.
         if not "hpe" in dset.fields:
             hpe = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2)
-            dset.add_float("hpe", val=hpe)
+            dset.add_float("hpe", val=hpe, write_level="operational",)
 
         if not "vpe" in dset.fields:
             vpe = np.absolute(dset.enu.enu.up)
-            dset.add_float("vpe", val=vpe)
+            dset.add_float("vpe", val=vpe, write_level="operational",)
 
         if not "pos_3d" in dset.fields:
             pos_3d = np.sqrt(dset.enu.enu.east ** 2 + dset.enu.enu.north ** 2 + dset.enu.enu.up ** 2)
-            dset.add_float("pos_3d", val=pos_3d)
+            dset.add_float("pos_3d", val=pos_3d, write_level="operational",)
 
 
         # Determine dataframe

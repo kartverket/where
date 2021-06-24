@@ -1,5 +1,6 @@
 from distutils.core import setup
 from Cython.Build import cythonize
+import numpy as np
 import sys
 
 
@@ -10,7 +11,13 @@ sourcefiles = ["where/models/orbit/*.pyx", "where/integrators/*.pyx"]
 # Setup each version
 setup(
     name="cython_orbit_models",
+    include_dirs=[np.get_include()],
     ext_modules=cythonize(
-        sourcefiles, language_level=3, annotate=True, compiler_directives={"boundscheck": False, "cdivision": True}
+        sourcefiles,
+        language_level=3,
+        annotate=True,
+        compiler_directives={
+            "boundscheck": False,
+            "cdivision": True}
     ),
 )

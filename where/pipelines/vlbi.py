@@ -23,6 +23,7 @@ from where.lib import exceptions
 from where.lib import log
 from where.lib import util
 from where.models import site, delay
+from where import postprocessors
 from where import writers
 
 # The name of this technique
@@ -432,6 +433,8 @@ def estimate(stage, dset):
         estimation.call("estimate_method", dset=dset, partial_vectors=partial_vectors, obs_noise=obs_noise)
         rms = dset.rms("residual")
         log.info(f"{dset.num_obs} observations, rms of postfit residuals = {rms:.4f} {delay_unit}")
+        
+        
         dset.write_as(stage=stage, label=iter_num - 1)
         if iter_num >= max_iterations:
             break
@@ -443,13 +446,20 @@ def estimate(stage, dset):
         log.blank()
         if dset.num_obs == num_obs_before or dset.num_obs == 0:
             break
+        
+        
 
     log.blank()
     if dset.num_obs > 0:
         estimation.solve_neq(dset)
+        
     dset.write()
 
-
+@plugins.register
+def postprocess(stage, dset):
+    postprocessors.apply_postprocessors("postprocessors", dset)    
+    dset.write_as(stage=stage, label=0)
+    
 @plugins.register
 def write(stage, dset):
     """Write results to file

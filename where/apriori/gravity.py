@@ -88,8 +88,9 @@ def get_gravity_coefficients(gravity_field, truncation_level, rundate):
             gr["S"][l["degree"], l["order"]] = l["S"]
 
     if not "gfct" in gravity_coefficients:
-        # Rates not contained in gravity file, apply rates from IERS
-        apply_rates(gr, truncation_level, rundate)
+        if gravity_field == "EGM2008":
+            # Rates not contained in gravity file, apply rates from IERS
+            apply_rates(gr, truncation_level, rundate)
         return gr, GM, r
 
     for l in gravity_coefficients["gfct"]:

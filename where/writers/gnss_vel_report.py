@@ -372,6 +372,7 @@ def _plot_number_of_satellites(dset: "Dataset", figure_dir: "pathlib.PosixPath")
         dset.add_float(
             "num_satellite_used",
             val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time.gps.datetime),
+            write_level="detail",
         )
 
     plot(

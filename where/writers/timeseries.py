@@ -226,8 +226,19 @@ def method_statistics(dset, field, idx_values, func):
 
 
 def method_meta(dset, field, idx_values, func):
-    # TODO: Geir Arne!
-    return None, None, None
+    """Save simple meta information in timeseries
+    
+    Fields must be saved in meta in the following way:
+        dset.meta[field] = {'value': 146.41794074611778, '__unit__': 'Megameter**3'}
+
+    "value" is assumed to be a float
+    """
+    num_obs = len(idx_values[list(idx_values.keys()).pop()])
+    val = np.full(num_obs, np.nan, dtype=float)
+    val[:] = dset.meta[field]["value"]
+    unit = dset.meta[field].get("__unit__")
+    
+    return val, "add_float", unit
 
 
 def method_text(dset, field, idx_values, func):

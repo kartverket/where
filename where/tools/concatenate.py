@@ -51,8 +51,8 @@ Here are some concrete examples of how to run the program:
 Concatenate datasets from GNSS analysis for a given period:
   {exe:tools} concatenate 2019 1 1 2019 1 31 --gnss --station=vegs --stage=estimate --id=grc_inav_e1 --writers=gnss_report
 
-Concatenate datasets from GNSS SPV analysis for a given period:
-  {exe:tools} concatenate 2019 1 1 2019 1 31 --gnss_spv --station=vegs --stage=spv_doppler --writers=gnss_spv_report
+Concatenate datasets from GNSS VEL analysis for a given period:
+  {exe:tools} concatenate 2019 1 1 2019 1 31 --gnss_vel --station=vegs --stage=write --writers=gnss_vel_report
 
 Concatenate datasets from SISRE analysis for a given period:
   {exe:tools} concatenate 2018 2 1 2018 2 3 --sisre --stage=calculate --id=mgex_fnav_e1e5a_5min --label=2

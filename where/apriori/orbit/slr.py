@@ -25,7 +25,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where.apriori import orbit
-from where import data
+from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import log
 from where import parsers
@@ -68,9 +68,10 @@ class Slr(orbit.AprioriOrbit):
         super().__init__(rundate=rundate, time=time, satellite=satellite, system=system)
         self.file_key = file_key
         self.day_offset = day_offset
+        self.sat_name = satellite
         self.file_path = file_path
 
-    def _read(self, dset_raw, provider, version):
+    def _read(self, dset_raw, rundate, provider, version):
         """Read SP3 orbit file data and save it in a Dataset
 
         Naming convention correspond to end of arc, at midnight, hence we add day_offset,
@@ -78,14 +79,15 @@ class Slr(orbit.AprioriOrbit):
 
         Args:
             dset_raw (Dataset):   Dataset representing raw data from apriori orbit files
+            rundate:              Date of run, datetime object
             provider:             Str: Orbit provider
             version:              Str: Orbit version
         """
-        rundate = dset_raw.rundate
         date_to_read = rundate + timedelta(days=self.day_offset)
         file_vars = config.date_vars(date_to_read)
         file_vars["provider"] = provider
         file_vars["version"] = version
+        file_vars["sat_name"] = self.sat_name
 
         if self.file_path is None:
             file_path = config.files.path(self.file_key, file_vars)
@@ -94,12 +96,11 @@ class Slr(orbit.AprioriOrbit):
 
         log.debug(f"Parse precise orbit file {file_path}")
 
-        # Generate temporary Dataset with orbit file data
-        dset_orbit = data.Dataset(
-            rundate=date_to_read, tech=dset_raw.vars["tech"], stage="orbit", dataset_name="", dataset_id=0, empty=True
+        # Generate dataset with external orbit file data
+        dset_orbit = dataset.Dataset(
+            tech=dset_raw.meta["tech"], stage="orbit", dataset_name="", dataset_id=0, empty=True
         )
         parser = parsers.parse(parser_name="orbit_sp3", file_path=file_path, rundate=date_to_read)
         parser.write_to_dataset(dset_orbit)
 
-        dset_orbit.add_to_meta("parser", "file_path", file_path)
         return dset_orbit

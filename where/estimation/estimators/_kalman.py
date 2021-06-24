@@ -73,6 +73,8 @@ class KalmanFilter(object):
         self.x_hat_ferr = np.zeros((self.num_obs, self.n))
         self.x_smooth = np.zeros((self.num_obs, self.n, 1))
         self.param_names = param_names if param_names else []
+        self.innovation = np.zeros(self.num_obs)
+        self.sigma = np.zeros(self.num_obs)
 
         self.p_hat_file_path = config.files.path("output_covariance_matrix")
         self.p_hat_file = h5py.File(self.p_hat_file_path, "w")
@@ -85,8 +87,6 @@ class KalmanFilter(object):
         # Initialize
         x_tilde = np.zeros((self.n, 1))
         p_tilde = np.diag(self.apriori_stdev ** 2)
-        sigma = np.zeros(self.num_obs)
-        innovation = np.zeros(self.num_obs)
         k = np.zeros((self.num_obs, self.n, 1))
         lam = np.zeros((self.n, 1))
 
@@ -99,6 +99,8 @@ class KalmanFilter(object):
         x_hat = self.x_hat
         x_smooth = self.x_smooth
         I = np.eye(self.n)
+        innovation = self.innovation
+        sigma = self.sigma
 
         # Run filter forward over all observations
         for epoch in range(self.num_obs):

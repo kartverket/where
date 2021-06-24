@@ -344,7 +344,7 @@ def _plot_velocity_error(
         "plot_to": "file",
         "plot_type": "plot",
         # "statistic": ["rms", "mean", "std", "min", "max", "percentile"], #TODO: Is only shown for data, which are plotted at last.
-        "title": file_vars["solution"].upper(),
+        "title": config.tech.gnss_vel_comparison_report.title.str.upper(),
     }
 
     colors = (

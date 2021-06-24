@@ -21,6 +21,8 @@ from midgard.plot.matplotlib_extension import plot_bar_dataframe_columns
 
 # Where imports
 from where.lib import config
+from where.lib import log
+from where.postprocessors.gnss_compare_tgd import gnss_compare_tgd
 from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
 
@@ -37,7 +39,7 @@ def rinex_nav_report(dset: "Dataset") -> None:
         dset:        A dataset containing the data.
     """
     file_vars = {**dset.vars, **dset.analysis}
-
+ 
     # TODO: Better solution?
     if "station" not in file_vars:  # necessary if called for example by ./where/tools/concatenate.py
         file_vars["station"] = ""
@@ -46,7 +48,7 @@ def rinex_nav_report(dset: "Dataset") -> None:
     # Generate figure directory to save figures generated for RINEX navigation file report
     figure_dir = config.files.path("output_rinex_nav_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
-
+    
     # Generate RINEX navigation file report
     path = config.files.path("output_rinex_nav_report", file_vars=file_vars)
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
@@ -96,6 +98,35 @@ def _add_figures(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath"
                 figure_path=figure_path, 
                 caption=caption, 
         )
+        
+    rpt.add_text("\n\\clearpage\n\n")
+    
+    
+    # Plot TGD/BGD comparison
+    bias_comp_def = {"bgd_e1_e5a_diff", "bgd_e1_e5b_diff", "tgd_diff", "tgd_b1_b2_diff", "tgd_b1_b3_diff"}
+    
+    # Add DCB comparison results to dataset if not existing
+    if not set(dset.fields).intersection(bias_comp_def):
+        gnss_compare_tgd(dset)
+
+    if set(dset.fields).intersection(bias_comp_def):
+        for figure_path in plt.plot_tgd_comparison():
+            words = figure_path.stem.split("_")
+            gnss = words[2] if words[1] == "field" else words[1]
+            
+            if "diff." in str(figure_path):
+                caption=f"TGD/BGD comparison against DCBs for {enums.gnss_id_to_name[gnss].value}"
+            elif "diff_mean." in str(figure_path):
+                caption=f"TGD/BGD comparison against DCBs for {enums.gnss_id_to_name[gnss].value} (zero mean)"
+            else:
+                caption=f"TGD/BGD for {enums.gnss_id_to_name[gnss].value}"
+            rpt.add_figure(
+                    figure_path=figure_path, 
+                    caption=caption, 
+            )
+        
+    else:
+        log.warn(f"No TGD/BGD comparison plots are generated.")
         
     rpt.add_text("\n\\clearpage\n\n")
 

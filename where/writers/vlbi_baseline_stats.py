@@ -7,7 +7,6 @@ Write simple statistics about a VLBI analysis to screen and file. For each basel
 and for the whole dataset the following information is printed:
 
 * Number of observations
-* Length of baseline in meters (only for baselines)
 * Bias (average residual) in meters
 * RMS of residual in meters
 * Stars, ``*``, indicating high RMS'es
@@ -17,18 +16,28 @@ Example:
 
 .. highlight:: none
 
-The following example shows output from a VLBI analysis of three stations::
+Example:
 
-    ALL                  2686         0.00   -0.00143    0.09186 *
-    HOBART12             1798         0.00    0.00072    0.08387 *
-    KATH12M              1782         0.00   -0.00247    0.09918 *
-    YARRA12M             1792         0.00   -0.00255    0.09196 *
-    HOBART12  KATH12M     894   3431879.01    0.00082    0.09166 *
-    HOBART12  YARRA12M    904   3211335.64    0.00063    0.07539 *
-    KATH12M   HOBART12    894   3431879.01    0.00082    0.09166 *
-    KATH12M   YARRA12M    888   2360367.26   -0.00579    0.10621 **
-    YARRA12M  HOBART12    904   3211335.64    0.00063    0.07539 *
-    YARRA12M  KATH12M     888   2360367.26   -0.00579    0.10621 **
+  Station   Station   Num obs      Offset         RMS Outlier
+                            #         [m]         [m]
+  ALL                    1921   -0.000006    0.008974 
+  HOBART26                154    0.000257    0.014238 
+  KOKEE                   631   -0.000069    0.011818 
+  NYALES20                989    0.000346    0.008244 
+  SVETLOE                 972   -0.000277    0.007016 
+  TIGOCONC                186    0.000003    0.011267 
+  WETTZELL                910   -0.000099    0.007514 
+  HOBART26  KOKEE          78    0.000343    0.013261 
+  HOBART26  NYALES20       19    0.001131    0.016477 
+  HOBART26  SVETLOE        26   -0.003174    0.012600 
+  HOBART26  TIGOCONC       22    0.000611    0.016259 
+  HOBART26  WETTZELL        9    0.006708    0.016331 
+  KOKEE     HOBART26       78    0.000343    0.013261 
+  KOKEE     NYALES20      191    0.000900    0.012089 
+  KOKEE     SVETLOE       159   -0.000502    0.011344 
+  KOKEE     TIGOCONC       73   -0.000795    0.010306 
+  ...
+
 """
 
 # Standard library imports
@@ -58,6 +67,8 @@ def baseline_stats(dset):
         dset:   Dataset, information about model run.
     """
     stats_str = ["Statistics about stations and baselines"]
+    stats_str.append(f"{'Station'.ljust(9)} {'Station'.ljust(9)} {'Num obs'.rjust(7)} {'Offset'.rjust(11)} {'RMS'.rjust(11)} Outlier")
+    stats_str.append(f"{''.ljust(9)} {''.ljust(9)} {'#'.rjust(7)} {'[m]'.rjust(11)} {'[m]'.rjust(11)}")
     baselines = itertools.permutations(dset.unique("station"), 2)
     idx = np.ones(dset.num_obs, dtype=bool)
     stats_str.append(_write_line("ALL", "", dset, idx))
@@ -93,14 +104,4 @@ def _write_line(sta_1, sta_2, dset, idx):
     bias = dset.mean("residual", idx=idx) if any(idx) else 0
     stars = "" if rms < STAR_THRESHOLD else "*" * min(MAX_NUM_STARS, math.ceil(math.log2(rms / STAR_THRESHOLD)))
 
-    if sta_2 and any(idx):
-        trf = apriori.get("trf", time=dset.time.utc.mean)
-        site_id_1 = dset.meta[sta_1]["site_id"]
-        site_id_2 = dset.meta[sta_2]["site_id"]
-        pos_1 = trf[site_id_1].pos.trs
-        pos_2 = trf[site_id_2].pos.trs
-        bl_len = (pos_2 - pos_1).length
-    else:
-        bl_len = 0
-
-    return f"{sta_1:<9s} {sta_2:<9s} {np.sum(idx):>5d} {bl_len:>11.1f} {bias:>11.6f} {rms:>11.6f} {stars}"
+    return f"{sta_1:<9s} {sta_2:<9s} {np.sum(idx):>7d} {bias:>11.6f} {rms:>11.6f} {stars}"

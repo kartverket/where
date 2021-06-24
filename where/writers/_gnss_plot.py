@@ -17,13 +17,25 @@ import numpy as np
 # Midgard imports
 from midgard.collections import enums
 from midgard.gnss import gnss
-from midgard.plot.matplotlib_extension import plot
+from midgard.math.unit import Unit
+from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import log
 
+
+PlotField = namedtuple(
+    "PlotField", ["ylabel", "unit"]
+)
+PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
+PlotField.__doc__ = """A convenience class for defining a necessary plotting parameters
+
+    Args:
+        ylabel (str):   y-axis label description
+        unit (str):     Unit used for plotting of y-axis
+    """
 
 class GnssPlot:
     """Class for GNSS plots
@@ -58,7 +70,8 @@ class GnssPlot:
         figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
         log.debug(f"Plot {figure_path}.")
     
-        plot(
+        plt = MatPlotExt()
+        plt.plot(
             x_arrays=[
                 self.dset.time.gps.datetime,
                 self.dset.time.gps.datetime,
@@ -72,7 +85,7 @@ class GnssPlot:
             y_unit="",
             labels=["GDOP", "PDOP", "VDOP", "HDOP", "TDOP"],
             figure_path=figure_path,
-            opt_args={
+            options={
                 "figsize": (7, 4), 
                 "legend": True, 
                 "plot_to": "file",
@@ -96,7 +109,6 @@ class GnssPlot:
             List with figure path for linear combinations depending on GNSS. File name ends with GNSS identifier
             (e.g. 'E', 'G') and observation type, for example 'plot_geometry_free_code_G_C1C_C2X.png'.
         """
-
         figure_paths = list()
         
         for field in self.dset.diff_epo.fields:
@@ -125,7 +137,8 @@ class GnssPlot:
                     labels.append(sat)  
                 
                 # Plot scatter plot
-                plot(
+                plt = MatPlotExt()
+                plt.plot(
                     x_arrays=x_arrays,
                     y_arrays=y_arrays,
                     xlabel="Time [GPS]",
@@ -133,7 +146,7 @@ class GnssPlot:
                     y_unit="m",
                     labels=labels,
                     figure_path=figure_path,
-                    opt_args={
+                    options={
                         "figsize": (7, 6),
                         "legend": True,
                         "legend_ncol": 6,
@@ -162,22 +175,42 @@ class GnssPlot:
             figure_name: File name of figure.
         
         Returns:
-            List with figure path for depending on GNSS. File name ends with GNSS identifier
-            (e.g. 'E', 'G') and field name, for example 'plot_field_G_C1C.png'.
+            List with figure path for depending on GNSS. File name ends with GNSS identifier (e.g. 'E', 'G') and field 
+            name, for example 'plot_field_G_C1C.png'.
         """
-
         figure_paths = list()
         fieldname = f"{collection}.{field}" if collection else field
         
-        field_def = {
-                "gnss_ionosphere": "Ionospheric delay",
-                "gnss_range": "Range",
-                "gnss_satellite_clock": "Satellite clock",
-                "gnss_total_group_delay": "Total group delay",
-                "troposphere_radio": "Troposphere delay",
+        plot_def = {
+                "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns"),
+                "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns"),
+                "bgd_e1_e5a_diff_mean": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns"),
+                "bgd_e1_e5b": PlotField("BGD(E1,E5b)", "ns"),
+                "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns"),
+                "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns"),
+                "gnss_ionosphere": PlotField("Ionospheric delay", "m"),
+                "gnss_range": PlotField("Range", "m"),
+                "gnss_satellite_clock": PlotField("Satellite clock", "m"),
+                "gnss_total_group_delay": PlotField("Total group delay", "m"),
+                "tgd": PlotField("TGD(L1,L2)", "ns"),
+                "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns"),
+                "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns"),
+                "tgd_b1_b3": PlotField("TGD(B1,B3)", "ns"),
+                "tgd_b1_b3_diff": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns"),
+                "tgd_b1_b3_diff_mean": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns"),
+                "tgd_b2_b3": PlotField("TGD(B2,B3)", "ns"),
+                "tgd_b2_b3_diff": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns"),
+                "tgd_b2_b3_diff_mean": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns"),
+                "troposphere_radio": PlotField("Troposphere delay", "m"),
         }
 
-        for sys in sorted(self.dset.meta["obstypes"].keys()):
+        plot_def_qzss = {
+                "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns"),
+                "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns"),
+        }
+
+
+        for sys in sorted(self.dset.unique("system")):
 
             x_arrays = []
             y_arrays = []
@@ -197,19 +230,30 @@ class GnssPlot:
                     continue
                 idx = self.dset.filter(satellite= sat)
                 x_arrays.append(self.dset.time.gps.datetime[idx])
-                y_arrays.append(self.dset[fieldname][idx])
+                y_array = self._convert_to_unit(self.dset[fieldname][idx], self.dset.unit(fieldname)[0], plot_def[fieldname].unit) if fieldname in plot_def.keys() else self.dset[fieldname][idx]
+                y_arrays.append(y_array) 
                 labels.append(sat)  
             
+ 
+            if fieldname in plot_def.keys():
+                if sys == "J" and fieldname in ["tgd_diff", "tgd_diff_mean"]:
+                    ylabel = plot_def_qzss[fieldname].ylabel
+                else:
+                    ylabel = plot_def[fieldname].ylabel
+            else:
+                ylabel = f"Field ({field})"
+
             # Plot scatter plot
-            plot(
+            plt = MatPlotExt()
+            plt.plot(
                 x_arrays=x_arrays,
                 y_arrays=y_arrays,
                 xlabel="Time [GPS]",
-                ylabel=field_def[field] if field in field_def else f"Field ({field})",
-                y_unit="m",
+                ylabel=ylabel,
+                y_unit=plot_def[fieldname].unit if fieldname in plot_def.keys() else "",
                 labels=labels,
                 figure_path=figure_path,
-                opt_args={
+                options={
                     "figsize": (7, 6),
                     "legend": True,
                     "legend_ncol": 6,
@@ -217,11 +261,11 @@ class GnssPlot:
                     "plot_to": "file", 
                     "plot_type": "scatter",
                     "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                    "xlim": "fit_to_data",
                 },
             )
                 
         return figure_paths
-    
     
     
     def plot_gnss_signal_in_space_status(
@@ -301,7 +345,8 @@ class GnssPlot:
                     title = f"{enums.gnss_id_to_name[sys].value.upper()} signal-in-space status ({nav_type})"
                     
                 # Generate plot
-                plot(
+                plt = MatPlotExt()
+                plt.plot(
                     x_arrays=x_arrays,
                     y_arrays=y_arrays,
                     xlabel="Time [GPS]",
@@ -310,7 +355,7 @@ class GnssPlot:
                     labels=labels[sys],
                     colors=colors[sys],
                     figure_path=figure_path,
-                    opt_args={
+                    options={
                         "figsize": (7, 8),
                         "marker": "s",
                         "marksersize": 10,
@@ -368,7 +413,8 @@ class GnssPlot:
         day_start, day_end = self._get_day_limits()
     
         # Generate plot
-        plot(
+        plt = MatPlotExt()
+        plt.plot(
             x_arrays=x_arrays,
             y_arrays=y_arrays,
             xlabel="Time [GPS]",
@@ -377,7 +423,7 @@ class GnssPlot:
             labels=labels,
             colors=colors,
             figure_path=figure_path,
-            opt_args={
+            options={
                 "figsize": (7, 12),
                 "marker": "s",
                 "marksersize": 10,
@@ -413,7 +459,6 @@ class GnssPlot:
             List with figure path for linear combinations depending on GNSS. File name ends with GNSS identifier
             (e.g. 'E', 'G') and observation type, for example 'plot_geometry_free_code_G_C1C_C2X.png'.
         """
-
         FigureInfo = namedtuple("FigureInfo", ["file_path", "name", "system", "obstype"])
         
         figure_info = list()
@@ -446,7 +491,8 @@ class GnssPlot:
                         labels.append(sat)  
                     
                     # Plot scatter plot
-                    plot(
+                    plt = MatPlotExt()
+                    plt.plot(
                         x_arrays=x_arrays,
                         y_arrays=y_arrays,
                         xlabel="Time [GPS]",
@@ -454,7 +500,7 @@ class GnssPlot:
                         y_unit="m",
                         labels=labels,
                         figure_path=figure_path,
-                        opt_args={
+                        options={
                             "figsize": (7, 6),
                             "legend": True,
                             "legend_ncol": 6,
@@ -462,6 +508,7 @@ class GnssPlot:
                             "plot_to": "file", 
                             "plot_type": "scatter",
                             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                            "xlim": "fit_to_data",
                         },
                     )
                 
@@ -490,7 +537,8 @@ class GnssPlot:
                         labels.append(sat)  
 
                     # Plot scatter plot
-                    plot(
+                    plt = MatPlotExt()
+                    plt.plot(
                         x_arrays=x_arrays,
                         y_arrays=y_arrays,
                         xlabel="Time [GPS]",
@@ -498,7 +546,7 @@ class GnssPlot:
                         y_unit="m",
                         labels=labels,
                         figure_path=figure_path,
-                        opt_args={
+                        options={
                             "figsize": (7, 6),
                             "legend": True,
                             "legend_ncol": 6,
@@ -506,6 +554,7 @@ class GnssPlot:
                             "plot_to": "file", 
                             "plot_type": "scatter",
                             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                            "xlim": "fit_to_data",
                         },
                     ) 
                     
@@ -535,7 +584,8 @@ class GnssPlot:
                         labels.append(sat)  
 
                     # Plot scatter plot
-                    plot(
+                    plt = MatPlotExt()
+                    plt.plot(
                         x_arrays=x_arrays,
                         y_arrays=y_arrays,
                         xlabel="Time [GPS]",
@@ -543,7 +593,7 @@ class GnssPlot:
                         y_unit="m",
                         labels=labels,
                         figure_path=figure_path,
-                        opt_args={
+                        options={
                             "figsize": (7, 6),
                             "legend": True,
                             "legend_ncol": 6,
@@ -551,6 +601,7 @@ class GnssPlot:
                             "plot_to": "file", 
                             "plot_type": "scatter",
                             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                            "xlim": "fit_to_data",
                         },
                     ) 
                                         
@@ -584,7 +635,8 @@ class GnssPlot:
                     ylabel = f"{name1.capitalize()}-{name2} ({obscode})"
                     
                     # Plot scatter plot
-                    plot(
+                    plt = MatPlotExt()
+                    plt.plot(
                         x_arrays=x_arrays,
                         y_arrays=y_arrays,
                         xlabel="Time [GPS]",
@@ -592,7 +644,7 @@ class GnssPlot:
                         y_unit="m",
                         labels=labels,
                         figure_path=figure_path,
-                        opt_args={
+                        options={
                             "figsize": (7, 6),
                             "legend": True,
                             "legend_ncol": 6,
@@ -600,6 +652,7 @@ class GnssPlot:
                             "plot_to": "file", 
                             "plot_type": "scatter",
                             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                            "xlim": "fit_to_data",
                         },
                     )
 
@@ -618,7 +671,7 @@ class GnssPlot:
         Returns:
             Figure path.
         """
-    
+        
         # Generate x- and y-axis data per system
         x_arrays = []
         y_arrays = []
@@ -637,7 +690,8 @@ class GnssPlot:
             labels.append(enums.gnss_id_to_name[sys].value)
     
         # Plot scatter plot
-        plot(
+        plt = MatPlotExt()
+        plt.plot(
             x_arrays=x_arrays,
             y_arrays=y_arrays,
             xlabel="Time [GPS]",
@@ -645,14 +699,15 @@ class GnssPlot:
             y_unit="",
             labels=labels,
             figure_path=figure_path,
-            opt_args={
+            options={
                 "figsize": (7, 4), 
                 "marker": ",",
                 "legend": True,
                 "legend_location": "bottom",
                 "legend_ncol": len(self.dset.unique("system")),
                 "plot_to": "file", 
-                "plot_type": "plot"
+                "plot_type": "plot",
+                "xlim": "fit_to_data",
             },
         )
         
@@ -681,9 +736,11 @@ class GnssPlot:
                                     self.dset.system, 
                                     self.dset.satellite, 
                                     self.dset.time.gps.datetime),
+                write_level="operational",
             )
     
-        plot(
+        plt = MatPlotExt()
+        plt.plot(
             x_arrays=[self.dset.time.gps.datetime, self.dset.time.gps.datetime],
             y_arrays=[self.dset.num_satellite_available, self.dset.num_satellite_used],
             xlabel="Time [GPS]",
@@ -691,12 +748,13 @@ class GnssPlot:
             y_unit="",
             labels=["Available", "Used"],
             figure_path=figure_path,
-            opt_args={
+            options={
                 "figsize": (7, 4), 
                 "legend": True, 
                 "marker": ",", 
                 "plot_to": "file", 
-                "plot_type": "plot"
+                "plot_type": "plot",
+                "xlim": "fit_to_data",
             },
         )
         
@@ -716,7 +774,6 @@ class GnssPlot:
             List with figure path for observation type availability depending on GNSS. File name ends with GNSS 
             identifier (e.g. 'E', 'G'), for example 'plot_obstype_availability_E.png'.
         """
-    
         figure_paths = list()
     
         for sys in sorted(self.dset.unique("system")):
@@ -748,20 +805,22 @@ class GnssPlot:
                         x_arrays.append(self.dset.time.gps.datetime[keep_idx])
                         y_arrays.append(np.full(num_obs, f"{sat}_{obstype}"))
 
-            plot(
+            plt = MatPlotExt()
+            plt.plot(
                 x_arrays=x_arrays,
                 y_arrays=y_arrays,
                 xlabel="Time [GPS]",
                 ylabel="Satellite and observation type",
                 figure_path=figure_path,
                 y_unit="",
-                opt_args={
+                options={
                     "colormap": "tab20",
                     "figsize": (1.0 * num_sat, 3.0 * num_sat),
                     "fontsize": 5,
                     "plot_to": "file",
                     "plot_type": "scatter",
                     #"title": "Satellite and observation type",
+                    "xlim": "fit_to_data",
                 },
             )
 
@@ -780,7 +839,7 @@ class GnssPlot:
         Returns:
             Figure path.
         """
-    
+        
         # Generate x- and y-axis data per system
         x_arrays = []
         y_arrays = []
@@ -798,7 +857,8 @@ class GnssPlot:
             
         # Plot scatter plot
         num_sat = len(self.dset.unique("satellite"))
-        plot(
+        plt = MatPlotExt()
+        plt.plot(
             x_arrays=x_arrays,
             y_arrays=y_arrays,
             xlabel="Time [GPS]",
@@ -806,7 +866,7 @@ class GnssPlot:
             y_unit="",
             #labels=labels,
             figure_path=figure_path,
-            opt_args={
+            options={
                 "colormap": "tab20",
                 "figsize": (0.1 * num_sat, 0.2 * num_sat),
                 "fontsize": 10,
@@ -816,6 +876,7 @@ class GnssPlot:
                 "plot_to": "file",
                 "plot_type": "scatter",
                 #"title": "Satellite availability",
+                "xlim": "fit_to_data",
             },
         )
         
@@ -865,7 +926,8 @@ class GnssPlot:
         
             # Plot with polar projection
             # TODO: y-axis labels are overwritten after second array plot. Why? What to do?
-            plot(
+            plt = MatPlotExt()
+            plt.plot(
                 x_arrays=x_arrays,
                 y_arrays=y_arrays,
                 xlabel="",
@@ -873,7 +935,7 @@ class GnssPlot:
                 y_unit="",
                 labels=labels,
                 figure_path=figure_path,
-                opt_args={
+                options={
                     "colormap": "tab20",
                     "figsize": (7, 7.5),
                     "legend": True,
@@ -933,7 +995,8 @@ class GnssPlot:
                 labels.append(sat)
         
             # Plot with scatter plot
-            plot(
+            plt = MatPlotExt()
+            plt.plot(
                 x_arrays=x_arrays,
                 y_arrays=y_arrays,
                 xlabel="Time [GPS]",
@@ -941,7 +1004,7 @@ class GnssPlot:
                 y_unit="",
                 labels=labels,
                 figure_path=figure_path,
-                opt_args={
+                options={
                     "colormap": "tab20",
                     "figsize": (7, 8),
                     "legend": True,
@@ -998,7 +1061,8 @@ class GnssPlot:
             return None
     
         # Generate plot
-        plot(
+        plt = MatPlotExt()
+        plt.plot(
             x_arrays=[time_read.tolist(), time_orbit.tolist(), time_edit.tolist()],
             y_arrays=[satellite_read.tolist(), satellite_orbit.tolist(), satellite_edit.tolist()],
             xlabel="Time [GPS]",
@@ -1007,7 +1071,7 @@ class GnssPlot:
             # labels = ["Rejected in orbit stage", "Rejected in edit stage", "Kept observations"],
             colors=["red", "orange", "green"],
             figure_path=figure_path,
-            opt_args={
+            options={
                 "colormap": "tab20",
                 "figsize": (7, 6),
                 "marker": "|",
@@ -1019,6 +1083,202 @@ class GnssPlot:
         )
         
         return figure_path
+    
+    
+    def plot_tgd_comparison(
+                            self, 
+                            figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
+
+    ) -> List[pathlib.PosixPath]:
+        """Plot total/broadcast group delay (TGD/BGD) comparison results
+        
+        Args:
+            figure_name: File name of figure.
+        
+        Returns:
+            List with figure path for TGD/BGD comparison plots. File name ends with GNSS identifier
+            (e.g. 'E', 'G') and observation type, for example 'plot_G_tgd.png'.
+        """          
+        figure_paths = list()
+       
+        plot_def = {
+            "C": {
+                "tgd_b1_b3": PlotField("TGD(B1,B2), DCB(C2I,C6I)", "ns"),
+                "tgd_b2_b3": PlotField("TGD(B1,B3), DCB(C7I,C6I)", "ns"),
+            },
+            "E": {
+                "bgd_e1_e5a":  PlotField("BGD(E1,E5a), DCB(C1C,C5Q)", "ns"),
+                "bgd_e1_e5b":  PlotField("BGD(E1,E5b), DCB(C1C,C7Q)", "ns"),
+            },
+            "G": {
+                "tgd": PlotField("TGD(L1,L2), DCB(C1W,C2W)", "ns"),
+            },
+            "J": {
+                "tgd": PlotField("TGD(L1,L2), DCB(C1X,C2X)", "ns"),
+            },
+           
+        }  
+            
+        tgd_def = ["bgd_e1_e5a", "bgd_e1_e5b", "tgd", "tgd_b1_b3", "tgd_b2_b3"]
+
+        #
+        # Plot average of TGD and DCB by satellite
+        #          
+
+        # Generate x- and y-axis data per system
+        for sys in sorted(self.dset.unique("system")):
+             
+            if sys not in plot_def:
+                log.warn(f"TGD/BGD comparison against post-processed DCBs is not defined for GNSS '{sys}'.")
+                continue
+          
+            for field in plot_def[sys].keys():
+
+                if not field in self.dset.fields or not f"{field}_dcb" in self.dset.fields:
+                    continue
+            
+                satellites = []
+                tgd_sat_mean = []
+                dcb_sat_mean = []
+                tgd_dcb_sat_mean = []
+                tgd_dcb_sat_std = []
+                tgd_dcb_sat_rms = []
+                tgd_dcb_sat_percentile = []
+                        
+                for sat in sorted(self.dset.unique("satellite")):
+                    if not sat.startswith(sys):
+                        continue
+                    idx = self.dset.filter(satellite=sat)
+                    satellites.append(sat)
+                    tgd_sat = self.dset[f"{field}_mean"][idx] * Unit.second2nanosecond
+                    dcb_sat = self.dset[f"{field}_dcb_mean"][idx] * Unit.second2nanosecond
+                    tgd_dcb_sat = tgd_sat - dcb_sat
+                    tgd_sat_mean.append(np.mean(tgd_sat))
+                    dcb_sat_mean.append(np.mean(dcb_sat))
+                    tgd_dcb_sat_mean.append(np.mean(tgd_dcb_sat))
+                    tgd_dcb_sat_std.append(np.std(tgd_dcb_sat))
+                    tgd_dcb_sat_rms.append(self._rms(tgd_dcb_sat))
+                    tgd_dcb_sat_percentile.append(np.nanpercentile((np.absolute(tgd_dcb_sat)), 95))
+            
+                # Plot average of TGD and DCB by satellite in one plot
+                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb")
+                figure_paths.append(figure_path)
+                log.debug(f"Plot {figure_path}.")
+                         
+                plt = MatPlotExt()
+                plt.plot(
+                    x_arrays= [satellites, satellites],
+                    y_arrays=[tgd_sat_mean, dcb_sat_mean],
+                    xlabel="Satellite",
+                    ylabel=f"Mean {plot_def[sys][field].ylabel}",
+                    y_unit="ns",
+                    labels=plot_def[sys][field].ylabel.split(", "),
+                    colors=["blue", "red"],
+                    figure_path=figure_path,
+                    options={
+                        "figsize": (7, 4),
+                        "legend": True,
+                        "legend_ncol": 2,
+                        "legend_location": "bottom",
+                        "marker": ".",
+                        "markersize": 15,
+                        "plot_to": "file",
+                        "plot_type": "scatter",
+                        "xlabelrotation": 45,
+                    },
+                )
+                               
+                # Plot difference average of TGD and DCB by satellite 
+                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb_diff")
+                figure_paths.append(figure_path)
+                log.debug(f"Plot {figure_path}.")
+                plt = MatPlotExt()
+                plt.plot(
+                    x_arrays= [satellites],
+                    y_arrays=[tgd_dcb_sat_mean],
+                    yerr_arrays=[tgd_dcb_sat_std],
+                    xlabel="Satellite",
+                    ylabel=f"Mean {plot_def[sys][field].ylabel.replace(', ', ' - ')}",
+                    y_unit="ns",
+                    colors=["black"],
+                    figure_path=figure_path,
+                    options={
+                        "ecolor": "grey",
+                        "errorbar": True,
+                        "figsize": (7, 4),
+                        "marker": ".",
+                        "markersize": 30,
+                        "plot_to": "file",
+                        "plot_type": "scatter",
+                        "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                        "xlabelrotation": 45,
+                    },
+                )
+                
+                # RMS
+                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb_diff_rms")
+                figure_paths.append(figure_path)
+                log.debug(f"Plot {figure_path}.")
+                plt = MatPlotExt()
+                plt.plot(
+                    x_arrays= [satellites],
+                    y_arrays=[tgd_dcb_sat_rms],
+                    xlabel="Satellite",
+                    ylabel=f"RMS {plot_def[sys][field].ylabel.replace(', ', ' - ')}",
+                    y_unit="ns",
+                    colors=["dodgerblue"],
+                    figure_path=figure_path,
+                    options={
+                        "figsize": (7, 4),
+                        "marker": ".",
+                        "markersize": 30,
+                        "plot_to": "file",
+                        "plot_type": "bar",
+                        "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                        "xlabelrotation": 45,
+                    },
+                )
+                
+                # Percentile
+                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb_diff_percentile")
+                figure_paths.append(figure_path)
+                log.debug(f"Plot {figure_path}.")
+                plt = MatPlotExt()
+                plt.plot(
+                    x_arrays= [satellites],
+                    y_arrays=[tgd_dcb_sat_percentile],
+                    xlabel="Satellite",
+                    ylabel=f"Percentile {plot_def[sys][field].ylabel.replace(', ', ' - ')}",
+                    y_unit="ns",
+                    colors=["dodgerblue"],
+                    figure_path=figure_path,
+                    options={
+                        "figsize": (7, 4),
+                        "marker": ".",
+                        "markersize": 30,
+                        "plot_to": "file",
+                        "plot_type": "bar",
+                        "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+                        "xlabelrotation": 45,
+                    },
+                )
+                
+
+        #
+        # Plot TGD, TGD-DCB and TGD_mean - DCB_mean by time
+        #         
+        for field in tgd_def: 
+            
+            if field in self.dset.fields:
+                figure_paths = figure_paths + self.plot_field(field)
+            
+            #if f"{field}_diff" in self.dset.fields:
+            #    figure_paths = figure_paths + self.plot_field(f"{field}_diff")
+                
+            if f"{field}_diff_mean" in self.dset.fields:
+                figure_paths = figure_paths + self.plot_field(f"{field}_diff_mean")
+        
+        return figure_paths
 
 
     #        
@@ -1039,7 +1299,25 @@ class GnssPlot:
     
     #        
     # AUXILIARY FUNCTIONS
-    # 
+    #
+    def _convert_to_unit(self, data: np.ndarray, from_unit: str, to_unit: str) -> np.ndarray:
+        """Convert field data to specified unit
+        
+        Args:
+            data:       Array with data
+            from_unit:  Data unit
+            to_unit:    Unit to convert 
+            
+        Returns:
+            Array with data in specified unit
+        """
+        if (from_unit is None) or (from_unit == to_unit):
+            return data
+
+        #log.debug(f"Convert field {field} from unit {from_unit} to {to_unit}.")
+        return data * Unit(from_unit).to(to_unit).m 
+    
+    
     def _get_dataset(
             self, 
             stage: str, 
@@ -1144,6 +1422,18 @@ class GnssPlot:
             satellite.extend(self.dset.satellite[idx][idx_status])
     
         return time, satellite
+    
+    
+    def _rms(self, x: np.ndarray) -> np.ndarray:
+        """Determine root mean square (RMS)
+        
+        Args:
+            x: Array with data
+            
+        Returns:
+            RMS for given data
+        """
+        return np.sqrt(np.nanmean(np.square(x)))
         
         
     def _select_gnss_signal(self, system: Union[str, None]=None) -> Tuple[List[str], str]:

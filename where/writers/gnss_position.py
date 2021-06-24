@@ -306,25 +306,40 @@ def gnss_position(dset: "Dataset") -> None:
 
     # Add date field to dataset
     if "date" not in dset.fields:
-        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
+        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], write_level="detail")
 
     # Add ENU position to dataset
     ref_pos = position.Position(
         val=np.array([dset.meta["pos_x"], dset.meta["pos_y"], dset.meta["pos_z"]]), system="trs"
     )
     enu = (dset.site_pos.trs.pos - ref_pos).enu
-    dset.add_float("site_pos_vs_ref_east", val=enu.east, unit="meter")
-    dset.add_float("site_pos_vs_ref_north", val=enu.north, unit="meter")
-    dset.add_float("site_pos_vs_ref_up", val=enu.up, unit="meter")
+    dset.add_float("site_pos_vs_ref_east", val=enu.east, unit="meter", write_level="detail")
+    dset.add_float("site_pos_vs_ref_north", val=enu.north, unit="meter", write_level="detail")
+    dset.add_float("site_pos_vs_ref_up", val=enu.up, unit="meter", write_level="detail")
 
     # Add HPE and VPE to dataset
-    dset.add_float("hpe", val=np.sqrt(enu.east ** 2 + enu.north ** 2), unit="meter")
-    dset.add_float("vpe", val=np.absolute(enu.up), unit="meter")
+    dset.add_float("hpe", val=np.sqrt(enu.east ** 2 + enu.north ** 2), unit="meter", write_level="operational")
+    dset.add_float("vpe", val=np.absolute(enu.up), unit="meter", write_level="operational")
 
     # Add standard deviation of site position coordinates
-    dset.add_float("site_pos_sigma_x", val=np.sqrt(dset.estimate_cov_site_pos_xx), unit="meter")
-    dset.add_float("site_pos_sigma_y", val=np.sqrt(dset.estimate_cov_site_pos_yy), unit="meter")
-    dset.add_float("site_pos_sigma_z", val=np.sqrt(dset.estimate_cov_site_pos_zz), unit="meter")
+    dset.add_float(
+            "site_pos_sigma_x", 
+            val=np.sqrt(dset.estimate_cov_site_pos_xx), 
+            unit="meter",
+            write_level="detail",
+    )
+    dset.add_float(
+            "site_pos_sigma_y", 
+            val=np.sqrt(dset.estimate_cov_site_pos_yy), 
+            unit="meter",
+            write_level="detail",
+    )
+    dset.add_float(
+            "site_pos_sigma_z", 
+            val=np.sqrt(dset.estimate_cov_site_pos_zz), 
+            unit="meter",
+            write_level="detail",
+    )
 
     # Put together fields in an array as specified by the 'dtype' tuple list
     if config.tech.estimate_epochwise.bool:  # Epochwise estimation or over whole time period

@@ -188,15 +188,12 @@ def calculate(stage, dset):
                 apriori_orbit="slr",
                 file_key="slr_external_orbits",
             )
-            dset_external = apriori_orbit._read(dset, apriori_orbit_provider, version)
 
-            sat_pos = dset_external.sat_pos.gcrs_pos
-            t_sec = TimeDelta(
-                dset_external.time
-                - Time(datetime(rundate.year, rundate.month, rundate.day), scale="utc", fmt="datetime"),
-                fmt="seconds",
-            )
-            t_sec = t_sec.value
+            dset_external = apriori_orbit._read(dset, rundate, apriori_orbit_provider, version)
+            sat_pos = dset_external.sat_pos.gcrs.val
+            t_diff = dset_external.time - Time(datetime(rundate.year, rundate.month, rundate.day), fmt="datetime", scale="utc")
+
+            t_sec = np.array([t.total_seconds() for t in t_diff.base])
         else:
             sat_pos, sat_vel, t_sec = orbit.calculate_orbit(
                 datetime(rundate.year, rundate.month, rundate.day), sat_name, sat_time_list, return_full_table=True

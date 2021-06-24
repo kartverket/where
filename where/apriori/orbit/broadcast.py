@@ -289,7 +289,8 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             elif field in ["nav_type", "satellite", "system"]:
                 dset_edit.add_text(field, val=nav_np[:, idx])
             else:
-                dset_edit.add_float(field, val=nav_np[:, idx].astype(float))
+                unit = self.dset_raw.unit(field)[0] if self.dset_raw.unit(field) else None
+                dset_edit.add_float(field, val=nav_np[:, idx].astype(float), unit=unit)
 
     def _calculate(self, dset_out: "Dataset", dset_in: "Dataset", time: str = "time") -> None:
         """Calculate broadcast ephemeris and satellite clock correction for given observation epochs
@@ -510,9 +511,13 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         dset_brdc_idx = self._get_brdc_block_idx(dset, time=time)
 
         # Add satellite clock parameters to dataset
-        dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx])
-        dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx])
-        dset.add_float("sat_clock_drift_rate", val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx])
+        dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx], write_level="analysis")
+        dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx], write_level="analysis")
+        dset.add_float(
+            "sat_clock_drift_rate", 
+            val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx], 
+            write_level="analysis",
+        )
         
 
     def _galileo_signal_health_status(self):
@@ -643,7 +648,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         # if "signal_health_status" in dset.fields:
         #    dset.signal_health_status[:] = signal_health_status
         # else:
-        #    dset.add_float("signal_health_status", val=signal_health_status)
+        #    dset.add_float("signal_health_status", val=signal_health_status, write_level="analysis"))
         # -DEBUG
 
         return signal_health_status

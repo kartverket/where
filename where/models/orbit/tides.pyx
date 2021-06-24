@@ -1,4 +1,7 @@
 # cython: profile=True
+# cython: boundscheck=False
+# cython: cython.wraparound=False
+# cython: language_level=3
 """Calculates the force on the satellite from the solid earth tides and ocean tides
 
 Description:
@@ -16,7 +19,10 @@ References:
 import math
 
 # External library imports
+cimport numpy as np
 import numpy as np
+import pandas as pd
+import cython
 
 # Where imports
 from where import apriori
@@ -29,12 +35,13 @@ cdef double GM_earth, R_earth, GM_moon, GM_sun
 cdef int truncation_level
 cdef double[:, :] sun_pos, moon_pos
 cdef double[:] sun_distance, moon_distance
-cdef dict ocean_tides_coeffs
+#cdef double[:, :, :, :] ocean_tides_coeffs
 cdef CpS1, CmS1
 cdef epoch_list, delaunay_variables
 cdef double[:, :, :] g2i
 cdef double[:] GMST
 cdef double[:] m_1, m_2
+cdef double[:, :] norm_factor_matrix
 
 
 def register_entry_point():
@@ -77,6 +84,7 @@ def tides_setup(
     global GMST
     global m_1, m_2
     global ocean_tides_coeffs
+    global norm_factor_matrix
     epoch_list = epochs
 
     # Read the value of constants GM and r from gravity file
@@ -89,17 +97,24 @@ def tides_setup(
     GM_moon = constant.get("GM_moon")
     GM_sun = constant.get("GM_sun")
 
+    # Read configuration settings
+    truncation_level = config.tech.gravity_truncation_level.int
+
     # Ocean tides coefficients, corrections to the gravity coefficients C and S.
-    # The dict containing the values Cp, Cm, Sp and Sm
-    ocean_tides_coeffs = apriori.get("ocean_tides_orbit")
+    # Pandas is used for the applymap function, 
+    # but we want the result to be a dict for speed purposes. 
+    df = pd.DataFrame.from_dict(
+        apriori.get("ocean_tides_orbit")).applymap(
+            data_dict2matrix)
+    ocean_tides_coeffs = df.to_dict()
+
+    # Get the normalization matrix
+    norm_factor_matrix = normalization_matrix(truncation_level)
 
     # The S1 wave is contained in a separate file
     s1_wave = apriori.get("ocean_tides_s1")
     CpS1 = s1_wave[164.556]["C+"]
     CmS1 = s1_wave[164.556]["C-"]
-
-    # Read configuration settings
-    truncation_level = config.tech.gravity_truncation_level.int
 
     # Tides from Moon:
     idx_moon = bodies.index("moon")
@@ -334,6 +349,9 @@ cdef solid_earth_tides(int current_step):
 
     # Compute the non-normalized coefficients here.
 
+    # Get the normalization matrix
+    # norm_factor_matrix = normalization_matrix(truncation_level)
+
     # STEP 1
     # Equation (6.6)
     for n in range(2, min(4, C.shape[0])):
@@ -344,8 +362,8 @@ cdef solid_earth_tides(int current_step):
             correction = (factor_moon * V_moon[n, m] + factor_sun * V_sun[n, m] +
                           (factor_moon * W_moon[n, m] + factor_sun * W_sun[n, m]) * 1j)
 
-            C[n, m] = correction.real * normalization_factor(n, m)**2
-            S[n, m] = correction.imag * normalization_factor(n, m)**2
+            C[n, m] = correction.real * norm_factor_matrix[n,m]**2
+            S[n, m] = correction.imag * norm_factor_matrix[n,m]**2
 
     # Treat the n=4 case separately:
     # Equation (6.7)
@@ -355,22 +373,22 @@ cdef solid_earth_tides(int current_step):
             factor_sun = k(4, m) / 5 * (GM_sun / GM_earth)
             correction = (factor_moon * V_moon[2, m] + factor_sun * V_sun[2, m]
                           + 1j * (factor_moon * W_moon[2, m] + factor_sun * W_sun[2, m]))
-            C[4, m] = correction.real * normalization_factor(2, m) * normalization_factor(4, m)
-            S[4, m] = correction.imag * normalization_factor(2, m) * normalization_factor(4, m)
+            C[4, m] = correction.real * norm_factor_matrix[2,m] * norm_factor_matrix[4,m]
+            S[4, m] = correction.imag * norm_factor_matrix[2,m] * norm_factor_matrix[4,m]
 
     # STEP 2
     # Equation (6.8a)
-    C[2, 0] += normalization_factor(2, 0) * equation_68a(current_step)
+    C[2, 0] += norm_factor_matrix[2,0] * equation_68a(current_step)
 
     # Equation (6.8b) with m=1.
     correction1, correction2 = equation_68b_m1(current_step)
-    C[2, 1] += normalization_factor(2, 1) * correction1
-    S[2, 1] += normalization_factor(2, 1) * correction2
+    C[2, 1] += norm_factor_matrix[2,1] * correction1
+    S[2, 1] += norm_factor_matrix[2,1] * correction2
 
     # Equation (6.8b) with m=2.
     correction3, correction4 = equation_68b_m2(current_step)
-    C[2, 2] += normalization_factor(2, 2) * correction3
-    S[2, 2] += normalization_factor(2, 2) * correction4
+    C[2, 2] += norm_factor_matrix[2,2] * correction3
+    S[2, 2] += norm_factor_matrix[2,2] * correction4
 
     return C, S
 
@@ -384,37 +402,65 @@ def ocean_tides(int current_step):
         current_step:        Int, Current step of the integrator
 
     Returns:
-        C, S:                Time variable part of gravity coefficients due to ocean tides at time t.
+        C, S:                Time variable part of the normalized gravity coefficients due to ocean tides at time t.
 
     NB. This uses Doodson arguments and multipliers to compute the angular argument NF below
     """
+    # Initialize gravity coefficient matrices 
     C = np.zeros((truncation_level, truncation_level))
     S = np.zeros((truncation_level, truncation_level))
+
+    # Doodson vars are common to all doodson numbers
+    doodson_vars = doodson_args(delaunay_variables[current_step], GMST[current_step])
 
     # Equation 6.15
     for doodson in ocean_tides_coeffs.keys():
         doodson_mul = doodson_multipliers(doodson)
-        doodson_vars = doodson_args(delaunay_variables[current_step], GMST[current_step])
         NF = np.dot(doodson_mul, doodson_vars)
+
+        # fetch coefficients from dictionary
         Cp = ocean_tides_coeffs[doodson]["C+"]
         Cm = ocean_tides_coeffs[doodson]["C-"]
         Sp = ocean_tides_coeffs[doodson]["S+"]
         Sm = ocean_tides_coeffs[doodson]["S-"]
 
-        for n in range(2, C.shape[0]):
-            for m in range(0, n + 1):
-                if (n,m) not in Cp:     # skip coeffs. excluded because of amplitude limit
-                    continue
+        # moved these two out of the for loop!
+        sin_theta_f = math.sin(NF)
+        cos_theta_f = math.cos(NF)
 
-                sin_theta_f = math.sin(NF)
-                cos_theta_f = math.cos(NF)
+        # use linear algebra to calculate C and S for this doodson value
+        C += np.multiply(norm_factor_matrix, (
+                    (cos_theta_f * (Cp + Cm)) + 
+                    (sin_theta_f * (Sp + Sm)))
+                    )
 
-                C[n, m] += normalization_factor(n, m) * (cos_theta_f * (Cp[n, m] + Cm[n, m]) +
-                                                         sin_theta_f * (Sp[n, m] + Sm[n, m]))
-                if (m > 0):
-                    S[n, m] += normalization_factor(n, m) * (cos_theta_f * (Sp[n, m] - Sm[n, m]) -
-                                                             sin_theta_f * (Cp[n, m] - Cm[n, m]))
+        S += np.multiply(norm_factor_matrix, (
+                    (cos_theta_f * (Sp - Sm)) - 
+                    (sin_theta_f * (Cp - Cm)))
+                    )
+
     return C, S
+
+
+def data_dict2matrix(raw_data):
+    """Converts a coefficient dictionary to a matrix
+    Input:
+        raw_data: dict: doubbly indexed data dictionary
+        matrix_size: int, default 10
+    Returns:
+        matrix: nxn matrix, numpy array
+    """
+    if not truncation_level:
+        raise ValueError
+    # Build a matrix to store the values
+    matrix = np.zeros((truncation_level, truncation_level))
+    # loop through the data and assign to matrix
+    for n, m in raw_data.keys():
+        try:
+            matrix[n,m] = raw_data[n,m]
+        except IndexError:
+            continue
+    return matrix
 
 
 def doodson_args(delaunay_vars, GMST):
@@ -768,15 +814,33 @@ cdef delaunay():
 
     return fundamental_arguments.T
 
-
+# Adding cython decorator to speed up division
+@cython.cdivision(True)
 cdef normalization_factor(int n, int m):
     """
     Normalization factor, see Conventions chapter 6
-
+    
     Input:
         n:  Integer
         m:  Integer
     Returns
        integer
     """
-    return np.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m == 0)) / math.factorial(n + m))
+    return math.sqrt(math.factorial(n - m) * (2 * n + 1) * (2 - (m == 0)) / math.factorial(n + m))
+
+
+def normalization_matrix(truncation_level):
+    """Calculate the normalization matrix up to a truncation level
+    note: truncation_level is a global variable.
+    Input:
+        truncation_level: int: size of matrix to be calcualted.
+    Returns
+       normalization_matrix: [nxn numpy matrix] 
+    """
+    norm_factor_matrix = np.zeros((truncation_level, truncation_level))
+
+    for n in range(0, norm_factor_matrix.shape[0]):
+        for m in range(0, n+1):
+            norm_factor_matrix[n,m] = normalization_factor(n, m)
+    
+    return norm_factor_matrix

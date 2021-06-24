@@ -283,7 +283,11 @@ def gnss_velocity(dset: "Dataset") -> None:
 
     # Add date field to dataset
     if "date" not in dset.fields:
-        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
+        dset.add_text(
+            "date", 
+            val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime],
+            write_level="detail",
+        )
 
     # Add necessary site velocity fields to dataset    
     if "site_vel_3d" not in dset.fields:

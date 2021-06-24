@@ -112,7 +112,10 @@ def gnss_position(dset: "Dataset") -> None:
     # Add date and DOPs fields to dataset
     if "date" not in dset.fields:
         dset.add_text(
-            "date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], unit="YYYY/MM/DD hh:mm:ss"
+            "date", 
+            val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], 
+            unit="YYYY/MM/DD hh:mm:ss",
+            write_level="detail",
         )
 
     if "pdop" not in dset.fields:
@@ -122,6 +125,7 @@ def gnss_position(dset: "Dataset") -> None:
         dset.add_float(
             "num_satellite_used",
             val=gnss.get_number_of_satellites(dset.system, dset.satellite, dset.time.gps.datetime),
+            write_level="operational",
         )
 
     # Put together fields in an array as specified by the 'dtype' tuple list

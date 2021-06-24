@@ -55,5 +55,5 @@ def gnss_dop(dset: "Dataset") -> None:
             log.debug(f"{_SECTION}: Update gdop, pdop, hdop and vdop fields to Dataset.")
 
         else:
-            dset.add_float(dop, val=val)
+            dset.add_float(dop, val=val, write_level="operational")
             log.debug(f"{_SECTION}: Add gdop, pdop, hdop and vdop fields to Dataset.")

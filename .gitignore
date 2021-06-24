@@ -13,6 +13,18 @@ build
 *.c
 *.o
 
+# Latex extensions
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.run.xml
+*.out
+*.toc
+
 # Distribution / packaging
 *.egg-info/
 
@@ -24,6 +36,7 @@ where/integrators/*.html
 where/models/orbit/*.html
 
 # External libraries source
+external/gl_library/
 external/gpt2w/src/
 external/iers/hfeop/
 external/iers/src_2010/

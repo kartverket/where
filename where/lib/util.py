@@ -21,6 +21,9 @@ import platform
 import re
 import sys
 
+# Midgard imports
+from midgard.collections import enums
+
 # Where imports
 import where
 from where.lib import config
@@ -120,6 +123,16 @@ def check_help_and_version(doc_module=None):
     if check_options("--version"):
         _print_version_from_doc(doc_module)
         raise SystemExit
+  
+  
+def check_write_level(write_level: enums.WriteLevel) -> bool:
+    """Check if given configuration write level is larger than given write level
+    
+    Args:
+        write_level: Write level to check
+    """
+    cfg_write_level = config.where.write_level.str
+    return True if enums.get_value("write_level", write_level) >= enums.get_value("write_level", cfg_write_level) else False
 
 
 @no_traceback

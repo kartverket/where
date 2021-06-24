@@ -88,7 +88,7 @@ def estimate_solution(dset: "Dataset") -> None:
 
     # Add date field to dataset
     if "date" not in dset.fields:
-        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
+        dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], write_level="detail")
         
     # Add states to WriterField depending on used pipeline
     fields_def = list(FIELDS)
