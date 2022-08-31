@@ -3,8 +3,8 @@
 Description:
 ------------
 
-Reads data for earth orientation parameters from the two data files (eopc04_IAU2000.62-now and eopc04_extended.dat). If
-there are data in both files, the former is prioritized.
+Reads data for earth orientation parameters from the configured data sources. The order of the EOP sources determines
+the prioritization. 
 
 The following parameters are provided:
 
@@ -63,6 +63,7 @@ from functools import lru_cache
 # External library imports
 from scipy import interpolate
 import numpy as np
+from numpy.polynomial import Polynomial
 
 # Midgard imports
 from midgard.dev import plugins
@@ -83,7 +84,7 @@ _EOP_DATA = dict()
 
 
 @plugins.register
-def get_eop(time, models=None, pole_model=None, window=4, sources=None, remove_leap_seconds=None):
+def get_eop(time, models=None, pole_model=None, cpo_model=None, window=None, sources=None, remove_leap_seconds=None):
     """Get EOP data for the given time epochs
 
     Args:
@@ -100,7 +101,7 @@ def get_eop(time, models=None, pole_model=None, window=4, sources=None, remove_l
         for source in sources:
             _EOP_DATA.setdefault(source, {}).update(parsers.parse_key(file_key=f"eop_{source}").as_dict())
 
-    return Eop(_EOP_DATA, time, models=models, pole_model=pole_model, window=window, sources=sources, remove_leap_seconds=remove_leap_seconds)
+    return Eop(_EOP_DATA, time, models=models, pole_model=pole_model, cpo_model=cpo_model, window=window, sources=sources, remove_leap_seconds=remove_leap_seconds)
 
 
 class Eop:
@@ -115,7 +116,7 @@ class Eop:
 
     _correction_cache = dict()
 
-    def __init__(self, eop_data, time, models=None, pole_model=None, window=4, sources=None, remove_leap_seconds=None):
+    def __init__(self, eop_data, time, models=None, pole_model=None, cpo_model=None ,window=None, interp=None, sources=None, remove_leap_seconds=None):
         """Create an Eop-instance that calculates EOP corrections for the given time epochs
 
         The interpolation window is based on https://hpiers.obspm.fr/iers/models/interp.f which uses 4 days.
@@ -125,20 +126,25 @@ class Eop:
             time (Time):     Time epochs for which to calculate EOPs.
             models (Tuple):  Optional tuple of EOP correction models. If not given, the config setting is used.
             window (Int):    Number of days to use as interpolation window.
+            interp (String:  Interpolation method. 'lagrange' or 'linear'
         """
         if time.scale == "ut1":
             raise ValueError(f"Time scale of 'time' cannot be 'ut1'")
-        self.window = window
         self.time = time
         self.sources = sources
-        self.data = self.pick_data(eop_data, self.time, self.window, sources)
-        self.calculate_leap_second_offset()
-
+        
+        # Figure out how to do interpolation
+        self.interp = config.tech.eop_interpolation_method.str if interp is None else interp
+        self.window = config.tech.eop_interpolation_window.int if window is None else window
+        
         # Figure out which correction models to use
         self.models = config.tech.eop_models.tuple if models is None else models
 
         # Determines whether the interpolated values should contain the jump caused by leap seconds or not
-        self.remove_leap_seconds = remove_leap_seconds if remove_leap_seconds is not None else config.tech.eop_remove_leap_seconds.bool
+        self.remove_leap_seconds = config.tech.eop_remove_leap_seconds.bool if remove_leap_seconds is None else remove_leap_seconds 
+        
+        self.data = self.pick_data(eop_data, self.time, self.window, sources)
+        self.calculate_leap_second_offset()
 
         if "rg_zont2" in self.models:
             self.remove_low_frequency_tides()
@@ -161,6 +167,9 @@ class Eop:
             self.mean_pole_y = interpolate.interp1d(
                 range(len(data["y"])), data["y"], kind="previous", fill_value="extrapolate"
             )
+        
+        # Figure out which CPO model to use:
+        self.cpo_model = config.tech.get("eop_cpo_model", value=cpo_model, default=None).str
 
     @staticmethod
     def pick_data(eop_data, time, window, sources):
@@ -186,6 +195,14 @@ class Eop:
             try:
                 picked_data = {d: eop_data[source][d].copy() for d in np.arange(start_time, end_time + 1)}
                 eop_path = config.files.path(f"eop_{source}")
+                for d, params in picked_data.items():
+                    for param, value in params.items():
+                        try:
+                            if np.isnan(value):
+                                log.warn(f"Missing value for {param} for mjd {d} in {eop_path}")
+                        except TypeError:
+                            # np.isnan fails on strings etc. Which is ok
+                            pass
                 log.debug(f"Using a priori EOP values from {eop_path} ")
                 return picked_data
             except KeyError:
@@ -519,8 +536,10 @@ class Eop:
         Returns:
             Array: X-offset of the CIP, one value for each time epoch [arcseconds].
         """
-        values = self._interpolate_table("dx")
-        return values
+        if not self.cpo_model:
+            return self._interpolate_table("dx")
+        
+        return getattr(self, f"dx_{self.cpo_model}")()
 
     @property
     @lru_cache()
@@ -533,9 +552,59 @@ class Eop:
         Returns:
             Array: Y-offset of the CIP, one value for each time epoch [arcseconds].
         """
-        values = self._interpolate_table("dy")
+        if not self.cpo_model:
+            return self._interpolate_table("dy")
+        
+        return getattr(self, f"dy_{self.cpo_model}")()
 
-        return values
+    @Unit.register("arcseconds")
+    def dy_empirical_2020(self):
+        """ Empirical model fitted to 2020 data
+        
+        Courtesy: Axel Nothnagel
+        """ 
+        # Coefficients for Y nutation component in mas
+        A = -0.08826
+        B = +0.10496
+        C = -0.01245
+        D = -0.00011
+        return self.cpo_empirical_2020(A, B, C, D) * Unit.mas2arcseconds
+    
+    @Unit.register("arcseconds")
+    def dx_empirical_2020(self):
+        """ Empirical model fitted to 2020 data
+        
+        Courtesy: Axel Nothnagel 
+        """
+        # Coefficient for X nutation component in mas
+        A = +0.06373 
+        B = +0.04188 
+        C = +0.14386
+        D = +0.00018
+        return self.cpo_empirical_2020(A, B, C, D) * Unit.mas2arcseconds
+    
+    @Unit.register("arcseconds")    
+    def cpo_empirical_2020(self, A, B, C, D):
+        """ Empirical model of CPO with optimal fit to data from the year 2020.
+        
+        Used in a research project to estimate polar motion and ut1 as 6 hours piecewise linear offsets, 
+        which requires the CPO to be fixed. 
+        """
+        f = 2 * np.pi / 430 # period of 430 days
+        t = self.time.mjd - 58849.0  # datetime(2000, 1, 1, 0, 0)
+        return A * np.sin(f * t) + B * np.cos(f * t) + C + D * t
+  
+    @Unit.register("arcseconds")
+    def dy_zero(self):
+        """ Sets the Y - celestial pole offset to zero.
+        """ 
+        return np.zeros(len(self.time))
+    
+    @Unit.register("arcseconds")
+    def dx_zero(self):
+        """ Sets the X - celestial pole offset to zero.
+        """ 
+        return np.zeros(len(self.time))
 
     def _interpolate_table(self, key, leap_second_correction=False, derivative_order=0):
         """Interpolate daily values to the given time epochs
@@ -570,13 +639,17 @@ class Eop:
             leap = {d: 0 for d in days}
 
         table_values = {d: np.array([self.data[d + o][key] for o in offsets]) + leap[d] for d in days}
-        interpolators = {d: interpolate.lagrange(offsets, v) for d, v in table_values.items()}
-        for poly in interpolators.values():
-            poly.c[np.abs(poly.c) < 1e-15] = 0  # Avoid numerical instabilities for constant values
+        
+        if self.interp == "lagrange":
+            interpolators = {d: interpolate.lagrange(offsets, v) for d, v in table_values.items()}
+            for poly in interpolators.values():
+                poly.c[np.abs(poly.c) < 1e-15] = 0  # Avoid numerical instabilities for constant values
+        elif self.interp == "linear":
+            interpolators = {d:Polynomial.fit(offsets, v, 1) for d,v in table_values.items()}
 
         if derivative_order:
             interp_values = {
-                d: np.polyder(ip, derivative_order)(self.time.utc.mjd_frac) for d, ip in interpolators.items()
+                d: ip.deriv(derivative_order)(self.time.utc.mjd_frac) for d, ip in interpolators.items()
             }
         else:
             interp_values = {d: ip(self.time.utc.mjd_frac) for d, ip in interpolators.items()}

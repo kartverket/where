@@ -41,9 +41,9 @@ Read Where dataset and write Where datasets fields via a defined writer.
 
 Example:
 --------
-
-  {exe:tools} write 2018 10 26 --sisre --stage=calculate --label=1 --id='grc_inav_e1_std_sat' --writers=sisre_plot
-  {exe:tools} write 2019 2 1 --gnss --station=stas --stage=estimate --writers=gnss_report
+  {exe:tools} write 2021 7 1 --sisre --stage=calculate --label=raw --id='_cnes_inav_e1' --writers=sisre_plot
+  {exe:tools} write 2019 2 1 --gnss --station=stas --stage=write --writers=gnss_report
+  {exe:tools} write 2019 2 1 --rinex_nav --stage=read --writers=rinex_nav_report
 """
 # Standard library imports
 from typing import List

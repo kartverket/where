@@ -132,10 +132,10 @@ class OrbitSp3dParser(ChainParser):
                 },
                 # ----+----1----+----2----+----3----+----4----+----5----+----6
                 # %c G  cc GPS ccc cccc cccc cccc cccc ccccc ccccc ccccc ccccc
-                15: {"parser": self._parse_string, "fields": {"file_type": (3, 5), "time_sys": (9, 12)}},
+                17: {"parser": self._parse_string, "fields": {"file_type": (3, 5), "time_sys": (9, 12)}},
                 # ----+----1----+----2----+----3----+----4----+----5----+----6
                 # %f  1.2500000  1.025000000  0.00000000000  0.000000000000000
-                17: {"parser": self._parse_float, "fields": {"base_posvel": (3, 13), "base_clkrate": (14, 26)}},
+                19: {"parser": self._parse_float, "fields": {"base_posvel": (3, 13), "base_clkrate": (14, 26)}},
             },
         )
 

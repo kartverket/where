@@ -34,7 +34,7 @@ class TrfSnxParser(SinexParser):
         for d, soln in zip(data, data["soln"].astype("i8")):
             site_key = d["site_code"]
             self.data[site_key].setdefault("pos_vel", dict())
-            self.data[site_key]["pos_vel"][soln] = dict(start=datetime.min, end=datetime.max)
+            self.data[site_key]["pos_vel"][soln] = dict(start=d["start_epoch"], end=d["end_epoch"], mean=d["mean_epoch"])
 
     def parse_solution_estimate(self, data):
         for d, soln in zip(data, data["soln"].astype("i8")):

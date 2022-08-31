@@ -9,7 +9,8 @@ Description:
 # Standard library imports
 from enum import Enum
 from collections import namedtuple
-from typing import Union
+from pathlib import PosixPath
+from typing import List, Union
 
 # External library imports
 import numpy as np
@@ -18,7 +19,7 @@ import pandas as pd
 # Midgard imports
 from midgard.collections import enums 
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import plot_scatter_subplots, plot
+from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.data import dataset3 as dataset
@@ -37,9 +38,9 @@ PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
 PlotField.__doc__ = """A convenience class for defining a output field for plotting
 
     Args:
-        name  (str):              Unique name
-        collection (Tuple[str]):  Collection name
-        caption (str):            Caption of plot
+        name  (str):         Unique name
+        collection (str):    Collection name
+        caption (str):       Caption of plot
     """
 
 FIELDS = (
@@ -238,19 +239,79 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     rpt.add_text("\n# Plots of model parameters\n\n")
       
     for field in FIELDS:
-               
-        for figure_path in plt.plot_field(field.name, field.collection):
-            system, _ = figure_path.stem.split("_")[2:4] 
-            rpt.add_figure(
-                figure_path=figure_path, 
-                caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
-                clearpage=True,
-            )
 
+        if f"{field.collection}.{field.name}" in dset.fields or f"{field.name}" in dset.fields:                
+            for figure_path in plt.plot_field(field.name, field.collection):
+                system, _ = figure_path.stem.split("_")[2:4] 
+                rpt.add_figure(
+                    figure_path=figure_path, 
+                    caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
+                    clearpage=True,
+                )
+                
+                
+    #
+    # Galileo HAS plots
+    #
+    if "has_orbit_correction" in dset.fields:
+        rpt.add_text("\n# Galileo HAS correction\n\n")
+        
+        for figure_path in _plot_has_correction(dset, figure_dir):
+            if figure_path.exists():
+                rpt.add_figure(
+                    figure_path,
+                    caption=f"HAS correction for {enums.gnss_id_to_name[figure_path.stem[-1]]}",
+                    clearpage=True,
+                )
 
 #
 # PLOT FUNCTIONS
 #
+def _plot_has_correction(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> List[PosixPath]:
+    """Plot Galileo HAS correction
+
+    Args:
+       dset:        A dataset containing the data.
+       figure_dir:  Figure directory
+       
+    Returns:
+        List with figure path for depending on GNSS. File name ends with GNSS identifier (e.g. 'E', 'G') like 
+        'plot_has_correction_E.png'.
+    """
+    figure_paths = list()
+
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
+        
+        figure_path = figure_dir / f"plot_has_correction_{sys}.{FIGURE_FORMAT}"
+        figure_paths.append(figure_path)
+        log.debug(f"Plot {figure_path}.")
+        plt = MatPlotExt()
+        plt.plot_subplots(
+            x_array=dset.time.gps.datetime,
+            y_arrays=[
+                dset.has_orbit_correction.pos.trs.x[idx],
+                dset.has_orbit_correction.pos.trs.y[idx],
+                dset.has_orbit_correction.pos.trs.z[idx],
+                dset.has_clock_correction[idx],
+            ],
+            xlabel="Time [GPS]",
+            ylabels=["Orbit-X", "Orbit-Y", "Orbit-Z", "Clock"],
+            colors=["steelblue", "darkorange", "limegreen", "red"],
+            y_units=["meter", "meter", "meter", "meter"],
+            figure_path=figure_path,
+            options={
+                "figsize": (6, 8),
+                "plot_to": "file",
+                "sharey": True,
+                "title": "Galileo HAS corrections",
+                "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+            },
+        )
+        
+    return figure_paths
+
+
 def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
     """Plot site position plots
 
@@ -267,7 +328,8 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
 
     figure_path = figure_dir / f"plot_timeseries_enu.{FIGURE_FORMAT}"
     log.debug(f"Plot {figure_path}.")
-    plot_scatter_subplots(
+    plt = MatPlotExt()
+    plt.plot_subplots(
         x_array=dset.time.gps.datetime,
         y_arrays=[enu.east, enu.north, enu.up],
         xlabel="Time [GPS]",
@@ -275,7 +337,7 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         colors=["steelblue", "darkorange", "limegreen"],
         y_units=["meter", "meter", "meter"],
         figure_path=figure_path,
-        opt_args={
+        options={
             "figsize": (6, 6.8),
             "plot_to": "file",
             "sharey": True,
@@ -290,7 +352,8 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
 
     figure_path = figure_dir / f"plot_timeseries_pdop_hpe_vpe.{FIGURE_FORMAT}"
     log.debug(f"Plot {figure_path}.")
-    plot_scatter_subplots(
+    plt = MatPlotExt()
+    plt.plot_subplots(
         x_array=dset.time.gps.datetime,
         y_arrays=[dset.pdop, hpe, vpe],
         xlabel="Time [GPS]",
@@ -298,7 +361,7 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         colors=["steelblue", "darkorange", "limegreen"],
         y_units=[None, "meter", "meter"],
         figure_path=figure_path,
-        opt_args={
+        options={
             "figsize": (6, 5),
             "plot_to": "file",
             "sharey": False,
@@ -309,14 +372,15 @@ def _plot_position(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
 
     figure_path = figure_dir / f"plot_horizontal_error.{FIGURE_FORMAT}"
     log.debug(f"Plot {figure_path}.")
-    plot_scatter_subplots(
+    plt = MatPlotExt()
+    plt.plot_subplots(
         x_array=enu.east,
         y_arrays=[enu.north],
         xlabel="East [meter]",
         ylabels=["North"],
         y_units=["meter"],
         figure_path=figure_path,
-        opt_args={
+        options={
             "grid": True,
             "figsize": (6, 6),
             "histogram": "x, y",
@@ -338,7 +402,8 @@ def _plot_position_kinematic(dset: "Dataset", figure_dir: "pathlib.PosixPath") -
 
     figure_path = figure_dir / f"plot_timeseries_llh.{FIGURE_FORMAT}"
     log.debug(f"Plot {figure_path}.")
-    plot_scatter_subplots(
+    plt = MatPlotExt()
+    plt.plot_subplots(
         x_array=dset.time.gps.datetime,
         y_arrays=[np.rad2deg(dset.site_pos.llh.lat), np.rad2deg(dset.site_pos.llh.lon), dset.site_pos.llh.height],
         xlabel="Time [GPS]",
@@ -346,7 +411,7 @@ def _plot_position_kinematic(dset: "Dataset", figure_dir: "pathlib.PosixPath") -
         colors=["steelblue", "darkorange", "limegreen"],
         y_units=["degree", "degree", "meter"],
         figure_path=figure_path,
-        opt_args={
+        options={
             "figsize": (6, 6.8),
             "plot_to": "file",
             "sharey": False,
@@ -366,14 +431,15 @@ def _plot_position_kinematic(dset: "Dataset", figure_dir: "pathlib.PosixPath") -
     dy = np.abs(np.max(lat) - np.min(lat))
     incr = np.max([dx, dy])/2 # increment
 
-    plot_scatter_subplots(
+    plt = MatPlotExt()
+    plt.plot_subplots(
         x_array=lon,
         y_arrays=[lat],
         xlabel="Longitude [degree]",
         ylabels=["Latitude"],
         y_units=["degree"],
         figure_path=figure_path,
-        opt_args={
+        options={
             "grid": True,
             "figsize": (6, 6),
             "plot_to": "file",
@@ -424,7 +490,8 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
             y_arrays = [dset.residual]
             colors = ["dodgerblue"]
 
-    plot(
+    plt = MatPlotExt()
+    plt.plot(
         x_arrays=x_arrays,
         y_arrays=y_arrays,
         xlabel="Time [GPS]",
@@ -432,7 +499,7 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         y_unit="meter",
         colors=colors,
         figure_path=figure_path,
-        opt_args={
+        options={
             "figsize": (7, 4),
             "histogram": "y",
             "histogram_size": 0.8,
@@ -477,7 +544,7 @@ def _table_outlier_overview(dset: "Dataset"):
     dset_outlier = _get_outliers_dataset(dset)
     if dset_outlier == enums.ExitStatus.error:
         # NOTE: This is the case for concatencated Datasets, where "calculate" stage data are not available.
-        log.warn(f"No data for calculate stage available. Outliers can not be detected.")
+        log.warn("No data for calculate stage available. Outliers can not be detected.")
         return df
 
     if dset_outlier.num_obs:

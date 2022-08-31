@@ -68,6 +68,23 @@ def rinex3_obs(dset):
 
         # ----+----1----+----2----+----3----+----4----+----5----+----6----+----7----+----8
         # G = GPS R = GLONASS E = GALILEO S = GEO M = MIXED           COMMENT
+
+        # Add comments related applying HAS code bias corrections
+        if config.tech.get("apply_has_correction", default=False).bool:
+            if "has_corrected_obstypes" in meta:
+                meta["comment"].extend([
+                    # ----+----1----+----2----+----3----+----4----+----5----+----6
+                      "",
+                      "HAS corrections are applied for code observations by Where",
+                      "software. The corrected observations are listed for a given",
+                      "GNSS and used HAS code bias signal (after convention",
+                      "<sys> <sig>: <obs_codes>):",
+                ])
+                for sys in sorted(meta["has_corrected_obstypes"].keys()):
+                    for signal in sorted(meta["has_corrected_obstypes"][sys].keys()):
+                        line = f"{sys} {signal+':':6s} {' '.join(meta['has_corrected_obstypes'][sys][signal])}"
+                        meta["comment"].append(line)
+
         if "comment" in meta:
             for line in meta["comment"]:
                 fid.write("{:60s}COMMENT\n".format(line))
@@ -366,7 +383,7 @@ def _write_epoch(dset, fid, obs_epoch_cache, idx, num_sat, epoch):
         if dset.meta["rcv_clk_offset_flag"] == "0":
             rcv_clk_offset = "{:15s}".format("")  # Blank if receiver clock offset is not given.
     else:
-        rcv_clk_offset = "{:>15.12f}".format(dset.rcv_clk_offset[idx])
+        rcv_clk_offset = "" if isnan(dset.rcv_clk_offset[idx]) else "{:>15.12f}".format(dset.rcv_clk_offset[idx])
     fid.write(
         "> {:3d}{:>3d}{:>3d}{:>3d}{:>3d}{:>11.7f}{:>3d}{:3d}{:6s}{:15s}\n"
         "".format(

@@ -104,7 +104,7 @@ Where            </a>
 <footer class="post-info">
     <span class="label label-default">Date</span>
     <span class="published">
-        <i class="fa fa-calendar"></i><time datetime="2018-06-06T00:00:00+02:00"> Wed 06 June 2018</time>
+        <i class="fa fa-calendar"></i><time datetime="2018-06-06T00:00:00+02:00"> on. 06 juni 2018</time>
     </span>
 
 
@@ -126,7 +126,9 @@ Where            </a>
     
 </footer><!-- /.post-info -->                    </div>
                 </div>
-                <h2 id="download-where">Download Where</h2>
+                <p>These instructions are written for installation on a Linux system. Where also works with Windows, 
+but is a lot tested on this platform and no instructions are provided. </p>
+<h2 id="download-where">Download Where</h2>
 <p>In order to install Where, you first need to download it. Please
 <a href="where-latest.html">Download the latest version of Where</a>, and unpack it at a
 convenient location on your computer.</p>
@@ -156,12 +158,15 @@ pages.</p>
 needed by Where by doing:</p>
 <pre><code>conda env update -f environment.yml
 </code></pre>
-<h3 id="step-3-install-a-fortran-compiler-windows-only">Step 3: Install a Fortran Compiler (Windows Only)</h3>
-<p>Windows typically does not come with a Fortran compiler preinstalled.</p>
-<p>(Instructions coming)</p>
-<h3 id="step-4-install-a-c-compiler-windows-only">Step 4: Install a C Compiler (Windows Only)</h3>
-<p>Windows typically does not come with a C compiler preinstalled.</p>
-<p>(Instructions coming)</p>
+<h3 id="step-3-install-a-fortran-compiler">Step 3: Install a Fortran Compiler</h3>
+<p>For Linux <code>gfortran</code> is needed.</p>
+<h3 id="step-4-install-a-c-compiler">Step 4: Install a C Compiler</h3>
+<p>For Linux <code>gcc</code> is needed.</p>
+<h3 id="step-5-other-dependencies">Step 5: Other dependencies</h3>
+<p>For Linux the following packages are needed:</p>
+<ul>
+<li>patch</li>
+</ul>
 <h2 id="installing-where">Installing Where</h2>
 <p>The actual installation of Where happens in three steps:</p>
 <ul>
@@ -218,32 +223,37 @@ needs when it is running.</p>
 separately. In the example below we assume that you specified the <code>data</code>
 directory to be <code>~/where_data/</code>. Change the path if you specified a different
 <code>data</code> directory above:</p>
-<h3 id="analyzing-ngs-format">Analyzing NGS Format</h3>
-<p>The following downloads the observation file for January 2nd 2018:</p>
-<pre><code>mkdir -p ~/where_data/vlbi/obs/ngs/2018 
-cd ~/where_data/vlbi/obs/ngs/2018 
-wget ftp://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/ngs/2018/18JAN02XA_N004.gz
-</code></pre>
-<p>You can then analyse this file by running:</p>
-<pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=ngs
-</code></pre>
-<blockquote>
-<p><strong>Note:</strong> New NGS files are no longer produced and the recommended file format for observations files is vgosDB.</p>
-</blockquote>
 <h3 id="analyzing-vgosdb-format">Analyzing vgosDB Format</h3>
 <p>The following downloads the observation file for January 2nd 2018:</p>
 <pre><code>mkdir -p ~/where_data/vlbi/obs/vgosdb/2018 
 cd ~/where_data/vlbi/obs/vgosdb/2018 
-wget ftp://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/vgosdb/2018/18JAN02XA.tgz
+wget https://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/vgosdb/2018/18JAN02XA.tgz
 tar -xvf 18JAN02XA.tgz
 </code></pre>
 <p>You can then analyse this file by running:</p>
 <pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=vgosdb
 </code></pre>
+<p><code>vgosdb</code> is the default format if <code>--obs_format</code> is not specified.</p>
+<h3 id="analyzing-ngs-format">Analyzing NGS Format</h3>
+<blockquote>
+<p><strong>Note:</strong> New NGS files are no longer produced and the recommended file format for observations files is vgosDB.</p>
+</blockquote>
+<p>The following downloads the observation file for January 2nd 2018:</p>
+<pre><code>mkdir -p ~/where_data/vlbi/obs/ngs/2018 
+cd ~/where_data/vlbi/obs/ngs/2018 
+wget https://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/ngs/2018/18JAN02XA_N004.gz
+</code></pre>
+<p>You can then analyse this file by running:</p>
+<pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=ngs
+</code></pre>
 <h3 id="other-files">Other files</h3>
-<p>Where will automatically download a version of all other files needed to do an analysis. This is to facilitate an easy
-setup for beginners. However, Where does not keep these files updated. The user needs to manage and update these files 
-as needed. See <code>config/files.conf</code> and <code>config/files_pipeline_vlbi.conf</code> for information about files used by Where. </p>
+<p>Where will automatically try to download a version of all other files needed to do an analysis. This is to facilitate 
+an easy setup for beginners. However, some sites requires a personal account to be able to download the necessary 
+files. One example is files from <a href="https://cddis.nasa.gov/">CDDIS</a>. Where will give an error message if any files are 
+missing when running the progam. Investigate these error messages, create
+personal accounts when needed and download the missing files. Some files also need to be updated routinely, for 
+instance files with Earth Orientation Parameters. These will not be updated automatically. See <code>config/files.conf</code> 
+and <code>config/files_pipeline_vlbi.conf</code> for information about files used by Where. </p>
 <h2 id="external-libraries">External libraries</h2>
 <p>Where depends on three external libraries that are not included in the
 download. These are all available online and have already been downloaded
@@ -258,8 +268,7 @@ transformations.</p>
 <code>external/sofa/</code> directory. This can be done automatically by running</p>
 <pre><code>python download.py sofa
 </code></pre>
-<p>The library depends on a catalog of leap seconds, and should as such be updated
-regularly.</p>
+<p>The library depends on a catalog of leap seconds, and should be updated regularly.</p>
 <h3 id="iers-software">IERS software</h3>
 <p>In companionship with the IERS Convention 2010, the IERS has made available
 implementations of several conventional models. Where uses these models directly
@@ -270,8 +279,9 @@ stored in the <code>external/iers/</code> directory. This can be done automatica
 running</p>
 <pre><code>python download.py iers_2010
 </code></pre>
-<p>The library depends on a catalog of leap seconds, and should as such be updated
-regularly.</p>
+<p>The library depends on a catalog of leap seconds, and should be updated regularly.
+Before compilation of the iers_2010 library some of the source code and make files
+needs to be patched. Therefore, make sure <code>patch</code> (Linux) is installed. </p>
 <h3 id="gpt2w">GPT2w</h3>
 <p>One of the available troposphere models in Where is the GPT2w. This is
 implemented using the

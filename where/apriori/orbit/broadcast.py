@@ -108,10 +108,11 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         self.day_offset = day_offset
 
         # TODO hjegei: Should it be not enough to 'station' in _dset_raw?
-        self._dset_raw.vars["station"] = station.lower()
-        self._dset_raw.vars["STATION"] = self._dset_raw.vars["station"].upper()
-        self._dset_edit.vars["station"] = station.lower()
-        self._dset_edit.vars["STATION"] = self._dset_raw.vars["station"].upper()
+        if station:
+            self._dset_raw.vars["station"] = station.lower()
+            self._dset_raw.vars["STATION"] = self._dset_raw.vars["station"].upper()
+            self._dset_edit.vars["station"] = station.lower()
+            self._dset_edit.vars["STATION"] = self._dset_raw.vars["station"].upper()
 
     def _read(self, dset_raw):
         """Read RINEX navigation file data and save it in a Dataset
@@ -184,7 +185,6 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                     if date in dict(dset_raw.meta).keys():
                         for key in ["iono_para", "time_sys_corr"]:
                             dset_temp.meta[key].update(dset_raw.meta[date][key])
-
                     dset_raw.extend(dset_temp, meta_key=date)
 
                 else:
@@ -321,6 +321,8 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             time:     Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
                       observation time and 'sat_time' to satellite transmission time.
         """
+        apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
+        
         # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
         # navigation records
         cleaners.apply_remover("gnss_clean_orbit", dset_in, orbit_flag="broadcast")
@@ -385,6 +387,9 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         dset_out.add_text("system", val=dset_in.system)
         dset_out.add_time("time", val=dset_in[time])
         dset_out.vars["orbit"] = self.name
+        
+        if apply_has_correction:
+            dset_out.add_float("has_gnssiod_orb", val=dset_in.has_gnssiod_orb)
 
         # Add time field
         # MURKS, TODO: How it works to initialize time field with a Time object?
@@ -564,7 +569,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
     def signal_health_status(self, dset: "Dataset", frequencies: Union[None, List] = None) -> np.ndarray:
         """Determine signal health status
-20.3.3.5.1.3
+
         How the signal health status has to be handled depends on GNSS, used observation type and navigation message
         type. The determination of the signal health status is defined for:
 
@@ -775,6 +780,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             "transmission_time:positive",
         ]
         brdc_idx = list()
+        apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
 
         # Get configuration option
         brdc_block_nearest_to = config.tech.get("brdc_block_nearest_to", default="toe:positive").str.rsplit(":", 1)
@@ -802,21 +808,37 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             )
 
             cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
+                     
+        if apply_has_correction:
+            
+            # Determine broadcast ephemeris block index for a given satellite, HAS IOD and observation epoch
+            for sat, iode, obs_epoch in zip(dset.satellite, dset.has_gnssiod_orb, dset[time]):  # TODO: Is _add_time needed for dset[time]?
+    
+                idx = self.dset_edit.filter(satellite=sat, iode=iode)
+                
+                if np.any(idx) == False:
+                    log.fatal(f"No valid broadcast navigation message could be found for satellite {sat}, HAS message "
+                              f"IOD {iode} and observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit' remover.") 
+               
+                nearest_idx = self._get_nearest_idx(idx, obs_epoch.gps.mjd, time_key, positive)
+                brdc_idx.append(idx.nonzero()[0][nearest_idx])
+            
+        else:    
 
-        # Determine broadcast ephemeris block index for a given satellite and observation epoch
-        for sat, obs_epoch in zip(dset.satellite, self._add_dim(dset[time].gps.mjd)):
-
-            idx = self.dset_edit.filter(satellite=sat)
-           
-            diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
-            if positive:
-                nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
-            else:
-                nearest_idx = np.array([abs(diff)]).argmin()
-
-            brdc_idx.append(idx.nonzero()[0][nearest_idx])
+            # Determine broadcast ephemeris block index for a given satellite and observation epoch
+            for sat, obs_epoch in zip(dset.satellite, dset[time]): # TODO: Is _add_time needed for dset[time]?
+    
+                idx = self.dset_edit.filter(satellite=sat)
+               
+                if np.any(idx) == False:
+                    log.fatal(f"No valid broadcast navigation message could be found for satellite {sat} and "
+                              f"observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit' remover.") 
+                    
+                nearest_idx = self._get_nearest_idx(idx, obs_epoch.gps.mjd, time_key, positive)
+                brdc_idx.append(idx.nonzero()[0][nearest_idx])
 
         return brdc_idx
+    
 
     def _get_corrected_broadcast_ephemeris(
         self, t_sat_gpsweek: float, t_sat_gpssec: float, idx: int, sys: str
@@ -918,6 +940,34 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 log.fatal(f"Convergence problem by determination of eccentric anomaly (max_iter = {max_iter})")
 
         return E
+    
+    
+    def _get_nearest_idx(self, idx: np.ndarray, obs_epoch: float, time_key: str, positive: bool) -> np.ndarray:
+        """Get nearest HAS message data index for given observation epoch
+        
+        Args:
+            idx:        Index used to filter HAS messages e.g. after satellite, GNSS IOD
+            obs_epoch:  Observation epoch in modified Julian day
+            time_key:   Time key
+            positive:   Difference between observation epoch and broadcast navigation messate has to be positive
+
+        Returns:
+            Nearest broadcast navigation messages indices for given observation epochs
+        """
+        
+        diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
+        if positive:
+            data = np.array([99999 if v < 0 else v for v in diff])
+            if np.all(data == 99999): # No broadcast navigation message epochs larger than observation epoch
+                log.fatal(f"No valid broadcast navigation message could be found before observation epoch {obs_epoch} " 
+                          f"(nearest broadcast navigation message receiver reception time: {min(self.dset_edit[time_key].gps.mjd)})")
+            
+            nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
+        else:
+            nearest_idx = np.array([abs(diff)]).argmin()
+            
+        return nearest_idx 
+    
 
     def _get_satellite_position_vector(self, bdict):
         """Determine satellite position vector in Earth centered Earth fixed (ECEF) coordinate system.

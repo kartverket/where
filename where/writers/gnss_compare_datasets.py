@@ -25,7 +25,7 @@ import numpy as np
 from midgard.data._time import GpsTime, UtcTime
 from midgard.data import collection
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import plot_scatter_subplots
+from midgard.plot.matplotext import MatPlotExt
 from midgard.math.unit import Unit
 
 # Where imports
@@ -173,7 +173,8 @@ def _plot(
         unit = Unit(FIELDS[field].unit).units if field in FIELDS.keys() else Unit(dset1.unit(field)[0]).units
         options = _set_plot_config(title=title)
 
-        plot_scatter_subplots(
+        plt = MatPlotExt()
+        plt.plot_subplots((
             x_array=dset1.time.gps.datetime,
             y_arrays=[dset1[field], dset2[field], ddiff[field]],
             xlabel="Time [GPS]",
@@ -181,7 +182,7 @@ def _plot(
             colors=["steelblue", "darkorange", "limegreen"],
             y_units=[f"{unit:~P}", f"{unit:~P}", f"{unit:~P}"],
             figure_path=figure_dir / f"plot_{field}.{FIGURE_FORMAT}",
-            opt_args=options,
+            options=options,
         )
 
 

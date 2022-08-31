@@ -41,6 +41,12 @@ def vlbi_network_volume(dset: "Dataset") -> None:
     trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames="itrf:2014, vtrf, custom, vlbi_obs")
     site_ids = dset.unique("site_id")
     
+    if len(site_ids) < 4:
+        log.warn(f"Unable to compute network volume. Only {len(site_ids)} usable stations in session.")
+        dset.meta.add("value", np.nan, section="network_volume")
+        dset.meta.add("__unit__", "Megameter**3", section="network_volume")
+        return
+    
     pos = np.zeros((len(site_ids), 3))
     for i, site_id in enumerate(site_ids):    
         pos[i, :] = trf[site_id].pos.trs.val

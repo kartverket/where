@@ -30,7 +30,7 @@ import pandas as pd
 # Midgard imports
 from midgard.data import position
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import plot
+from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.lib import config
@@ -359,7 +359,7 @@ def _plot_position_error(
             "std": "STD",
     }
 
-    opt_args = {
+    options = {
         "colormap": "tab20",
         "figsize": (7, 3),
         # "grid": True,
@@ -375,13 +375,7 @@ def _plot_position_error(
     colors = (
         config.tech.gnss_comparison_report.colors.list
         if config.tech.gnss_comparison_report.colors.list
-        else ["orange", "red", "violet", "blue", "green"]
-    )
-
-    colors = (
-        config.tech.gnss_comparison_report.colors.list
-        if config.tech.gnss_comparison_report.colors.list
-        else ["orange", "red", "violet", "blue", "green"]
+        else ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive", "tab:cyan"]
     )
 
     # Loop over statistical solutions
@@ -413,7 +407,7 @@ def _plot_position_error(
                 else:
                     ylim = config.tech.gnss_comparison_report.ylim.list
 
-                opt_args["ylim"] = [float(ylim[0]), float(ylim[1])] if ylim else ylim
+                options["ylim"] = [float(ylim[0]), float(ylim[1])] if ylim else ylim
 
                 # Generate x- and y-arrays for plotting
                 x_arrays = []
@@ -422,13 +416,14 @@ def _plot_position_error(
 
                 for station in sample_data[field].columns:
                     #if sample == "monthly":
-                    #    opt_args.update({"xlim": "auto", "ylim": "auto"})
+                    #    options.update({"xlim": "auto", "ylim": "auto"})
                     x_arrays.append(list(sample_data[field].index))
                     y_arrays.append(list(sample_data[field][station]))
                     labels.append(station.upper())
 
                 # Generate plot
-                plot(
+                plt = MatPlotExt()
+                plt.plot(
                     x_arrays=x_arrays,
                     y_arrays=y_arrays,
                     xlabel="Time [GPS]",
@@ -438,5 +433,5 @@ def _plot_position_error(
                     colors=colors,
                     figure_path=figure_dir
                     / f"plot_{type_}_{field}_{sample}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
-                    opt_args=opt_args,
+                    options=options,
                 )

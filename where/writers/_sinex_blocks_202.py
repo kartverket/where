@@ -27,6 +27,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.math.unit import Unit
+from midgard.data.time import Time
 
 # Where imports
 import where
@@ -77,16 +78,20 @@ class SinexBlocks:
             name = name.rsplit("_", maxsplit=1)
 
             if len(name) == 2:
-                ident, name = (name[0], name[1])
-            elif name[0] in self.ids:
-                ident, name = (name[0], name[0])
+                split_name, _, epoch = name[1].partition(":")
+                ident, name = (name[0], split_name)
+            elif name[0].split(":", maxsplit=1)[0] in self.ids:
+                split_name, _, epoch = name[0].partition(":")
+                ident, name = (split_name, split_name)
             else:
-                ident, name = ("----", name[0])
-            self.state_vector.append({"type": partial_type, "id": ident, "partial": name})
+                split_name, _, epoch = name[0].partition(":")
+                ident, name = ("----", split_name)
+
+            self.state_vector.append({"type": partial_type, "id": ident, "partial": name, "epoch": epoch})
 
         for e in self.state_vector:
             if e["type"] == "trop_wet":
-                _PARAMS["trop_wet"][e["partial"]] = "TROWET"
+                _PARAMS["trop_wet"][e["partial"]] = "TROWET"   
 
     @property
     @lru_cache()
@@ -406,11 +411,17 @@ class SinexBlocks:
             point_code = "A" if param["type"] == "site_pos" else "--"
             try:
                 param_type = _PARAMS[param["type"]][param["partial"]]
+                if param["epoch"]:
+                    time = Time(param["epoch"], scale="utc", fmt="isot")
+                    ref_epoch = time.yydddsssss
+                else:
+                    time = self.dset.time.mean
+                    ref_epoch = time.yydddsssss
             except KeyError:
                 continue
 
             param_unit = self.dset.meta["normal equation"]["unit"][i - 1]
-            value = self.dset.meta["normal equation"]["solution"][i - 1] + self._get_apriori_value(param, param_unit)
+            value = self.dset.meta["normal equation"]["solution"][i - 1] + self._get_apriori_value(param, param_unit, time)
             if self.dset.meta["normal equation"]["covariance"][i - 1][i - 1] < 0:
                 log.error(
                     "Negative covariance ({})for {} {}".format(
@@ -428,7 +439,7 @@ class SinexBlocks:
                     self.ids[param["id"]],
                     point_code,
                     sol_id,
-                    self.dset.time.mean.yydddsssss,
+                    ref_epoch,
                     param_unit,
                     2,
                     value,
@@ -448,10 +459,17 @@ class SinexBlocks:
             point_code = "A" if param["type"] == "site_pos" else "--"
             try:
                 param_type = _PARAMS[param["type"]][param["partial"]]
+                if param["epoch"]:
+                    time = Time(param["epoch"], scale="utc", fmt="isot")
+                    ref_epoch = time.yydddsssss
+                else:
+                    time = None
+                    ref_epoch = self.dset.time.mean.yydddsssss
             except KeyError:
                 continue
+            
             param_unit = self.dset.meta["normal equation"]["unit"][i - 1]
-            value = self._get_apriori_value(param, param_unit)
+            value = self._get_apriori_value(param, param_unit, time)
             self.fid.write(
                 " {:>5} {:6} {:4} {:2} {:>4} {:12} {:4} {:1} {: 20.14e} {:11.5e}\n"
                 "".format(
@@ -460,7 +478,7 @@ class SinexBlocks:
                     self.ids[param["id"]],
                     point_code,
                     sol_id,
-                    self.dset.time.mean.yydddsssss,
+                    ref_epoch,
                     param_unit,
                     2,
                     value,
@@ -510,6 +528,10 @@ class SinexBlocks:
             point_code = "A" if param["type"] == "site_pos" else "--"
             try:
                 param_type = _PARAMS[param["type"]][param["partial"]]
+                if param["epoch"]:
+                    ref_epoch = Time(param["epoch"], scale="utc", fmt="isot").yydddsssss
+                else:
+                    ref_epoch = self.dset.time.mean.yydddsssss
             except KeyError:
                 continue
             param_unit = self.dset.meta["normal equation"]["unit"][i - 1]
@@ -521,7 +543,7 @@ class SinexBlocks:
                     self.ids[param["id"]],
                     point_code,
                     sol_id,
-                    self.dset.time.mean.yydddsssss,
+                    ref_epoch,
                     param_unit,
                     constraint,
                     self.dset.meta["normal equation"]["vector"][i - 1],
@@ -554,9 +576,11 @@ class SinexBlocks:
                     )
         self.fid.write("-SOLUTION/NORMAL_EQUATION_MATRIX {:1}\n".format(structure))
 
-    def _get_apriori_value(self, param, param_unit):
+    def _get_apriori_value(self, param, param_unit, time=None):
+        if time is None:
+            time = self.dset.time.utc.mean
         if param["type"] == "site_pos":
-            trf = apriori.get("trf", time=self.dset.time.utc.mean)
+            trf = apriori.get("trf", time=time)
             pos = trf[self.ids[param["id"]]].pos.trs
             return getattr(pos, param["partial"])
 
@@ -571,35 +595,36 @@ class SinexBlocks:
             return pos
 
         if param["type"] == "eop_nut":
-            eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
+            eop = apriori.get("eop", time=time, models=())
             if param["partial"] == "x":
                 return eop.convert_to("dx", param_unit)
             elif param["partial"] == "y":
                 return eop.convert_to("dy", param_unit)
         if param["type"] == "eop_pm":
-            eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
+            eop = apriori.get("eop", time=time, models=())
             if param["partial"] == "xp":
                 return eop.convert_to("x", param_unit)
             elif param["partial"] == "yp":
                 return eop.convert_to("y", param_unit)
         if param["type"] == "eop_pm_rate":
-            eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
+            eop = apriori.get("eop", time=time, models=())
             if param["partial"] == "dxp":
                 return eop.convert_to("x_rate", param_unit)
             elif param["partial"] == "dyp":
                 return eop.convert_to("y_rate", param_unit)
         if param["type"] == "eop_dut1":
-            eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
+            eop = apriori.get("eop", time=time, models=("rg_zont2"))
             return eop.convert_to("ut1_utc", param_unit)
         if param["type"] == "eop_lod":
-            eop = apriori.get("eop", time=self.dset.time.utc.mean, models=())
-            # return eop.convert_to("lod", param_unit)
+            eop = apriori.get("eop", time=time, models=())
             return -1 * eop.convert_to("ut1_utc_rate", param_unit + "/day")
         if param["type"] == "trop_wet":
-            trop_sta = np.zeros(self.dset.num_obs)
-            idx_1 = self.dset.filter(station_1=param["id"])
-            trop_sta[idx_1] = self.dset.troposphere_zwd_1[idx_1]
-            idx_2 = self.dset.filter(station_2=param["id"])
-            trop_sta[idx_2] = self.dset.troposphere_zwd_2[idx_2]
-            return np.mean(trop_sta)
+            from where.models.delay import troposphere_radio
+            lat = self.dset.meta[param["id"]]["latitude"]
+            lon = self.dset.meta[param["id"]]["longitude"]
+            height = self.dset.meta[param["id"]]["height"]
+            zenith_distance = np.nan
+            _, temp, e, tm, lambd = troposphere_radio.meteorological_data(param["id"], lat, lon, height, time)
+            zwd = troposphere_radio.zenith_wet_delay(param["id"], lat, lon, height, time, temp, e, tm, lambd)
+            return zwd
         return 0

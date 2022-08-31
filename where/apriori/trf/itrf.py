@@ -11,6 +11,7 @@ References:
 -----------
 
 """
+from datetime import datetime
 
 # External library imports
 import numpy as np
@@ -120,19 +121,13 @@ class Itrf(TrfFactory):
         paths = self.file_paths
         data_trf = parsers.parse_file("trf_snx", file_path=paths["snx"]).as_dict()
         data_snx = {k.lower(): v for k, v in data_trf.items()}
-        # Time epoch intervals are in a separate file
-        data_soln = parsers.parse_file("trf_snx_soln", file_path=paths["soln"]).as_dict()
-        for site_key, site_dict in data_soln.items():
-            site_id = site_key.lower()
-            for soln, interval in site_dict.items():
-                if soln in data_snx[site_id]["pos_vel"]:
-                    data_snx[site_id]["pos_vel"][soln]["start"] = interval["start"]
-                    data_snx[site_id]["pos_vel"][soln]["end"] = interval["end"]
-                elif soln - 1 in data_snx[site_id]["pos_vel"]:
-                    # copy previous solution for extrapolation
-                    data_snx[site_id]["pos_vel"][soln] = data_snx[site_id]["pos_vel"][soln - 1].copy()
-                    data_snx[site_id]["pos_vel"][soln]["start"] = interval["start"]
-                    data_snx[site_id]["pos_vel"][soln]["end"] = interval["end"]
+
+        for site_key, site_dict in data_snx.items():
+            min_soln = min(site_dict["pos_vel"].keys())
+            max_soln = max(site_dict["pos_vel"].keys())
+            # Change start and end time for first and last solution to allow extrapolation
+            site_dict["pos_vel"][min_soln]["start"] = datetime.min
+            site_dict["pos_vel"][max_soln]["end"] = datetime.max
 
         # Post-seismic deformations (for 2014 and later)
         if self.solution >= "2014":

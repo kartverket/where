@@ -20,7 +20,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import get_statistic, plot_subplot_row
+from midgard.plot.matplotext import MatPlotExt
 from midgard.math.unit import Unit
 
 # Where imports
@@ -58,15 +58,15 @@ PLOTCONFIG = {
     "sisre": PlotConfig("SISE", True, ".2f"),
     "sisre_orb": PlotConfig("orbit-only SISE", True, ".2f"),
     "orb_diff_3d": PlotConfig("3D orbit error", True, ".2f"),
-    "clk_diff": PlotConfig("Satellite clock correction difference \n without mean", True, ".2f"),
-    "clk_diff_with_dt_mean": PlotConfig("Satellite clock correction \ndifference", True, ".2f"),
+    "clk_diff": PlotConfig("Clock difference \n without mean", True, ".2f"),
+    "clk_diff_with_dt_mean": PlotConfig("Clock difference", True, ".2f"),
     "bias_brdc": PlotConfig("Satellite bias of broadcast clocks", True, ".0f"),
     "bias_precise": PlotConfig("Satellite bias of precise clocks", True, ".0f"),
     "used_iode": PlotConfig("IODE", False, ".0f"),
 }
 
 UNIT_TITLE = {"": "", "meter": "m", "minute": "min", "second": "s"}
-UNIT_YLABEL = {"": "", "meter": "[meter]", "minute": "[minute]", "second": "[second]"}
+UNIT_YLABEL = {"": "", "meter": "m", "minute": "min", "second": "s"}
 
 
 @plugins.register
@@ -184,7 +184,8 @@ def _get_statistic_text(data: np.ndarray, unit: str = "", width: int = 150) -> s
     Return:
         text representing statistical information      
     """
-    stat_text = ", ".join(get_statistic(data, unit=unit))
+    mpe = MatPlotExt()
+    stat_text = ", ".join(mpe.get_statistic(data, unit=unit))
     return textwrap.fill(stat_text, width=width, break_long_words=False, break_on_hyphens=True)
 
 
@@ -256,15 +257,16 @@ def _plot_scatter_subplots(
                 color = options["color"] if options["color"] else color
 
                 if np.sum(dset[field][idx_sat]) != 0:
-                    plot_subplot_row(
+                    mpe = MatPlotExt()
+                    mpe.plot_subplot_row(
                         ax,
                         x_array=dset.time.gps.datetime[idx_sat],
                         y_array=dset[field][idx_sat],
                         ylabel=f"{PLOTCONFIG[field].label}",
-                        y_unit=unit,
+                        y_unit=UNIT_YLABEL[unit],
                         label=sat,
                         color=color,
-                        opt_args=options,
+                        options=options,
                     )
 
             # Overwrite subtitle with statistical information over all satellites
@@ -277,17 +279,26 @@ def _plot_scatter_subplots(
         # Rotates and right aligns the x labels, and moves the bottom of the axes up to make room for them
         fig.autofmt_xdate()
 
-        # Automatically adjusts subplot parameteres so that the subplot(s) fits in to the figure area
-        # Note: Legend is not taken into account.
-        fig.tight_layout()
-
         # Plot legend on the right side of the figure by getting labels only from the last subplot row
         if options["legend"]:
             handles, labels = ax.get_legend_handles_labels()
-            fig.legend(handles, labels, loc="upper right", bbox_to_anchor=(1.0, 0.91))
+            fig.legend(
+                handles, 
+                labels, 
+                loc="upper center", 
+                ncol=7, 
+                bbox_to_anchor=(0.54, -0.005),
+                fontsize=8,
+                fancybox=True, 
+                shadow=True,
+            )
 
         # Adjust subplot axes (to place legend on the right side of the figure)
-        fig.subplots_adjust(right=0.89, top=0.91)
+        #fig.subplots_adjust(right=0.89, top=0.91)
+
+        # Automatically adjusts subplot parameteres so that the subplot(s) fits in to the figure area
+        # Note: Legend is not taken into account.
+        fig.tight_layout()
 
         # Save figure
         plt.savefig(
@@ -349,9 +360,26 @@ def _plot_scatter_field(
 
         if options["legend"]:
             # plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
-            plt.legend(bbox_to_anchor=(1.04, 1), borderaxespad=0.0, loc="upper left", ncol=1)
+            #plt.legend(
+            #    bbox_to_anchor=(1.04, 1), 
+            #    borderaxespad=0.0, 
+            #    loc="upper left", 
+            #    ncol=1,
+            #    fancybox=True, 
+            #    shadow=True,
+            #)
 
-        plt.ylabel(f"{PLOTCONFIG[field].label} {UNIT_YLABEL[unit]}")
+            plt.legend(
+                loc="upper center", 
+                ncol=6, 
+                bbox_to_anchor=(0.50, -0.20), 
+                fontsize=8,
+                fancybox=True, 
+                shadow=True,
+            )
+
+        ylabel = f"{PLOTCONFIG[field].label} [{UNIT_YLABEL[unit]}]" if UNIT_YLABEL[unit] else f"{PLOTCONFIG[field].label}"
+        plt.ylabel(ylabel)
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
         plt.xlabel("Time [GPS]")
 

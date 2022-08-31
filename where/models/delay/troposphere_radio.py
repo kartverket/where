@@ -14,8 +14,8 @@ References:
 
 
 TODO:
-    * Maybe it could be better to implement a "troposphere" class. For example with an object the information about
-      used models can be retrieved, which is useful for example in routine :func:`zenith_wet_delay` (see TODO).
+    * Potential idea: Troposphere class. Remove meteorological data as a function. Create properties of pressure, 
+      temperature, e, tm, lambd instead. Lazy evaluation based on config or input parameters. 
     * Test Dataset needed to assure better unit testing. So far all models are tested against output of the GIPSY
       program 'tropnominal', except GPT2w model.
 
@@ -41,16 +41,10 @@ MODEL = __name__.split(".")[-1]
 
 # Available troposphere models
 MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "vmf1_gridded", "vmf1_station"]
-METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "site_pressure"]
+METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "site_pressure", "default"]
 ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded", "vmf1_station"]
-ZENITH_HYDROSTATIC_MODELS = ["saastamoinen", "vmf1_gridded", "vmf1_station"]
+ZENITH_HYDROSTATIC_DELAY_MODELS = ["saastamoinen", "vmf1_gridded", "vmf1_station"]
 GRADIENT_MODELS = ["none", "apg"]
-
-# Default relation between used mapping function model and zenith wet delay model
-MAPPING_ZENITH_WET_RELATION = dict(gmf="none", gpt2="saastamoinen", gpt2w="askne", vmf1_gridded="vmf1_gridded")
-
-# Default relation between used mapping function model and meteorological data
-MAPPING_METEO_RELATION = dict(gmf="gpt", gpt2="gpt2", gpt2w="gpt2w", vmf1_gridded="vmf1_gridded")
 
 # Cache for GPT2 model
 _GPT2 = dict()
@@ -105,15 +99,34 @@ def troposphere(dset):
     Returns:
         numpy.ndarray:  Total tropospheric delay for each observation and one station in [m].
     """
-    latitude, _, height = dset.site_pos.pos.llh.T
-    pressure, temperature, e, tm, lambd = meteorological_data(dset)
-    mh, mw = mapping_function(dset)
-    mg, gn, ge = gradient_model(dset)
-    zhd = zenith_hydrostatic_delay(dset, pressure, latitude, height)
-    zwd = zenith_wet_delay(dset, temperature, e, tm, lambd)
+    
+    log.debug(f"Computing troposphere for station{dset.default_field_suffix}")
+
+    latitude, longitude, height = dset.site_pos.pos.llh.T
+    time = dset.time
+    zenith_distance = dset.site_pos.zenith_distance
+    azimuth = dset.site_pos.azimuth
+    elevation = dset.site_pos.elevation
+    stations = dset.station
+
+    obs_pressure = meteo_from_dset(dset, "pressure")
+    obs_temp = meteo_from_dset(dset, "temperature")
+    # TODO: use different names?
+    obs_e = meteo_from_dset(dset, "e")
+    obs_tm = meteo_from_dset(dset, "tm")
+    obs_lambd = meteo_from_dset(dset, "lambd")
+
+    pressure, temperature, e, tm, lambd = meteorological_data(stations, latitude, longitude, height, 
+                                                              time, obs_pressure, obs_temp, 
+                                                              obs_e, obs_tm, obs_lambd)
+    #import IPython; IPython.embed()
+    mh, mw = mapping_function(latitude, longitude, height, time, zenith_distance)
+    mg, gn, ge = gradient_model(latitude, longitude, azimuth, elevation)
+    zhd = zenith_hydrostatic_delay(stations, latitude, longitude, height, time, pressure)
+    zwd = zenith_wet_delay(stations, latitude, longitude, height, time, temperature, e, tm, lambd)
 
     # Line of sight delay
-    dT = mh * zhd + mw * zwd + mg * (gn * np.cos(dset.site_pos.azimuth) + ge * np.sin(dset.site_pos.azimuth))
+    dT = mh * zhd + mw * zwd + mg * (gn * np.cos(azimuth) + ge * np.sin(azimuth))
 
     terms_and_levels = dict(
         dT=("operational", "meter"),
@@ -130,7 +143,6 @@ def troposphere(dset):
         if field in dset.fields:
             dset[field][:] = locals()[term]
         else:
-            # dset.add_float(field, table="troposphere", val=locals()[term], write_level=write_level)
             dset.add_float(field, val=locals()[term], write_level=write_level, unit=unit)
 
     # +DEBUG
@@ -147,11 +159,25 @@ def troposphere(dset):
     return dT
 
 
-def meteorological_data(dset):
+def meteorological_data(stations, latitude, longitude, height, time,
+                        obs_pressure=None,
+                        obs_temp=None,
+                        obs_e=None, 
+                        obs_tm=None,
+                        obs_lambd=None):
     """Determine meteorological data (atmospheric pressure, ...) based on configuration file definition.
 
     Args:
-        dset (Dataset): Model data.
+        stations (numpy.ndarray):        Station name for each observation.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        obs_pressure (numpy.ndarray):    Observed pressure for each observation in [hPa]
+        obs_temperature (numpy.ndarray): Observed temperature for each observation in [C]
+        obs_e (numpy.ndarray):           Observed water vapor pressure for each observation in [hPa]
+        obs_tm (numpy.ndarray):          Observed mean water vapor temperature for each observation in [K]
+        obs_lambd (numpy.ndarray):       Observed water vapor decrease factor for each observation
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -166,83 +192,129 @@ def meteorological_data(dset):
      lambd                      Water vapor decrease factor for each observation. Marked with 'None', if unknown.
     ============  ===========  =====================================================================================
     """
-    pressure = None
-    temperature = None
-    e = None
-    tm = None
-    lambd = None
 
-    model = config.tech.get("meteorological_data", section=MODEL, default="").str
-    mapping_function = config.tech[MODEL].mapping_function.str
-
-    # Use default meteorological models, if no model is defined in configuration file
-    if not model:
-        try:
-            model = MAPPING_METEO_RELATION[mapping_function]
-        except KeyError:
-            log.fatal(
-                f"Unknown mapping function {mapping_function}. "
-                f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
-            )
-
-    log.debug(f"Meteorological data model: {model}")
-
-    if model == "vmf1_gridded":
-        pressure = vmf1_gridded_pressure(dset)
-    if model == "vmf1_station":
-        pressure = vmf1_station_pressure(dset)
-    elif model == "gpt":
-        pressure, temperature, _ = gpt(dset)
-
-    elif model == "gpt2":
-        pressure, temperature, _, e, _, _, _ = gpt2(dset)
-
-    elif model == "gpt2w":
-        pressure, temperature, _, tm, e, _, _, lambd, _ = gpt2w(dset)
-
-    elif model == "site_pressure":
-        pressure = site_pressure(dset)
-
-    else:
+    models = config.tech[MODEL].meteorological_data.list
+    if not models:
         log.fatal(
-            f"Unknown meteorological data model {model}. Available models are {', '.join(METEOROLOGICAL_MODELS)}"
+            f"No meteorological data model defined. "
+            f"Available options are {', '.join(METEOROLOGICAL_MODELS)}"
         )
+    log.debug(f"Meteorological data model: {models}")
+
+    num_obs = len(time)
+    
+    pressure = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    temperature = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    e = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    tm = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    lambd = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    
+    for model in models:
+        if model == "vmf1_gridded":
+            model_pressure = vmf1_gridded_pressure(latitude, longitude, height, time)
+            model_temp, model_e, model_tm, model_lambd = None, None, None, None
+        elif model == "vmf1_station":
+            model_pressure = vmf1_station_pressure(stations, time)
+            model_temp, model_e, model_tm, model_lambd = None, None, None, None
+        elif model == "gpt":
+            model_pressure, model_temp, _ = gpt(latitude, longitude, height, time)
+            model_e, model_tm, model_lambd = None, None, None
+        elif model == "gpt2":
+            model_pressure, model_temp, _, model_e, _, _, _ = gpt2_meteo(latitude, longitude, height, time)
+            model_tm, model_lambd = None, None, 
+        elif model == "gpt2w":
+            model_pressure, model_temp, _, model_tm, model_e, _, _, model_lambd, _ = gpt2w(latitude, longitude, height, time)
+        elif model == "site_pressure":
+            model_pressure = obs_pressure
+            model_temp, model_e, model_tm, model_lambd = None, None, None, None
+        elif model == "site_temperature":
+            model_temp = obs_temperature
+            model_pressure, model_e, model_tm, model_lambd = None, None, None, None
+        elif model == "site_e":
+            model_e = obs_e
+            model_pressure, model_temp, model_tm, model_lambd = None, None, None, None
+        elif model == "site_tm":
+            model_tm = obs_tm
+            model_pressure, model_temp, model_e, model_lambd = None, None, None, None
+        elif model == "site_lambd":
+            model_lambd = obs_lambd
+            model_pressure, model_temp, model_e, model_tm = None, None, None, None
+        elif model == "default":
+            model_pressure = np.full(num_obs, fill_value=1013.25) # 1013.25 HPa (1 atm)
+            # TODO: create default values for other parameters
+            model_temp, model_e, model_tm, model_lambd = None, None, None, None
+        else:
+            log.fatal(
+                f"Unknown meteorological data model '{model}'. Available models are {', '.join(METEOROLOGICAL_MODELS)}."
+            )
+        
+        if model_pressure is not None:
+            pressure = _update_data(pressure, model_pressure, model, "pressure")
+        if model_temp is not None:
+            temperature = _update_data(temperature, model_temp, model, "temperature")
+        if model_e is not None:
+            e = _update_data(e, model_e, model, "water vapor pressure")
+        if model_tm is not None:
+            tm = _update_data(tm, model_tm, model, "mean temperature of the water vapor")
+        if model_lambd is not None:
+            lambd = _update_data(lambd, model_lambd, model, "water vapor decrease factor")
 
     return pressure, temperature, e, tm, lambd
 
 
-def gradient_model(dset):
+def gradient_model(latitude, longitude, azimuth, elevation):
     """Calculates asymmetric delay based on gradient model given in configuration file
 
     Args:
-        dset (Dataset):       Model data.
+        latitude (numpy.ndarray):    Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):   Geodetic longitude for each observation in [rad]
+        azimuth (numpy.ndarray):     Azimuth angle for each observatioin in [rad]
+        elevation (numpy.ndarray):   Elevation angle for each observation in [rad]
 
     Returns:
         numpy.ndarray:  Troposphere asymmetric delay in [m] for each observation
     """
-    model = config.tech.get("gradients", section=MODEL, default="apg").str
-    log.debug(f"Troposphere gradient model: {model}")
+    models = config.tech[MODEL].gradients.list
+    if not models:
+        log.fatal(
+            f"No gradient model defined. "
+            f"Available options are {', '.join(GRADIENT_MODELS)}"
+        )
+    log.debug(f"Troposphere gradient model: {models}")
 
+    
     # Note: Be aware, that the apg.f function uses c = 0.0031 instead of c = 0.0032.
-    mg = 1 / (np.sin(dset.site_pos.elevation) * np.tan(dset.site_pos.elevation) + 0.0032)
+    mg = 1 / (np.sin(elevation) * np.tan(elevation) + 0.0032)
 
-    if model == "none":
-        gn = ge = np.zeros(dset.num_obs)
-    elif model == "apg":
-        gn, ge = apg_gradient_model(dset)
-    else:
-        log.fatal(f"Unknown troposphere gradient model {model}. Available models are {', '.join(GRADIENT_MODELS)}")
+    num_obs = len(latitude)
+    gn = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    ge = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    
+    for model in models:
+        if model == "none":
+            model_gn = np.zeros(num_obs)
+            model_ge = np.zeros(num_obs)
+        elif model == "apg":
+            model_gn, model_ge = apg_gradient_model(latitude, longitude, azimuth, elevation)
+        else:
+            log.fatal(f"Unknown troposphere gradient model {model}. Available models are {', '.join(GRADIENT_MODELS)}")
+    
+        gn = _update_data(gn, model_gn, model, "north gradient")
+        ge = _update_data(ge, model_ge, model, "east gradient")
 
     log.debug(f"Troposphere gradients North and East (average): {np.mean(gn)} {np.mean(ge)} [m]")
-
     return mg, gn, ge
 
 
-def mapping_function(dset):
+def mapping_function(latitude, longitude, height, time, zenith_distance):
     """Calculates hydrostatic and wet mapping functions based on configuration file definition
 
     Args:
-        dset (Dataset):    A Dataset containing model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -254,68 +326,95 @@ def mapping_function(dset):
      mw                         Wet mapping function values
     ============  ===========  =====================================================================================
     """
-    model = config.tech[MODEL].mapping_function.str
-    log.debug(f"Troposphere mapping function: {model}")
-
-    if model == "gmf":
-        mh, mw = gmf_mapping_function(dset)
-
-    elif model == "gpt2":
-        _, _, _, _, mh, mw, _ = gpt2(dset)
-
-    elif model == "gpt2w":
-        _, _, _, _, _, mh, mw, _, _ = gpt2w(dset)
-
-    elif model == "vmf1_gridded":
-        mh, mw = vmf1_gridded_mapping_function(dset)
-    elif model == "vmf1_station":
-        mh, mw = vmf1_station_mapping_function(dset)
-
-    else:
+    models = config.tech[MODEL].mapping_function.list
+    if not models:
         log.fatal(
-            f"Unknown troposphere mapping function {model}. "
-            f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
+            f"No troposphere mapping functions defined. "
+            f"Available options are {', '.join(MAPPING_FUNCTIONS)}"
         )
+    log.debug(f"Troposphere mapping function: {models}")
 
+    num_obs = len(time)
+    mh = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    mw = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+    
+    for model in models:
+        if model == "gmf":
+            model_mh, model_mw = gmf_mapping_function(latitude, longitude, height, time, zenith_distance)
+        elif model == "gpt2":
+            _, _, _, _, model_mh, model_mw, _ = gpt2_mapping_function(latitude, longitude, height, time, zenith_distance)
+        elif model == "gpt2w":
+            _, _, _, _, _, model_mh, model_mw, _, _ = gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance)
+        elif model == "vmf1_gridded":
+            model_mh, model_mw = vmf1_gridded_mapping_function(latitude, longitude, height, time, zenith_distance)
+        elif model == "vmf1_station":
+            model_mh, model_mw = vmf1_station_mapping_function(latitude, longitude, height, time, zenith_distance)
+    
+        else:
+            log.fatal(
+                f"Unknown troposphere mapping function {model}. "
+                f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
+            )
+        mh = _update_data(mh, model_mh, model, "hydrostatic mapping function")
+        mw = _update_data(mw, model_mw, model, "wet mapping function")
+    
+    log.debug(f"Troposphere mapping functions mh, mw (average): {np.mean(mh)}, {np.mean(mw)}")
     return mh, mw
 
 
-def zenith_hydrostatic_delay(dset, pressure, latitude, height):
+def zenith_hydrostatic_delay(stations, latitude, longitude, height, time, pressure):
     """Calculates zenith hydrostatic delay based on configuration file definition
 
     Args:
-        pressure:    Array with atmospheric pressure for each observation in [hPa]
-        latitude:    Array with geodetic latitude for each observation in [rad]
-        height:      Array with orthometric height for each observation in [m]
+        stations (numpy.ndarray):    Station name for each observation.
+        latitude (numpy.ndarray):    Geodetic latitude for each observation in [rad]
+        ongitude (numpy.ndarray):    Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):      Orthometric height for each observation in [m]
+        time (Time):                 Epoch of each observation
+        pressure (numpy.ndarray):    Atmospheric pressure for each observation in [hPa]
 
     Returns:
         numpy.ndarray:         Array with zenith hydrostatic delay for each observation in [m]
     """
-    model = config.tech.get("zenith_hydrostatic_delay", section=MODEL, default="saastamoinen").str
-    log.debug(f"Troposphere zenith hydrostatic delay model: {model}")
 
-    if model == "saastamoinen":
-        zhd = saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height)
-    elif model == "vmf1_gridded":
-        zhd = vmf1_gridded_zenith_hydrostatic_delay(dset)
-    elif model == "vmf1_station":
-        zhd = vmf1_station_zenith_hydrostatic_delay(dset)
-    else:
+    models = config.tech[MODEL].zenith_hydrostatic_delay.list
+    if not models:
         log.fatal(
-            f"Unknown zenith hydrostatic troposphere delay model {model}. "
-            f"Available models are {', '.join(ZENITH_HYDROSTATIC_MODELS)}"
+            f"No zenith hydrostatic delay model defined. "
+            f"Available options are {', '.join(ZENITH_HYDROSTATIC_DELAY_MODELS)}"
         )
+    log.debug(f"Troposphere zenith hydrostatic delay model: {models}")
+    
+    num_obs = len(time)
+    zhd = np.nan if num_obs == 1 else  np.full(num_obs, fill_value=np.nan)
 
+    for model in models:
+        if model == "saastamoinen":
+            model_zhd = saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height)
+        elif model == "vmf1_gridded":
+            model_zhd = vmf1_gridded_zenith_hydrostatic_delay(latitude, longitude, height, time)
+        elif model == "vmf1_station":
+            model_zhd = vmf1_station_zenith_hydrostatic_delay(stations, time)
+        else:
+            log.fatal(
+                f"Unknown zenith hydrostatic troposphere delay model {model}. "
+                f"Available models are {', '.join(ZENITH_HYDROSTATIC_DELAY_MODELS)}"
+            )
+        zhd = _update_data(zhd, model_zhd, model, "zenith hydrostatic delay")
+        
     log.debug(f"Troposphere zenith hydrostatic delay (average): {np.mean(zhd)} [m]")
-
     return zhd
 
 
-def zenith_wet_delay(dset, temperature, e, tm, lambd):
+def zenith_wet_delay(stations, latitude, longitude, height, time, temperature, e, tm, lambd):
     """Calculates zenith wet delay based on configuration file definition
 
     Args:
-        dset (Dataset):                A Dataset containing model data
+        stations (numpy.ndarray):    Station name for each observation.
+        latitude (numpy.ndarray):    Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):   Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):      Orthometric height for each observation in [m]
+        time (Time):                 Epoch of each observation
         temperature (numpy.ndarray):   Temperature for each observation in [Celsius]
         e (numpy.ndarray):             Water vapor pressure for each observation in [hPa]
         tm (numpy.ndarray):            Mean temperature of the water vapor for each observation in [K]
@@ -325,53 +424,43 @@ def zenith_wet_delay(dset, temperature, e, tm, lambd):
     Returns:
         numpy.ndarray:    Zenith wet delay values for each observation in [m].
     """
-    model = config.tech.get("zenith_wet_delay", section=MODEL, default="").str
-    mapping_function = config.tech[MODEL].mapping_function.str
-
-    # Use default zenith wet delay models, if no model is defined in configuration file
-    if not model:
-        try:
-            model = MAPPING_ZENITH_WET_RELATION[mapping_function]
-        except KeyError:
-            log.fatal(
-                f"Unknown mapping function {mapping_function}. "
-                f"Available mapping functions are {', '.join(MAPPING_FUNCTIONS)}"
-            )
-    log.debug(f"Troposphere zenith wet delay model: {model}")
-
-    if model == "none":
-        zwd = np.zeros(dset.num_obs)
-    elif model == "askne":
-        zwd = askne_zenith_wet_delay(e, tm, lambd)
-        # TODO: log.fatal(f"Meteorological model {met_model!r} does not provide input parameters for using Askne and "
-        #                 "Nordius zenith wet delay model. Use 'gpt2w' model")
-
-    elif model == "davis":
-        latitude, _, height = dset.site_pos.pos.llh.T
-        zwd = davis_zenith_wet_delay(latitude, height, temperature, e)
-
-    elif model == "saastamoinen":
-        latitude, _, height = dset.site_pos.pos.llh.T
-        zwd = saastamoinen_zenith_wet_delay(latitude, height, temperature, e)
-        # TODO: log.fatal(f"Meteorological model {met_model} does not provide input parameters for using Saastamoinen "
-        #                 "zenith wet delay model. Use 'gpt2' or 'gpt2w' model")
-
-    elif model == "vmf1_gridded":
-        zwd = vmf1_gridded_zenith_wet_delay(dset)
-    elif model == "vmf1_station":
-        zwd = vmf1_station_zenith_wet_delay(dset)
-    else:
+    models = config.tech[MODEL].zenith_wet_delay.list
+    if not models:
         log.fatal(
-            f"Unknown zenith wet troposphere delay model {model}. "
-            f"Available models are {', '.join(ZENITH_WET_DELAY_MODELS)}"
+            f"No zenith wet delay model defined. "
+            f"Available options are {', '.join(ZENITH_WET_DELAY_MODELS)}"
         )
+    log.debug(f"Troposphere zenith wet delay model: {models}")
+
+    num_obs = len(time)
+    zwd = np.nan if num_obs == 1 else np.full(num_obs, fill_value=np.nan)
+
+    for model in models:
+        if model == "none":
+            model_zwd = np.zeros(num_obs)
+        elif model == "askne":
+            model_zwd = askne_zenith_wet_delay(e, tm, lambd)
+        elif model == "davis":
+            model_zwd = davis_zenith_wet_delay(latitude, height, temperature, e)
+        elif model == "saastamoinen":
+            model_zwd = saastamoinen_zenith_wet_delay(latitude, height, temperature, e)
+        elif model == "vmf1_gridded":
+            model_zwd = vmf1_gridded_zenith_wet_delay(latitude, longitude, height, time)
+        elif model == "vmf1_station":
+            model_zwd = vmf1_station_zenith_wet_delay(stations, time)
+        else:
+            log.fatal(
+                f"Unknown zenith wet troposphere delay model {model}. "
+                f"Available models are {', '.join(ZENITH_WET_DELAY_MODELS)}"
+            )
+
+        zwd = _update_data(zwd, model_zwd, model, "zenith wet delay")
 
     log.debug(f"Troposphere zenith wet delay (average): {np.mean(zwd)} [m]")
-
     return zwd
 
 
-def apg_gradient_model(dset):
+def apg_gradient_model(latitude, longitude, azimuth, elevation):
     """Calculates ECMWF gradient model based on Fortran routine 'apg.f'
 
     The tropospheric asymmetric delay and the horizontal delay gradients ``G_N`` and ``G_E`` are computed by using the
@@ -379,7 +468,10 @@ def apg_gradient_model(dset):
     (9.12) described in IERS conventions 2010 in Section 9.2 :cite:`iers2010`.
 
     Args:
-        dset (Dataset):       A Dataset containing model data.
+        latitude (numpy.ndarray):    Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):   Geodetic longitude for each observation in [rad]
+        azimuth (numpy.ndarray):     Azimuth angle for each observatioin in [rad]
+        elevation (numpy.ndarray):   Elevation angle for each observation in [rad]
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -391,14 +483,13 @@ def apg_gradient_model(dset):
      ge            m            Horizontal delay gradient in the East direction
     ============  ===========  =====================================================================================
     """
-    gn = ge = np.empty(dset.num_obs)
-    lat, lon, _ = dset.site_pos.pos.llh.T
-    az = dset.site_pos.azimuth
-    el = dset.site_pos.elevation
+    num_obs = len(latitude)
+    gn = np.empty(num_obs)
+    ge = np.empty(num_obs)
 
-    for obs in range(dset.num_obs):
+    for obs in range(num_obs):
         # Get horizontal gradients G_N and G_E
-        _, gn[obs], ge[obs] = iers.apg(lat[obs], lon[obs], az[obs], el[obs])
+        _, gn[obs], ge[obs] = iers.apg(latitude[obs], longitude[obs], azimuth[obs], elevation[obs])
 
     return gn * Unit.mm2m, ge * Unit.mm2m
 
@@ -476,14 +567,18 @@ def davis_zenith_wet_delay(latitude, height, temperature, e):
     return zwd
 
 
-def gmf_mapping_function(dset):
+def gmf_mapping_function(latitude, longitude, height, time, zenith_distance):
     """Calculates GMF hydrostatic and wet mapping functions
 
     Use the 'gmf.f' Fortran routine from the IERS software library to calculate the Global Mapping Function (see
     Section 9.2 in :cite:`iers2010`), which are described in Boehm et al. :cite:`boehm2006b`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -495,25 +590,27 @@ def gmf_mapping_function(dset):
      mw                         Wet mapping function coefficient aw
     ============  ===========  =======================================================
     """
-    mh = np.empty(dset.num_obs)
-    mw = np.empty(dset.num_obs)
-    lat, lon, height = dset.site_pos.pos.llh.T
-    zd = dset.site_pos.zenith_distance
-    mjd = dset.time.utc.mjd
-    for obs in range(dset.num_obs):
-        mh[obs], mw[obs] = iers.gmf(mjd[obs], lat[obs], lon[obs], height[obs], zd[obs])
+    num_obs = len(time)
+    mh = np.empty(num_obs)
+    mw = np.empty(num_obs)
+    mjd = time.utc.mjd
+    for obs in range(num_obs):
+        mh[obs], mw[obs] = iers.gmf(mjd[obs], latitude[obs], longitude[obs], height[obs], zenith_distance[obs])
 
     return mh, mw
 
 
-def gpt(dset):
+def gpt(latitude, longitude, height, time):
     """Calculates Global Pressure and Temperature (GPT)
 
     This subroutine determines atmospheric pressure and temperature globally based on spherical harmonics up to degree
     and order 9 (see Boehm et al. :cite:`boehm2007`) for a given latitude, longitude and ellipsoidal height.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -526,28 +623,31 @@ def gpt(dset):
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
     ============  ===========  =======================================================
     """
-    pressure = np.empty(dset.num_obs)
-    temperature = np.empty(dset.num_obs)
-    geoid_undu = np.empty(dset.num_obs)
+    num_obs = len(time)
+    pressure = np.empty(num_obs)
+    temperature = np.empty(num_obs)
+    geoid_undu = np.empty(num_obs)
 
     # Note: For GPT2 and GPT2w linear interpolation is done between daily solutions. Here
     #      it does not seem to be necessary, because the performance of GPT Fortran routine
     #      is not so worse than for GPT2 and GPT2w.
-    mjd = dset.time.utc.mjd
-    lat, lon, height = dset.site_pos.pos.llh.T
-    for obs in range(dset.num_obs):
-        pressure[obs], temperature[obs], geoid_undu[obs] = iers.gpt(mjd[obs], lat[obs], lon[obs], height[obs])
+    mjd = time.utc.mjd
+    for obs in range(num_obs):
+        pressure[obs], temperature[obs], geoid_undu[obs] = iers.gpt(mjd[obs], latitude[obs], longitude[obs], height[obs])
 
     return pressure, temperature, geoid_undu
 
 
-def gpt2(dset):
-    """Calculates meteorological data and mapping function coefficients based on GPT2 model
+def gpt2_meteo(latitude, longitude, height, time):
+    """Calculates meteorological data based on GPT2 model
 
     The GPT2 model is described in Lagler et al. :cite:`lagler2013`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -559,41 +659,76 @@ def gpt2(dset):
      temperature   Celsius      Temperature values
      dt            degree/km    Temperature lapse rate
      e             hPa          Water vapor pressure
-     mh                         Hydrostatic mapping function coefficient ah
-     mw                         Wet mapping function coefficient aw
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
     ============  ===========  =======================================================
     """
-    press = np.empty(dset.num_obs)
-    temp = np.empty(dset.num_obs)
-    dt = np.empty(dset.num_obs)
-    e = np.empty(dset.num_obs)
-    ah = np.empty(dset.num_obs)
-    aw = np.empty(dset.num_obs)
-    mh = np.empty(dset.num_obs)
-    mw = np.empty(dset.num_obs)
-    undu = np.empty(dset.num_obs)
+    num_obs = len(time)
+    press = np.empty(num_obs)
+    temp = np.empty(num_obs)
+    dt = np.empty(num_obs)
+    e = np.empty(num_obs)
+    ah = np.empty(num_obs)
+    aw = np.empty(num_obs)
+    undu = np.empty(num_obs)
 
     # Determine GPT2 values for each observation by interpolating between two unique
     # daily solutions
-    mjd = dset.time.utc.mjd
-    lat, lon, height = dset.site_pos.pos.llh.T
-    zd = dset.site_pos.zenith_distance
+    mjd = time.utc.mjd
 
-    for obs in range(dset.num_obs):
+    for obs in range(num_obs):
         # Start 'gpt2.f' day-by-day in folder where 'gpt2_5.grd' is placed and carry out
         # linear interpolation
         press[obs], temp[obs], dt[obs], e[obs], ah[obs], aw[obs], undu[obs] = gpt2_wrapper(
-            mjd[obs], [lat[obs]], [lon[obs]], [height[obs]]
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
+        )
+
+    return press, temp, dt, e, undu
+
+def gpt2_mapping_function(latitude, longitude, height, time, zenith_distance):
+    """Calculates mapping function based on coefficients from GPT2 model
+
+    The GPT2 model is described in Lagler et al. :cite:`lagler2013`.
+
+    Args:
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
+
+    Returns:
+        tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
+
+    ============  ===========  =======================================================
+     Element       Unit         Description
+    ============  ===========  =======================================================
+     mh                         Hydrostatic mapping function coefficient ah
+     mw                         Wet mapping function coefficient aw
+    ============  ===========  =======================================================
+    """
+    num_obs = len(time)
+    ah = np.empty(num_obs)
+    aw = np.empty(num_obs)
+    mh = np.empty(num_obs)
+    mw = np.empty(num_obs)
+
+    # Determine GPT2 values for each observation by interpolating between two unique
+    # daily solutions
+    mjd = time.utc.mjd
+
+    for obs in range(num_obs):
+        # Start 'gpt2.f' day-by-day in folder where 'gpt2_5.grd' is placed and carry out
+        # linear interpolation
+        _, _, _, _, ah[obs], aw[obs], _ = gpt2_wrapper(
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
         )
 
         # Determine mapping function values based on coefficients 'ah' and 'aw'
-        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], lat[obs], height[obs], zd[obs])
+        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], height[obs], zenith_distance[obs])
 
-    return press, temp, dt, e, mh, mw, undu
+    return mh, mw
 
-
-def gpt2_wrapper(mjd, lat, lon, hell):
+def gpt2_wrapper(mjd, latitude, longitude, hell):
     """Calculates meteorological data and mapping function coefficients based on GPT2 model
 
     The functions calls the IERS library routine 'gpt2.f' (see Section 9.2 in :cite:`iers2010`). The Fortran routine
@@ -610,8 +745,8 @@ def gpt2_wrapper(mjd, lat, lon, hell):
 
     Args:
         mjd (numpy.float64):  Modified Julian date.
-        lat (list):           Array with latitude for each station in [rad].
-        lon (list):           Array with longitude for each station in [rad].
+        latitude (list):      Array with latitude for each station in [rad].
+        longitude (list):     Array with longitude for each station in [rad].
         hell (list):          Array with height for each station in [m].
 
     Returns:
@@ -629,13 +764,12 @@ def gpt2_wrapper(mjd, lat, lon, hell):
      [6]      m            Geoid undulation (based on 9x9 EGM model)
     =======  ===========  =======================================================
     """
-    nstat = len(lat)  # Number of stations
+    nstat = len(latitude)  # Number of stations
     it = 0  # Use of time variations (annual and semiannual terms)
 
-    if not (len(lat) == len(lon) == len(hell)):
+    if not (len(latitude) == len(longitude) == len(hell)):
         log.fatal("Length of latitude, longitude and ellipsoidal height array is not equal.")
 
-    # TODO: Case not handled if several stations are included in Dataset. Is that the case for VLBI?
 
     # Change directory so that gpt2.f can read the gpt2_5.grd-file in the IERS source directory
     current_dir = os.getcwd()
@@ -646,7 +780,7 @@ def gpt2_wrapper(mjd, lat, lon, hell):
 
         # Check if date is already included in cache
         if date not in _GPT2:
-            _GPT2[date] = np.array(iers.gpt2(date, lat, lon, hell, nstat, it)).reshape(-1)
+            _GPT2[date] = np.array(iers.gpt2(date, latitude, longitude, hell, nstat, it)).reshape(-1)
     os.chdir(current_dir)
 
     # Linear interpolation between two daily GPT2 solutions
@@ -656,13 +790,70 @@ def gpt2_wrapper(mjd, lat, lon, hell):
     return output
 
 
-def gpt2w(dset):
+def gpt2w_meteo(latitude, longitude, height, time):
+    """Calculates meteorological data based on GPT2w model
+
+    The GPT2w model is described in Boehm et al. :cite:`boehm2015`.
+
+    Args:
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+
+    Returns:
+        tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
+
+    ============  ===========  =======================================================
+     Element       Unit         Description
+    ============  ===========  =======================================================
+     pressure      hPa          Pressure value
+     temperature   Celsius      Temperature values
+     dt            degree/km    Temperature lapse rate
+     tm            K            Mean temperature of the water vapor
+     e             hPa          Water vapor pressure
+     la                         Water vapor decrease factor
+     geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
+    ============  ===========  =======================================================
+    """
+    num_obs = len(time)
+    press = np.empty(num_obs)
+    temp = np.empty(num_obs)
+    dt = np.empty(num_obs)
+    tm = np.empty(num_obs)
+    e = np.empty(num_obs)
+    ah = np.empty(num_obs)
+    aw = np.empty(num_obs)
+    la = np.empty(num_obs)
+    undu = np.empty(num_obs)
+
+    mjd = time.utc.mjd
+
+    # Determine GPT2W values for each observation by interpolating between two unique
+    # daily solutions
+    for obs in range(num_obs):
+        # Start 'gpt2.f' day-by-day in folder where 'gpt2_5.grd' is placed and carry out
+        # linear interpolation
+        (press[obs], temp[obs], dt[obs], tm[obs], e[obs], ah[obs], aw[obs], la[obs], undu[obs]) = gpt2w_wrapper(
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
+        )
+
+        # Determine mapping function values based on coefficients 'ah' and 'aw'
+        #mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], height[obs], zenith_distance[obs])
+
+    return press, temp, dt, tm, e, la, undu
+
+def gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance):
     """Calculates meteorological data and mapping function coefficients based on GPT2w model
 
     The GPT2w model is described in Boehm et al. :cite:`boehm2015`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -681,38 +872,31 @@ def gpt2w(dset):
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
     ============  ===========  =======================================================
     """
-    press = np.empty(dset.num_obs)
-    temp = np.empty(dset.num_obs)
-    dt = np.empty(dset.num_obs)
-    tm = np.empty(dset.num_obs)
-    e = np.empty(dset.num_obs)
-    ah = np.empty(dset.num_obs)
-    aw = np.empty(dset.num_obs)
-    mh = np.empty(dset.num_obs)
-    mw = np.empty(dset.num_obs)
-    la = np.empty(dset.num_obs)
-    undu = np.empty(dset.num_obs)
+    num_obs = len(time)
+    ah = np.empty(num_obs)
+    aw = np.empty(num_obs)
+    mh = np.empty(num_obs)
+    mw = np.empty(num_obs)
 
-    mjd = dset.time.utc.mjd
-    lat, lon, height = dset.site_pos.pos.llh.T
-    zd = dset.site_pos.zenith_distance
+    mjd = time.utc.mjd
 
     # Determine GPT2W values for each observation by interpolating between two unique
     # daily solutions
-    for obs in range(dset.num_obs):
+    for obs in range(num_obs):
         # Start 'gpt2.f' day-by-day in folder where 'gpt2_5.grd' is placed and carry out
         # linear interpolation
-        (press[obs], temp[obs], dt[obs], tm[obs], e[obs], ah[obs], aw[obs], la[obs], undu[obs]) = gpt2w_wrapper(
-            mjd[obs], [lat[obs]], [lon[obs]], [height[obs]]
+        _, _, _, _, _, ah[obs], aw[obs], _, _ = gpt2w_wrapper(
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
         )
 
         # Determine mapping function values based on coefficients 'ah' and 'aw'
-        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], lat[obs], height[obs], zd[obs])
+        mh[obs], mw[obs] = iers.vmf1_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], height[obs], zenith_distance[obs])
 
-    return press, temp, dt, tm, e, mh, mw, la, undu
+    return mh, mw
 
 
-def gpt2w_wrapper(mjd, lat, lon, hell):
+
+def gpt2w_wrapper(mjd, latitude, longitude, hell):
     """Calculates meteorological data and mapping function coefficients based on GPT2w model
 
     The functions calls the GPT2w library routine ``gpt2w_1w.f`` (see
@@ -729,8 +913,8 @@ def gpt2w_wrapper(mjd, lat, lon, hell):
 
     Args:
         mjd (numpy.float64):  Modified Julian date.
-        lat (list):           Array with latitude for each station in [rad].
-        lon (list):           Array with longitude for each station in [rad].
+        latitude (list):      Array with latitude for each station in [rad].
+        longitude (list):     Array with longitude for each station in [rad].
         hell (list):          Array with height for each station in [m].
 
     Returns:
@@ -750,12 +934,10 @@ def gpt2w_wrapper(mjd, lat, lon, hell):
      [8]      m            Geoid undulation (based on 9x9 EGM model)
     =======  ===========  =======================================================
     """
-    nstat = len(lat)  # Number of stations
+    nstat = len(latitude)  # Number of stations
     it = 0  # Use of time variations (annual and semiannual terms)
 
-    # TODO: Case not handled if several stations are included in Dateset. Is that the case for VLBI?
-
-    if not (len(lat) == len(lon) == len(hell)):
+    if not (len(latitude) == len(longitude) == len(hell)):
         log.fatal("Length of latitude, longitute and ellipsoidal height array is not equal.")
 
     # Change directory so that gpt2w.f can read the gpt2_5.grd-file in the GPT2w source directory
@@ -767,7 +949,7 @@ def gpt2w_wrapper(mjd, lat, lon, hell):
 
         # Check if date is already included in cache
         if date not in _GPT2W:
-            _GPT2W[date] = np.array(ext_gpt2w.gpt2_1w(date, lat, lon, hell, nstat, it)).reshape(-1)
+            _GPT2W[date] = np.array(ext_gpt2w.gpt2_1w(date, latitude, longitude, hell, nstat, it)).reshape(-1)
     os.chdir(current_dir)
 
     # Linear interpolation between two daily GPT2W solutions
@@ -788,18 +970,7 @@ def pressure_zhd(zhd, latitude, height):
     Returns:
         numpy.ndarray:    Atmospheric pressure for each observation in [hPa]
     """
-    #model = config.tech.get("zenith_hydrostatic_delay", section=MODEL, default="saastamoinen").str
-
-    #if model == "saastamoinen":
-    # TODO: model needs to in a different configuration parameter than zenith_hydrostatic_delay
-    pressure = saastamoinen_pressure(zhd, latitude, height)
-    #else:
-    #    log.fatal(
-    #        f"Zenith troposphere delay definition {model!r} is not correct in configuration file. "
-    #        "It should be 'saastamoinen'"
-    #    )
-
-    return pressure
+    return saastamoinen_pressure(zhd, latitude, height)
 
 
 def pressure_height_correction(pressure_ref, height_ref, height):
@@ -957,16 +1128,10 @@ def saastamoinen_zenith_wet_delay(latitude, height, temperature, e):
     return 0.002_276_8 * (1255 / Unit.celsius_to_kelvin(temperature) + 0.05) * e
 
 
-def site_pressure(dset):
+def meteo_from_dset(dset, fieldname):
     """Get atmospheric pressure from local site measurements
 
-    If local atmospheric pressure measurements on a site are not available an alternative model given in configuration
-    file is used to determine atmospheric pressure.
-
-    TODO:
-        So far only gridded VMF1 model is used, if local pressure data are not available.  Which alternative is used,
-        should be decided via the configuration file. How to check after an alternative model in configuration file?
-        model_list = config.tech[MODEL].meteorological_data.list???
+    Missing values are set to np.nan
 
     Args:
         dset (Dataset): A Dataset containing model data.
@@ -974,22 +1139,15 @@ def site_pressure(dset):
     Returns:
         numpy.ndarray: Atmospheric pressure for each observation in [hPa]
     """
-    pressure = np.zeros(dset.num_obs)
+    meteo_data = np.full(dset.num_obs, fill_value=np.nan)
 
-    i_given = np.zeros(dset.num_obs, dtype=bool)
-    if "pressure" + (dset.default_field_suffix or "") in dset.fields:
-        i_given[np.logical_not(np.isnan(dset.pressure))] = True
-        pressure[i_given] = dset.pressure[i_given]
+    if fieldname + (dset.default_field_suffix or "") in dset.fields:
+        meteo_data = dset[fieldname]
 
-    i_missing = np.logical_not(i_given)
-    if i_missing.any():
-        log.warn(f"No pressure data for some epochs in dataset. Using VMF1 station data as backup")
-        pressure[i_missing] = vmf1_station_pressure(dset)[i_missing]
-
-    return pressure
+    return meteo_data
 
 
-def vmf1_gridded_pressure(dset):
+def vmf1_gridded_pressure(latitude, longitude, height, time):
     """Calulates VMF1 gridded atmospheric pressure
 
     Equation (9.11) in IERS conventions 2010 :cite:`iers2010` is converted to 'pressure' and the VMF1 gridded
@@ -998,57 +1156,71 @@ def vmf1_gridded_pressure(dset):
     :cite:`kouba2007`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):    Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):   Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):      Orthometric height for each observation in [m]
+        time (Time):                 Epoch of each observation
 
     Returns:
         numpy.ndarray:  Atmospheric pressure for each observation in [hPa].
     """
     # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1_grid", time=dset.time)
-    lat, lon, height = dset.site_pos.pos.llh.T
+    vmf1 = apriori.get("vmf1_grid", time=time)
     try:
-        grid_zhd = vmf1["zh"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
-        grid_height = vmf1["ell"](lon, lat, grid=False)
-        grid_pressure = pressure_zhd(grid_zhd, lat, grid_height)
+        grid_zhd = vmf1["zh"](time, longitude, latitude)  # Interpolation in time and space in VMF1 grid
+        grid_height = vmf1["ell"](longitude, latitude, grid=False)
+        grid_pressure = pressure_zhd(grid_zhd, latitude, grid_height)
 
         # Rescale gridded pressure to station pressure
         pressure = pressure_height_correction(grid_pressure, grid_height, height)
     except KeyError:
-        log.warn("No VMF1 grid data available. Unable to compute pressure value. Setting pressure to 1 atm (1013.25hPa). ")
-        pressure = np.full(len(lat), fill_value=1013.25)
+        pressure = np.full(len(time), fill_value=np.nan)
     return pressure
 
-def vmf1_station_pressure(dset):
-    """Calulates atmospheric pressure from station dependend VMF1 files
+def vmf1_station_pressure(stations, time):
+    """Calculates atmospheric pressure from station dependent VMF1 files
+
+    Values for unknown station names are set to np.nan.
 
     Args:
-        dset (Dataset):    Model data.
+        stations (numpy.ndarray):    Station name for each observation.
+        time (Time):                 Epoch of each observation
 
     Returns:
         numpy.ndarray:  Atmospheric pressure for each observation in [hPa].
     """
-    vmf1 = apriori.get("vmf1_station", time=dset.time)
-    pressure = np.zeros(dset.num_obs)
-
-    for sta in dset.unique("station"):
-        idx = dset.station == sta
+    
+    vmf1 = apriori.get("vmf1_station", time=time)
+    
+    if time.size == 1:
         try:
-            pressure[idx] = vmf1[sta]["pressure"](dset.time.mjd[idx])
+            return float(vmf1[stations]["pressure"](time.mjd))
         except KeyError:
-            # Station is missing, use grid as backup
-            log.warn(f"No data for station {sta} in VMF1 station data. Using VMF1 grid as backup")
-            pressure_grid = vmf1_gridded_pressure(dset)
-            pressure[idx] = pressure_grid[idx]
+            return np.nan
+    
+    pressure = np.full(len(time), fill_value=np.nan)
+
+    for sta in np.unique(stations):
+        idx = stations == sta
+        try:
+            pressure[idx] = vmf1[sta]["pressure"](time.mjd[idx])
+        except KeyError:
+            # pressure[idx] is already set to nan
+            pass
     return pressure
 
-def vmf1_gridded_mapping_function(dset):
+def vmf1_gridded_mapping_function(latitude, longitude, height, time, zenith_distance):
     """Calculates VMF1 hydrostatic and wet mapping functions based on gridded VMF1 files
 
     This routine determines the VMF1 (Vienna Mapping Functions 1) described in Boehm et al. :cite:`boehm2006a` and
     Kouba :cite:`kouba2007` and uses the 'vmf1_ht.f' from the IERS software library :cite:`iers2010`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -1061,44 +1233,39 @@ def vmf1_gridded_mapping_function(dset):
     ============  ===========  =======================================================
     """
     # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1_grid", time=dset.time)
+    vmf1 = apriori.get("vmf1_grid", time=time)
 
-    mh = np.empty(dset.num_obs)
-    mw = np.empty(dset.num_obs)
+    num_obs = len(time)
+    mh = np.full(num_obs, fill_value=np.nan)
+    mw = np.full(num_obs, fill_value=np.nan)
 
-    lat, lon, height = dset.site_pos.pos.llh.T
-    zd = dset.site_pos.zenith_distance
-    idx_missing = np.zeros(dset.num_obs, dtype=bool)
-
-    for obs in range(dset.num_obs):
+    for obs in range(num_obs):
         try:
             mh[obs], mw[obs] = iers.vmf1_ht(
-                vmf1["ah"](dset.time[obs], lon[obs], lat[obs]),
-                vmf1["aw"](dset.time[obs], lon[obs], lat[obs]),
-                dset.time.utc.mjd_int[obs],
-                lat[obs],
+                vmf1["ah"](time[obs], longitude[obs], latitude[obs]),
+                vmf1["aw"](time[obs], longitude[obs], latitude[obs]),
+                time.utc.mjd_int[obs],
+                latitude[obs],
                 height[obs],
-                zd[obs],
+                zenith_distance[obs],
             )
         except KeyError:
-            idx_missing[obs] = True
-    
-    if idx_missing.any():
-        log.warn(f"No VMF1 grid data available. Using GMF mapping function.")
-        mh_gmf, mw_gmf = gmf_mapping_function(dset)
-        mh[idx_missing] = mh_gmf[idx_missing]
-        mw[idx_missing] = mw_gmf[idx_missing]
+            # mh[obs] already set to nan
+            pass
 
     return mh, mw
 
-def vmf1_station_mapping_function(dset):
+def vmf1_station_mapping_function(latitude, stations, time, zenith_distance):
     """Calculates VMF1 hydrostatic and wet mapping functions based on station VMF1 files
 
     This routine determines the VMF1 (Vienna Mapping Functions 1) described in Boehm et al. :cite:`boehm2006a` and
     Kouba :cite:`kouba2007` and uses the 'vmf1_ht.f' from the IERS software library :cite:`iers2010`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        stations (numpy.ndarray):        Station name for each observation
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -1110,136 +1277,149 @@ def vmf1_station_mapping_function(dset):
      mw                         Wet mapping function coefficient aw
     ============  ===========  =======================================================
     """
-    # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1_station", time=dset.time)
+    vmf1 = apriori.get("vmf1_station", time=time)
 
-    mh = np.empty(dset.num_obs)
-    mw = np.empty(dset.num_obs)
+    num_obs = len(time)
+    mh = np.full(num_obs, fill_value=np.nan)
+    mw = np.full(num_obs, fill_value=np.nan)
+    mjd = time.utc.mjd
 
-    lat = dset.site_pos.pos.llh.lat
-    zd = dset.site_pos.zenith_distance
-    sta = dset.station
-    mjd = dset.time.mjd
-    missing_idx = np.zeros(dset.num_obs, dtype=bool)
-
-    for obs in range(dset.num_obs):
+    for obs in range(num_obs):
         try:
             mh[obs], mw[obs] = iers.vmf1(
-                vmf1[sta[obs]]["ah"](mjd[obs]),
-                vmf1[sta[obs]]["aw"](mjd[obs]),
+                vmf1[stations[obs]]["ah"](mjd[obs]),
+                vmf1[stations[obs]]["aw"](mjd[obs]),
                 mjd[obs],
-                lat[obs],
-                zd[obs],
+                latitude[obs],
+                zenith_distance[obs],
             )
         except KeyError:
-            # Station is missing, use grid as backup
-            missing_idx[obs] = True
-
-    if missing_idx.any():
-        log.warn(f"No data for some epochs in VMF1 station data. Using VMF1 grid as backup")
-        mh_grid, mw_grid = vmf1_gridded_mapping_function(dset)
-        mh[missing_idx] = mh_grid[missing_idx]
-        mw[missing_idx] = mw_grid[missing_idx]
+            # mh[obs] already set to nan
+            pass
 
     return mh, mw
 
 
-def vmf1_gridded_zenith_wet_delay(dset):
+def vmf1_gridded_zenith_wet_delay(latitude, longitude, height, time):
     """Calculates zenith wet delay based on gridded zenith wet delays from VMF1
 
     Uses gridded zenith wet delays from VMF1, which are rescaled from the gridded height to actual station height by
     using Equation(5) described in Kouba :cite:`kouba2007`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):    Latitude for each observation
+        longitude (numpy.ndarray):    Longitude for each observation
+        height (numpy.ndarray): Height for each observation
+        time (Time):            Epoch of each observation
 
     Returns:
         numpy.ndarray:     Zenith wet delay for each observation in [m]
     """
     # Get gridded VMF1 data
-    vmf1 = apriori.get("vmf1_grid", time=dset.time)
-
-    lat, lon, height = dset.site_pos.pos.llh.T
+    vmf1 = apriori.get("vmf1_grid", time=time)
+    
     try:
-        grid_zwd = vmf1["zw"](dset.time, lon, lat)  # Interpolation in time and space in VMF1 grid
-        grid_height = vmf1["ell"](lon, lat, grid=False)
+        grid_zwd = vmf1["zw"](time, longitude, latitude)  # Interpolation in time and space in VMF1 grid
+        grid_height = vmf1["ell"](longitude, latitude, grid=False)
 
         # Zenith Wet delay. Eq. (5) in Kouba :cite:`kouba2007`
         zwd = grid_zwd * np.exp(-(height - grid_height) / 2000)
     except KeyError:
-        log.warn(f"No VMF1 grid data available. Setting zenith wet delay to 0.")
-        zwd = np.zeros(dset.num_obs)
+        zwd = np.full(num_obs, fill_value=np.nan)
 
     return zwd
 
-def vmf1_station_zenith_wet_delay(dset):
+def vmf1_station_zenith_wet_delay(stations, time):
     """Calculates zenith wet delay based on station zenith wet delays from VMF1
 
     Args:
-        dset (Dataset):    Model data.
+        stations (numpy.ndarray):   Station name for each observation
+        time (Time):                Epoch of each observation
 
     Returns:
         numpy.ndarray:     Zenith wet delay for each observation in [m]
     """
-    vmf1 = apriori.get("vmf1_station", time=dset.time)
-    zwd = np.zeros(dset.num_obs)
+    vmf1 = apriori.get("vmf1_station", time=time)
+    zwd = np.full(len(time), fill_value=np.nan)
 
-    for sta in dset.unique("station"):
-        idx = dset.station == sta
+    for sta in np.unique(stations):
+        idx = stations == sta
         try:
-            zwd[idx] = vmf1[sta]["zw"](dset.time.mjd[idx])
+            zwd[idx] = vmf1[sta]["zw"](time.mjd[idx])
         except KeyError:
-            # Station is missing, use grid as backup
-            log.warn(f"No data for station {sta} in VMF1 station data. Using VMF1 grid as backup")
-            zwd_grid = vmf1_gridded_zenith_wet_delay(dset)
-            zwd[idx] = zwd_grid[idx]
-
+            # zwd[obs] already set to nan
+            pass
     return zwd
 
-def vmf1_gridded_zenith_hydrostatic_delay(dset):
+def vmf1_gridded_zenith_hydrostatic_delay(latitude, longitude, height, time):
     """Calculates zenith hydrostatic delay based on gridded zenith wet delays from VMF1
 
     Uses gridded zenith wet delays from VMF1, which are rescaled from the gridded height to actual station height by
     using Equation (3) and (4) described in Kouba :cite:`kouba2007`.
 
     Args:
-        dset (Dataset):    Model data.
+        latitude (numpy.ndarray):    Latitude for each observation
+        longitude (numpy.ndarray):    Longitude for each observation
+        height (numpy.ndarray): Height for each observation
+        time (Time):            Epoch of each observation
 
     Returns:
         numpy.ndarray:     Zenith hydrostatic delay for each observation in [m]
     """
     # Gridded pressure rescaled to station height
-    pressure = vmf1_gridded_pressure(dset)
+    pressure = vmf1_gridded_pressure(latitude, longitude, height, time)
+    
     # Zenith hydrostatic delay. Eq. (4) in Kouba :cite:`kouba2007`
-    lat, _, height = dset.site_pos.pos.llh.T
-    zhd = saastamoinen_zenith_hydrostatic_delay(pressure, lat, height)
+    zhd = saastamoinen_zenith_hydrostatic_delay(pressure, latitude, height)
 
     return zhd
 
-def vmf1_station_zenith_hydrostatic_delay(dset):
+def vmf1_station_zenith_hydrostatic_delay(stations, time):
     """Calculates zenith hydrostatic delay based on station zenith hydrostatic delays from VMF1
 
     Args:
-        dset (Dataset):    Model data.
+        stations (numpy.ndarray):   Station name for each observation.
+        time (Time):                Epoch of each observation
 
     Returns:
         numpy.ndarray:     Zenith hydrostatic delay for each observation in [m]
     """
-    vmf1 = apriori.get("vmf1_station", time=dset.time)
-    zhd = np.zeros(dset.num_obs)
+    vmf1 = apriori.get("vmf1_station", time=time)
+    zhd = np.full(len(time), fill_value=np.nan)
 
-    for sta in dset.unique("station"):
-        idx = dset.station == sta
+    for sta in np.unique(stations):
+        idx = stations == sta
         try:
-            zhd[idx] = vmf1[sta]["zh"](dset.time.mjd[idx])
+            zhd[idx] = vmf1[sta]["zh"](time.mjd[idx])
         except KeyError:
-            # Station is missing, use grid as backup
-            log.warn(f"No data for station {sta} in VMF1 station data. Using VMF1 grid as backup")
-            zhd_grid = vmf1_gridded_zenith_hydrostatic_delay(dset)
-            zhd[idx] = zhd_grid[idx]
+            # zhd[idx] already set to nan
+            pass
 
     return zhd
 
+def _update_data(data, model_data, model, model_text):
+    """Updates the input argument data with information from model_data if entries are missing in data.
+    
+    Args:
+        data (numpy.ndarray or float):        Data accumulated so far
+        model_data(numpy.ndarray or float):   New data
+        model (str):                          Name of model
+        model_text (str):                     Text description of model
+    
+    Returns:
+        np.ndarray or float:                  Data updated with new data
+    """
+    idx_missing = np.isnan(data)
+    num_missing = np.sum(idx_missing)
+    if num_missing > 0 and isinstance(model_data, np.ndarray):
+        data[idx_missing] = model_data[idx_missing]
+        num_missing_model = np.sum(np.isnan(model_data))
+        log.debug(f"Used {model} for {model_text} for {num_missing-num_missing_model} observations")
+    elif num_missing > 0 and isinstance(model_data, float):
+        data = model_data
+        log.debug(f"Used {model} for {model_text}")
+
+    return data
 
 def _rounded_dates(datetimes):
     """Calculate days including the given datetimes

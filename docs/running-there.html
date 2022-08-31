@@ -101,7 +101,7 @@ Where            </a>
 <footer class="post-info">
     <span class="label label-default">Date</span>
     <span class="published">
-        <i class="fa fa-calendar"></i><time datetime="2018-06-05T00:00:00+02:00"> Tue 05 June 2018</time>
+        <i class="fa fa-calendar"></i><time datetime="2018-06-05T00:00:00+02:00"> ti. 05 juni 2018</time>
     </span>
 
 
@@ -157,7 +157,7 @@ of residuals or estimation parameters, as is seen in the following screenshot:</
 </ul>
 <h2 id="running-there">Running There</h2>
 <p>You can start the There program quite simply by issuing the command</p>
-<pre><code>$ there --vlbi
+<pre><code>there --vlbi
 </code></pre>
 <p>on the command line. This will open the There program. Inside There you can then
 explore all the analyses you have already done with Where.</p>
@@ -170,7 +170,7 @@ running on Windows.</p>
 <p>You can also choose to open There showing a specific analysis, by using a
 command very similar to the one you used for running the analysis. For instance,
 to open an analysis of the VLBI XA-session for December 27 2016 you would do:</p>
-<pre><code>$ there 2016 12 27 -v --session=XA
+<pre><code>there 2016 12 27 -v --session=XA
 </code></pre>
 <h3 id="timeseries">Timeseries</h3>
 <p>If you do not specify a specific analysis the default tab will show you the <strong>timeseries</strong> 
@@ -198,19 +198,16 @@ can be done by clicking the <em>Edit</em> button and writing directly in the con
 the analysis needs to be run again. This is done with the <em>Rerun</em> button.</p>
 <h3 id="customizing-there">Customizing There</h3>
 <p>It is possible to customize much of the look and behavior of There. As with
-Where, you do this through the configuration. To see the current configuration,
-simply add <code>-S</code> or <code>--showconfig</code> to your command:</p>
-<pre><code>$ there 2016 12 27 -v --session=XA -S
-</code></pre>
-<p>Any of the settings listed can be changed on the command line. For instance, to
+Where, you do this through the configuration.</p>
+<p>Any of the settings in <code>config/there.conf</code> can be overridden on the command line. For instance, to
 change the colormap and the marker symbol used for scatter plots, you can do:</p>
-<pre><code>$ there 2016 12 27 -v --session=XA --colormap=rainbow --scatter:marker=+
+<pre><code>there 2016 12 27 -v --session=XA --colormap=rainbow --scatter:marker=+
 </code></pre>
 <p>There also uses
 <a href="https://kartverket.github.io/where/the-where-software.html#configuration-profile">configuration profiles</a> to
 simplify setting commonly used configuration settings. As with Where you can
 explicitly specify one or more profiles to apply on the command line:</p>
-<pre><code>$ there 2016 12 27 -v --session=XA --profile=projector
+<pre><code>there 2016 12 27 -v --session=XA --profile=projector
 </code></pre>
 <p>The <code>projector</code> profile contains some settings that makes There better suited
 for being displayed on the lower resolution that projectors normally deliver. In
@@ -218,6 +215,15 @@ addition, there might be profiles associated with pipelines (like VLBI) or
 users. These are automatically applied.</p>
 <p>To see all available configuration profiles, see the file
 <a href="https://github.com/kartverket/where/blob/master/config/there.conf"><code>there.conf</code></a>.</p>
+<p>To make permanent changes to the default settings, it is recommended to create a new file
+called <code>config/there_local.conf</code> and then add the changes to this file. Unlike <code>config/there.conf</code>, the 
+local version will not be overwritten when a new version of Where is installed. Example <code>config/there_local.conf</code>:</p>
+<pre><code>[general]
+colormap    = rainbow
+
+[scatter]
+marker      = +
+</code></pre>
 <!-- ## The There user interface -->
             </div>
             <!-- /.entry-content -->

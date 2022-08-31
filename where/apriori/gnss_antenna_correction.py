@@ -20,7 +20,6 @@ from midgard.collections import enums
 from midgard.dev import plugins
 
 # Where imports
-from where import data
 from where import parsers
 from where.lib import log
 from where.data import position
@@ -33,7 +32,7 @@ class AntennaCorrection(UserDict):
     The attribute "data" is a dictionary with GNSS satellite PRN or receiver antenna as key. The GNSS satellite antenna
     corrections are time dependent and saved with "valid from" datetime object entry. The dictionary looks like:
 
-        dout = { <prn> : { <valid from>: { cospar_id:   <value>,
+        dout = { <prn> : { <valid from>: { cospar_id:   <value>,
                                            sat_code:    <value>,
                                            sat_type:    <value>,
                                            valid_until: <value>,
@@ -43,7 +42,7 @@ class AntennaCorrection(UserDict):
                                                           neu: [north, east, up],
                                                           noazi: [<list with elevation dependent corrections>] }}},
 
-                 <receiver antenna> : { azimuth:     <list with azimuth values>,
+                 <receiver antenna> : { azimuth:     <list with azimuth values>,
                                         elevation:   <list with elevation values>,
                                         <frequency>: { azi: [<array with azimuth-elevation dependent corrections>],
                                                        neu: [north, east, up],
@@ -88,10 +87,10 @@ class AntennaCorrection(UserDict):
         _used_date(): Choose correct date for use of satellite antenna corrections
     """
 
-    def __init__(self, file_key: Optional[str] = "gnss_antex") -> None:
+    def __init__(self, file_key: Optional[str] = "antex") -> None:
         """Set up a new GNSS antenna correction object by parsing ANTEX file
 
-        The parsing is done by :mod:`where.parsers.gnss_antex`.
+        The parsing is done by :mod:`where.parsers.antex`.
         """
         parser = parsers.parse_key(file_key)
         self.data = parser.as_dict()
@@ -286,6 +285,31 @@ class AntennaCorrection(UserDict):
 
         return pco_sat
 
+
+    def get_satellite_info(self, satellite: str, date: datetime.datetime) -> Dict[str, str]:
+        """Get satellite information for a given date
+
+        Args:
+            sat:   Satellite identifier.
+            date:  Date.
+
+        Returns:
+            Satellite information
+        """
+        if satellite not in self.data.keys():
+            log.fatal(
+                f"Satellite '{satellite}' is not given in ANTEX file {self.file_path}."
+            )
+
+        used_date = self._used_date(satellite, date)
+
+        return {
+            "sat_type": self.data[satellite][used_date]["sat_type"],
+            "sat_code": self.data[satellite][used_date]["sat_code"],
+            "cospar_id": self.data[satellite][used_date]["cospar_id"],
+        }
+
+
     def satellite_type(self, dset: "Dataset") -> np.core.defchararray.chararray:
         """Get satellite type from ANTEX file (e.g. BLOCK IIF, GALILEO-1, GALILEO-2, GLONASS-M, BEIDOU-2G, ...)
 
@@ -324,6 +348,7 @@ class AntennaCorrection(UserDict):
             sat_types[idx] = sat_type
 
         return sat_types.astype(np.str_)
+
 
     def _used_date(self, satellite: str, given_date: datetime.date) -> Union[datetime.datetime, None]:
         """Choose correct date for use of satellite antenna corrections

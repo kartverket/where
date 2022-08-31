@@ -33,8 +33,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
     Args:
         dset:     A Dataset containing model data.
     """
-    trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames="itrf:2014, vtrf, custom, vlbi_obs")
-    names = apriori.get("vlbi_station_codes")
+    trf = apriori.get("trf", time=dset.time.utc.mean)
 
     baselines = dset.unique("baseline")
     lengths = []
@@ -43,13 +42,12 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
     save_to_file = config.tech.vlbi_baseline_length.save_to_file.bool
     bl_str = []
 
-    
-    log_and_write("# " + f"{'Baseline'.ljust(18)} {'Length'.rjust(14)} {'Formal error'.rjust(13)}", bl_str)
-    log_and_write("# " + f"{''.ljust(18)} {'[m]'.rjust(14)} {'[m]'.rjust(13)}", bl_str)
+    log_and_write("# " + f"{'Baseline'.ljust(18)} {'Num obs'.ljust(7)} {'Length'.rjust(14)} {'Formal error'.rjust(13)}", bl_str)
+    log_and_write("# " + f"{''.ljust(18)} {''.rjust(7)} {'[m]'.rjust(14)} {'[m]'.rjust(13)}", bl_str)
     for i, bl in enumerate(baselines):
         sta_1, _, sta_2 = bl.partition("/")
-        pos_apriori_1 = trf[names[sta_1]["cdp"]].pos
-        pos_apriori_2 = trf[names[sta_2]["cdp"]].pos
+        pos_apriori_1 = trf[dset.meta[sta_1]["cdp"]].pos
+        pos_apriori_2 = trf[dset.meta[sta_2]["cdp"]].pos
         
         try:
             corr_1 = [
@@ -99,7 +97,9 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
         dset.meta.add("baseline_length_ferr", bl_length_ferr, section=bl)
         dset.meta.add("__unit__", "meter", section=bl)
         
-        log_and_write(f"{bl:20} {baseline.length:14.4f} {bl_length_ferr:13.4f}", bl_str)
+        num_obs = dset.num(baseline=bl)
+        
+        log_and_write(f"{bl:20} {num_obs:7d} {baseline.length:14.4f} {bl_length_ferr:13.4f}", bl_str)
         
         lengths.append(baseline.length)
         ferrs.append(bl_length_ferr)

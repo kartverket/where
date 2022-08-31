@@ -7,6 +7,8 @@ Description:
 """
 # Standard library imports
 from collections import namedtuple
+from pathlib import PosixPath
+from typing import List
 
 # External library imports
 import matplotlib.patches as mpatches
@@ -15,15 +17,18 @@ import numpy as np
 import pandas as pd
 
 # Midgard imports
+from midgard.collections import enums 
 from midgard.dev import plugins
+from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where import apriori
 from where.lib import config
-from where.lib import enums
 from where.lib import gnss
 from where.lib import log
+from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
+
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
@@ -47,28 +52,57 @@ AxhlineConfig.__doc__ = """A convenience class for defining matplotlib axhline c
         y_value (float):        Y-value for horizontal line to be plotted in [m]
         color (str):            Color of horizontal line
     """
+    
+    
+PlotField = namedtuple("PlotField", ["name", "collection", "caption"])
+PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
+PlotField.__doc__ = """A convenience class for defining a output field for plotting
 
-# Define dictionary with fields to be printed in SISRE report
-write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
-if write_level <= enums.get_value("write_level", "detail"):
-    FIELDS = {
-        "age_of_ephemeris": "Age of ephemeris",
-        "sisre": "SISRE",
-        "sisre_orb": "orbit-only SISRE",
-        "orb_diff_3d": "3D orbit error",
-        "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
-        "bias_brdc": "satellite bias of broadcast clocks",
-        "bias_precise": "satellite bias of precise clocks",
-    }
-else:
-    FIELDS = {
-        "age_of_ephemeris": "Age of ephemeris",
-        "sisre": "SISRE",
-        "sisre_orb": "orbit-only SISRE",
-        "orb_diff_3d": "3D orbit error",
-        "clk_diff_with_dt_mean": "satellite clock correction difference $\Delta t$",
-    }
+    Args:
+        name  (str):         Unique name
+        collection (str):    Collection name
+        caption (str):       Caption of plot
+    """
+    
 
+FIELDS = (
+    PlotField(
+        "age_of_ephemeris",
+        "",
+        "Age of ephemeris",
+    ),
+    PlotField(
+        "sisre",
+        "",
+        "SISRE",
+    ),
+    PlotField(
+        "sisre_orb",
+        "",
+        "Orbit-only SISRE",
+    ),
+    PlotField(
+        "orb_diff_3d",
+        "",
+        "3D orbit error",
+    ),
+    PlotField(
+        "clk_diff_with_dt_mean",
+        "",
+        "Satellite clock correction difference $\Delta t$",
+    ),
+    PlotField(
+        "bias_brdc",
+        "",
+        "Satellite bias of broadcast clocks",
+    ),
+    PlotField(
+        "bias_precise",
+        "",
+        "Satellite bias of precise clocks",
+    ),
+)
+    
 
 # TODO: Maybe better to write a SisreReport class.
 @plugins.register
@@ -78,12 +112,15 @@ def sisre_report(dset):
     Args:
         dset (Dataset):       A dataset containing the data.
     """
-    write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
     file_vars = {**dset.vars, **dset.analysis}
 
     # TODO: Better solution?
     if "sampling_rate" not in dset.analysis:  # necessary if called for example by ./where/tools/concatenate.py
         dset.analysis["sampling_rate"] = ""
+        
+    # Generate figure directory to save figures generated for SISRE report
+    figure_dir = config.files.path("output_sisre_report_figure", file_vars=file_vars)
+    figure_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate SISRE report
     path = config.files.path(f"output_sisre_report_{dset.vars['label']}", file_vars=file_vars)
@@ -92,33 +129,66 @@ def sisre_report(dset):
         rpt.title_page()
         _write_information(fid)
         rpt.write_config()
-        fid.write("\n# Satellite status\n\n")
+        # rpt.add_text("\n# Satellite status\n\n")
         # _unhealthy_satellites(fid, dset)
         # _eclipse_satellites(fid, dset)
-
+        
         # Generate figure directory to save figures generated for SISRE report
-        fid.write("\n# SISRE analysis results\n\n")
+        rpt.add_text("\n# SISRE analysis results\n\n")
         figure_dir = config.files.path("output_sisre_report_figure", file_vars=file_vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
-
-        _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset)
-        _plot_scatter_sisre(fid, figure_dir, dset)
-        _plot_scatter_field(fid, figure_dir, dset, "sisre")
-        # _plot_scatter_field(fid, figure_dir, dset, 'sisre', label=False, legend=False)
-        _plot_histogram_sisre(fid, figure_dir, dset)
-        _plot_scatter_field(fid, figure_dir, dset, "age_of_ephemeris")
-        _satellite_statistics_and_plot(fid, figure_dir, dset, rpt)
-
-        # if write_level <= enums.get_value("write_level", "detail"):
-        #    fid.write("\n# Analysis of input files\n\n")
-        #    # _plot_scatter_satellite_bias(fid, figure_dir, dset)
-        #    _plot_scatter_field(fid, figure_dir, dset, "bias_brdc")
-        #    _plot_scatter_field(fid, figure_dir, dset, "bias_precise")
-
+        
+        _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset) #TODO: move to _add_to_report
+        _plot_scatter_sisre(fid, figure_dir, dset)  #TODO: move to _add_to_report
+        _plot_histogram_sisre(fid, figure_dir, dset) #TODO: move to _add_to_report
+        _add_to_report(dset, rpt, figure_dir)
+        
+        _satellite_statistics_and_plot(fid, figure_dir, dset, rpt) #TODO: move to _add_to_report
+                
     # Generate PDF from Markdown file
     if config.where.sisre_report.get("markdown_to_pdf", default=False).bool:
         rpt.markdown_to_pdf()
+        
+        
+def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath") -> None:
+    """Add figures and tables to report
 
+    Args:
+        dset:        A dataset containing the data.
+        rpt:         Report object.
+        figure_dir:  Figure directory.
+    """
+
+    plt = GnssPlot(dset, figure_dir)
+    
+    #
+    # Field plots
+    #     
+    for field in FIELDS:
+        
+        if f"{field.collection}.{field.name}" in dset.fields or f"{field.name}" in dset.fields:                
+            for figure_path in plt.plot_field(field.name, field.collection):
+                system, _ = figure_path.stem.split("_")[2:4] 
+                rpt.add_figure(
+                    figure_path=figure_path, 
+                    caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
+                    clearpage=True,
+                ) 
+                
+                  
+    #
+    # Galileo HAS plots
+    #
+    if "has_orbit_correction" in dset.fields:
+        rpt.add_text("\n# Galileo HAS correction\n\n")
+        for figure_path in _plot_has_correction(dset, figure_dir):
+            rpt.add_figure(
+                    figure_path=figure_path,
+                    caption=f"HAS correction for satellite {figure_path.stem.split('_')[-1]} (blue line: " 
+                            f"difference between broadcast navigation and precise product; orange line: HAS " 
+                            f"correction)", 
+                    clearpage=True,
+            )
 
 def _eclipse_satellites(fid, dset):
     """Write overview over satellites in eclipse
@@ -256,7 +326,7 @@ def _plot_bar_stacked(
     fig_width = len(df_merged.index) / 4 if len(df_merged.index) > 30 else 6.4
     ax = df_merged.plot(kind="bar", stacked=True, width=0.8, figsize=(fig_width, fig_width / 1.33))
     ax.set_xlabel(xlabel, fontsize=fontsize)
-    ax.set_ylabel(f"Accuracy [m]", fontsize=fontsize)
+    ax.set_ylabel("Accuracy [m]", fontsize=fontsize)
     if axhline is not None:
         for idx in range(0, len(axhline)):
             plt.axhline(y=axhline[idx].y_value, linewidth=2, color=axhline[idx].color)
@@ -432,53 +502,74 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
                 fid.write("\n\\clearpage\n\n")
 
 
-def _plot_scatter_field(fid, figure_dir, dset, field, label=True, legend=True):
-    """Scatter plot of given field
+            
+def _plot_has_correction(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> List[PosixPath]:
+    """Plot HAS correction in comparison to satellite orbit and clock difference between broadcast and precise orbits
 
     Args:
-       fid (_io.TextIOWrapper):  File object.
-       figure_dir (PosixPath):   Figure directory
-       dset (Dataset):           A dataset containing the data.
-       field (str):              Dataset field.
-       label(bool):              Plot label or not
-       legend(bool):             Plot legend or not
+       dset:        A dataset containing the data.
+       figure_dir:  Figure directory
+       
+    Returns:
+        List with figure path for satellite depending plots. File name ends with satellite identifier (e.g. 'E01', 'G02'), 
+        for example 'plot_has_correction_E01.png'.
     """
-    for sys in dset.unique("system"):
-        idx = dset.filter(system=sys)
-        figure_path = figure_dir / f"plot_scatter_{field.lower()}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
-
-        fig = plt.figure(figsize=(7, 5))
-        if label == True:
-            for sat in sorted(dset.unique("satellite", idx=idx)):
-                idx_sat = dset.filter(system=sys, satellite=sat)
-                if np.sum(dset[field][idx_sat]) != 0:
-                    plt.scatter(
-                        dset.time.gps.datetime[idx_sat], dset[field][idx_sat], label=sat, marker="o", s=10, alpha=0.7
-                    )
-        else:
-            if np.sum(dset[field][idx]) != 0:
-                plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], marker="o", s=10, alpha=0.7)
-
-        if legend == True:
-            plt.legend(bbox_to_anchor=(1.2, 1), ncol=1)
-        text = (
-            f"mean $= {np.mean(dset[field][idx]):.2f} \pm {np.std(dset[field][idx]):.2f}$ {dset.unit(field)[0]}"
-            f"\nrms $= {np.sqrt(np.mean(np.square(dset[field][idx]))):.2f}$ {dset.unit(field)[0]}"
+    figure_paths = list()
+    
+    for sat in sorted(dset.unique("satellite")):
+        idx = dset.filter(satellite=sat)
+       
+        figure_path = figure_dir / f"plot_has_correction_{sat}.{FIGURE_FORMAT}"
+        figure_paths.append(figure_path)
+        log.debug(f"Plot {figure_path}.")
+        
+        y_arrays = list()
+        y_arrays.append(
+                np.stack([
+                    dset.orb_diff.trs.x[idx] - dset.has_orbit_correction.trs.x[idx],
+                    -dset.has_orbit_correction.trs.x[idx],
+                ])
         )
-        fig.text(0.83, 0.9, text, horizontalalignment="right", verticalalignment="top", multialignment="left")
-        plt.ylabel(f"{field.upper()} [{dset.unit(field)[0]}]")
-        plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
-        plt.xlabel("Time [GPS]")
-        plt.title(f"{GNSS_NAME[sys]}")
-        fig.autofmt_xdate()  # rotates and right aligns the x labels, and moves the bottom of the axes up to make room for them
-        plt.tight_layout()
-        plt.savefig(figure_path, dpi=FIGURE_DPI)
-        plt.clf()  # clear the current figure
+        y_arrays.append(
+                np.stack([
+                    dset.orb_diff.trs.y[idx] - dset.has_orbit_correction.trs.y[idx],
+                    -dset.has_orbit_correction.trs.y[idx],
+                ])
+        )
+        y_arrays.append(
+                np.stack([
+                    dset.orb_diff.trs.z[idx] - dset.has_orbit_correction.trs.z[idx],
+                    -dset.has_orbit_correction.trs.z[idx],
+                ])
+        )
+        y_arrays.append(
+                np.stack([
+                    dset.clk_diff[idx] + dset.has_clock_correction[idx],
+                    dset.has_clock_correction[idx] + dset.pco_brdc.yaw.z[idx] - dset.bias_brdc[idx],
+                ])
+        )
 
-        fid.write(f"![{field.upper()} for {GNSS_NAME[sys]}]({figure_path})\n")
-        fid.write("\n\\clearpage\n\n")
-
-
+        plt = MatPlotExt()
+        plt.plot_subplots(
+            x_array=dset.time.gps.datetime[idx],
+            y_arrays=y_arrays,
+            xlabel="Time [GPS]",
+            ylabels=["Orbit-X", "Orbit-Y", "Orbit-Z", "Clock"],
+            colors=[["steelblue", "darkorange"], ["steelblue", "darkorange"], ["steelblue", "darkorange"], ["steelblue", "darkorange"]],
+            y_units=["meter", "meter", "meter", "meter"],
+            figure_path=figure_path,
+            options={
+                "figsize": (6, 8),
+                "legend": True, 
+                "plot_to": "file",
+                "sharey": True,
+                "title": f"Satellite {sat}",
+            },
+        )
+        
+    return figure_paths       
+     
+   
 #
 # SCATTER SUPPLOTS
 #
@@ -611,7 +702,7 @@ def _generate_satellite_index_dataframe(dset):
     # E11  GALILEO-1  0.175557  0.138370  0.108046  0.014441  0.701326    0.259400
     # E12  GALILEO-1  0.366780  0.310270  0.195602  0.039986  0.945892    0.765318
     # E19  GALILEO-1  0.154111  0.141690  0.060615  0.013444  0.284842    0.244182
-    for field in FIELDS.keys():
+    for field in FIELDS:
         extra_row_names = list()
         extra_rows = list()
         df_field = pd.DataFrame(columns=columns)
@@ -621,7 +712,7 @@ def _generate_satellite_index_dataframe(dset):
             row = [_get_satellite_type(dset, satellite)]
             for function in functions:
                 try:
-                    value = dset.apply(function, field, satellite=satellite)
+                    value = dset.apply(function, field.name, satellite=satellite)
                 except:
                     value = float("nan")
                 row.append(value)
@@ -638,7 +729,7 @@ def _generate_satellite_index_dataframe(dset):
             row = [""]  # Append satellite type
             for function in functions:
                 try:
-                    value = dset.apply(function, field, system=system)
+                    value = dset.apply(function, field.name, system=system)
                 except:
                     value = float("nan")
                 row.append(value)
@@ -651,7 +742,7 @@ def _generate_satellite_index_dataframe(dset):
             row = [""]  # Append satellite type
             for function in functions:
                 try:
-                    value = dset.apply(function, field, satellite_type=type_)
+                    value = dset.apply(function, field.name, satellite_type=type_)
                 except:
                     value = float("nan")
                 row.append(value)
@@ -667,7 +758,7 @@ def _generate_satellite_index_dataframe(dset):
         )  # TODO: Why is the column order be changed by appending extra rows?
 
         # Add field Dataframe to field Dataframe dictionary
-        field_dfs.update({field: df_field})
+        field_dfs.update({field.name: df_field})
 
     return field_dfs, extra_row_names
 
@@ -690,20 +781,23 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset, rpt):
     # Write field Dataframes
     column = "rms"  # Column to plot
 
-    fid.write(f"\n\n# Statistics\n\n")
+    fid.write("\n\n# Statistics\n\n")
     fid.write(
         "In this Section statistics are represented for: \n\n{}".format(
-            "".join(["* " + v + "\n" for v in FIELDS.values()])
+            "".join(["* " + v.caption + "\n" for v in FIELDS])
         )
     )
-    for field, df in field_dfs.items():
-        fid.write(f"\n\n## Statistic for {FIELDS[field]}\n\n")
-        fid.write(f"Unit: {dset.unit(field)[0]}\n")
-        rpt.write_dataframe_to_markdown(df, format="6.3f")
-        fid.write("  ")
-
-        # _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names, column=column, unit=dset.unit(field)[0])
-        _plot_bar_dataframe_columns(fid, figure_dir, df, field, column=column, unit=dset.unit(field)[0])
+    for field in FIELDS:
+        
+        if f"{field.collection}.{field.name}" in dset.fields or f"{field.name}" in dset.fields:  
+            df = field_dfs[field.name]
+            fid.write(f"\n\n## Statistic for {field.caption}\n\n")
+            fid.write(f"Unit: {dset.unit(field.name)[0]}\n")
+            rpt.write_dataframe_to_markdown(df, format="6.3f")
+            fid.write("  ")
+    
+            # _plot_bar_dataframe_columns(fid, figure_dir, df, field.name, extra_row_names, column=column, unit=dset.unit(field.name)[0])
+            _plot_bar_dataframe_columns(fid, figure_dir, df, field.name, column=column, unit=dset.unit(field.name)[0])
 
 
 def _unhealthy_satellites(fid, dset):
@@ -740,7 +834,7 @@ def _write_information(fid):
     fid.write(
         """# SISRE analysis\n\n
 
-For the SISRE analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
+For the signal-in-space range error (SISRE) analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
 
 \\begin{equation}
      \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
@@ -776,8 +870,6 @@ with\\\\
 
 It should be noted that we have neglected the uncertainty of precise ephemeris and clocks by the determination of SISRE.
 
-The SISRE analysis is carried out on daily basis. Each daily solution is cleaned for outliers. The outliers are detected and rejected for each day iteratively using a 3-sigma threshold determined for each satellite. After each iteration the SISRE results are again recomputed.
-
 The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is caculated as follows:
 \\begin{equation}
      \\text{ORB\_DIFF\_3D}^s = \sqrt{(\Delta {r^s}^2 + \Delta {a^s}^2 + \Delta {c^s}^2)}
@@ -786,15 +878,17 @@ The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is cacula
 
 \\begin{table}[!ht]
 \\begin{center}
-  \\begin{tabular}[c]{lll}
+  \\begin{tabular}[c]{llll}
     \\hline
-    System       & $w_r$  & $w_{a,c}$ \\\\
+    System       & $E_{min}$ & $w_r$  & $w_{a,c}$ \\\\
     \\hline
-    GPS          & $0.979$ & $0.143$ \\\\
-    Galileo      & $0.984$ & $0.128$ \\\\
+    GPS          & $0^{\\circ}$ & $0.979$ & $0.143$ \\\\
+                 & $5^{\\circ}$ & $0.980$ & $0.139$ \\\\
+    Galileo      & $0^{\\circ}$ & $0.984$ & $0.128$ \\\\
+                 & $5^{\\circ}$ & $0.984$ & $0.124$ \\\\
     \\hline
   \\end{tabular}
-  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\circ}$ based on Table 4 in Montenbruck et al. 2018.}
+  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an defined elevation mask of $E_{min}$ based on Table 4 in Montenbruck et al. 2018.}
   \\label{tab:sisre_weight_factors}
 \\end{center}
 \\end{table}

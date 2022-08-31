@@ -121,19 +121,19 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
     # Add pseudo-observations
     constraints = config.tech.get(key="estimate_constraint", default="").as_list(split_re=", *")
-    if constraints:
-        trf_constraints = [c for c in constraints if "crf" not in c]
-        reference_frame = config.tech.reference_frames.list[0]
-        trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
+    if "minimum_trf" in constraints:
+        frame = config.tech.minimum_trf.reference_frame.str or config.tech.reference_frames.list[0]
+        trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=frame)
         d = np.zeros((n, 6))
         stations = set()
+        skip_stations = config.tech.minimum_trf.skip_stations.list
 
         for idx, column in enumerate(param_names):
             if "_site_pos-" not in column:
                 continue
             station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
             key = dset.meta[station]["site_id"]
-            if key in trf:
+            if key in trf and station not in skip_stations:
                 x0, y0, z0 = trf[key].pos.trs  # TODO: Take units into account
                 if column.endswith("_x"):
                     d[idx, :] = np.array([1, 0, 0, 0, z0, -y0])
@@ -144,20 +144,33 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
                 stations.add(station)
 
         # TODO deal with slr_site_pos etc
-        log.info(
-            f"Applying {'/'.join(trf_constraints).upper()} with {', '.join(stations)} from {reference_frame.upper()}"
-        )
-        if "nnt" in constraints and "nnr" in constraints and "vlbi_site_pos" in constant_params:
-            obs_noise = np.hstack((obs_noise, np.array([0.0001 ** 2] * 3 + [(1.5e-11) ** 2] * 3))).T
-        elif "nnt" in constraints and "nnr" not in constraints and "vlbi_site_pos" in constant_params:
-            d = d[:, 0:3]
-            obs_noise = np.hstack((obs_noise, np.array([0.0001 ** 2] * 3))).T
-        elif "nnt" not in constraints and "nnr" in constraints and "vlbi_site_pos" in constant_params:
-            d = d[:, 3:6]
-            obs_noise = np.hstack((obs_noise, np.array([(1.5e-11) ** 2] * 3))).T
-        elif "nnt" not in constraints and "nnr" not in constraints and "vlbi_site_pos" in constant_params:
-            d = np.zeros((n, 0))
-            log.warn(f"Unknown constraints {'/'.join(constraints).upper()}. Not applying.")
+        if "vlbi_site_pos" in constant_params:
+            trf_constraints = [c.upper() for c in ["nnt", "nnr"] if config.tech.minimum_trf[c].bool]
+            log.info(
+                f"Applying {'/'.join(trf_constraints)} with {', '.join(stations)} from {frame.upper()}"
+            )
+            nnt = config.tech.minimum_trf["nnt"].bool
+            nnr = config.tech.minimum_trf["nnr"].bool
+            
+            nnt_unit = config.tech.minimum_trf.nnt_unit.str 
+            nnt_sigma = config.tech.minimum_trf.nnt_sigma.float * Unit(nnt_unit, "meter") # Convert to meter
+            
+            nnr_unit = config.tech.minimum_trf.nnr_unit.str 
+            nnr_sigma = config.tech.minimum_trf.nnr_sigma.float * Unit(nnr_unit, "rad") # Convert to radians
+            
+            if nnt and nnr:
+                obs_noise = np.hstack((obs_noise, np.array([nnt_sigma ** 2] * 3 + [nnr_sigma ** 2] * 3))).T
+            elif nnt and not nnr:
+                d = d[:, 0:3]
+                obs_noise = np.hstack((obs_noise, np.array([nnt_sigma ** 2] * 3))).T
+            elif not nnt and nnr:
+                d = d[:, 3:6]
+                obs_noise = np.hstack((obs_noise, np.array([nnr_sigma ** 2] * 3))).T
+            elif not nnt and not nnr:
+                d = np.zeros((n, 0))
+            else:
+                d = np.zeros((n, 0))
+                log.warn(f"Unknown constraints: {'/'.join(constraints).upper()}. Not applying.")
 
         num_constraints = d.shape[1]
         try:
@@ -165,30 +178,34 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
         except np.linalg.linalg.LinAlgError:
             pass
 
-        if "nnr_crf" in constraints and "vlbi_src_dir" in constant_params:
-            celestial_reference_frame = config.tech.celestial_reference_frames.list[0]
-            crf = apriori.get("crf", time=dset.time, celestial_reference_frames=celestial_reference_frame)
-            # NNR to CRF
-            log.info(f"Applying NNR constraint to {celestial_reference_frame.upper()}")
-            H2 = np.zeros((3, n))
-            for idx, column in enumerate(param_names):
-                if "_src_dir-" not in column:
-                    continue
-                source = column.split("-", maxsplit=1)[-1].split("_")[0]
-                if source in crf:
-                    ra = crf[source].pos.right_ascension
-                    dec = crf[source].pos.declination
-                    if column.endswith("_ra"):
-                        H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
-                        H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
-                        H2[2, idx] = np.cos(dec) ** 2
-                    if column.endswith("_dec"):
-                        H2[0, idx] = np.sin(ra)
-                        H2[1, idx] = -np.cos(ra)
-
-            obs_noise = np.hstack((obs_noise, np.array([(1e-6) ** 2] * 3)))
-            num_constraints += 3
-            h = np.vstack((h, H2[:, :, None]))
+        if "vlbi_src_dir" in constant_params:
+            if "minimum_crf" in constraints:
+                frame = config.tech.minimum_crf.reference_frame.str or config.tech.celestial_reference_frames.list[0]
+                crf = apriori.get("crf", time=dset.time, celestial_reference_frames=frame)
+                skip_sources = config.tech.minimum_crf.skip_sources.list # TODO: only defining sources
+                # NNR to CRF
+                log.info(f"Applying NNR constraint to {frame.upper()}")
+                H2 = np.zeros((3, n))
+                for idx, column in enumerate(param_names):
+                    if "_src_dir-" not in column:
+                        continue
+                    source = column.split("-", maxsplit=1)[-1].split("_")[0]
+                    if source in crf and source not in skip_sources:
+                        ra = crf[source].pos.right_ascension
+                        dec = crf[source].pos.declination
+                        if column.endswith("_ra"):
+                            H2[0, idx] = -np.cos(ra) * np.sin(dec) * np.cos(dec)
+                            H2[1, idx] = -np.sin(ra) * np.sin(dec) * np.cos(dec)
+                            H2[2, idx] = np.cos(dec) ** 2
+                        if column.endswith("_dec"):
+                            H2[0, idx] = np.sin(ra)
+                            H2[1, idx] = -np.cos(ra)
+    
+                nnr_unit = config.tech.minimum_crf.unit.str 
+                nnr_sigma = config.tech.minimum_crf.sigma.float * Unit(nnr_unit, "rad") # Convert to radians
+                obs_noise = np.hstack((obs_noise, np.array([nnr_sigma ** 2] * 3)))
+                num_constraints += 3
+                h = np.vstack((h, H2[:, :, None]))
 
         z = np.hstack((z, np.zeros(num_constraints))).T
         # phi = np.vstack((phi, np.repeat(np.eye(n)[None, :, :], num_constraints, axis=0)))

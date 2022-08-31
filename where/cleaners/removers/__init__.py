@@ -36,7 +36,7 @@ def apply_removers(config_key: str, dset: "Dataset") -> None:
     """
     prefix = dset.vars["pipeline"]
     removers = config.tech[config_key].list
-    log.info(f"Applying removers")
+    log.info("Applying removers")
     keep_idxs = plugins.call_all(package_name=__name__, plugins=removers, prefix=prefix, dset=dset)
 
     all_keep_idx = np.ones(dset.num_obs, dtype=bool)

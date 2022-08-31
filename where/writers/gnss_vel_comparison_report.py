@@ -29,7 +29,7 @@ import pandas as pd
 
 # Midgard imports
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import plot
+from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.lib import config
@@ -334,7 +334,7 @@ def _plot_velocity_error(
         "site_vel_3d":  "3D VE",
     }
 
-    opt_args = {
+    options = {
         "colormap": "tab20",
         "figsize": (7, 3),
         # "grid": True,
@@ -386,12 +386,12 @@ def _plot_velocity_error(
                 else:
                     ylim = config.tech.gnss_vel_comparison_report.ylim.list
                     
-                opt_args["ylim"] = [float(ylim[0]), float(ylim[1])] if ylim else ylim
+                options["ylim"] = [float(ylim[0]), float(ylim[1])] if ylim else ylim
     
                 #if field == "site_vel_h":
-                #    opt_args["ylim"] = [0.0, 0.03]
+                #    options["ylim"] = [0.0, 0.03]
                 #elif field == "site_vel_3d":
-                #    opt_args["ylim"] = [0.0, 0.07]
+                #    options["ylim"] = [0.0, 0.07]
     
                 # Generate x- and y-arrays for plotting
                 x_arrays = []
@@ -400,7 +400,7 @@ def _plot_velocity_error(
                 
                 for station in sample_data[field].columns:
                     # if sample == "monthly":
-                    #    opt_args.update({"xlim": "auto", "ylim": [0.0, 3.0]})
+                    #    options.update({"xlim": "auto", "ylim": [0.0, 3.0]})
                     x_data = (
                         sample_data[field].index.to_pydatetime()
                         if isinstance(sample_data[field].index, pd.core.indexes.datetimes.DatetimeIndex)
@@ -411,7 +411,8 @@ def _plot_velocity_error(
                     labels.append(station.upper())
     
                 # Generate plot
-                plot(
+                plt = MatPlotExt()
+                plt.plot(
                     x_arrays=x_arrays,
                     y_arrays=y_arrays,
                     xlabel="Time [GPS]",
@@ -421,5 +422,5 @@ def _plot_velocity_error(
                     colors=colors,
                     figure_path=figure_dir
                     / f"plot_{type_}_{field}_{sample}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
-                    opt_args=opt_args,
+                    options=options,
                 )

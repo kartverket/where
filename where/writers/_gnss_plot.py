@@ -6,6 +6,7 @@ TODO
 
 """
 # Standard liberay imports
+from dataclasses import dataclass
 from collections import namedtuple
 from datetime import datetime
 import pathlib
@@ -16,6 +17,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.collections import enums
+from midgard.dev import exceptions
 from midgard.gnss import gnss
 from midgard.math.unit import Unit
 from midgard.plot.matplotext import MatPlotExt
@@ -26,16 +28,17 @@ from where.lib import config
 from where.lib import log
 
 
-PlotField = namedtuple(
-    "PlotField", ["ylabel", "unit"]
-)
-PlotField.__new__.__defaults__ = (None,) * len(PlotField._fields)
-PlotField.__doc__ = """A convenience class for defining a necessary plotting parameters
+@dataclass
+class PlotField:
+    """A convenience class for defining a necessary plotting parameters
 
     Args:
-        ylabel (str):   y-axis label description
-        unit (str):     Unit used for plotting of y-axis
+        ylabel:   y-axis label description
+        unit:     Unit used for plotting of y-axis
     """
+    ylabel: str
+    unit: str
+    
 
 class GnssPlot:
     """Class for GNSS plots
@@ -165,6 +168,8 @@ class GnssPlot:
                     field: str,
                     collection: Union[str, None] = None, 
                     figure_name: str="plot_field_{solution}.{FIGURE_FORMAT}",
+                    use_labels: bool=True,
+                    suffix: str="",
 
     ) -> List[pathlib.PosixPath]:
         """Plot field
@@ -173,6 +178,8 @@ class GnssPlot:
             collection:  Collection name.
             field:       Field name.
             figure_name: File name of figure.
+            use_labels:  Use labels together with legend.
+            suffix:      File name suffix
         
         Returns:
             List with figure path for depending on GNSS. File name ends with GNSS identifier (e.g. 'E', 'G') and field 
@@ -182,16 +189,38 @@ class GnssPlot:
         fieldname = f"{collection}.{field}" if collection else field
         
         plot_def = {
+                "age_of_data": PlotField("Age of data", "s"),
+                "age_of_ephemeris": PlotField("Age of ephemeris", "s"),
                 "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns"),
                 "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns"),
                 "bgd_e1_e5a_diff_mean": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns"),
                 "bgd_e1_e5b": PlotField("BGD(E1,E5b)", "ns"),
                 "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns"),
                 "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns"),
-                "gnss_ionosphere": PlotField("Ionospheric delay", "m"),
-                "gnss_range": PlotField("Range", "m"),
-                "gnss_satellite_clock": PlotField("Satellite clock", "m"),
-                "gnss_total_group_delay": PlotField("Total group delay", "m"),
+                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\Delta t$ (mean)", "m"),
+                "code_bias": PlotField("HAS code bias", "m"),
+                "delay.gnss_earth_rotation_drift": PlotField("Earth rotation drift", "m/s"),
+                "delay.gnss_ionosphere": PlotField("Ionospheric delay", "m"),
+                "delay.gnss_range": PlotField("Range", "m"),
+                "delay.gnss_range_rate": PlotField("Range rate", "m/s"),
+                "delay.gnss_relativistic_clock": PlotField("Relativistic clock", "m"),
+                "delay.gnss_relativistic_clock_rate": PlotField("Relativistic clock rate", "m/s"),
+                "delay.gnss_satellite_clock": PlotField("Satellite clock", "m"),
+                "delay.gnss_satellite_clock_rate": PlotField("Satellite clock rate", "m/s"),
+                "delay.gnss_total_group_delay": PlotField("Total group delay", "m"),
+                "delay.troposphere_radio": PlotField("Troposphere delay", "m"),
+                "delta_clock_c0": PlotField("Δclock-c0", "m"),
+                "delta_cross_track": PlotField("Δcross-track", "m"),
+                "delta_in_track": PlotField("Δin-track", "m"),
+                "delta_radial": PlotField("Δradial", "m"),
+                "gnssid": PlotField("HAS GNSS ID", ""),
+                "gnssiod": PlotField("HAS GNSS IOD", ""),
+                "iod": PlotField("HAS IOD", ""),
+                "multiplier": PlotField("Multiplier for Δclock-c0", ""),
+                "orb_diff_3d": PlotField("3D orbit error", "m"),
+                "phase_bias": PlotField("HAS phase bias", "cycle"),
+                "sisre": PlotField("SISRE", "m"),
+                "sisre_orb": PlotField("orbit-only SISRE", "m"),
                 "tgd": PlotField("TGD(L1,L2)", "ns"),
                 "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns"),
                 "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns"),
@@ -201,14 +230,13 @@ class GnssPlot:
                 "tgd_b2_b3": PlotField("TGD(B2,B3)", "ns"),
                 "tgd_b2_b3_diff": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns"),
                 "tgd_b2_b3_diff_mean": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns"),
-                "troposphere_radio": PlotField("Troposphere delay", "m"),
+                "validity": PlotField("HAS validity interval", "s"),
         }
 
         plot_def_qzss = {
                 "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns"),
                 "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns"),
         }
-
 
         for sys in sorted(self.dset.unique("system")):
 
@@ -221,7 +249,7 @@ class GnssPlot:
             if np.all(np.isnan(self.dset[fieldname][idx_sys])):
                 continue
                               
-            figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}").replace("{FIGURE_FORMAT}", self.figure_format)
+            figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}{suffix}").replace("{FIGURE_FORMAT}", self.figure_format)
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
 
@@ -229,11 +257,17 @@ class GnssPlot:
                 if not sat.startswith(sys):
                     continue
                 idx = self.dset.filter(satellite= sat)
-                x_arrays.append(self.dset.time.gps.datetime[idx])
-                y_array = self._convert_to_unit(self.dset[fieldname][idx], self.dset.unit(fieldname)[0], plot_def[fieldname].unit) if fieldname in plot_def.keys() else self.dset[fieldname][idx]
-                y_arrays.append(y_array) 
                 labels.append(sat)  
-            
+                x_arrays.append(self.dset.time.gps.datetime[idx])
+                
+                # Convert y_array to defined unit
+                if fieldname in plot_def.keys() and plot_def[fieldname].unit:         
+                    y_array = self._convert_to_unit(self.dset[fieldname][idx], self.dset.unit(fieldname)[0], plot_def[fieldname].unit) 
+                else:
+                    y_array = self.dset[fieldname][idx]
+                
+                y_array = y_array
+                y_arrays.append(y_array) 
  
             if fieldname in plot_def.keys():
                 if sys == "J" and fieldname in ["tgd_diff", "tgd_diff_mean"]:
@@ -251,7 +285,7 @@ class GnssPlot:
                 xlabel="Time [GPS]",
                 ylabel=ylabel,
                 y_unit=plot_def[fieldname].unit if fieldname in plot_def.keys() else "",
-                labels=labels,
+                labels=labels if use_labels else None,
                 figure_path=figure_path,
                 options={
                     "figsize": (7, 6),
@@ -261,7 +295,7 @@ class GnssPlot:
                     "plot_to": "file", 
                     "plot_type": "scatter",
                     "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
-                    "xlim": "fit_to_data",
+                    "xlim": [min(self.dset.time.gps.datetime), max(self.dset.time.gps.datetime)],
                 },
             )
                 
@@ -432,7 +466,7 @@ class GnssPlot:
                 "plot_to": "file",
                 "plot_type": "scatter",
                 "tick_labelsize": ("y", 7),  # specify labelsize 7 for y-axis
-                "title": f"GNSS signal-in-space status",
+                "title": "GNSS signal-in-space status",
                 "xlim": [day_start, day_end],
             },
         )
@@ -443,7 +477,192 @@ class GnssPlot:
         # frameon=True,
         
         return figure_path
-   
+    
+    
+    def plot_has_clock_availability(
+                            self, 
+                            figure_name: str="plot_galileo_has_clock_availability_{system}.{FIGURE_FORMAT}",
+
+    ) -> List[pathlib.PosixPath]:
+        """Plot Galileo HAS clock correction availability
+        
+        Args:
+            figure_name: File name of figure.
+        
+        Returns:
+            List with figure path for Galileo HAS clock correction availability plots. File name ends with GNSS 
+            identifier (e.g. 'E', 'G') and observation type, for example 'plot_galileo_has_clock_availability_G.png'.
+                
+        """
+        figure_paths = list()
+        colors = ["green", "yellow", "red"]
+        labels = ["data ok", "data not available", "data shall not be used"]
+        status_def = [0, 1, 2]
+        
+        for system in self.dset.unique("system"):
+            
+            figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{system}", system)
+            
+            # Generate time and satellite data for given Galileo HAS clock correction status
+            x_arrays = []
+            y_arrays = []
+            for status in status_def:   
+                time, satellite = self._get_galileo_has_clock_status_data(status, system)
+                x_arrays.append(time)
+                y_arrays.append(satellite)
+        
+            # Limit x-axis range to rundate
+            day_start, day_end = self._get_day_limits()
+        
+            # Generate plot
+            plt = MatPlotExt()
+            plt.plot(
+                x_arrays=x_arrays,
+                y_arrays=y_arrays,
+                xlabel="Time [GPS]",
+                ylabel="Satellite",
+                y_unit="",
+                labels=labels,
+                colors=colors,
+                figure_path=figure_path,
+                options={
+                    "figsize": (7, 8),
+                    "marker": "s",
+                    "marksersize": 10,
+                    "legend_ncol": 4,
+                    "legend_location": "bottom",
+                    "plot_to": "file",
+                    "plot_type": "scatter",
+                    "tick_labelsize": ("y", 8),  # specify labelsize for y-axis
+                    "title": "HAS clock correction availability",
+                    "xlim": [day_start, day_end],
+                },
+            )
+            # TODO: Legend has to be improved. Old configuration:
+            # figsize = (7, 10)
+            # loc="lower center",
+            # bbox_to_anchor=(0.5, -0.01),
+            # frameon=True,
+            
+            # Add figure path
+            figure_paths.append(figure_path)
+      
+        return figure_paths
+    
+    
+    def plot_has_orbit_availability(
+                            self, 
+                            figure_name: str="plot_galileo_has_orbit_availability_{system}.{FIGURE_FORMAT}",
+
+    ) -> List[pathlib.PosixPath]:
+        """Plot Galileo HAS orbit correction availability
+        
+        Args:
+            figure_name: File name of figure.
+        
+        Returns:
+            List with figure path for Galileo HAS orbit correction availability plots. File name ends with GNSS 
+            identifier (e.g. 'E', 'G') and observation type, for example 'plot_galileo_has_orbit_availability_G.png'.
+                
+        """
+        figure_paths = list()
+        colors = ["green", "red"]
+        labels = ["data ok", "data not available"]
+        
+        for system in self.dset.unique("system"):
+                      
+            figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{system}", system)
+            
+            # Generate time and satellite data for given Galileo HAS orbit correction status
+            x_arrays = []
+            y_arrays = []
+            
+            for data_available in [True, False]:   
+                time, satellite = self._get_galileo_has_orbit_status_data(data_available, system)
+                x_arrays.append(time)
+                y_arrays.append(satellite)
+        
+            # Limit x-axis range to rundate
+            day_start, day_end = self._get_day_limits()
+        
+            # Generate plot
+            plt = MatPlotExt()
+            plt.plot(
+                x_arrays=x_arrays,
+                y_arrays=y_arrays,
+                xlabel="Time [GPS]",
+                ylabel="Satellite",
+                y_unit="",
+                labels=labels,
+                colors=colors,
+                figure_path=figure_path,
+                options={
+                    "figsize": (7, 8),
+                    "marker": "s",
+                    "marksersize": 10,
+                    "legend_ncol": 4,
+                    "legend_location": "bottom",
+                    "plot_to": "file",
+                    "plot_type": "scatter",
+                    "tick_labelsize": ("y", 8),  # specify labelsize for y-axis
+                    "title": "HAS orbit availability",
+                    "xlim": [day_start, day_end],
+                },
+            )
+            # TODO: Legend has to be improved. Old configuration:
+            # figsize = (7, 10)
+            # loc="lower center",
+            # bbox_to_anchor=(0.5, -0.01),
+            # frameon=True,
+            
+            # Add figure path
+            figure_paths.append(figure_path)
+      
+        return figure_paths
+  
+    
+    def plot_has_correction(
+                            self, 
+                            figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
+
+    ) -> List[pathlib.PosixPath]:
+        """Plot Galileo HAS correction results
+        
+        Args:
+            figure_name: File name of figure.
+        
+        Returns:
+            List with figure path for Galileo HAS correction plots. File name includes GNSS identifier
+            (e.g. 'E', 'G') and field name, for example 'plot_field_G_age_of_ephemeris.png'.
+        """          
+        figure_paths = list()
+               
+        # Define fields to plot
+        fields_without_labels={"age_of_data", "iod"}
+        remove_fields = {"satellite", "signal", "status", "system", "time", "tom"}
+        fields = set(self.dset.fields) - remove_fields
+        
+        # Get file name suffix
+        if "delta_radial" in self.dset.fields:
+            suffix = "_orb"
+        elif "multiplier" in self.dset.fields:
+            suffix = "_clk"
+        elif "code_bias" in self.dset.fields:
+            suffix = "_cb"
+        elif "phase_bias" in self.dset.fields:
+            suffix = "_pb"
+        
+        #
+        # Plot HAS message fields 
+        #         
+        for field in fields:        
+            if field in fields_without_labels:
+                figure_paths = figure_paths + self.plot_field(field, use_labels=False, suffix=suffix) # without satellite labels
+            else:
+                figure_paths = figure_paths + self.plot_field(field, suffix=suffix) # with satellite labels
+                
+        return figure_paths
+    
          
     def plot_linear_combinations(
                             self, 
@@ -900,7 +1119,10 @@ class GnssPlot:
         figure_paths = list()
     
         # Convert azimuth to range 0-360 degree
-        azimuth = self.dset.site_pos.azimuth
+        try:
+            azimuth = self.dset.site_pos.azimuth
+        except exceptions.InitializationError:
+            return figure_paths
         idx = azimuth < 0
         azimuth[idx] = 2 * np.pi + azimuth[idx]
     
@@ -969,9 +1191,13 @@ class GnssPlot:
             for example 'plot_skyplot_E.png'.
         """
         figure_paths = list()
-    
+ 
         # Convert elevation from radian to degree
-        elevation = np.rad2deg(self.dset.site_pos.elevation)
+        try:
+            elevation = np.rad2deg(self.dset.site_pos.elevation)
+        except exceptions.InitializationError:
+            return figure_paths
+            
     
         # Limit x-axis range to rundate
         day_start, day_end = self._get_day_limits()
@@ -1044,15 +1270,16 @@ class GnssPlot:
         file_vars = {**self.dset.vars, **self.dset.analysis}
         file_vars["stage"] = "read"
         file_path = config.files.path("dataset", file_vars=file_vars)
-        if file_path.exists(): 
+        if file_path.exists():
+            systems = list(self.dset.unique("system")) # self.dset.meta["obstypes"].keys()
             time_read, satellite_read, _ = self._sort_by_satellite(
-                self._get_dataset(stage="read", systems=self.dset.meta["obstypes"].keys())
+                self._get_dataset(stage="read", systems=systems)
             )
             time_orbit, satellite_orbit, _ = self._sort_by_satellite(
-                self._get_dataset(stage="orbit", systems=self.dset.meta["obstypes"].keys())
+                self._get_dataset(stage="orbit", systems=systems)
             )
             time_edit, satellite_edit, _ = self._sort_by_satellite(
-                self._get_dataset(stage="edit", systems=self.dset.meta["obstypes"].keys())
+                self._get_dataset(stage="edit", systems=systems)
             )
             
         else:
@@ -1084,7 +1311,7 @@ class GnssPlot:
         
         return figure_path
     
-    
+        
     def plot_tgd_comparison(
                             self, 
                             figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
@@ -1365,6 +1592,93 @@ class GnssPlot:
     
         return day_start, day_end
     
+
+    def _get_galileo_has_clock_status_data(
+                self,
+                status: int, 
+                system: Union[str, None]=None,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Get time and satellite data based on a given Galileo HAS clock correction status 
+    
+        The Galileo HAS clock correction status can be:
+    
+         | CODE | CLOCK STATUS                 | 
+         |------|------------------------------|
+         |   0  | data ok                      |
+         |   1  | data not available           | 
+         |   2  | satellite shall not be used  |
+    
+        Args:
+           status:        Galileo HAS clock correction status 
+           system:        Get only Galileo HAS clock correction status for selected system identifier.
+    
+        Returns:
+            Tuple with time and satellite data for a given Galileo HAS clock correction status and ordered by satellite
+        """
+        # TODO: order of satellites is not correct. Maybe to save the data in a dataframe could help?
+    
+        # Generate x- and y-axis data
+        time = []
+        satellite = []
+    
+        for sat in sorted(self.dset.unique("satellite"), reverse=True):
+            
+            if system: # Skip GNSS, which are not selected
+                if not sat.startswith(system):
+                    continue
+                
+            idx = self.dset.filter(satellite=sat)
+            idx_status = self.dset.status[idx] == status
+
+            time.extend(self.dset.time.gps.datetime[idx][idx_status])
+            satellite.extend(self.dset.satellite[idx][idx_status])
+    
+        return time, satellite
+    
+    
+    def _get_galileo_has_orbit_status_data(
+                    self,
+                    data_available: bool, 
+                    system: str,
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        """Get time and satellite data based on a given Galileo HAS orbit correction status 
+    
+        The Galileo HAS orbit correction status can be accessed via Not a Number (NaN). If data are NaN, then orbit
+        correction are not available otherwise they are available.
+    
+         | Type  | ORBIT STATUS                 | 
+         |-------|------------------------------|
+         | float | data available               |
+         | NaN   | data not available           | 
+         
+        TODO: Has to be tested.
+    
+        Args:
+           data_available:   Depending on this flag it is checked, if either orbit correction are available or not
+           system:           Get only Galileo HAS clock orbit status for selected system identifier.
+    
+        Returns:
+            Tuple with time and satellite data for a given Galileo HAS orbit correction status and ordered by satellite
+        """
+        
+        time = []
+        satellite = []
+    
+        for sat in sorted(self.dset.unique("satellite"), reverse=True):
+            
+            if system: # Skip GNSS, which are not selected
+                if not sat.startswith(system):
+                    continue
+                
+            idx = self.dset.filter(satellite=sat)
+            idx_status = np.isnan(self.dset.delta_radial[idx])
+            idx_status = ~idx_status if data_available else idx_status
+
+            time.extend(self.dset.time.gps.datetime[idx][idx_status])
+            satellite.extend(self.dset.satellite[idx][idx_status])
+  
+        return time, satellite
+    
     
     def _get_gnss_signal_in_space_status_data(
                 self,
@@ -1423,7 +1737,7 @@ class GnssPlot:
     
         return time, satellite
     
-    
+        
     def _rms(self, x: np.ndarray) -> np.ndarray:
         """Determine root mean square (RMS)
         

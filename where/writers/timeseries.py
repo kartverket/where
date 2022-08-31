@@ -154,7 +154,12 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
             continue
         params = [f for f in names if f.startswith(field + "-")]
         param_units = [u for f, u in zip(names, units) if f.startswith(field + "-")]
-        name2 = [p.split("-")[-1].split("_")[-1] for p in params]
+        name2 = [p.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[-1] for p in params]
+        epochs = [n.find(":") > -1 for n in name2]
+        if any(epochs):
+            log.warn(f"NEQ parameter ({field}) with estimation epochs different from mid-session cannot be added to timeseries")
+            continue
+    
         dim = len(np.unique(name2)) if not any([n2 in n for n2 in name2 for n in idx_names]) else 1
         shape = (num_obs, dim) if dim > 1 else num_obs
         shape_cov = (num_obs, dim, dim) if dim > 1 else num_obs
@@ -256,11 +261,16 @@ def method_state(dset, field, idx_values, func):
     idx_names = idx_values[list(idx_values.keys()).pop()]
     num_obs = len(idx_names)
     params = [f for f in dset.fields if f.startswith("state." + field + "-") and not f.endswith("_sigma")]
-    name2 = [p.split("-")[-1].split("_")[-1] for p in params]
+    name2 = [p.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[-1] for p in params]
+    epochs = [n.find(":") > -1 for n in name2]
+    if any(epochs):
+        log.warn(f"Parameter ({field}) with estimation epochs different from mid-session cannot be added to timeseries")
+        return None, None, None
     dim = len(np.unique(name2)) if not any([n2 in n for n2 in name2 for n in idx_names]) else 1
     val = np.full((num_obs, dim), np.nan, dtype=float)
     idx = np.array([any([n in p for p in params]) for n in idx_names], dtype=bool)
     mean = [dset.mean(p) for p in params]
+
     if mean:
         mean = np.array(mean).reshape(-1, dim)
     else:

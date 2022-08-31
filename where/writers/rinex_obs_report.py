@@ -18,7 +18,7 @@ import pandas as pd
 # Midgard imports
 from midgard.collections import enums
 from midgard.dev import plugins
-from midgard.plot.matplotlib_extension import plot_bar_dataframe_columns
+from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.data import dataset3 as dataset
@@ -328,29 +328,33 @@ def _plot_observation_system(
        figure_dir:  Figure directory
     """ 
      
-    plot_bar_dataframe_columns(
+    plt = MatPlotExt()
+    plt.plot_bar_dataframe_columns(
         df_system,
         column="num_sat",
         path=figure_dir / f"plot_gnss_number_of_satellites.{FIGURE_FORMAT}",
         xlabel="GNSS name",
         ylabel="# satellites",
         label="sys",
-        opt_args={
+        options={
               "figsize": (8,4),
               "legend": False,
+              "plot_to": "file",
         },
     )
     
-    plot_bar_dataframe_columns(
+    plt = MatPlotExt()
+    plt.plot_bar_dataframe_columns(
         df_system,
         column="num_obs",
         path=figure_dir / f"plot_gnss_observation_overview.{FIGURE_FORMAT}",
         xlabel="GNSS name",
         ylabel="# observations",
         label="sys",
-        opt_args={
+        options={
               "figsize": (8,4),
               "legend": False,
+              "plot_to": "file",
         },
     )
     
@@ -368,35 +372,40 @@ def _plot_observation_type(
     """   
     num_sys = len(set(df_obstype.sys))
 
-    plot_bar_dataframe_columns(
+
+    plt = MatPlotExt()
+    plt.plot_bar_dataframe_columns(
         df_obstype,
         column="num_sat",
         path=figure_dir / f"plot_gnss_obstype_number_of_satellites.{FIGURE_FORMAT}",
         xlabel="Observation type",
         ylabel="# satellites",
         label="sys",
-        opt_args={
+        options={
               "figsize": (8, 4), 
               "fontsize": 17,
               "legend": True,
               "legend_location": "bottom",
               "legend_ncol": num_sys,
+              "plot_to": "file",
         },
     )
     
-    plot_bar_dataframe_columns(
+    plt = MatPlotExt()
+    plt.plot_bar_dataframe_columns(
         df_obstype,
         column="num_obs",
         path=figure_dir / f"plot_gnss_obstype_overview.{FIGURE_FORMAT}",
         xlabel="Observation type",
         ylabel="# observations",
         label="sys",
-        opt_args={
+        options={
               "figsize": (8, 4), 
               "fontsize": 17,
               "legend": True,
               "legend_location": "bottom",
               "legend_ncol": num_sys,
+              "plot_to": "file",
         },
     )
 

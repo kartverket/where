@@ -46,11 +46,10 @@ def get_orbit(apriori_orbit=None, **kwargs):
         AprioriOrbit: Apriori orbit object.
     """
     apriori_orbit = config.tech.get("apriori_orbit", apriori_orbit).str
-    if apriori_orbit not in ["broadcast", "precise", "slr"]:
+    if apriori_orbit not in ["has", "broadcast", "precise", "slr"]:
         log.fatal(
-            "Configuration value '{}' for option 'apriori_orbit' is unknown. It should be either 'broadcast' "
-            "and/or 'precise', or 'slr'. ",
-            apriori_orbit,
+            f"Configuration value '{apriori_orbit}' for option 'apriori_orbit' is unknown. It should be either 'broadcast' "
+            "and/or 'precise', or 'has' or 'slr'. "
         )
 
     return plugins.call(package_name=__name__, plugin_name=apriori_orbit, **kwargs)

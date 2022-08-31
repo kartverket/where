@@ -42,4 +42,18 @@ def gnss_ignore_system(dset: "Dataset", systems: Union[List[str], None] = None) 
         for system in systems:
             remove_idx |= dset.filter(system=system)
 
+    # Remove unneccessary meta entries
+    if "R" in systems:
+        if "glonass_slot" in dset.meta.keys():
+            del dset.meta["glonass_slot"]
+
+        if "glonass_bias" in dset.meta.keys():
+            del dset.meta["glonass_bias"]
+
+    for sys in systems:
+        if sys in dset.meta["obstypes"]:
+            del dset.meta["obstypes"][sys]
+        if sys in dset.meta["phase_shift"]:
+            del dset.meta["phase_shift"][sys]
+
     return ~remove_idx

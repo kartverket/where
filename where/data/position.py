@@ -96,3 +96,13 @@ class YawVelocityDelta(mg_position.VelocityDeltaArray):
     system = "yaw"
     column_names = ("vx", "vy", "vz")
     _units = ("meter/second", "meter/second", "meter/second")
+
+# Define shorthands for available systems and conversions
+Position.SYSTEMS = mg_position.PositionArray._systems()
+PositionDelta.SYSTEMS = mg_position.PositionDeltaArray._systems()
+PosVel.SYSTEMS = mg_position.PosVelArray._systems()
+PosVelDelta.SYSTEMS = mg_position.PosVelDeltaArray._systems()
+Position.CONVERSIONS = mg_position.PositionArray._conversions()
+PositionDelta.CONVERSIONS = mg_position.PositionDeltaArray._conversions()
+PosVel.CONVERSIONS = mg_position.PosVelArray._conversions()
+PosVelDelta.CONVERSIONS = mg_position.PosVelDeltaArray._conversions()

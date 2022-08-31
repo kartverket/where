@@ -45,17 +45,25 @@ def gnss_clean_orbit(dset: "Dataset", orbit_flag: str) -> None:
     Returns:
         numpy.ndarray:   Array containing False for observations to throw away.
     """
+
+    apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
     check_nav_validity_length = config.tech[_SECTION].check_nav_validity_length.bool
     ignore_unhealthy_satellite = config.tech[_SECTION].ignore_unhealthy_satellite.bool
 
     # GNSS observations are rejected from Dataset 'dset', if apriori satellite orbits are not given
     _ignore_satellites(dset, orbit_flag)
+    
+    # GNSS observation epochs are rejected with no corresponding IOD between HAS messages and broadcast navigation 
+    # messages and observation with timestamps less than HAS receiver reception time
+    if (orbit_flag == "broadcast") and apply_has_correction:
+        _ignore_epochs(dset)
 
     # Remove unhealthy satellites
     if (orbit_flag == "broadcast") and ignore_unhealthy_satellite:
         cleaners.apply_remover("gnss_ignore_unhealthy_satellite", dset)
 
     # Remove GNSS observations which exceeds the validity length of broadcast ephemeris
+    keep_idx = np.ones(dset.num_obs, dtype=bool)
     if (orbit_flag == "broadcast") and check_nav_validity_length:
         keep_idx = _ignore_epochs_exceeding_validity(dset)
 
@@ -65,6 +73,59 @@ def gnss_clean_orbit(dset: "Dataset", orbit_flag: str) -> None:
 
     return keep_idx
 
+
+def _ignore_epochs(dset: "Dataset") -> np.ndarray:
+    """Remove GNSS observations for which no corresponding IOD can be found for HAS and broadcast navigation message
+    and observation epoch with timestamps less than HAS message receiver reception time
+
+    Args:
+        dset:   A Dataset containing model data.
+    """
+    brdc = apriori.get(
+        "orbit", 
+        rundate=dset.analysis["rundate"], 
+        system=tuple(dset.unique("system")), 
+        station=dset.vars["station"],
+        day_offset=0, 
+        apriori_orbit="broadcast",
+    )
+    
+    keep_idx = np.ones(dset.num_obs, dtype=bool)
+    obs_epoch_nearest_positive = True if "positive" in config.tech.has_message_nearest_to.str else False
+    
+    for epoch, sat, iode in zip(dset.time, dset.satellite, dset.has_gnssiod_orb):
+
+        idx = brdc.dset_edit.filter(satellite=sat, iode=iode)
+        
+        if np.any(idx) == False:
+            idx_dset = dset.filter(satellite=sat, has_gnssiod_orb=iode)
+            keep_idx[idx_dset] = False
+            log.debug(f"No valid broadcast navigation message could be found for satellite {sat} and HAS message IOD "
+                      f"{iode}. Removing {sum(~keep_idx[idx_dset])} observations.")
+            continue
+        
+        if obs_epoch_nearest_positive:
+           
+            diff = epoch.gps.gps_ws.seconds - brdc.dset_edit.time.gps.gps_ws.seconds[idx]
+    
+            if np.all(diff < 0):
+                log.debug(f"No valid broadcast navigation message could be found for satellite {sat}, HAS message IOD " 
+                         f"{iode} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} (nearest " 
+                         f"receiver reception time of HAS message: " 
+                         f"{min(brdc.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')}, "
+                         f"{min(brdc.dset_edit.time.gps_ws.week[idx]):.0f}-"
+                         f"{min(brdc.dset_edit.time.gps_ws.seconds[idx]):.0f})")
+                idx_dset = np.logical_and(dset.filter(satellite=sat, has_gnssiod_orb=iode), epoch.gps.gps_ws.seconds == dset.time.gps.gps_ws.seconds)
+                keep_idx[idx_dset] = False
+            
+    num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
+    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs")
+    
+    # Note: Observations have to be removed already here, otherwise further processing does not work.
+    if num_removed_obs > 0:
+        log.info(f"Keeping {sum(keep_idx)} of {dset.num_obs} observations.")
+        dset.subset(keep_idx)
+   
 
 def _ignore_satellites(dset: "Dataset", orbit_flag: str) -> None:
     """Remove GNSS observations with unavailable apriori satellite orbits from Dataset

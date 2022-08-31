@@ -5,7 +5,7 @@ Description:
 
 Config should use the following format
 
-    ignore_epochs = identifier1 start_epoch1 end_epoch1, identifier2 start_epoch2 end_epoch2, ...
+    intervals = identifier1 start_epoch1 end_epoch1, identifier2 start_epoch2 end_epoch2, ...
 
 If the identifier is omitted data will be discarded from all stations in the given time interval.
 An identifier may be either a station name or a baseline
@@ -14,9 +14,9 @@ An identifier may be either a station name or a baseline
 Example:
 --------
 
-    ignore_epochs = NYALES20 2013-11-20 17:30:00 2013-11-20 18:24:00
-    ignore_epochs = 2013-11-20 17:30:00 2013-11-20 18:24:00
-    ignore_epochs = NYALES20/WETTZELL 2013-11-20 17:30:00 2013-11-20 18:24:00
+    intervals = NYALES20 2013-11-20 17:30:00 2013-11-20 18:24:00
+    intervals = 2013-11-20 17:30:00 2013-11-20 18:24:00
+    intervals = NYALES20/WETTZELL 2013-11-20 17:30:00 2013-11-20 18:24:00
 
 """
 
@@ -44,16 +44,17 @@ def ignore_epochs(dset):
         Array containing False for observations to throw away
     """
     intervals = config.tech[_SECTION].intervals.as_list(split_re=", *")
+    scale = config.tech[_SECTION].time_scale.str
 
     keep_idx = np.ones(dset.num_obs, dtype=bool)
     for interval in intervals:
         interval = interval.split()
-        start_time = Time(" ".join(interval[-4:-2]), scale="utc", fmt="iso")
-        end_time = Time(" ".join(interval[-2:]), scale="utc", fmt="iso")
+        start_time = Time(" ".join(interval[-4:-2]), scale=scale, fmt="iso").datetime
+        end_time = Time(" ".join(interval[-2:]), scale=scale, fmt="iso").datetime
         # station name may contain spaces
         station = " ".join(interval[:-4])
 
-        remove_idx = np.logical_and(start_time < dset.time, dset.time < end_time)
+        remove_idx = np.logical_and(start_time <= getattr(dset.time, scale).datetime, getattr(dset.time, scale).datetime <= end_time)
         if len(interval) == 5:
             if "/" in station:
                 remove_idx = dset.filter(baseline=station, idx=remove_idx)

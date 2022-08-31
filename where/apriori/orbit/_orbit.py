@@ -121,7 +121,7 @@ class AprioriOrbit:
                     observation time and 'sat_time' to satellite transmission time.
         """
         if not dset.num_obs:
-            log.fatal(f"Dataset is empty. No observation epochs given for calculating orbits.")
+            log.fatal("Dataset is empty. No observation epochs given for calculating orbits.")
 
         # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
         try:

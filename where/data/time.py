@@ -24,8 +24,9 @@ from where.ext import sofa_wrapper as sofa
 np_float = TypeVar("np_float", float, np.ndarray)
 
 
-# Time deltas
-
+######################################################################################################################
+# Transitions between time scales
+######################################################################################################################
 
 def delta_ut1_utc(time: "TimeArray", models=None) -> "np_float":
 
@@ -156,3 +157,11 @@ class TdbTime(mg_time.TimeArray):
 class TdbTimeDelta(mg_time.TimeDeltaArray):
 
     scale = "tdb"
+
+# Define shorthands for available formats, scales and conversions
+Time.FORMATS = list(mg_time.TimeArray._formats().keys())
+TimeDelta.FORMATS = list(mg_time.TimeDeltaArray._formats().keys())
+Time.SCALES = list(mg_time.TimeArray._scales().keys())
+TimeDelta.SCALES = list(mg_time.TimeDeltaArray._scales().keys())
+Time.CONVERSIONS = list(mg_time.TimeArray._conversions().keys())
+TimeDelta.CONVERSIONS = list(mg_time.TimeDeltaArray._conversions().keys())

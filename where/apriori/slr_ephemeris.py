@@ -39,7 +39,7 @@ def get_ephemeris(rundate, sat_name):
     ephemeris_data = get_satellite_vars(sat_name)
     provider_list = config.tech.prediction_providers.list
     # Find the latest version of the observation file
-    versions = config.files.glob_variable(file_key, "version", r"\d{4}", file_vars=ephemeris_data)
+    versions = config.files.glob_variable(file_key, "version", r"\d+", file_vars=ephemeris_data)
 
     try:
         ephemeris_data["version"] = sorted(versions)[-1]
