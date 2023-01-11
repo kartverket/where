@@ -50,7 +50,6 @@ BiasField.__doc__ = """A convenience class for defining a necessary parameters t
 
 @plugins.register
 def gnss_compare_tgd(dset: "Dataset") -> None:
-    cfg_systems = config.tech.systems.list
     
     tgd_def = {
         "C": {
@@ -82,7 +81,7 @@ def gnss_compare_tgd(dset: "Dataset") -> None:
     for sys in dset.unique("system"):
         
         # Skip if GNSS is not defined
-        if not sys in tgd_def.keys() or sys not in cfg_systems:
+        if not sys in tgd_def.keys():
             continue
         
         idx_sys = dset.filter(system=sys)

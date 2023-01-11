@@ -31,7 +31,6 @@ Option               Description
 --id=                Analysis identifier (Default: '').
 --only_for_rundate   Concatenate only data for given run date. Data are removed
                      from Datasets, which exceeds run date boundaries.
---session=           Session name (Default: '').
 --station=           Station name (Default: '').
 --writers=           List with writers.
 -h, --help           Show this help message and exit.
@@ -90,14 +89,13 @@ def concatenate(from_date: "datedoy", to_date: "datedoy", pipeline: "pipeline", 
     # TODO: label = "last" if label == "last" else label
     id_ = util.read_option_value("--id", default="")
     only_for_rundate = True if util.check_options("--only_for_rundate") else False
-    session = util.read_option_value("--session", default="")
     station = util.read_option_value("--station", default="")
     writers = util.read_option_value("--writers", default="").replace(",", " ").split()
 
     # Update configuration of Where analysis
     config.where.update_from_options(_clean_sys_argv(pipeline))
 
-    dset_vars = dict(pipeline=pipeline, stage=stage, session=session, station=station, label=label, id=id_)
+    dset_vars = dict(pipeline=pipeline, stage=stage, station=station, label=label, id=id_)
     dset = _concatenate_datasets(from_date, to_date, dset_vars, only_for_rundate)
     if dset.num_obs == 0:
         log.fatal(f"No data to read period from {from_date} to {to_date}.")
@@ -114,7 +112,7 @@ def concatenate(from_date: "datedoy", to_date: "datedoy", pipeline: "pipeline", 
 def _clean_sys_argv(pipeline: str) -> List[str]:
     """Values in sys.argv that are not valid option values in Where
     """
-    reserved_opts = {pipeline, "label", "id", "only_for_rundate", "session", "stage", "station", "writers"}
+    reserved_opts = {pipeline, "label", "id", "only_for_rundate", "stage", "station", "writers"}
     return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]
 
 

@@ -219,8 +219,8 @@ def parse_baseline_clock_offsets(dset, baseline_clock_offsets, ref_clock):
     if store_bco:
         rundate = dset.analysis["rundate"]
         pipeline = dset.vars["pipeline"]
-        session = session=dset.vars["session"]
-        with config.update_tech_config(rundate, pipeline, session=session) as cfg:
+        session_code = dset.vars["session_code"]
+        with config.update_tech_config(rundate, pipeline, session_code=session_code) as cfg:
             cfg.update(MODEL, "baseline_clock_offsets",
                        ", ".join(baseline_clock_offsets), 
                        source=MODEL)

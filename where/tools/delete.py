@@ -2,7 +2,7 @@
 
 Usage:
 
-    {exe:tools} delete <date> <pipeline> [--session=<session>] [options]
+    {exe:tools} delete <date> <pipeline> [options]
 
 The tool requires a date given in the format `<year month day>` (for example
 2015 8 4).
@@ -28,7 +28,7 @@ Examples:
 
 Delete the VLBI analysis for August 4 2015:
 
-    {exe:tools} delete 2015 8 4 -v --session=XA
+    {exe:tools} delete 2015 8 4 -v --session_code=r1669
 
 
 Current Maintainers:

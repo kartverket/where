@@ -99,32 +99,34 @@ def get_grc_csv_row(
     }
 
     slot_def = {
-            "GSAT101": "B05",
-            "GSAT102": "B06",
-            "GSAT103": "C04",
-            "GSAT104": "C05",
-            "GSAT201": "EXT01",
-            "GSAT202": "EXT02",
-            "GSAT203": "B08",
-            "GSAT204": "B03",
-            "GSAT205": "A08",
-            "GSAT206": "A05",
-            "GSAT207": "C06",
-            "GSAT208": "C07",
-            "GSAT209": "C02",
-            "GSAT210": "A02",
-            "GSAT211": "A06",
-            "GSAT212": "C08",
-            "GSAT213": "C03",
-            "GSAT214": "C01",
-            "GSAT215": "A03",
-            "GSAT216": "A07",
-            "GSAT217": "A04",
-            "GSAT218": "A01",
-            "GSAT219": "B04",
-            "GSAT220": "B01",
-            "GSAT221": "B02",
-            "GSAT222": "B07",
+            "GSAT0101": "B05",
+            "GSAT0102": "B06",
+            "GSAT0103": "C04",
+            "GSAT0104": "C14",
+            "GSAT0201": "EXT01",
+            "GSAT0202": "EXT02",
+            "GSAT0203": "B08",
+            "GSAT0204": "B14",
+            "GSAT0205": "A08",
+            "GSAT0206": "A05",
+            "GSAT0207": "C06",
+            "GSAT0208": "C07",
+            "GSAT0209": "C02",
+            "GSAT0210": "A02",
+            "GSAT0211": "A06",
+            "GSAT0212": "C08",
+            "GSAT0213": "C03",
+            "GSAT0214": "C01",
+            "GSAT0215": "A03",
+            "GSAT0216": "A07",
+            "GSAT0217": "A04",
+            "GSAT0218": "A01",
+            "GSAT0219": "B04",
+            "GSAT0220": "B01",
+            "GSAT0221": "B02",
+            "GSAT0222": "B07",
+            "GSAT0223": "B03",
+            "GSAT0224": "B15",
     }
 
     station_def = {
@@ -167,7 +169,7 @@ def get_grc_csv_row(
         sat_info = atx.get_satellite_info(satellite, used_date)
 
         batch = batch_def[sat_info["sat_type"]] if sat_info["sat_type"] in batch_def.keys() else ""
-        prn = sat_info["sat_code"].replace("E", "GSAT") if sat_info["sat_code"].startswith("E") else sat_info["sat_code"]
+        prn = sat_info["sat_code"].replace("E", "GSAT0") if sat_info["sat_code"].startswith("E") else sat_info["sat_code"]
         slot = slot_def[prn] if prn in slot_def.keys() else ""
 
 
@@ -176,8 +178,8 @@ def get_grc_csv_row(
         category_def[kpi], # Service Category
         business_def[kpi], # Business Service
         batch, # Batch
-        satellite, # Satellite
         prn, # PRN
+        satellite, # Satellite
         slot, # Slot
         station_to_write, # GSS Site
         station.upper(), # Station

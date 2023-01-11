@@ -92,11 +92,11 @@ def solve_neq(dset):
     # NNT/NNR to TRF
     if "minimum_trf" in config.tech.neq_constraints.list:
         if len(stations) >= 3:
-            H, H_sigma = _apply_minimum_trf(H, H_sigma, B, stations)
-            log.info(f"Applying NNT/NNR with {', '.join(stations)} from {reference_frame.upper()}")
+            H, H_sigma, constraints = _apply_minimum_trf(H, H_sigma, B, stations)
+            log.info(f"Applying {'/'.join(constraints)} with {', '.join(stations)} from {reference_frame.upper()}")
         else:
             log.info(
-                f"Too few stations to use NNR/NNT contraints from {reference_frame.upper()}. Using absolute constraints for station positions."
+                f"Too few stations to use minimum contraints from {reference_frame.upper()}. Using absolute constraints for station positions."
                 )
             # Automatic absolute constraints: Too few stations to use NNT/NNR
             for idx, column in enumerate(names):
@@ -183,7 +183,7 @@ def solve_neq(dset):
         previous_parameter = parameter
 
     if num_params != 0 and part != "":
-        # Apply the final relative constraint when this was the last paramater in the list
+        # Apply the final relative constraint when this was the last parameter in the list
         log.info(f"Applying relative constraints of {weight:6.4f}{unit}/h for {previous_parameter} {part}")
         H_part = np.diag(np.ones(num_params)) - np.diag(np.ones(num_params-1), 1)
         # Skip the last row in H_part
@@ -221,11 +221,14 @@ def solve_neq(dset):
     dset.meta.add("solution", x[:, 0].tolist(), section="normal equation")
     dset.meta.add("covariance", Q_xx.tolist(), section="normal equation")
 
-    _compute_helmert_parameters(dset, B, stations)
+    _compute_helmert_parameters(dset, B, stations, "neq")
 
 
 def _compute_helmert_matrix(dset, reference_frame):
     """Compute the Jacobian matrix for the 7-helmert parameters
+
+    The matrix is computed with the following order of the parameters:
+        T_x, T_y, T_z, D, R_x, R_y, R_z
     
     Args:
         dset (Dataset):               Dataset with model data
@@ -238,7 +241,7 @@ def _compute_helmert_matrix(dset, reference_frame):
     names = dset.meta["normal equation"]["names"]
     n = len(names)
     B = np.zeros((n, 7))
-    stations = set()
+    stations = list()
     
     trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
     skip_stations = config.tech.minimum_trf.skip_stations.list
@@ -247,16 +250,21 @@ def _compute_helmert_matrix(dset, reference_frame):
         if "_site_pos-" not in column:
             continue
         station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
-        site_id = dset.meta[station]["site_id"]
-        if site_id in trf and station not in skip_stations:
-            x0, y0, z0 = trf[site_id].pos.trs
+        site_id = dset.meta["station"][station]["site_id"]
+        if station not in skip_stations:
+            try:
+                x0, y0, z0 = trf[site_id].pos.trs
+            except KeyError:
+                # Station is not defined in the given reference frame for the given time
+                continue
+            #IERS 2010 Conventions eq. 4.8
             if column.endswith("_x"):
                 B[idx, :] = np.array([1, 0, 0, x0, 0, z0, -y0])
+                stations.append(station)
             if column.endswith("_y"):
                 B[idx, :] = np.array([0, 1, 0, y0, -z0, 0, x0])
             if column.endswith("_z"):
                 B[idx, :] = np.array([0, 0, 1, z0, y0, -x0, 0])
-            stations.add(station)
     return B, stations 
            
 def _apply_minimum_trf(H, H_sigma, B, stations):
@@ -272,9 +280,25 @@ def _apply_minimum_trf(H, H_sigma, B, stations):
         H (array):       Updated Jacobian matrix for the constraint
         H_sigma (array): Updated weights for the constraint
     """
+    constraints = []
+    nns = config.tech.minimum_trf["nns"].bool
+    nnt = config.tech.minimum_trf["nnt"].bool
+    nnr = config.tech.minimum_trf["nnr"].bool
+    
+    trf_nns_unit = config.tech.minimum_trf.nns_unit.str
+    trf_nns_sigma = config.tech.minimum_trf.nns_sigma.float * Unit(trf_nns_unit, "unit") # Convert to unit
 
-    # Remove scale factor
-    d = np.delete(B, 3, axis=1)
+    trf_nnt_unit = config.tech.minimum_trf.nnt_unit.str 
+    trf_nnt_sigma = config.tech.minimum_trf.nnt_sigma.float * Unit(trf_nnt_unit, "meter") # Convert to meter
+    
+    trf_nnr_unit = config.tech.minimum_trf.nnr_unit.str 
+    trf_nnr_sigma = config.tech.minimum_trf.nnr_sigma.float * Unit(trf_nnr_unit, "rad") # Convert to radians
+
+    if not nns:
+        # Remove scale factor
+        d = np.delete(B, 3, axis=1)
+    else:
+        d = B
 
     try:
         # thaller2008: eq 2.57
@@ -282,34 +306,60 @@ def _apply_minimum_trf(H, H_sigma, B, stations):
     except np.linalg.LinAlgError:
         log.warn(f"Unable to invert matrix for NNR/NNT constraints")
 
-
-    nnt = config.tech.minimum_trf["nnt"].bool
-    nnr = config.tech.minimum_trf["nnr"].bool
-    
-    trf_nnt_unit = config.tech.minimum_trf.nnt_unit.str 
-    trf_nnt_sigma = config.tech.minimum_trf.nnt_sigma.float * Unit(trf_nnt_unit, "meter") # Convert to meter
-    
-    trf_nnr_unit = config.tech.minimum_trf.nnr_unit.str 
-    trf_nnr_sigma = config.tech.minimum_trf.nnr_sigma.float * Unit(trf_nnr_unit, "rad") # Convert to radians
-
-    if nnt and nnr:
+    if nnt and nnr and not nns:
         H_sigma[0:3] = trf_nnt_sigma
         H_sigma[3:6] = trf_nnr_sigma
-    elif nnt and not nnr:
-        d = d[:, 0:3]
+        constraints.append("NNT")
+        constraints.append("NNR")
+    elif nnt and nnr and nns:
+        H_sigma[0:3] = trf_nnt_sigma
+        H_sigma[3:6] = trf_nnr_sigma
+        H_sigma = np.insert(H_sigma, 3, trf_nns_sigma)
+        constraints.append("NNT")
+        constraints.append("NNR")
+        constraints.append("NNS")
+    elif nnt and not nnr and not nns:
+        # This scenario is not tested
+        H = d[:, 0:3]
         H_sigma[0:3] = trf_nnt_sigma
         H_sigma = H_sigma[0:3]
-    elif not nnt and nnr:
-        d = d[:, 3:6]
+        constraints.append("NNT")
+    elif nnt and not nnr and nns:
+        # This scenario is not tested
+        H = d[:, 0:4]
+        H_sigma[0:3] = trf_nnt_sigma
+        H_sigma = H_sigma[0:3]
+        H_sigma = np.insert(H_sigma, 3, trf_nns_sigma)
+        constraints.append("NNT")
+        constraints.append("NNS")
+    elif not nnt and nnr and not nns:
+        # This scenario is not tested
+        H = d[:, 3:6]
         H_sigma[3:6] = trf_nnt_sigma
         H_sigma = H_sigma[3:6]
-    elif not nnt and not nnr:
-        d = np.zeros((n, 0))
+        constraints.append("NNR")
+    elif not nnt and nnr and nns:
+        # This scenario is not tested
+        H = d[:, 3:7]
+        H_sigma[3:6] = trf_nnt_sigma
+        H_sigma = H_sigma[3:6]
+        H_sigma = np.insert(H_sigma, 0, trf_nns_sigma)
+        constraints.append("NNR")
+        constraints.append("NNS")
+    elif not nnt and not nnr and not nns:
+        # This scenario is not tested
+        #H = np.zeros((n, 0))
+        pass
+    elif not nnt and not nnr and nns:
+        # This scenario is not tested
+        H = d[3, 3]
+        H_sigma = np.array([trf_nns_sigma])
+        constraints.append("NNS")
     else:
-        d = np.zeros((n, 0))
+        #H = np.zeros((n, 0))
         log.warn(f"Unknown constraints. Not applying.")
     
-    return H, H_sigma
+    return H, H_sigma, constraints
         
 def _apply_minimum_crf(dset, H, H_sigma):
     """Compute minimum constraints to the CRF
@@ -370,24 +420,33 @@ def _apply_minimum_crf(dset, H, H_sigma):
 
     return H, H_sigma
 
-def _compute_helmert_parameters(dset, B, stations):
+def _compute_helmert_parameters(dset, B, stations, source=None):
     """ Estimate Helmert parameters for solution with regards to apriori reference frame
     
     The estimated parameters are added to dset.meta
     """
+    def _get_estimated_pos(station, param, source=None):
+        """Get estimated position either from solved NEQ or Kalman filter solution"""
+        name = f"{config.tech.master_section.name}_site_pos-{station}_{param}"
+        if source == "neq":
+            idx = dset.meta["normal equation"]["names"].index(name)
+            return dset.meta["normal equation"]["solution"][idx]
+        else:
+            return np.mean(dset.state[name])
+
     reference_frame = config.tech.reference_frames.list[0]
     trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frame)
     pos_ref = []
     pos_est = []
     for station in stations:
-        site_id = dset.meta[station]["site_id"]
+        site_id = dset.meta["station"][station]["site_id"]
         x0, y0, z0 = trf[site_id].pos.trs
         pos_ref.append(x0)
         pos_ref.append(y0)
         pos_ref.append(z0)
-        x1 = x0 + np.mean(dset.state[f"{config.tech.master_section.name}_site_pos-{station}_x"])
-        y1 = y0 + np.mean(dset.state[f"{config.tech.master_section.name}_site_pos-{station}_y"])
-        z1 = z0 + np.mean(dset.state[f"{config.tech.master_section.name}_site_pos-{station}_z"])
+        x1 = x0 + _get_estimated_pos(station, "x", source)
+        y1 = y0 + _get_estimated_pos(station, "y", source)
+        z1 = z0 + _get_estimated_pos(station, "z", source)
         pos_est.append(x1)
         pos_est.append(y1)
         pos_est.append(z1)
@@ -399,12 +458,15 @@ def _compute_helmert_parameters(dset, B, stations):
     except np.linalg.LinAlgError:
         hp = np.full(len(B.T), fill_value=np.nan)
         
-    section = "helmert"
+    section = f"{source}_helmert" if source else "helmert"
     fields = ["T_X", "T_Y", "T_Z", "scale", "alpha", "beta", "gamma"]
     width = max([len(f) for f in fields])
     factors = [Unit.m2mm, Unit.m2mm, Unit.m2mm, Unit.unit2ppb, Unit.rad2mas, Unit.rad2mas, Unit.rad2mas]
     units = ["mm", "mm", "mm", "ppb", "mas", "mas", "mas"]
-    log.info(f"Session Helmert parameters with regards to {reference_frame.upper()}")
+    if source:
+        log.info(f"Session {source.upper()} Helmert parameters with regards to {reference_frame.upper()}")
+    else:
+        log.info(f"Session Kalman Filter Helmert parameters with regards to {reference_frame.upper()}")
     for i, (field, factor, unit) in enumerate(zip(fields, factors, units)):
         dset.meta.add(field, (hp[i] * factor, unit), section=section)
         log.info(

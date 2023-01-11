@@ -132,7 +132,7 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
             if "_site_pos-" not in column:
                 continue
             station = column.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0]
-            key = dset.meta[station]["site_id"]
+            key = dset.meta["station"][station]["site_id"]
             if key in trf and station not in skip_stations:
                 x0, y0, z0 = trf[key].pos.trs  # TODO: Take units into account
                 if column.endswith("_x"):

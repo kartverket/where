@@ -38,7 +38,8 @@ def vlbi_network_volume(dset: "Dataset") -> None:
     Args:
         dset:     A Dataset containing model data.
     """
-    trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames="itrf:2014, vtrf, custom, vlbi_obs")
+    reference_frames = config.tech.reference_frames.str
+    trf = apriori.get("trf", time=dset.time.utc.mean, reference_frames=reference_frames)
     site_ids = dset.unique("site_id")
     
     if len(site_ids) < 4:

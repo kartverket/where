@@ -26,10 +26,10 @@ import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
+from midgard.math.constant import constant
 
 # Where imports
 from where.parsers import parser
-from midgard.math.constant import constant
 
 
 @plugins.register

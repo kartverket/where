@@ -30,7 +30,6 @@ Option               Description
 ===================  ===========================================================
 --doy                Specify date as <year day-of-year>.
 --label=             Dataset label (Default: 'last').
---session=           Session name (Default: '').
 --station=           Station name (Default: '').
 --writers=           List with writers.
 -h, --help           Show this help message and exit.
@@ -72,7 +71,6 @@ def main(date: "datedoy", pipeline: "pipeline", ids: "option"):
     dataset_id = "last" if dataset_id == "last" else int(dataset_id)
     dataset_name = util.read_option_value("--dset_name", default="")
     writer_names = util.read_option_value("--writers", default="").replace(",", " ").split()
-    session = util.read_option_value("--session", default="")
     station = util.read_option_value("--station", default="")
 
     # Get datasets
@@ -80,7 +78,6 @@ def main(date: "datedoy", pipeline: "pipeline", ids: "option"):
             rundate=date, 
             pipeline=pipeline, 
             stage=stage, 
-            session=session, 
             station=station, 
             label=label, 
             id="-" + identifiers[0],
@@ -90,7 +87,6 @@ def main(date: "datedoy", pipeline: "pipeline", ids: "option"):
             rundate=date, 
             pipeline=pipeline, 
             stage=stage, 
-            session=session, 
             station=station, 
             label=label, 
             id="-" + identifiers[1],

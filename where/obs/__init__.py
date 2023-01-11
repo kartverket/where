@@ -9,10 +9,10 @@ should be called need to be decorated with the :func:`~midgard.dev.plugins.regis
     from midgard_dev import plugins
 
     @plugins.register
-    def write_to_dataset(dset, rundate=None, session=None, **obsargs):
+    def write_to_dataset(dset, rundate=None, **obsargs):
         ...
 
-The decorated function will be called through the :func:`get`, with rundate, pipeline and session specificed as input
+The decorated function will be called through the :func:`get`, with rundate and pipeline specificed as input
 arguments. Additional parameters to the registered function should be passed as named keyword arguments.
 """
 

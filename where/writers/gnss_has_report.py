@@ -10,7 +10,7 @@ asdf
 # Third party imports
 import numpy as np
 from pathlib import PosixPath
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 # Midgard imports
 from midgard.collections import enums
@@ -22,6 +22,7 @@ from midgard.plot.matplotext import MatPlotExt
 from where import apriori
 from where.lib import config
 from where.lib import log
+from where.writers._gnss import get_day_limits
 from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
 
@@ -63,15 +64,13 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
         figure_dir:  Figure directory.
     """
     compare_to_rinex_nav = config.tech[_SECTION].compare_to_rinex_nav.bool
-    plt = GnssPlot(dset, figure_dir)
     
     #
     # Galileo HAS corrections
     #
     rpt.add_text("\n# Galileo HAS corrections\n\n")
-    plt = GnssPlot(dset, figure_dir, figure_format=FIGURE_FORMAT)
     
-    for figure_path in plt.plot_has_correction():
+    for figure_path in _plot_has_correction(dset, figure_dir):
         rpt.add_figure(
                 figure_path=figure_path, 
                 caption=f"HAS message entry for {enums.gnss_id_to_name[figure_path.stem.split('_')[2]]}", 
@@ -79,7 +78,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
         )
         
     if "status" in dset.fields:
-        for figure_path in plt.plot_has_clock_availability():
+        for figure_path in _plot_has_clock_availability(dset, figure_dir):
             rpt.add_figure(
                     figure_path=figure_path, 
                     caption=f"HAS clock correction status for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
@@ -87,7 +86,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
             )
           
     if "delta_radial" in dset.fields:
-        for figure_path in plt.plot_has_orbit_availability():
+        for figure_path in _plot_has_orbit_availability(dset, figure_dir):
             rpt.add_figure(
                     figure_path=figure_path, 
                     caption=f"HAS orbit correction status for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
@@ -152,7 +151,11 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
                     caption=caption, 
                     clearpage=False,
             )
+
             
+#
+# PREPARE DATA
+#
 
 def _generate_latency_data(
         dset: "Dataset", 
@@ -243,6 +246,296 @@ def _generate_latency_data(
                 missing_messages.append({sat, iode})
                                 
     return x_arrays, y_arrays, labels, missing_satellites, missing_messages
+
+
+#
+# PLOT FUNCTIONS
+#
+
+def _get_galileo_has_clock_status_data(
+            dset: "Dataset",
+            status: int, 
+            system: Union[str, None]=None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Get time and satellite data based on a given Galileo HAS clock correction status 
+
+    The Galileo HAS clock correction status can be:
+
+     | CODE | CLOCK STATUS                 | 
+     |------|------------------------------|
+     |   0  | data ok                      |
+     |   1  | data not available           | 
+     |   2  | satellite shall not be used  |
+
+    Args:
+       dset:          A dataset containing the data.
+       status:        Galileo HAS clock correction status 
+       system:        Get only Galileo HAS clock correction status for selected system identifier.
+
+    Returns:
+        Tuple with time and satellite data for a given Galileo HAS clock correction status and ordered by satellite
+    """
+    # TODO: order of satellites is not correct. Maybe to save the data in a dataframe could help?
+
+    # Generate x- and y-axis data
+    time = []
+    satellite = []
+
+    for sat in sorted(dset.unique("satellite"), reverse=True):
+        
+        if system: # Skip GNSS, which are not selected
+            if not sat.startswith(system):
+                continue
+            
+        idx = dset.filter(satellite=sat)
+        idx_status = dset.status[idx] == status
+
+        time.extend(dset.time.gps.datetime[idx][idx_status])
+        satellite.extend(dset.satellite[idx][idx_status])
+
+    return time, satellite
+
+
+def _get_galileo_has_orbit_status_data(
+                dset: "Dataset",
+                data_available: bool, 
+                system: str,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    """Get time and satellite data based on a given Galileo HAS orbit correction status 
+
+    The Galileo HAS orbit correction status can be accessed via Not a Number (NaN). If data are NaN, then orbit
+    correction are not available otherwise they are available.
+
+     | Type  | ORBIT STATUS                 | 
+     |-------|------------------------------|
+     | float | data available               |
+     | NaN   | data not available           | 
+     
+    TODO: Has to be tested.
+
+    Args:
+       dset:            A dataset containing the data.
+       data_available:   Depending on this flag it is checked, if either orbit correction are available or not
+       system:           Get only Galileo HAS clock orbit status for selected system identifier.
+
+    Returns:
+        Tuple with time and satellite data for a given Galileo HAS orbit correction status and ordered by satellite
+    """
+    
+    time = []
+    satellite = []
+
+    for sat in sorted(dset.unique("satellite"), reverse=True):
+        
+        if system: # Skip GNSS, which are not selected
+            if not sat.startswith(system):
+                continue
+            
+        idx = dset.filter(satellite=sat)
+        idx_status = np.isnan(dset.delta_radial[idx])
+        idx_status = ~idx_status if data_available else idx_status
+
+        time.extend(dset.time.gps.datetime[idx][idx_status])
+        satellite.extend(dset.satellite[idx][idx_status])
+  
+    return time, satellite
+
+
+def _plot_has_clock_availability(
+                        dset: "Dataset",
+                        figure_dir:  PosixPath,
+                        figure_name: str="plot_galileo_has_clock_availability_{system}.{FIGURE_FORMAT}",
+
+) -> List[PosixPath]:
+    """Plot Galileo HAS clock correction availability
+    
+    Args:
+        dset:        A dataset containing the data.
+        figure_dir:  Figure directory.
+        figure_name: File name of figure.
+    
+    Returns:
+        List with figure path for Galileo HAS clock correction availability plots. File name ends with GNSS 
+        identifier (e.g. 'E', 'G') and observation type, for example 'plot_galileo_has_clock_availability_G.png'.
+            
+    """
+    figure_paths = list()
+    colors = ["green", "yellow", "red"]
+    labels = ["data ok", "data not available", "data shall not be used"]
+    status_def = [0, 1, 2]
+    
+    for system in dset.unique("system"):
+        
+        figure_path = figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT).replace("{system}", system)
+        
+        # Generate time and satellite data for given Galileo HAS clock correction status
+        x_arrays = []
+        y_arrays = []
+        for status in status_def:   
+            time, satellite = _get_galileo_has_clock_status_data(dset, status, system)
+            x_arrays.append(time)
+            y_arrays.append(satellite)
+    
+        # Limit x-axis range to rundate
+        day_start, day_end = get_day_limits(dset)
+    
+        # Generate plot
+        plt = MatPlotExt()
+        plt.plot(
+            x_arrays=x_arrays,
+            y_arrays=y_arrays,
+            xlabel="Time [GPS]",
+            ylabel="Satellite",
+            y_unit="",
+            labels=labels,
+            colors=colors,
+            figure_path=figure_path,
+            options={
+                "figsize": (7, 8),
+                "marker": "s",
+                "marksersize": 10,
+                "legend_ncol": 4,
+                "legend_location": "bottom",
+                "plot_to": "file",
+                "plot_type": "scatter",
+                "tick_labelsize": ("y", 8),  # specify labelsize for y-axis
+                "title": "HAS clock correction availability",
+                "xlim": [day_start, day_end],
+            },
+        )
+        # TODO: Legend has to be improved. Old configuration:
+        # figsize = (7, 10)
+        # loc="lower center",
+        # bbox_to_anchor=(0.5, -0.01),
+        # frameon=True,
+        
+        # Add figure path
+        figure_paths.append(figure_path)
+  
+    return figure_paths
+
+
+def _plot_has_orbit_availability(
+                        dset: "Dataset", 
+                        figure_dir: PosixPath,
+                        figure_name: str="plot_galileo_has_orbit_availability_{system}.{FIGURE_FORMAT}",
+
+) -> List[PosixPath]:
+    """Plot Galileo HAS orbit correction availability
+    
+    Args:
+        dset:        A dataset containing the data.
+        figure_dir:  Figure directory.
+        figure_name: File name of figure.
+    
+    Returns:
+        List with figure path for Galileo HAS orbit correction availability plots. File name ends with GNSS 
+        identifier (e.g. 'E', 'G') and observation type, for example 'plot_galileo_has_orbit_availability_G.png'.
+            
+    """
+    figure_paths = list()
+    colors = ["green", "red"]
+    labels = ["data ok", "data not available"]
+    
+    for system in dset.unique("system"):
+                  
+        figure_path = figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT).replace("{system}", system)
+        
+        # Generate time and satellite data for given Galileo HAS orbit correction status
+        x_arrays = []
+        y_arrays = []
+        
+        for data_available in [True, False]:   
+            time, satellite = _get_galileo_has_orbit_status_data(dset, data_available, system)
+            x_arrays.append(time)
+            y_arrays.append(satellite)
+    
+        # Limit x-axis range to rundate
+        day_start, day_end = get_day_limits(dset)
+    
+        # Generate plot
+        plt = MatPlotExt()
+        plt.plot(
+            x_arrays=x_arrays,
+            y_arrays=y_arrays,
+            xlabel="Time [GPS]",
+            ylabel="Satellite",
+            y_unit="",
+            labels=labels,
+            colors=colors,
+            figure_path=figure_path,
+            options={
+                "figsize": (7, 8),
+                "marker": "s",
+                "marksersize": 10,
+                "legend_ncol": 4,
+                "legend_location": "bottom",
+                "plot_to": "file",
+                "plot_type": "scatter",
+                "tick_labelsize": ("y", 8),  # specify labelsize for y-axis
+                "title": "HAS orbit availability",
+                "xlim": [day_start, day_end],
+            },
+        )
+        # TODO: Legend has to be improved. Old configuration:
+        # figsize = (7, 10)
+        # loc="lower center",
+        # bbox_to_anchor=(0.5, -0.01),
+        # frameon=True,
+        
+        # Add figure path
+        figure_paths.append(figure_path)
+  
+    return figure_paths
+  
+
+def _plot_has_correction(
+                        dset: "Dataset",
+                        figure_dir: PosixPath,
+                        figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
+
+) -> List[PosixPath]:
+    """Plot Galileo HAS correction results
+    
+    Args:
+        dset:        A dataset containing the data.
+        figure_dir:  Figure directory.
+        figure_name: File name of figure.
+    
+    Returns:
+        List with figure path for Galileo HAS correction plots. File name includes GNSS identifier
+        (e.g. 'E', 'G') and field name, for example 'plot_field_G_age_of_ephemeris.png'.
+    """          
+    figure_paths = list()
+    
+    gnss_plt = GnssPlot(dset, figure_dir, figure_format=FIGURE_FORMAT)
+           
+    # Define fields to plot
+    fields_without_labels={"age_of_data", "iod"}
+    remove_fields = {"satellite", "signal", "status", "system", "time", "tom"}
+    fields = set(dset.fields) - remove_fields
+    
+    # Get file name suffix
+    if "delta_radial" in dset.fields:
+        suffix = "_orb"
+    elif "multiplier" in dset.fields:
+        suffix = "_clk"
+    elif "code_bias" in dset.fields:
+        suffix = "_cb"
+    elif "phase_bias" in dset.fields:
+        suffix = "_pb"
+    
+    #
+    # Plot HAS message fields 
+    #         
+    for field in fields:        
+        if field in fields_without_labels:
+            figure_paths = figure_paths + gnss_plt.plot_field(field, use_labels=False, suffix=suffix) # without satellite labels
+        else:
+            figure_paths = figure_paths + gnss_plt.plot_field(field, suffix=suffix) # with satellite labels
+            
+    return figure_paths
+
 
 
 def _plot_latency(dset: "Dataset", orbit: "Dataset", figure_dir: PosixPath)  -> List[PosixPath]:

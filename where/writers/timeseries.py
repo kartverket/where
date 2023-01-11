@@ -42,22 +42,26 @@ def add_to_full_timeseries(dset):
 
     # Add data to dset_session
     idx_fields = config.tech[WRITER].index.list
-    field_values = [["all"] + list(dset.unique(f)) for f in idx_fields]
+    field_values = []
+    for f in idx_fields:
+        dset_value = set(dset.unique(f)) # field with data in dataset
+        meta_value = set(dset.meta[f].keys()) # field without data in dataset, but is defined in meta
+        values = dset_value.union(meta_value)
+        field_values.append(["all"] + sorted(list(values)))
+    #field_values = [set("all") + set(dset.unique(f)) + set(dset.meta[f].keys()) for f in idx_fields]
     idx_values = dict(zip(idx_fields, zip(*itertools.product(*field_values))))
     # TODO: Remove combinations where filter leaves 0 observations
 
     num_obs = len(idx_values[idx_fields[0]])  # Length of any (in this case the first) field
     mean_epoch = dset.time.mean.utc
     rundate_str = dset.analysis["rundate"].strftime(config.FMT_date)
-    session = dset.vars.get("session", "")
+    session_code = dset.vars.get("session_code", "")
     status = dset.meta.get("analysis_status", "unchecked")
-    session_type = dset.meta.get("input", dict()).get("session_type", "")
-    session_code = dset.meta.get("input", dict()).get("session_code", "")
+    session_type = dset.meta.get("input", dict()).get("where_session_type", "")
 
     dset_session.num_obs = num_obs
     dset_session.add_time("time", val=[mean_epoch] * num_obs, scale=mean_epoch.scale, fmt=mean_epoch.fmt)
     dset_session.add_text("rundate", val=[rundate_str] * num_obs)
-    dset_session.add_text("session", val=[session] * num_obs)
     dset_session.add_text("status", val=[status] * num_obs)
     dset_session.add_text("session_type", val=[session_type] * num_obs)
     dset_session.add_text("session_code", val=[session_code] * num_obs)
@@ -87,7 +91,7 @@ def add_to_full_timeseries(dset):
                     rundate=dset.analysis["rundate"],
                     pipeline=dset.vars["pipeline"],
                     stage=stage,
-                    session=dset.vars["session"],
+                    session_code=dset.vars["session_code"],
                     label=dset_id,
                     id=dset.analysis["id"],
                 )
@@ -112,7 +116,7 @@ def add_to_full_timeseries(dset):
             pipeline=dset.vars["pipeline"],
             stage="timeseries",
             label=dset_id,
-            session="",
+            session_code="",
             use_options=False,
             id=dset.analysis["id"],
         )
@@ -123,14 +127,14 @@ def add_to_full_timeseries(dset):
             pipeline=dset.vars["pipeline"],
             stage="timeseries",
             label=dset_id,
-            session="",
+            session_code="",
             use_options=False,
             id=dset.analysis["id"],
         )
 
     if dset_ts.num_obs > 0:
         # Filter timeseries dataset to remove any previous data for this rundate and session
-        keep_idx = np.logical_not(dset_ts.filter(rundate=rundate_str, session=session))
+        keep_idx = np.logical_not(dset_ts.filter(rundate=rundate_str, session_code=session_code))
         dset_ts.subset(keep_idx)
 
     # Extend timeseries dataset with dset_session and write to disk
@@ -154,18 +158,18 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
             continue
         params = [f for f in names if f.startswith(field + "-")]
         param_units = [u for f, u in zip(names, units) if f.startswith(field + "-")]
-        name2 = [p.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[-1] for p in params]
+        name, name2 = _parse_params(params, idx_names)
         epochs = [n.find(":") > -1 for n in name2]
         if any(epochs):
             log.warn(f"NEQ parameter ({field}) with estimation epochs different from mid-session cannot be added to timeseries")
             continue
     
-        dim = len(np.unique(name2)) if not any([n2 in n for n2 in name2 for n in idx_names]) else 1
+        dim = len(np.unique(name2)) if name2 else 1
         shape = (num_obs, dim) if dim > 1 else num_obs
         shape_cov = (num_obs, dim, dim) if dim > 1 else num_obs
         val = np.full(shape, np.nan, dtype=float)
         val_cov = np.full(shape_cov, np.nan, dtype=float)
-        idx = np.array([any([n in p for p in params]) for n in idx_names], dtype=bool)
+        idx = np.array([any([n == p for p in name]) for n in idx_names], dtype=bool)
         mean = np.array([state for state, param in zip(x, names) if param in params]).reshape(-1, dim)
 
         if idx.any():
@@ -189,16 +193,17 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
         dset_session.add_float("neq_" + field + "_cov_", val=val_cov, unit=param_units[0])
 
     # Add solution helmert parameters to timeseries
-    section = "helmert"
+    sections = "helmert", "neq_helmert"
     fields = ["T_X", "T_Y", "T_Z", "scale", "alpha", "beta", "gamma"]
-    for field in fields:
-        try:
-            value, unit = dset.meta[section][field]
-            data = np.full(num_obs, np.nan, dtype=float)
-            data[0] = value
-            dset_session.add_float(f"{section}_{field}", val=data, unit=unit)
-        except KeyError:
-            pass
+    for section in sections:
+        for field in fields:
+            try:
+                value, unit = dset.meta[section][field]
+                data = np.full(num_obs, np.nan, dtype=float)
+                data[0] = value
+                dset_session.add_float(f"{section}_{field}", val=data, unit=unit)
+            except KeyError:
+                pass
 
 
 #
@@ -229,6 +234,18 @@ def method_statistics(dset, field, idx_values, func):
 
     return val, "add_float", None  # Todo: Can we add a unit here somehow?
 
+def method_meta_index(dset, field, idx_values, func):
+    
+    key = list(idx_values.keys()).pop()
+    names = idx_values[key]
+    num_obs = len(names)
+    val = np.full(num_obs, np.nan, dtype=float)
+    for i, n in enumerate(names):
+        if n == "all":
+            continue
+        val[i] = dset.meta[key][n].get("scheduled_obs", np.nan)
+        
+    return val, "add_float", None
 
 def method_meta(dset, field, idx_values, func):
     """Save simple meta information in timeseries
@@ -261,20 +278,22 @@ def method_state(dset, field, idx_values, func):
     idx_names = idx_values[list(idx_values.keys()).pop()]
     num_obs = len(idx_names)
     params = [f for f in dset.fields if f.startswith("state." + field + "-") and not f.endswith("_sigma")]
-    name2 = [p.split("-", maxsplit=1)[-1].rsplit("_", maxsplit=1)[-1] for p in params]
+    name, name2 = _parse_params(params, idx_names)
     epochs = [n.find(":") > -1 for n in name2]
     if any(epochs):
         log.warn(f"Parameter ({field}) with estimation epochs different from mid-session cannot be added to timeseries")
         return None, None, None
-    dim = len(np.unique(name2)) if not any([n2 in n for n2 in name2 for n in idx_names]) else 1
+    dim = len(np.unique(name2)) if name2 else 1
     val = np.full((num_obs, dim), np.nan, dtype=float)
-    idx = np.array([any([n in p for p in params]) for n in idx_names], dtype=bool)
+    idx = np.array([any([n == p for p in name]) for n in idx_names], dtype=bool)
     mean = [dset.mean(p) for p in params]
 
     if mean:
         mean = np.array(mean).reshape(-1, dim)
     else:
         return None, None, None
+
+
     if idx.any():
         val[idx] = mean
     else:
@@ -286,6 +305,30 @@ def method_state(dset, field, idx_values, func):
 
     return val, "add_float", unit
 
+def _parse_params(params, idx_names):
+    "Split the parameter name of the subparameter into two parts"
+    subparams = [p.split("-", maxsplit=1)[-1] for p in params]
+    name = []
+    name2 = []
+
+    # Parameters connected to the idx_values, e.g. station params
+    for idx_name in idx_names:
+        for param in subparams:
+            idx = param.find(idx_name)
+            if idx >= 0:
+                name.append(param[idx:idx+len(idx_name)])
+                if len(idx_name) < len(param):
+                    name2.append(param[idx+len(idx_name):])
+
+    # Parameters not connected the idx_values, e.g. global params
+    if not name:
+        name = [p.split("_", maxsplit=1)[0] for p in subparams]
+        try:
+            name2 = [p.split("_", maxsplit=1)[-1] for p in subparams]
+        except IndexError:
+            pass
+
+    return name, name2
 
 #
 # Functions

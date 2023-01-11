@@ -184,7 +184,6 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
             gnss_compare_tgd(dset)
 
         if set(dset.fields).intersection(bias_comp_def):
-            plt = GnssPlot(dset, figure_dir, figure_format=FIGURE_FORMAT)
             for figure_path in plt.plot_tgd_comparison():
                 words = figure_path.stem.split("_")
                 gnss = words[2] if words[1] == "field" else words[1]

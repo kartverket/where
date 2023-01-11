@@ -154,7 +154,6 @@ def parse_args(*param_types, doc_module=None):
         log.info(f"Start {_get_program_version(doc_module)} at {datetime.now().strftime(config.FMT_datetime)}")
         log.debug(f"Receive command line arguments [{', '.join(sys.argv[1:])}]")
         title, sources = get_configuration(cfg=get_program_name())
-        # TODO log something meaningful when session config already exists
         log.info(f"Use {title} configuration from {', '.join(sources)}")
 
     # Parse arguments

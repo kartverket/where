@@ -26,6 +26,7 @@ from where.apriori.trf import TrfFactory
 from where.data.position import Position, PositionDelta
 from where.data.time import Time
 from where.lib import config
+from where.lib import exceptions
 from where.lib import log
 from where import parsers
 
@@ -168,6 +169,10 @@ class Itrf(TrfFactory):
             if isinstance(interval_years, float):
                 interval_years = np.array([interval_years])
             pos[idx, :] = ref_pos + interval_years[idx, None] * ref_vel[None, :]
+            
+        if not pos.any():
+            # All positions are zero
+            raise exceptions.MissingDataError(f"Position for {site} is not well defined in {self}")
 
         ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
         pos_trs = Position(np.squeeze(pos), system="trs", ellipsoid=ell, time=self.time)

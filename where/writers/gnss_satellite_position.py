@@ -205,34 +205,38 @@ def gnss_satellite_position(dset: "Dataset") -> None:
     # Add date field to dataset
     if "date" not in dset.fields:
         dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime], write_level="detail")
-        
+   
     # Add fields in case of broadcast ephemeris
-    if config.tech.apriori_orbit.str == "broadcast":
-        dset.add_text(
-            "trans_time_gpsweek",
-            val=[
-                f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_transmission_time
-            ],
-            write_level="detail",
-        )
-        dset.add_text(
-            "toe_gpsweek",
-            val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_toe],
-            write_level="detail",
-        )
-        dset.add_float(
-            "diff_trans_toe",
-            val=(dset.used_transmission_time.gps.mjd - dset.used_toe.gps.mjd) * Unit.day2second,
-            unit="second", 
-            write_level="detail",
-        )
-        dset.add_float(
-            "age_of_ephemeris",
-            val=(dset.time.gps.mjd - dset.used_toe.gps.mjd) * Unit.day2second,
-            unit="second", 
-            write_level="detail",
-        )
-        
+    if "broadcast" in config.tech.apriori_orbit.list:
+        if not "trans_time_gpsweek" in dset.fields:
+            dset.add_text(
+                "trans_time_gpsweek",
+                val=[
+                    f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_transmission_time
+                ],
+                write_level="detail",
+            )
+        if not "toe_gpsweek" in dset.fields:
+            dset.add_text(
+                "toe_gpsweek",
+                val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_toe],
+                write_level="detail",
+            )
+        if not "diff_trans_toe" in dset.fields:
+            dset.add_float(
+                "diff_trans_toe",
+                val=(dset.used_transmission_time.gps.mjd - dset.used_toe.gps.mjd) * Unit.day2second,
+                unit="second", 
+                write_level="detail",
+            )
+        if not "age_of_ephemeris" in dset.fields:
+            dset.add_float(
+                "age_of_ephemeris",
+                val=(dset.time.gps.mjd - dset.used_toe.gps.mjd) * Unit.day2second,
+                unit="second", 
+                write_level="detail",
+            )
+     
     # Select fields available in Dataset
     fields = get_existing_fields(dset, FIELDS)
 

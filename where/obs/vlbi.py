@@ -20,20 +20,20 @@ pipeline = __name__.split(".")[-1]
 
 
 @plugins.register
-def write_to_dataset(dset, rundate=None, session=None, obs_format=None, **obs_args):
+def write_to_dataset(dset, rundate=None, obs_format=None, **obs_args):
     obs_format = config.tech.get("obs_format", section=pipeline, value=obs_format).str
     log.info(f"Reading observation file in {obs_format} format")
-
-    file_vars = config.create_file_vars(rundate, pipeline, session=session, **obs_args)
+    session_code = dset.vars["session_code"]
+    file_vars = config.create_file_vars(rundate, pipeline, session_code=session_code, **obs_args)
     parser = parsers.parse_key(f"vlbi_obs_{obs_format}", file_vars)
 
     if parser.data_available:
-        _write_to_dataset(parser, dset, rundate, session)
+        _write_to_dataset(parser, dset, rundate, session_code)
     else:
         raise exceptions.MissingDataError(f"No observation file in {obs_format} format found for {rundate}")
 
 
-def _write_to_dataset(parser, dset, rundate, session):
+def _write_to_dataset(parser, dset, rundate, session_code):
 
     data = parser.as_dict()
     units = data.get("meta", {}).get("units", {})
@@ -43,18 +43,13 @@ def _write_to_dataset(parser, dset, rundate, session):
     dset.meta.add("file", parser.file_path.stem, section="input")
     dset.meta.add("type", config.tech.obs_format.str.upper(), section="input")
 
-    if "meta" not in data:
-        # Only read master file if session_code is not available in data["meta"]
-        # This is to avoid a dependency to the master file which changes frequently
-        master = apriori.get("vlbi_master_schedule", rundate=rundate)
-        master_data = master.get((rundate.timetuple().tm_yday, session), {})
-        session_code = master_data.get("session_code", "")
-    else:
-        master = apriori.get("vlbi_master_schedule")
-        session_code = data["meta"].get("session_code", "")
+    master = apriori.get("vlbi_master_schedule", rundate=rundate)
+    master_data = master.get(session_code, {})
+    session_type = master_data.get("session_type", "")
 
     dset.meta.add("session_code", session_code, section="input")
-    dset.meta.add("session_type", master.session_type(session_code), section="input")
+    dset.meta.add("where_session_type", master.where_session_type(session_code), section="input")
+    dset.meta.add("session_type", session_type, section="input")
 
     log.info(f"Session code: {session_code}")
 
@@ -181,30 +176,30 @@ def _write_to_dataset(parser, dset, rundate, session):
     # Station meta
     station_keys = sorted([k for k, v in data.items() if k.startswith("sta_")])
     pos_keys = sorted([k for k, v in data.items() if k.startswith("pos_")])
-
+    dset.meta["station"] = {}
     for sta_key, pos_key in zip(station_keys, pos_keys):
         sta_name = sta_key.replace("sta_", "")
         cdp = data[sta_key]["cdp"]
         ivsname = station_codes[cdp]["name"]
         longitude, latitude, height, _ = sofa.iau_gc2gd(2, data[pos_key][0, :])  # TODO: Reference ellipsoid
 
-        dset.meta.add("cdp", cdp, section=ivsname)
-        dset.meta.add("site_id", cdp, section=ivsname)
-        dset.meta.add("domes", station_codes[cdp]["domes"], section=ivsname)
-        dset.meta.add("marker", station_codes[cdp]["marker"], section=ivsname)
-        dset.meta.add("description", station_codes[cdp]["description"], section=ivsname)
-        dset.meta.add("longitude", longitude, section=ivsname)
-        dset.meta.add("latitude", latitude, section=ivsname)
-        dset.meta.add("height", height, section=ivsname)
+        dset.meta["station"].setdefault(ivsname, {})["cdp"] = cdp
+        dset.meta["station"].setdefault(ivsname, {})["site_id"] = cdp
+        dset.meta["station"].setdefault(ivsname, {})["domes"] = station_codes[cdp]["domes"]
+        dset.meta["station"].setdefault(ivsname, {})["marker"] = station_codes[cdp]["marker"]
+        dset.meta["station"].setdefault(ivsname, {})["description"] = station_codes[cdp]["description"]
+        dset.meta["station"].setdefault(ivsname, {})["longitude"] = longitude
+        dset.meta["station"].setdefault(ivsname, {})["latitude"] = latitude
+        dset.meta["station"].setdefault(ivsname, {})["height"] = height
         if sta_name != ivsname:
-            dset.meta.add("cdp", cdp, section=sta_name)
-            dset.meta.add("site_id", cdp, section=sta_name)
-            dset.meta.add("domes", station_codes[cdp]["domes"], section=sta_name)
-            dset.meta.add("marker", station_codes[cdp]["marker"], section=sta_name)
-            dset.meta.add("description", station_codes[cdp]["description"], section=sta_name)
-            dset.meta.add("longitude", longitude, section=sta_name)
-            dset.meta.add("latitude", latitude, section=sta_name)
-            dset.meta.add("height", height, section=sta_name)
+            dset.meta["station"].setdefault(sta_name, {})["cdp"] = cdp
+            dset.meta["station"].setdefault(sta_name, {})["site_id"] = cdp
+            dset.meta["station"].setdefault(sta_name, {})["domes"] = station_codes[cdp]["domes"]
+            dset.meta["station"].setdefault(sta_name, {})["marker"] = station_codes[cdp]["marker"]
+            dset.meta["station"].setdefault(sta_name, {})["description"] = station_codes[cdp]["description"]
+            dset.meta["station"].setdefault(sta_name, {})["longitude"] = longitude
+            dset.meta["station"].setdefault(sta_name, {})["latitude"] = latitude
+            dset.meta["station"].setdefault(sta_name, {})["height"] = height
 
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish

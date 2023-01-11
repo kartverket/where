@@ -271,7 +271,13 @@ def _plot_bar_dataframe_columns(fid, figure_dir, df, field, extra_row_names=None
     # Generate bar plot
     df_color = df_reduced["type"].apply(lambda x: colors[x])
     fig_width = len(df_reduced.index) / 4 if len(df_reduced.index) > 30 else 6.4
-    ax = df_reduced[column].plot(kind="bar", color=df_color, width=0.8, figsize=(fig_width, fig_width / 1.33))
+    ax = df_reduced[column].plot(
+                    kind="bar", 
+                    color=df_color, 
+                    width=0.8, 
+                    figsize=(fig_width, fig_width / 1.33),
+                    #ylim=(0.0, 0.6),
+    )
     ax.set_xlabel("Satellite", fontsize=fontsize)
     ax.set_ylabel(f"{field.upper()} {column.upper()} [{unit}]", fontsize=fontsize)
 
@@ -544,11 +550,11 @@ def _plot_has_correction(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> Li
         )
         y_arrays.append(
                 np.stack([
-                    dset.clk_diff[idx] + dset.has_clock_correction[idx],
-                    dset.has_clock_correction[idx] + dset.pco_brdc.yaw.z[idx] - dset.bias_brdc[idx],
+                    dset.clk_diff[idx] - dset.has_clock_correction[idx],
+                    -dset.has_clock_correction[idx], 
                 ])
         )
-
+          
         plt = MatPlotExt()
         plt.plot_subplots(
             x_array=dset.time.gps.datetime[idx],
@@ -658,7 +664,11 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
         )
 
         _plot_scatter_subplots(
-            dset.time.gps.datetime[idx], subplots, figure_path, xlabel="Time [GPS]", title=f"{GNSS_NAME[sys]}"
+                    dset.time.gps.datetime[idx], 
+                    subplots, 
+                    figure_path, 
+                    xlabel="Time [GPS]", 
+                    title=f"{GNSS_NAME[sys]}",
         )
 
         fid.write(f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_path})\n")

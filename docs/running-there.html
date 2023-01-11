@@ -127,9 +127,9 @@ analysis.</p>
 <a href="https://kartverket.github.io/where/the-where-software.html#dataset">dataset</a> which contains timeseries of all
 relevant variables in the analysis. A normal use of There is to plot timeseries
 of residuals or estimation parameters, as is seen in the following screenshot:</p>
-<p><img alt="A timeseries plotted in There" src="images/there_residuals.png" /></p>
+<p><img alt="A timeseries plotted in There" src="https://kartverket.github.io/where/images/there_residuals.png" /></p>
 <p><strong>Figure:</strong> <em>A timeseries plotted in There showing the pre-fit residuals after
-  analyzing the VLBI XA-session on December 27 2016</em></p>
+  analyzing the VLBI session on December 27 2016</em></p>
 <p>However, There also has more advanced capabilities including:</p>
 <ul>
 <li>
@@ -147,6 +147,9 @@ of residuals or estimation parameters, as is seen in the following screenshot:</
 <ul>
 <li>
 <p>Identify and add clock breaks to an analysis</p>
+</li>
+<li>
+<p>Remove outliers</p>
 </li>
 <li>
 <p>Update the configuration of an analysis</p>
@@ -169,8 +172,8 @@ running on Windows.</p>
 <h3 id="opening-a-specific-analysis">Opening a specific analysis</h3>
 <p>You can also choose to open There showing a specific analysis, by using a
 command very similar to the one you used for running the analysis. For instance,
-to open an analysis of the VLBI XA-session for December 27 2016 you would do:</p>
-<pre><code>there 2016 12 27 -v --session=XA
+to open an analysis of the VLBI session for December 27 2016 you would do:</p>
+<pre><code>there 2016 12 27 -v --session_code=R1772
 </code></pre>
 <h3 id="timeseries">Timeseries</h3>
 <p>If you do not specify a specific analysis the default tab will show you the <strong>timeseries</strong> 
@@ -201,13 +204,13 @@ the analysis needs to be run again. This is done with the <em>Rerun</em> button.
 Where, you do this through the configuration.</p>
 <p>Any of the settings in <code>config/there.conf</code> can be overridden on the command line. For instance, to
 change the colormap and the marker symbol used for scatter plots, you can do:</p>
-<pre><code>there 2016 12 27 -v --session=XA --colormap=rainbow --scatter:marker=+
+<pre><code>there -v--colormap=rainbow --scatter:marker=+
 </code></pre>
 <p>There also uses
 <a href="https://kartverket.github.io/where/the-where-software.html#configuration-profile">configuration profiles</a> to
 simplify setting commonly used configuration settings. As with Where you can
 explicitly specify one or more profiles to apply on the command line:</p>
-<pre><code>there 2016 12 27 -v --session=XA --profile=projector
+<pre><code>there -v --profile=projector
 </code></pre>
 <p>The <code>projector</code> profile contains some settings that makes There better suited
 for being displayed on the lower resolution that projectors normally deliver. In

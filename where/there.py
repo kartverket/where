@@ -74,6 +74,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib import cm
 import matplotlib.dates as mdates
 from matplotlib import gridspec
+from matplotlib.widgets import RectangleSelector
 from mpl_toolkits.mplot3d import Axes3D  # noqa (Needed for projection='3d')
 import numpy as np
 
@@ -87,10 +88,11 @@ import where
 from where import pipelines
 from where import setup
 from where.data import dataset3 as dataset
-from where.data.time import Time
+from where.data.time import Time, is_time
 from where.lib import config
 from where.lib import log
 from where.lib import util
+from where.tools import delete
 
 
 PLOT_TYPES = dict()  # Dynamically set by plot_type()
@@ -142,7 +144,7 @@ def main():
             rotation=log_cfg.number_of_log_backups.int,
         )
 
-    # Use options to specify pipeline and session, include pipeline as profile
+    # Use options to specify pipeline. Include pipeline as profile
     pipeline = pipelines.get_from_options()
     config.read_pipeline(pipeline)
 
@@ -538,7 +540,9 @@ class Tab(ttk.Frame):
         if self.vars.get("traceback", False):
             cmd.append("-T")
         if self.vars["pipeline"] == "vlbi":  # TODO better solution
-            cmd.append(f"--session={self.vars['session']}")
+            cmd.append(f"--session_code={self.vars['session_code']}")
+        if self.vars.get("user", None):
+            cmd.append(f"--user={self.vars['user']}")
 
         description = f"Running {self.vars['pipeline'].upper()} analysis: {' '.join(cmd)}"
         self.master.master.run(subprocess.check_call, cmd, description=description)
@@ -606,6 +610,11 @@ class TabFigure(Tab):
         self.add_radiobuttons(tool_line, "double_click", *cfg.double_clicks.tuple)
         self.add_buttons(tool_line, self.figure, *cfg.figure_buttons.list)
         tool_line.pack(side=tk.TOP, fill=tk.X, expand=False)
+
+        # More edit operations
+        tool_line2 = ttk.Frame(self)
+        self.add_radiobuttons(tool_line2, "selector", *cfg.selectors.tuple)
+        tool_line2.pack(side=tk.TOP, fill=tk.X, expand=False)
 
         # Update figure and start automatic updates
         self.add_widget_update(self.figure, self.figure.update_plot)
@@ -776,7 +785,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 self.dataset.add_float("event_interval", event_interval)
             self.dataset.event_interval[:] = event_interval
 
-        # Observations that will not be plotted
+        # Observations that are deselected but not processed yet
         self.ignore_obs = np.zeros(self.dataset.num_obs, dtype=bool)
 
         # Update the next widget
@@ -809,10 +818,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
     @property
     def title(self):
         pipeline = self.vars["pipeline"].upper()
-        session = f" {self.vars['session']}" if self.vars.get("session") else ""
+        session_code = f" {self.vars['session_code']}" if self.vars.get("session_code") else ""
         date = f" {self.vars['date']}" if self.vars.get("date") else ""
         stage = f" - {self.vars['stage']}".title() if self.vars.get("stage") else ""
-        return f"{pipeline}{session}{date}{stage}"
+        return f"{pipeline}{session_code}{date}{stage}"
 
     @property
     def xlabel(self):
@@ -850,7 +859,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         log.debug(f"Updating the {self.vars['plot_type']}-plot")
         tooltip_fields = config.there.tooltip_fields.tuple
         idx, idx_other = self.do_filter()
-        self.figure.canvas.mpl_connect("pick_event", self.dbl_click_pick)  # TODO: Delete these?
+        self.figure.canvas.mpl_connect("pick_event", self.dbl_click_pick)
 
         # Use the registered plotting functions to plot the correct plot
         self.figure.clear()
@@ -919,9 +928,13 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         self.figure.subplots_adjust(right=0.99, top=0.95)
         self.draw()
 
-    def do_filter(self):
+    def do_filter(self, ignore_obs=True):
         filter_dict = {f: self.vars[f"filter_{f}"] for f in self.filters if self.vars[f"filter_{f}"] != "no filter"}
-        idx_data = self.dataset.filter(**filter_dict, idx=np.logical_not(self.ignore_obs))
+        if ignore_obs:
+            idx = np.logical_not(self.ignore_obs)
+        else:
+            idx = np.ones(self.dataset.num_obs)
+        idx_data = self.dataset.filter(**filter_dict, idx=idx)
         try:
             idx_other = self.other_dataset.filter(**filter_dict)
         except AttributeError:
@@ -944,6 +957,108 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 idx_finite &= np.ones(sum(idx), dtype=bool)
 
         return np.where(idx)[0][ind][idx_finite[ind]]
+
+    def selector_event(self, click_event, release_event):
+        """Event triggered when the user does a click, drag and release action on the plot
+
+        Behaviour is defined by the radio button choices "Selector". Default is to do nothing.
+        """
+        selector_func = getattr(self, f"selector_{self.vars['selector']}")
+        selector_func(click_event, release_event)
+
+    def selector_ignore_interval(self, click_event, release_event):
+        """Observations between start end epoch are marked for deletion.
+
+        May discard all observations in the interval or for one station or one baseline. 
+
+        The following content is updated in the configuration file:
+            [ignore_epochs]
+            intervals = ...
+        """
+        x_time = self.dataset[self.vars["x_axis_name"]]
+        if not is_time(x_time):
+            log.error(f"X-axis needs to a time variable to remove intervals")
+            return
+
+        station = ""
+        if "filter_station" in self.vars:
+            if self.vars["filter_station"] != "no filter":
+                station = self.vars["filter_station"]
+
+        if "filter_baseline" in self.vars:
+            if self.vars["filter_baseline"] != "no filter":
+                station = self.vars["filter_baseline"]
+
+        start = mdates.num2date(click_event.xdata).replace(tzinfo=None)
+        end = mdates.num2date(release_event.xdata).replace(tzinfo=None)
+        start_time = Time(start, fmt="datetime", scale="utc")
+        end_time = Time(end, fmt="datetime", scale="utc")
+
+        idx, _ = self.do_filter()
+        idx = np.logical_and(idx, x_time.utc.datetime > start_time.utc.datetime)
+        idx = np.logical_and(idx, x_time.utc.datetime < end_time.utc.datetime)
+        self.ignore_obs[idx] = True
+
+        interval = f"{station} {start_time:{config.FMT_datetime}} {end_time:{config.FMT_datetime}}"
+        log.info(f"Adding interval to ignore_epochs: {interval}")
+
+        # Add to config file
+        with config.update_tech_config(use_options=False, **self.vars) as cfg:
+            current = cfg.ignore_epochs.intervals.as_list(", *")
+            updated = ", ".join(sorted(current + [interval]))
+            cfg.update("ignore_epochs", "intervals", updated, source=util.get_program_name())
+
+        self.update_plot()
+
+        return False, dict()
+
+    def selector_ignore_observations(self, click_event, release_event):
+        """Observations between within the selected box are marked for deletion. 
+
+        The following content is updated in the configuration file:
+            [ignore_observation]
+            observations = ...
+        """
+        x_time = self.dataset[self.vars["x_axis_name"]]
+        if not is_time(x_time):
+            log.error(f"X-axis needs to a time variable to remove intervals")
+            return
+        y_data = self.dataset[self.vars["y_axis_name"]]
+
+        start = mdates.num2date(click_event.xdata).replace(tzinfo=None)
+        end = mdates.num2date(release_event.xdata).replace(tzinfo=None)
+        start_time = Time(start, fmt="datetime", scale="utc")
+        end_time = Time(end, fmt="datetime", scale="utc")
+
+        idx, _ = self.do_filter()
+        idx = np.logical_and(idx, x_time.utc.datetime > start_time.utc.datetime)
+        idx = np.logical_and(idx, x_time.utc.datetime < end_time.utc.datetime)
+        idx = np.logical_and(idx, y_data > click_event.ydata)
+        idx = np.logical_and(idx, y_data < release_event.ydata)
+
+        self.ignore_obs[idx] = True
+
+        station_field = "baseline" if "baseline" in self.dataset.fields else "station"
+
+        ignore_list = list()
+        for utc_iso, st in zip(x_time.utc.iso[idx], self.dataset[station_field][idx]):
+            ignore_str = f"{utc_iso} {st}"
+            log.info(f"Adding '{ignore_str}' to ignore_observation")
+            ignore_list.append(ignore_str)
+
+        # Add to config file
+        with config.update_tech_config(use_options=False, **self.vars) as cfg:
+            current = cfg.ignore_observation.observations.as_list(", *")
+            updated = ", ".join(sorted(current + ignore_list))
+            cfg.update("ignore_observation", "observations", updated, source=util.get_program_name())
+
+        self.update_plot()
+
+        return False, dict()
+
+
+    def selector_do_nothing(self, _, __):
+        pass
 
     def dbl_click_pick(self, event, mouse_event=None):
         if mouse_event is None:
@@ -1030,7 +1145,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
 
         # Figure out info about the observation that was clicked
         idx = self.event2dset(event.ind)[0]  # Use first event index
-        var_names = ["rundate", "pipeline", "id"]
+        var_names = list(set(config.there.general.dataset_variables.list) - {"stage", "label"})
         var_names += [f[7:] for f in self.vars.keys() if f.startswith("filter_")]
         analysis_vars = dict()
         for var in var_names:
@@ -1064,6 +1179,47 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         analysis_tab.select()
 
         return False, dict()
+
+    def dbl_click_delete_analysis(self, event, mouse_event):
+        if "ind" not in dir(event) or len(event.ind) == 0:
+            return False, dict()
+
+        # Figure out info about the observation that was clicked
+        idx = self.event2dset(event.ind)[0]  # Use first event index
+        var_names = list(set(config.there.general.dataset_variables.list) - {"stage", "label"})
+        var_names += [f[7:] for f in self.vars.keys() if f.startswith("filter_")]
+        analysis_vars = dict()
+        for var in var_names:
+            fvar = var[7:] if var.startswith("filter_") else var
+            if fvar in self.dataset.fields:
+                analysis_vars[var] = self.dataset[fvar][idx]
+            elif fvar in self.vars:
+                analysis_vars[var] = self.vars[fvar]
+            else:
+                print(f"Unknown fvar {fvar} in dbl_click_delete_analysis")
+
+        # Find timeseries entries related to this analysis
+        ts_vars = {k:v for k,v in analysis_vars.items() if k in self.dataset.fields}
+        del ts_vars[config.tech.timeseries.index.str]
+        session_idx = self.dataset.filter(**ts_vars)
+
+        # Prepare vars
+        analysis_vars["rundate"] = datetime.strptime(analysis_vars["rundate"], config.FMT_date)
+        analysis_vars["date"] = analysis_vars["rundate"].strftime("%Y%m%d")
+        dset_dir = config.files.path("dataset", analysis_vars).parent
+
+        answer_yes = tk.messagebox.askyesno(title="Confirmation", 
+            message= f"This will delete {dset_dir} and remove the analysis from the timeseries. Are you sure you want to continue?")
+
+        if answer_yes:
+            # Delete analysis
+            self.dataset.subset(~session_idx)
+            self.dataset.write()
+            delete.delete_analysis(**analysis_vars)
+
+        self.update_dataset()
+        return False, dict()
+
 
     def button_ignore_baseline(self):
         if "filter_baseline" not in self.vars or self.vars["filter_baseline"] == "no filter":
@@ -1109,9 +1265,10 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
     @plot_type
     def plot_scatter(self, gs=gridspec.GridSpec(1, 1)[0]):
         idx, idx_other = self.do_filter()
+        all_idx, all_idx_other = self.do_filter(ignore_obs=False)
         x_data, x_events = self._identify_events(self.vars["x_axis_data"])
         y_data, y_events = self._identify_events(self.vars["y_axis_data"])
-
+        self.selectors = []
         if x_data.ndim < 1 or y_data.ndim < 1:
             return idx, idx_other
 
@@ -1162,6 +1319,17 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
                 cmap=self.cmap,
                 picker=True,
             )
+
+            # Draw ignored obs in a different color and shape
+            i_idx = np.logical_and(self.ignore_obs, all_idx)
+            ax.scatter(x_data[i_idx][idx_x],
+                       y_data[i_idx][idx_y],
+                       c="gray",
+                       marker="+",
+                       alpha=0.5
+                       )
+
+            self.selectors.append(RectangleSelector(ax, self.selector_event, useblit=True))
 
             try:
                 x_other = self.vars.get("x_axis_other")[idx_other][idx_x]
@@ -1260,6 +1428,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         ax.clear()
 
         idx, idx_other = self.do_filter()
+        all_idx, all_idx_other = self.do_filter(ignore_obs=False)
         x_data, x_lim = self._convert_datetime_to_sec(self._project_to_1d(self.vars["x_axis_data"]))
         y_data, y_lim = self._convert_datetime_to_sec(self._project_to_1d(self.vars["y_axis_data"]))
 
@@ -1279,6 +1448,15 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             cmap=self.cmap,
             picker=True,
         )
+
+        # Draw ignored obs in a different color and shape
+        i_idx = np.logical_and(self.ignore_obs, all_idx)
+        ax.scatter(x_data[i_idx],
+                   y_data[i_idx],
+                   c="gray",
+                   marker="+",
+                   alpha=0.5
+                   )
 
         ax.set_ylim(self._pad_range(y_lim))
         ax.set_theta_zero_location("N")  # sets 0(deg) to North
@@ -1500,17 +1678,17 @@ class DD_RunDate(DropdownPicker):
 
 
 @register_dropdown
-class DD_Session(DropdownPicker):
+class DD_SessionCode(DropdownPicker):
 
-    name = "session"
-    label = "Session"
+    name = "session_code"
+    label = "Session Code"
     width = 10
 
     def read_options(self):
         """Read sessions from filenames
         """
         file_vars = {k: v for k, v in self.vars.items() if k not in ("stage", "label")}
-        sessions = config.files.glob_variable("dataset", "session", r"[_a-zA-Z0-9]*", file_vars=file_vars)
+        sessions = config.files.glob_variable("dataset", "session_code", r"[_a-zA-Z0-9]*", file_vars=file_vars)
         return sorted(sessions)
 
 

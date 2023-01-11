@@ -48,15 +48,23 @@ WriterField.__doc__ = """A convenience class for defining a output field for the
     """
 
 FIELDS = {
+    "clk_diff_dt_mean": WriterField("avg(clock)", "Epochwise satellite clock average (dB_mean)", "m"),
+    "clk_diff": WriterField("Δclock", "Satellite clock difference", "m"),
+    "clk_diff_with_dt_mean": WriterField("Δclock (mean)", "Satellite clock difference (dH_mean)", "m"),
     "delay.gnss_ionosphere": WriterField("Delay", "Ionosphere delay", "m"),
     "delay.gnss_range": WriterField("Range", "Range between satellite and receiver", "m"),
     "delay.gnss_satellite_clock": WriterField("Clock", "Satellite clock correction", "m"),
     "delay.gnss_total_group_delay": WriterField("TGD", "Total group delay", "m"),
+    "dradial": WriterField("Δradial", "Orbit difference - radial", "m"),
     "gdop": WriterField("GDOP", "Geometric dilution of precision", ""),
     "hdop": WriterField("HDOP", "Horizontal dilution of precision", ""),
     "num_satellite_available": WriterField("#satellites", "Number of available satellites", ""),
     "num_satellite_used": WriterField("#satellites", "Number of used satellites", ""),
     "pdop": WriterField("PDOP", "Position dilution of precision", ""),
+    "orb_diff_3d": WriterField("3D orbit error", "3D orbit error", "m"),
+    "orb_diff_x": WriterField("X", "Orbit difference - X", "m"),
+    "orb_diff_y": WriterField("Y", "Orbit difference - Y", "m"),
+    "orb_diff_z": WriterField("Z", "Orbit difference - Z", "m"),
     "residual": WriterField("Residual", "Residual", "m"),
     "sat_pos_x": WriterField("X", "Satellite position", "m"),
     "sat_pos_y": WriterField("Y", "Satellite position", "m"),
@@ -64,6 +72,7 @@ FIELDS = {
     "sat_vel_x": WriterField("VX", "Satellite velocity", "m/s"),
     "sat_vel_y": WriterField("VY", "Satellite velocity", "m/s"),
     "sat_vel_z": WriterField("VZ", "Satellite velocity", "m/s"),
+    "sisre": WriterField("SISE", "Signal-in-space ranging error (URE_Av_mean)", "m"),
     "site_pos_vs_ref_east": WriterField("East", "Site position vs. reference position", "m"),
     "site_pos_vs_ref_north": WriterField("North", "Site position vs. reference position", "m"),
     "site_pos_vs_ref_up": WriterField("Up", "Site position vs. reference position", "m"),
@@ -76,6 +85,7 @@ FIELDS = {
     "site_vel_east": WriterField("East", "Site velocity", "m/s"),
     "site_vel_north": WriterField("North", "Site velocity", "m/s"),
     "site_vel_up": WriterField("Up", "Site velocity", "m/s"),
+    "sqrt_a2_c2": WriterField("SQRT(Δa^2 + Δc^2)", "Orbit difference (dAC)", "m"),
     "tdop": WriterField("TDOP", "Time dilution of precision", ""),
     "troposphere_dT": WriterField("Delay", "Tropospheric delay", "m"),
     "used_iode": WriterField("IODE", "Issue of ephemeris data", ""),
@@ -170,17 +180,23 @@ def _plot(
     for field in common_fields:
         ylabel = FIELDS[field].label if field in FIELDS.keys() else field.lower()
         title = FIELDS[field].title if field in FIELDS.keys() else ""
-        unit = Unit(FIELDS[field].unit).units if field in FIELDS.keys() else Unit(dset1.unit(field)[0]).units
+        if field in FIELDS.keys():
+            unit = f"{Unit(FIELDS[field].unit).units:~P}"
+        else:
+            if dset1.unit(field):
+                unit = f"{Unit(dset1.unit(field)[0]).units:~P}"
+            else:
+                unit = ""
         options = _set_plot_config(title=title)
 
         plt = MatPlotExt()
-        plt.plot_subplots((
+        plt.plot_subplots(
             x_array=dset1.time.gps.datetime,
             y_arrays=[dset1[field], dset2[field], ddiff[field]],
             xlabel="Time [GPS]",
             ylabels=[f"{dset1_name} {ylabel}", f"{dset2_name} {ylabel}", f"Difference: {ylabel}"],
             colors=["steelblue", "darkorange", "limegreen"],
-            y_units=[f"{unit:~P}", f"{unit:~P}", f"{unit:~P}"],
+            y_units=[unit, unit, unit],
             figure_path=figure_dir / f"plot_{field}.{FIGURE_FORMAT}",
             options=options,
         )
@@ -211,8 +227,14 @@ def _decimate_datasets(dset1: "Dataset", dset2: "Dataset", decimate_by: List[str
     # Get common dataset data
     dset1_index_data = [dset1[n.strip()] for n in decimate_by]
     dset2_index_data = [dset2[n.strip()] for n in decimate_by]
-    A = np.rec.fromarrays(dset1_index_data)
-    B = np.rec.fromarrays(dset2_index_data)
+    # intersect1d does not like to compare unicode strings of different lengths
+    # use object as dtype for all fields to avoid the problem
+    dtype_dset1 = ",".join("O"*len(dset1_index_data))
+    dtype_dset2 = ",".join("O"*len(dset2_index_data))
+
+    A = np.rec.fromarrays(dset1_index_data, dtype=dtype_dset1)
+    B = np.rec.fromarrays(dset2_index_data, dtype=dtype_dset2)
+        
     common, dset1_idx, dset2_idx = np.intersect1d(A, B, return_indices=True)
     
     keep_idx1[dset1_idx] = True
@@ -320,6 +342,21 @@ def _get_common_fields(dset1: "Dataset", dset2: "Dataset") -> Set[str]:
 
         remove_fields.add("sat_posvel")
         common_fields.update(("sat_pos_x", "sat_pos_y", "sat_pos_z", "sat_vel_x", "sat_vel_y", "sat_vel_z"))
+        
+    if "orb_diff" in common_fields:
+        
+        dset1.add_float("orb_diff_x", val=dset1.orb_diff.pos.trs.x)
+        dset1.add_float("orb_diff_y", val=dset1.orb_diff.pos.trs.y)
+        dset1.add_float("orb_diff_z", val=dset1.orb_diff.pos.trs.z)
+        del dset1.orb_diff
+
+        dset2.add_float("orb_diff_x", val=dset2.orb_diff.pos.trs.x)
+        dset2.add_float("orb_diff_y", val=dset2.orb_diff.pos.trs.y)
+        dset2.add_float("orb_diff_z", val=dset2.orb_diff.pos.trs.z)
+        del dset2.orb_diff
+
+        remove_fields.add("orb_diff")
+        common_fields.update(("orb_diff_x", "orb_diff_y", "orb_diff_z"))
 
     # Remove unnecessary fields
     common_fields -= remove_fields

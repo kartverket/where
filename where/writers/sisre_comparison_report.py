@@ -206,7 +206,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
 
     """
     df = pd.DataFrame()
-    signal_types = list()
+    column_names = list()
     df_month_perc_rms = None
     df_month_rms = None
 
@@ -216,10 +216,13 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
             log.warn(f"Dataset '{name}' is empty.")
             continue
 
-        signal_type = _get_signal_type(dset.meta)
-        signal_types.append(signal_type)
+        if "has" in dset.vars["id"] or "os" in dset.vars["id"]:
+            column_name = "HAS" if "has" in dset.vars["id"] else "OS"
+        else:
+            column_name = _get_signal_type(dset.meta)
+        column_names.append(column_name)
         df_tmp = dset.as_dataframe(fields=["satellite", "system", "sisre", "time.gps"])  # , index="time.gps")
-        df_tmp = df_tmp.rename(columns={"sisre": signal_type})
+        df_tmp = df_tmp.rename(columns={"sisre": column_name})
 
         if df.empty:
             df = df_tmp
@@ -242,16 +245,16 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
     # NOTE: Following solutions assumes that SISRE solution in dataframe 'df' is only given for one GNSS
     if len(set(df["system"])) == 1:
         epochs = sorted(set(df["time_gps"]))
-        df_tmp = pd.DataFrame(index=epochs, columns=signal_types)
+        df_tmp = pd.DataFrame(index=epochs, columns=column_names)
 
-        ## Loop over observation epochs
+        # Loop over observation epochs
         for epoch in epochs:
             idx = df["time_gps"] == epoch
             row = dict()
 
             # Determine RMS for each signal type over all given SISRE satellite solutions in each epoch
-            for signal_type in signal_types:
-                row[signal_type] = np.sqrt(np.nanmean(np.square(df[signal_type][idx])))
+            for name in column_names:
+                row[name] = np.sqrt(np.nanmean(np.square(df[name][idx])))
             df_tmp.loc[epoch] = pd.Series(row)
 
         df_month_perc_rms = df_tmp.resample("M").apply(lambda x: np.nanpercentile(list(x), q=95))

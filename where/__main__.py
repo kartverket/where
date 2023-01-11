@@ -3,7 +3,7 @@
 
 Usage:
 
-    {exe} <date> <pipeline> [--session=<session>] [options]
+    {exe} <date> <pipeline> [options]
 
 The program requires a date. Typically, the date is given in the format
 `<year month day>` (for example 2015 8 4). However, it is also possible to
@@ -35,7 +35,7 @@ Option               Description
                      same analysis simultaneously).
 --profile=name       Use config settings specfied for a given profile, for
                      instance --profile=vascc for a VLBI analysis.
---session=session    Run analysis for the given session.
+--session_code=session_code    Run analysis for the given session.
 --station=station    Run analysis for the given station. This is only valid for
                      GNSS, GNSS_OBS and GNSS_VEL pipeline.
 --user=username      Run as username. Does not need to be an existing username
@@ -65,7 +65,7 @@ Here are some concrete examples of how to run Where:
 
 Run a VLBI analysis for August 4 2015:
 
-    {exe} 2015 8 4 -v --session=XA
+    {exe} 2015 8 4 -v --session_code=r1669
 
 Run an SLR analysis for September 1 2015 using day-of-year:
 

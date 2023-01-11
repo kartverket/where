@@ -122,9 +122,10 @@ Where            </a>
 <p>To do an analysis with Where you only need to specify which analysis
 <a href="https://kartverket.github.io/where/the-where-software.html#pipeline"><strong>pipeline</strong></a> you want to run
 (i.e. VLBI), as well as the <strong>date</strong> and any pipeline specific options. 
-For VLBI analysis you need to specify <strong>session</strong>.  The most
-basic Where command looks something like</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA
+For VLBI analysis you need to specify <strong>session_code</strong>. See the 
+<a href="https://ivscc.gsfc.nasa.gov/program/index.html">IVS observing program</a> 
+to find possible session codes. A basic Where command for VLBI is</p>
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772
 </code></pre>
 <p>This command can be extended by setting any of the many configuration options
 available for an analysis. Some of these will be described below. You can also
@@ -142,61 +143,59 @@ in detail how the analysis is performed, including</p>
 default configuration is used.</p>
 <p>By using the <code>-E</code> or <code>--edit</code> option open the configuration in your
 standard editor and change it:</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA -E
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772 -E
 </code></pre>
 <p>When you are happy with the configuration, save and close the configuration file the analysis will be executed.</p>
 <h3 id="other-useful-options">Other useful options</h3>
 <p>If you want to delete a configuration (and any analysis done) you can use the
 <code>-D</code> or <code>--delete</code> option:</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA -D
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772 -D
 </code></pre>
 <p>To reset the configuration without deleting any of the previous analysis done,
 use the <code>-N</code> or <code>--new</code> option:</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA -N
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772 -N
 </code></pre>
 <p>The same option can be combined with the delete option, to
 immediately start a new configuration:</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA -D -N
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772 -D -N
 </code></pre>
 <p>Where tries to skip stages that have previously been processed and where none of the dependencies for
 that stage has changed. This behaviour can be overridden using the <code>-F</code> or <code>--force</code> option.</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA --F
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772 --F
 </code></pre>
 <p>Then all stages will be reprocessed using the existing configuration.</p>
 <h3 id="configuration-profiles">Configuration profiles</h3>
 <p>The default configuration for VLBI is tuned for analyzing R1/R4 sessions. To
 make it easy to analyze other kinds of sessions you can create profiles. This is done by appending <code>__&lt;profilename&gt;</code>
-to the configuration parameter that you want to change. There are incomplete profiles created for intensive sessions
-and VGOS sessions. These do not work fully yet, but they illustrate the idea behind profiles. Example on use:</p>
-<pre><code>where 2019 4 1 -v --session=VG --profile=vgos
+to the configuration parameter that you want to change. There are example profiles created for intensive sessions
+and VGOS sessions. Example on use:</p>
+<pre><code>where 2020 1 9 -v --session_code=VO0009 --profile=vgos
 </code></pre>
 <h2 id="comparative-analysis">Comparative analysis</h2>
 <p>If you want to do several analyses of the same session (for instance to compare
 different models etc), you need to mark the analysis with their own <strong>ids</strong>. For
 instance,</p>
-<pre><code>where 2016 12 27 --vlbi --session=XA --elevation:cut_off=0 --id=zero
-where 2016 12 27 --vlbi --session=XA --elevation:cut_off=3 --id=three
+<pre><code>where 2016 12 27 --vlbi --session_code=R1772 --elevation:cut_off=0 --id=zero
+where 2016 12 27 --vlbi --session_code=R1772 --elevation:cut_off=3 --id=three
 </code></pre>
 <p>This will run two Where analyses with different elevation cut-offs, stored with
 the ids of <code>zero</code> and <code>three</code>.</p>
 <h2 id="running-many-analyses">Running many analyses</h2>
 <p>To analyze many sessions at once, use the <code>where_runner</code> tool. It has the same
-form as the regular <code>where</code> command, except that it needs to dates: The start
+form as the regular <code>where</code> command, except that it needs two dates: The start
 date and end date of the analysis (both inclusive).</p>
 <pre><code>where_runner 2016 1 1 2016 12 31 --vlbi
 </code></pre>
-<p>The <code>where_runner</code> command does not need a <code>--session</code> option. It will run all
+<p>The <code>where_runner</code> command does not need a <code>--session_code</code> option. It will run all
 kinds of sessions that it finds. If you want to specify that only one or a few
 types of sessions should be analyzed, you can still list them with the
-<code>--session</code> option:</p>
-<pre><code>where_runner 2016 1 1 2016 12 31 --vlbi --session=XA,XE
-</code></pre>
-<p>The <code>where_runner</code> command also accept an addition option called <code>--session_type</code>. By setting:</p>
+<code>--session_types</code> option:</p>
 <pre><code>where_runner 2016 1 1 2016 12 31 --vlbi --session_type=R,CONT
 </code></pre>
-<p>Where will run all sessions that are of type R1/R4 and CONT and skip all other session types it finds. Session type
- means the first
- part of the session code that consist of letters (and not numbers). Meaning a session with code <strong>R1881</strong>
+<p>In this example, Where will run all sessions that are of type R1/R4 and CONT and skip all other session types 
+it finds. Session type
+in this context is a Where specific definition that refers to the first
+part of the session code that consist of letters (and not numbers). Meaning a session with code <strong>R1881</strong> 
 will have type <em>R</em> and a session with code <strong>AOV031</strong> will have type <em>AOV</em>.</p>
             </div>
             <!-- /.entry-content -->

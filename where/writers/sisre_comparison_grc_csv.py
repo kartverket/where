@@ -62,7 +62,7 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
     #   Open Service,Ranging Domain,SDD-OS-0013 SIS Ranging Accuracy per Satellite over Month,FOC,E02,GSAT211,A06,,,OS,Single,E1,7,m,21-Jul,0.29602410930897965
     #
     with open(file_path, "w") as csvfile:
-        writer = csv.writer(csvfile, delimiter=",")
+        writer = csv.writer(csvfile, delimiter=";")
 
         log.info(f"Write file {file_path}.")
 

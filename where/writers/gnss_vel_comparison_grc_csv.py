@@ -60,7 +60,7 @@ def gnss_vel_comparison_grc_csv(dset: "Dataset") -> None:
     #   Open Service,Position Domain,FOM-OS-0021 3D Velocity Service Accuracy per Station over Month,,,,,Honningsvåg (Norway),hons,OS,Single,E1,,m/s,July-2021,0.04110985838629842
     #
     with open(file_path, "w") as csvfile:
-        writer = csv.writer(csvfile, delimiter=",")
+        writer = csv.writer(csvfile, delimiter=";")
 
         log.info(f"Write file {file_path}.")
 

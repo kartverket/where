@@ -7,7 +7,7 @@ Description:
 """
 import re
 from collections import UserDict, defaultdict
-from datetime import datetime
+from datetime import date
 
 # Midgard imports
 from midgard.dev import plugins
@@ -52,8 +52,8 @@ class VlbiMasterSchedule(UserDict):
         Returns:
             Dict:  Dummy information, blank strings for all fields.
         """
-        doy, session = key
-        log.warn(f"Session {session!r} not found in master file for {self.year} doy {doy}")
+        session_code = key
+        log.warn(f"Session {session_code!r} not found in master file for {self.year}")
 
         return defaultdict(default_factory="")
 
@@ -70,40 +70,57 @@ class VlbiMasterSchedule(UserDict):
         doy = date.timetuple().tm_yday
         if session_types:
             # Filter on session types in addition to date
+            # Convert all given session types to upper case to make a case insensitive comparison
+            session_types = [st.upper() for st in session_types]
             return [
-                s
-                for ((d, s), v) in self.data.items()
-                if d == doy and self.session_type(v["session_code"]) in session_types
+                sc
+                for (sc, v) in self.data.items()
+                if v["doy"] == doy and self.where_session_type(sc).upper() in session_types
             ]
-        return [s for d, s in self.data.keys() if d == doy]
+        return [sc for sc, v in self.data.items() if v["doy"] == doy]
 
-    def ready(self, date, session):
-        # Avoid using %b, %-m and %-d in strptime. Platform specific and weird locale behaviour
-        months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
-        key = (date.timetuple().tm_yday, session)
-        status = self.data[key]["status"].strip()
-        if not status:
-            # Status information might be missing
-            return True
-        try:
-            yy = int(status[0:2])
-            century = 2000 if yy < 50 else 1900
-            yyyy = str(yy + century)
-            MMM = status[2:5]
-            dd = status[5:7]
-            mm = str(months.index(MMM) + 1).zfill(2)
-            datetime.strptime(f"{yyyy}{mm}{dd}", "%Y%m%d")
-            # Assumption: successful parsing of status field as date means it's ready for processing
-            return True
-        except (IndexError, ValueError):
-            return False
+    def ready(self, session_code):
+        """Returns True if a session is marked as submitted in the master file
 
-    def status(self, date, session):
-        key = (date.timetuple().tm_yday, session)
-        return self.data[key]["status"]
+        Also returns True if information is missing. A session may be ready be processed even if
+        it is not ready. Example: A preliminary database is released while waiting for data from 
+        a station.
+        """
+        status = self.data[session_code]["status"]
+        is_date = isinstance(status, date)
+        if is_date:
+            # If the status field is a date the session is ready
+            return is_date
+
+        is_str = isinstance(status, str)
+        if is_str:
+            # Return True for empty string (information is missing), otherwise False
+            return not bool(status.strip())
+        return False
+
+    def status(self, session_code):
+        return self.data[session_code]["status"]
 
     @staticmethod
-    def session_type(session_code):
+    def where_session_type(session_code):
+        """Returns custom defintion of session type for a session.
+
+        The custom definition of session type is different from the official definition of session type
+        available in version 2 of the master file format. The custom definition is needed as long as offical
+        historical master files are not converted to version 2.
+
+        The custom session type is defined as as all letter in the session code until the first digit is
+        encountered. The letters are converted to uppercase.
+
+        Example: Session code: R11000, Session type: R
+
+        Args:
+            session_code     Session code as defined in the master file
+
+        Returns:
+            The custom defined session type
+        """
+        session_code = session_code.upper()
         reg_hits = re.search("\d", session_code)
         num_idx = reg_hits.start() if reg_hits else len(session_code)
         return session_code[:num_idx]

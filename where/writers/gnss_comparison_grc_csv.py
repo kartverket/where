@@ -59,7 +59,7 @@ def gnss_comparison_grc_csv(dset: "Dataset") -> None:
     #   Open Service,Position Domain,FOM-OS-0016 Vertical Positioning Service Accuracy per Station over Month,,,,,Ny Alesund (Norway),nabd,OS,Single,E1,15,m,July-2021,2.8155215806884515
     #
     with open(file_path, "w") as csvfile:
-        writer = csv.writer(csvfile, delimiter=",")
+        writer = csv.writer(csvfile, delimiter=";")
 
         log.info(f"Write file {file_path}.")
 

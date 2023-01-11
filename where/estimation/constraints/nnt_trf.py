@@ -25,7 +25,7 @@ def nnt_trf(dset, param_names):
         if "_site_pos-" not in column:
             continue
         station = column.split("-", maxsplit=1)[-1].split("_")[0]
-        site_id = dset.meta[station]["site_id"]
+        site_id = dset.meta["station"][station]["site_id"]
         if site_id in trf:
             # x0, y0, z0 = trf[site_id].pos.trs
             if column.endswith("_x"):

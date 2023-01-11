@@ -29,7 +29,6 @@ Option               Description
 --doy                Specify date as <year day-of-year>.
 --label=             Dataset label (Default: 'last').
 --id=                Analysis identifier (Default: '').
---session=           Session name (Default: '').
 --station=           Station name (Default: '').
 -h, --help           Show this help message and exit.
 ===================  ===========================================================
@@ -68,14 +67,13 @@ def write(rundate: "datedoy", pipeline: "pipeline", stage: "option", writers: "o
     label = util.read_option_value("--label", default="None")
     # TODO: label = "last" if label == "last" else label
     id_ = util.read_option_value("--id", default="")
-    session = util.read_option_value("--session", default="")
     station = util.read_option_value("--station", default="")
     writers = writers.replace(",", " ").split()
 
     # Update configuration of Where analysis
     config.where.update_from_options(_clean_sys_argv(pipeline))
 
-    dset_vars = dict(pipeline=pipeline, stage=stage, session=session, station=station, label=label, id=id_)
+    dset_vars = dict(pipeline=pipeline, stage=stage, station=station, label=label, id=id_)
 
     try:
         dset = dataset.Dataset.read(**dict(dset_vars, rundate=rundate))
@@ -96,5 +94,5 @@ def write(rundate: "datedoy", pipeline: "pipeline", stage: "option", writers: "o
 def _clean_sys_argv(pipeline: str) -> List[str]:
     """Values in sys.argv that are not valid option values in Where
     """
-    reserved_opts = {pipeline, "label", "id", "session", "stage", "station", "writers"}
+    reserved_opts = {pipeline, "label", "id", "stage", "station", "writers"}
     return [o for o in sys.argv[1:] if o.startswith("--") and o[2:].split("=")[0] not in reserved_opts]

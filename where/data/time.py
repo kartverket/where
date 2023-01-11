@@ -11,7 +11,7 @@ import numpy as np
 
 # Midgard imports
 from midgard.data import _time as mg_time
-from midgard.data.time import Time, TimeDelta  # noqa
+from midgard.data.time import Time, TimeDelta, is_time, is_timedelta  # noqa
 from midgard.math.constant import constant
 from midgard.math.unit import Unit
 

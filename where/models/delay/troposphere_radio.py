@@ -1325,7 +1325,7 @@ def vmf1_gridded_zenith_wet_delay(latitude, longitude, height, time):
         # Zenith Wet delay. Eq. (5) in Kouba :cite:`kouba2007`
         zwd = grid_zwd * np.exp(-(height - grid_height) / 2000)
     except KeyError:
-        zwd = np.full(num_obs, fill_value=np.nan)
+        zwd = np.full(len(time), fill_value=np.nan)
 
     return zwd
 

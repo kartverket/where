@@ -219,7 +219,7 @@ inside your home directory. Feel free to change these according to your taste.</
 <h2 id="obtaining-data-files">Obtaining data files</h2>
 <p>Where has functionality for automatically downloading the data files that it
 needs when it is running.</p>
-<p>You should however download the observation files you want to analyse
+<p>You should however download the observation files you want to analyze
 separately. In the example below we assume that you specified the <code>data</code>
 directory to be <code>~/where_data/</code>. Change the path if you specified a different
 <code>data</code> directory above:</p>
@@ -230,10 +230,9 @@ cd ~/where_data/vlbi/obs/vgosdb/2018
 wget https://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/vgosdb/2018/18JAN02XA.tgz
 tar -xvf 18JAN02XA.tgz
 </code></pre>
-<p>You can then analyse this file by running:</p>
-<pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=vgosdb
+<p>You can then analyze this file by running:</p>
+<pre><code>where 2018 1 2 --vlbi --session_code=R1823
 </code></pre>
-<p><code>vgosdb</code> is the default format if <code>--obs_format</code> is not specified.</p>
 <h3 id="analyzing-ngs-format">Analyzing NGS Format</h3>
 <blockquote>
 <p><strong>Note:</strong> New NGS files are no longer produced and the recommended file format for observations files is vgosDB.</p>
@@ -243,8 +242,8 @@ tar -xvf 18JAN02XA.tgz
 cd ~/where_data/vlbi/obs/ngs/2018 
 wget https://cddis.gsfc.nasa.gov/pub/vlbi/ivsdata/ngs/2018/18JAN02XA_N004.gz
 </code></pre>
-<p>You can then analyse this file by running:</p>
-<pre><code>where 2018 1 2 --vlbi --session=XA --obs_format=ngs
+<p>You can then analyze this file by running:</p>
+<pre><code>where 2018 1 2 --vlbi --session_code=R1823 --obs_format=ngs
 </code></pre>
 <h3 id="other-files">Other files</h3>
 <p>Where will automatically try to download a version of all other files needed to do an analysis. This is to facilitate 

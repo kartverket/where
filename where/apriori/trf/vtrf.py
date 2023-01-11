@@ -13,6 +13,7 @@ References:
 
 
 """
+from datetime import datetime
 
 # External library imports
 import numpy as np
@@ -27,6 +28,7 @@ from where.data.position import Position
 from where.data.time import Time
 from where.apriori import trf
 from where.lib import config
+from where.lib import exceptions
 from where.lib import log
 from where import parsers
 
@@ -103,7 +105,16 @@ class Vtrf(trf.TrfFactory):
         Returns:
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
-        return parsers.parse_file("trf_snx", file_path=self.file_paths["snx"]).as_dict()
+        data = parsers.parse_file("trf_snx", file_path=self.file_paths["snx"]).as_dict()
+
+        for site_key, site_dict in data.items():
+            min_soln = min(site_dict["pos_vel"].keys())
+            max_soln = max(site_dict["pos_vel"].keys())
+            # Change start and end time for first and last solution to allow extrapolation
+            site_dict["pos_vel"][min_soln]["start"] = datetime.min
+            site_dict["pos_vel"][max_soln]["end"] = datetime.max
+
+        return data
 
     def _calculate_pos_trs(self, site):
         """Calculate positions for the given time epochs
@@ -132,6 +143,10 @@ class Vtrf(trf.TrfFactory):
             if isinstance(interval_years, float):
                 interval_years = np.array([interval_years])
             pos[idx, :] = ref_pos + interval_years[idx, None] * ref_vel[None, :]
+
+        if not pos.any():
+            # All positions are zero
+            raise exceptions.MissingDataError(f"Position for {site} is not well defined in {self}")
 
         ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
         pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)

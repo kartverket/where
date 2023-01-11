@@ -82,7 +82,7 @@ def thermal_deformation_station(dset, temp_funcs):
     cos_d = np.cos(dset.src_dir.declination)
 
     for ivsname in dset.unique("ivsname"):
-        site_id = dset.meta[ivsname]["site_id"] if ivsname in dset.meta else ""
+        site_id = dset.meta["station"][ivsname]["site_id"] if ivsname in dset.meta else ""
         if ivsname not in antenna_info:
             log.warn(f"Missing antenna specifications for ivsname {ivsname!r} ({site_id}). Thermal deformation correction set to zero")
             continue
@@ -169,7 +169,7 @@ def calculate_temperature_functions(dset):
     temperature_funcs = dict()
     for ivsname in dset.unique("ivsname"):
         try:
-            site_id = dset.meta[ivsname]["site_id"]
+            site_id = dset.meta["station"][ivsname]["site_id"]
         except KeyError:
             site_id = ""
 

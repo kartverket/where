@@ -51,10 +51,10 @@ class Trf(collections.UserDict):
             try:
                 site = factory.site(key)
                 break  # Use site from this factory if it is found
-            except exceptions.UnknownSiteError:
+            except (exceptions.UnknownSiteError, exceptions.MissingDataError):
                 continue  # If site is not in factory, continue to next factory
-        else:  # Exit if site is not found in any factories
-            log.fatal(f"Site {key} not found in the reference frames {', '.join(self.reference_frames)}")
+        else:
+            raise KeyError(f"Site {key} not found in the reference frames {', '.join(self.reference_frames)} for epoch(s) {self.time}")
 
         # Add site to cache
         self.data[key] = site

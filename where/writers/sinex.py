@@ -28,7 +28,7 @@ WRITER = __name__.split(".")[-1]
 
 @plugins.register
 def write_sinex(dset):
-    """Write normal equations of session solution in SINEX format.
+    """Write normal equations of solution in SINEX format.
 
     Args:
         dset:  Dataset, data for a model run.

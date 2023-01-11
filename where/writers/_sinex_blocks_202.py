@@ -61,7 +61,7 @@ class SinexBlocks:
     def _create_state_vector(self):
         stations = self.dset.unique("station")
         parameters = self.dset.meta["normal equation"]["names"]
-        self.ids = {sta: self.dset.meta[sta].get("site_id", "----") for sta in stations}
+        self.ids = {sta: self.dset.meta["station"][sta].get("site_id", "----") for sta in stations}
         try:
             sources1 = set(self.dset.unique("source"))
             sources2 = {param[13:].rsplit("_", maxsplit=1)[0] for param in parameters if param.startswith("vlbi_src_dir")}
@@ -246,13 +246,13 @@ class SinexBlocks:
         self.fid.write("+SITE/ID\n")
         self.fid.write("*Code PT Domes____ T Station description___ Approx_lon_ Approx_lat_ App_h__\n")
         for sta in self.dset.unique("station"):
-            site_id = self.dset.meta[sta]["site_id"]
-            domes = self.dset.meta[sta]["domes"]
-            marker = self.dset.meta[sta]["marker"]
-            height = self.dset.meta[sta]["height"]
-            description = self.dset.meta[sta]["description"][0:22]
-            long_deg, long_min, long_sec = Unit.rad_to_dms(self.dset.meta[sta]["longitude"])
-            lat_deg, lat_min, lat_sec = Unit.rad_to_dms(self.dset.meta[sta]["latitude"])
+            site_id = self.dset.meta["station"][sta]["site_id"]
+            domes = self.dset.meta["station"][sta]["domes"]
+            marker = self.dset.meta["station"][sta]["marker"]
+            height = self.dset.meta["station"][sta]["height"]
+            description = self.dset.meta["station"][sta]["description"][0:22]
+            long_deg, long_min, long_sec = Unit.rad_to_dms(self.dset.meta["station"][sta]["longitude"])
+            lat_deg, lat_min, lat_sec = Unit.rad_to_dms(self.dset.meta["station"][sta]["latitude"])
 
             self.fid.write(
                 " {} {:>2} {:5}{:4} {:1} {:<22} {:>3.0f} {:>2.0f} {:4.1f} {:>3.0f} {:>2.0f} {:4.1f} {:7.1f}"
@@ -311,7 +311,7 @@ class SinexBlocks:
         self.fid.write("+SITE/ECCENTRICITY\n")
         self.fid.write("*Code PT SBIN T Data_Start__ Data_End____ typ Apr --> Benchmark (m)_____\n")
         for sta in self.dset.unique("station"):
-            site_id = self.dset.meta[sta]["site_id"]
+            site_id = self.dset.meta["station"][sta]["site_id"]
 
             self.fid.write(
                 " {:4} {:>2} {:>4} {:1} {:12} {:12} {:3} {: 8.4f} {: 8.4f} {: 8.4f}\n"

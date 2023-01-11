@@ -49,8 +49,8 @@ def get_crf(time, celestial_reference_frames=None):
     looked up in the vlbi_obs-reference frame instead.
 
     Args:
+        time (Time):                Time epochs for which to calculate the reference frame.
         celestial_reference_frames (String):  Optional specification of which reference frames to use (see above).
-        session (String)                   :  Two letter code to identify session specific apriori sources
 
     Returns:
         Crf: Reference frame object.

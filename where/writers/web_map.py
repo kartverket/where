@@ -40,8 +40,8 @@ def read_site_latlons(dset):
     sites = dict()
     for station in dset.unique("station"):
         sites[station] = (
-            dset.meta[station]["latitude"] * Unit.rad2deg,
-            dset.meta[station]["longitude"] * Unit.rad2deg,
+            dset.meta["station"][station]["latitude"] * Unit.rad2deg,
+            dset.meta["station"][station]["longitude"] * Unit.rad2deg,
         )
     return sites
 

@@ -20,7 +20,7 @@ The configuration is split into four parts:
 - `files`    - Information about the files Where knows about. Read from `files.conf`.
 - `where`    - Main configuration of Where. Read from `where.conf` and `where_local.conf`.
 - `analysis` - Information about the running program. Mainly based on command line input.
-- `session`  - Configuration of the current analysis. Copied from the `where` configuration and stored in the work dir.
+
 
 Each of these are further split into sections, and each section consists of `key=value`-pairs. To read a configuration
 entry, use `config.part.section.key`, for instance `config.where.path.work` reads the key `work` in the `path`-section

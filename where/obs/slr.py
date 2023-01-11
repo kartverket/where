@@ -126,14 +126,14 @@ def _write_to_dataset(parser1, parser2, dset, rundate):
         cdp = obs_data[sta_key]["cdp"]
         dset.meta.add(sta_name, "site_id", cdp)
         longitude, latitude, height, _ = sofa.iau_gc2gd(2, obs_data[pos_key][0, :])  # TODO: Reference ellipsoid
-        dset.meta.add("cdp", cdp, section=sta_name)
-        dset.meta.add("site_id", cdp, section=sta_name)
-        dset.meta.add("domes", obs_data[sta_key]["domes"], section=sta_name)
-        dset.meta.add("marker", " ", section=sta_name)
-        dset.meta.add("description", " ", section=sta_name)
-        dset.meta.add("longitude", longitude, section=sta_name)
-        dset.meta.add("latitude", latitude, section=sta_name)
-        dset.meta.add("height", height, section=sta_name)
+        dset.meta["station"].setdefault(sta_name, {})["cdp"] = cdp
+        dset.meta["station"].setdefault(sta_name, {})["site_id"] = cdp
+        dset.meta["station"].setdefault(sta_name, {})["domes"] = obs_data[sta_key]["domes"]
+        dset.meta["station"].setdefault(sta_name, {})["marker"] = " "
+        dset.meta["station"].setdefault(sta_name, {})["description"] = " "
+        dset.meta["station"].setdefault(sta_name, {})["longitude"] = longitude
+        dset.meta["station"].setdefault(sta_name, {})["latitude"] = latitude
+        dset.meta["station"].setdefault(sta_name, {})["height"] = height
 
     # Satellite data
     sat_fields = set().union(*[v.keys() for k, v in obs_data.items() if k.startswith("satellite_")])

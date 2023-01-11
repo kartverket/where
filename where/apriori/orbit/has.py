@@ -329,38 +329,81 @@ class HasOrbit(orbit.AprioriOrbit):
             fmt="datetime",
             write_level="analysis",
         )
-                
-
-    def apply_code_bias_to_dataset(self, dset: "Dataset") -> None:
+        
+        
+    def add_code_bias_to_dataset(self, dset: "Dataset") -> None:
         """Add HAS code bias to dataset
         
         Args: 
             dset:   A Dataset containing model data.
         """
-        # Relation between RINEX observation type and HAS signal definition
+        # Relation between HAS signal definition and dataset naming, where RINEX convention are used
         #
-        # Note: The HAS Galileo code bias corrections for signal E1-C, E5a-Q, E6-C and E5b-Q are used for all
-        #       defined RINEX observation types, which belongs to the same frequency.
         signal_def = {
-            "E": {
-                "C1": "E1-C",   # Valid observation types: C1A, C1B, C1C, C1X, C1Z
-                "C5": "E5a-Q",  # Valid observation types: C5I, C5Q, C5X
-                "C6": "E6-C",   # Valid observation types: C6A, C6B, C6C, C6X, C6Z
-                "C7": "E5b-Q",  # Valid observation types: C7I, C7Q, C7X
-                #"C8":, # Not defined so far.
-                
-            },
-            #"G": {
-            #    "C1C":
-            #    "C1P":
-            #    "C2W":
-            #    "C2X":
-            #    "C5X":   
-            #},
+            "E1-C": "C1C",
+            "E5a-Q": "C5Q",
+            "E6-C": "C6C", 
+            "E5b-Q": "C7Q",
+            #E:"C8":, # Not defined so far.
+            #G:    "C1C":
+            #G:    "C1P":
+            #G:    "C2W":
+            #G:    "C2X":
+            #G:    "C5X":         
         }
+    
+        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
+        # navigation records
+        cleaners.apply_remover("gnss_clean_orbit_has", dset, orbit=self)
 
-        dset.meta.setdefault("has_corrected_obstypes", dict())
+        # Get correct HAS message for given observations times and signal by determining the indices to HAS message
+        # dataset
+        log.fatal("MURKS: add_code_bias_to_dataset() function has to be updated, that it handles GPS and GALILEO")
+        for signal in set(self.dset_edit.signal):
+            dset_has_idx = self._get_has_message_idx(dset, signal=signal)
+            dset.add_float(
+                f"has_code_bias_{signal_def[signal].lower()}", 
+                val=self.dset_edit.code_bias[dset_has_idx],
+                unit="meters", 
+                write_level="operational",
+            )
         
+        # Add additional information (TOD0: is that correct or can code bias information for each signal be different?)
+        dset.add_float(
+            "has_gnssiod_code_bias", 
+            val=self.dset_edit.gnssiod[dset_has_idx], 
+            unit="meters", 
+            write_level="operational",
+        )
+        dset.add_float(
+            "has_validity_code_bias", 
+            val=self.dset_edit.validity[dset_has_idx],
+            unit="",
+            write_level="analysis",
+        )
+        dset.add_time(
+            "has_reception_time_of_message_code_bias", 
+            val=self.dset_edit.time.gps.datetime[dset_has_idx],
+            scale="gps",
+            fmt="datetime",
+            write_level="analysis",
+        )
+        dset.add_time(
+            "has_time_of_message_code_bias", 
+            val=self.dset_edit.tom.gps.datetime[dset_has_idx],
+            scale="gps",
+            fmt="datetime",
+            write_level="analysis",
+        ) 
+
+
+    def apply_code_bias_to_dataset(self, dset: "Dataset") -> None:
+        """Apply HAS code bias to corresponding observation types in dataset
+        
+        Args: 
+            dset:   A Dataset containing model data.
+        """
+        dset.meta.setdefault("has_corrected_obstypes", dict())
         
         # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
         # navigation records
@@ -370,29 +413,36 @@ class HasOrbit(orbit.AprioriOrbit):
         for obs_type in dset.obs.fields:
             values = np.zeros(dset.num_obs)
 
+            # Skip Doppler, carrier-phase and signal-to-noise observations types
+            if obs_type.startswith("D") or obs_type.startswith("L") or obs_type.startswith("S"):
+                continue
+
             for sys in dset.unique("system"):
                 idx = dset.filter(system=sys)
-
-                
+  
                 # Skip observation types, which are not defined for this GNSS
                 if obs_type not in dset.meta["obstypes"][sys]:
                     continue
+
+                sys_idx = self.dset_edit.filter(system=sys)
+                available_signals = list(set(self.dset_edit.signal[sys_idx]))
+
+                has_signal_type = self._get_has_bias_signal(sys, obs_type, available_signals)
                                 
-                if obs_type[0:2] in signal_def[sys].keys():
-                    log.info(f"Use HAS code bias correction of signal '{sys}:{signal_def[sys][obs_type[0:2]]}' for " 
+                if has_signal_type:
+                    log.info(f"Use HAS code bias correction of signal '{sys}:{has_signal_type}' for " 
                              f"observation type '{sys}:{obs_type}'")
+                    
                     # Get correct HAS message for given observations times by determining the indices to HAS message dataset
-                    dset_has_idx = self._get_has_message_idx(dset, signal=signal_def[sys][obs_type[0:2]])
+                    dset_has_idx = self._get_has_message_idx(dset, system=sys, signal=has_signal_type)
                     
                     values[idx] = self.dset_edit.code_bias[dset_has_idx][idx]
 
                     # Add HAS code bias correction information to meta variable
-                    dset.meta["has_corrected_obstypes"].setdefault(sys, dict()).setdefault(signal_def[sys][obs_type[0:2]], list())
-                    dset.meta["has_corrected_obstypes"][sys][signal_def[sys][obs_type[0:2]]].append(obs_type)
+                    dset.meta["has_corrected_obstypes"].setdefault(sys, dict()).setdefault(has_signal_type, list())
+                    dset.meta["has_corrected_obstypes"][sys][has_signal_type].append(obs_type)
 
                 else:
-                    sys_idx = self.dset_edit.filter(system=sys)
-                    available_signals = list(set(self.dset_edit.signal[sys_idx]))
                     log.warn(f"No Galileo HAS code bias correction are available for GNSS '{sys}' and observation "
                              f"type '{obs_type}'. Only for following signals are HAS code bias correction are "
                              f"available: {', '.join(available_signals)}")
@@ -407,10 +457,121 @@ class HasOrbit(orbit.AprioriOrbit):
             # Apply HAS code bias correction
             dset.obs[obs_type][:] = dset.obs[obs_type] + values
 
+
+    def apply_phase_bias_to_dataset(self, dset: "Dataset") -> None:
+        """Apply HAS phase bias to corresponding observation types in dataset
+        
+        Args: 
+            dset:   A Dataset containing model data.
+        """
+        #TODO: Can functions apply_code_bias_to_dataset and apply_phase_bias_to_dataset function be merged together?
+
+        dset.meta.setdefault("has_corrected_obstypes", dict())
+        
+        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
+        # navigation records
+        cleaners.apply_remover("gnss_clean_orbit_has", dset, orbit=self)
+
+        # Determine HAS phase bias correction    
+        for obs_type in dset.obs.fields:
+            values = np.zeros(dset.num_obs)
+
+            # Skip pseudo-range, Doppler and signal-to-noise observations types
+            if obs_type.startswith("C") or obs_type.startswith("D") or obs_type.startswith("S"):
+                continue
+
+            for sys in dset.unique("system"):
+                idx = dset.filter(system=sys)
+
+                # Skip observation types, which are not defined for this GNSS
+                if obs_type not in dset.meta["obstypes"][sys]:
+                    continue
+
+                sys_idx = self.dset_edit.filter(system=sys)
+                available_signals = list(set(self.dset_edit.signal[sys_idx]))
+
+                has_signal_type = self._get_has_bias_signal(sys, obs_type, available_signals)
+                                
+                if has_signal_type:
+                    log.info(f"Use HAS phase bias correction of signal '{sys}:{has_signal_type}' for " 
+                             f"observation type '{sys}:{obs_type}'")
+                    
+                    # Get correct HAS message for given observation times by determining the indices to HAS message dataset
+                    dset_has_idx = self._get_has_message_idx(dset, system=sys, signal=has_signal_type)
+                    
+                    values[idx] = self.dset_edit.phase_bias[dset_has_idx][idx]
+
+                    # Add HAS phase bias correction information to meta variable
+                    dset.meta["has_corrected_obstypes"].setdefault(sys, dict()).setdefault(has_signal_type, list())
+                    dset.meta["has_corrected_obstypes"][sys][has_signal_type].append(obs_type)
+
+                else:
+                    log.warn(f"No Galileo HAS phase bias correction are available for GNSS '{sys}' and observation "
+                             f"type '{obs_type}'. Only for following signals are HAS phase bias correction are "
+                             f"available: {', '.join(available_signals)}")
+
+            dset.add_float(
+                f"has_phase_bias.{obs_type}", 
+                val=values, 
+                unit="meters",
+                write_level="analysis",
+            )
+
+            # Apply HAS phase bias correction
+            dset.obs[obs_type][:] = dset.obs[obs_type] + values
+
     
     #
     # AUXILIARY FUNCTIONS
     #
+
+    def _get_has_bias_signal(self, system: str, obs_type: str, available_signals: List[str]) -> Union[str, None]:
+        """Get for given RINEX observation type and system the related HAS bias signal
+
+        Args:
+            system:            GNSS system identifier
+            obs_type:          RINEX observation type
+            available_signals: Available HAS signals
+
+        Returns:
+            HAS bias signal or if not given
+        """
+        # Relation between RINEX observation type and HAS signal definition
+        #
+        # Note: The HAS Galileo code bias corrections for signal E1-C, E5a-Q, E6-C, E5b-Q, L1 C/A, L2 CL and L2 P are 
+        #       used for all defined RINEX observation types, which belongs to the same frequency.
+        signal_def = {
+            "E": {
+                "E1-C": ["C1A", "C1B", "C1C", "C1X", "C1Z", 
+                         "L1A", "L1B", "L1C", "L1X", "L1Z"],
+                "E5a-Q": ["C5I", "C5Q", "C5X", "L5I", "L5Q", "L5X"],
+                "E6-C": ["C6A", "C6B", "C6C", "C6X", "C6Z", "C7I", "C7Q", "C7X",
+                         "L6A", "L6B", "L6C", "L6X", "L6Z", "L7I", "L7Q", "L7X"], 
+                #"E??": ["C8I", "C8Q", "C8X", "L8I", "L8Q", "L8X"], # TODO: Not defined so ar.
+            },
+            "G": {
+                "L1 C/A": ["C1C", "C1S", "C1L", "C1X", "C1P", "C1W", "C1Y", "C1M", 
+                           "L1C", "L1S", "L1L", "L1X", "L1P", "L1W", "L1Y", "L1M", "L1N"],
+                "L2 CL": ["C2S", "C2L", "C2X", "L2S", "L2L", "L2X"],
+                "L2 P": ["C2C", "C2D", "C2S", "C2L", "C2X", "C2P", "C2W", "C2Y", "C2M", 
+                         "L2C", "L2D", "L2S", "L2L", "L2X", "L2P", "L2W", "L2Y", "L2M", "L2N"],
+            },
+        }
+
+        if system == "E":
+            signals = ["E1-C", "E5a-Q", "E6-C"]
+        elif system == "G":
+            signals = ["L1 C/A", "L2 CL", "L2 P"]
+        else:
+            log.warn(f"For GNSS {system} are no Galileo HAS bias corrections provided.")
+            return None
+
+        for signal in signals:
+            if signal in available_signals:
+                if obs_type in signal_def[system][signal]:
+                    return signal
+
+        return None
 
     # TODO: Add functionality to .midgard/data/_position.py
     def _ric2trs(self, posvel: "PosVel") -> np.ndarray:
@@ -467,7 +628,13 @@ class HasOrbit(orbit.AprioriOrbit):
         return output
     
     
-    def _get_has_message_idx(self, dset: "Dataset", time: str = "time", signal: Union[str, None] = None) -> List[int]:
+    def _get_has_message_idx(
+                self, 
+                dset: "Dataset", 
+                time: str = "time", 
+                system: Union[str, None] = None,
+                signal: Union[str, None] = None,
+        ) -> List[int]:
         """Get Galileo HAS message indices for given observation epochs
 
         The indices relate the observation epoch to the correct set of HAS message. First the time difference
@@ -488,13 +655,15 @@ class HasOrbit(orbit.AprioriOrbit):
         |                              | epoch and transmission time has to be positive.                              |
         
         Satellite number and GNSS IOD is needed to select correct HAS message in relation to used broadcast navigation
-        messages. In addition filtering related to given GNSS signal is needed for code and phase bias information.
+        messages. In addition filtering related to given GNSS system identifier and signal is needed for code and 
+        phase bias information.
 
         Args:
             dset:   A Dataset containing model data.
             time:   Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
                     observation time and 'sat_time' to satellite transmission time.
-            signal: Satellite signal used to get correct code or phase bias HAS messages
+            system: Satellite system used to get correct code or phase bias HAS messages in combination with 'signal' definition
+            signal: Satellite signal used to get correct code or phase bias HAS messages in combination with 'system' definition
 
         Returns:
             HAS messages indices for given observation epochs.
@@ -505,7 +674,6 @@ class HasOrbit(orbit.AprioriOrbit):
             "transmission_time",
             "transmission_time:positive",
         ]
-        has_idx = list()
 
         # Get configuration option
         has_message_nearest_to = config.tech.get("has_message_nearest_to", default="transmission_time:positive").str.rsplit(":", 1)
@@ -534,26 +702,45 @@ class HasOrbit(orbit.AprioriOrbit):
 
             cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
 
-        # Determine HAS message index for a given satellite, observation epoch and eventually signal
-        for sat, obs_epoch in zip(dset.satellite, dset[time]):
-            
+        # Determine HAS message index for a given satellite, observation epoch and eventually system/signal
+        indices = np.full(dset.num_obs, -1, dtype=int) # -1 is chosen to guarantee that not a wrong index is used 
+                                                       # for getting correct HAS message
+        for idx_dset, (sat, obs_epoch) in enumerate(zip(dset.satellite, dset[time])):
+
+            # Skip not relevant GNSS satellites, if GNSS system is defined
+            if system:
+                if not sat[0:1] == system:
+                    continue
+                        
             if signal:
-                idx = self.dset_edit.filter(satellite=sat, signal=signal)
+                idx_has = self.dset_edit.filter(satellite=sat, system=system, signal=signal)
                
-                if np.any(idx) == False:
-                    log.fatal(f"No valid HAS message could be found for satellite {sat}, GNSS signal {signal} and "
-                              f"observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")            
+                if np.any(idx_has) == False:
+                    # TODO-MURKS: Better solution for handling of L2 CL signal type. L2 CL bias corrections are not available for all satellites.
+                    if system == "G" and signal == "L2 CL":
+                        idx_has = self.dset_edit.filter(satellite=sat, system=system, signal="L2 P")
+
+                        if np.any(idx_has) == False:
+                            log.fatal(f"No valid HAS message could be found for satellite {sat}, GNSS signal {system}:{signal} and "
+                                      f"observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")
+
+                        log.debug(f"HAS bias correction for signal 'G:{signal}' does not exists for satellite {sat}, "
+                                  f"therefore use of corrections for signal 'G:L2 P' satellite {sat}.")
+
+                    else:
+                        log.fatal(f"No valid HAS message could be found for satellite {sat}, GNSS signal {system}:{signal} and "
+                                  f"observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")            
             else: 
-                idx = self.dset_edit.filter(satellite=sat)
+                idx_has = self.dset_edit.filter(satellite=sat)
                
-                if np.any(idx) == False:
+                if np.any(idx_has) == False:
                     log.fatal(f"No valid HAS message could be found for satellite {sat}, and observation epoch "
                              f"{obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")
 
-            nearest_idx = self._get_nearest_idx(idx, obs_epoch, time_key, positive)
-            has_idx.append(idx.nonzero()[0][nearest_idx])
+            nearest_idx = self._get_nearest_idx(idx_has, obs_epoch, time_key, positive)
+            indices[idx_dset] = idx_has.nonzero()[0][nearest_idx]
 
-        return has_idx
+        return indices
 
     
     def _get_nearest_idx(self, idx: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray:

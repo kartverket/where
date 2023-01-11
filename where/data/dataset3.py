@@ -62,19 +62,24 @@ class Dataset(MgDataset):
         """Read a dataset from file"""
 
         dset_vars = cls._dset_vars(rundate=rundate, pipeline=pipeline, stage=stage, label=label, **dset_args)
-        if label == "last":
-            ids = config.files.glob_variable("dataset", variable="label", pattern=r"[\w]+", file_vars=dset_vars)
-            try:
-                dset_vars.update(label=max(ids))
-            except ValueError:
-                # No ids found
-                raise ValueError(f"No labels found for date {rundate}, pipeline {pipeline}, stage {stage}")
         analysis_vars = cls._analysis_vars(rundate, user, id)
 
         file_vars = dset_vars.copy()
         for k, v in analysis_vars.items():
             if k not in file_vars:
                 file_vars[k] = v
+
+        if label == "last":
+            del file_vars["label"]
+            labels = config.files.glob_variable("dataset", variable="label", pattern=r"[\w]+", file_vars=file_vars)
+            try:
+                found_label = max(labels)
+                dset_vars.update(label=found_label)
+                file_vars.update(label=found_label)
+            except ValueError:
+                # No labels found
+                raise ValueError(f"No labels found for date {rundate}, pipeline {pipeline}, stage {stage}")
+
         file_path = config.files.path("dataset", file_vars=file_vars)
 
         dset = super().read(file_path)

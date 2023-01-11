@@ -57,7 +57,7 @@ def vascc_calc(dset):
         dset:  Dataset, data for a model run.
     """
     with config.files.open(
-        "output_vascc_calc", file_vars=dict(session=dset.dataset_name, **dset.vars), mode="wt"
+        "output_vascc_calc", file_vars=dict(dbc=dset.vars["dbc"], **dset.vars), mode="wt"
     ) as fid:
         for obs, (time, src, sta_1, sta_2, calc) in enumerate(
             dset.values("time", "source", "station_1", "station_2", "calc"), start=1

@@ -46,8 +46,8 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
     log_and_write("# " + f"{''.ljust(18)} {''.rjust(7)} {'[m]'.rjust(14)} {'[m]'.rjust(13)}", bl_str)
     for i, bl in enumerate(baselines):
         sta_1, _, sta_2 = bl.partition("/")
-        pos_apriori_1 = trf[dset.meta[sta_1]["cdp"]].pos
-        pos_apriori_2 = trf[dset.meta[sta_2]["cdp"]].pos
+        pos_apriori_1 = trf[dset.meta["station"][sta_1]["cdp"]].pos
+        pos_apriori_2 = trf[dset.meta["station"][sta_2]["cdp"]].pos
         
         try:
             corr_1 = [
@@ -129,8 +129,8 @@ def plot_length_vs_ferr(dset, lengths, ferrs):
     plt.close()
 
 def extract_sta_covariance(covariance, param_names, sta_1, sta_2):
-    param_idx1 = np.char.startswith(param_names, f"vlbi_site_pos-{sta_1}")
-    param_idx2 = np.char.startswith(param_names, f"vlbi_site_pos-{sta_2}")
+    param_idx1 = np.char.startswith(param_names, f"vlbi_site_pos-{sta_1}_")
+    param_idx2 = np.char.startswith(param_names, f"vlbi_site_pos-{sta_2}_")
     if not param_idx1.any() or not param_idx2.any():
         return None
     Q_sta = np.empty(shape=(6, 6))

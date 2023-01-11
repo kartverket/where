@@ -193,7 +193,6 @@ def add_timestamp(rundate, pipeline, timestamp_key, **kwargs):
     Args:
         rundate:        Rundate of analysis.
         pipeline:       Pipeline used for analysis.
-        session:        Session in analysis.
         timestamp_key:  Key denoting timestamp.
     """
     # Find timestamp file
@@ -246,7 +245,6 @@ def _read_config(rundate, pipeline, *args, **kwargs):
     Args:
         rundate:   Rundate of analysis.
         pipeline:  Pipeline used for analysis.
-        session:   Session in analysis.
 
     Returns:
         Configuration of Where analysis.
@@ -268,7 +266,6 @@ def _config_path(rundate, pipeline, *args, **kwargs):
     Args:
         rundate:   Rundate of analysis.
         pipeline:  Pipeline used for analysis.
-        session:   Session in analysis.
 
     Returns:
         Path to configuration file.
@@ -299,6 +296,8 @@ def _dependent_sections(cfg_section, master_cfg=config.where):
 
         # Return sections matching entry values  # Todo: Add .set property to ConfigurationEntry
         sections = set(master_cfg.section_names) & set([s.split(":")[0] for s in entry.list])
+        # Convert to list and sort it alphabetically to ensure identical order or elements each time
+        sections = sorted(list(sections))
         for section in sections:
             yield master_cfg[section]
 

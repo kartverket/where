@@ -189,12 +189,11 @@ def paths(label_pattern, pipeline=None):
 
 
 def run(rundate, pipeline, *args, **kwargs):
-    """Run a Where pipeline for a given date and session
+    """Run a Where pipeline for a given date
 
     Args:
         rundate:   Rundate of analysis.
         pipeline:  Pipeline used for analysis.
-        session:   Session in analysis.
     """
 
     if not setup.has_config(rundate, pipeline, *args, **kwargs):
