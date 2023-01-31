@@ -205,7 +205,7 @@ def solve_neq(dset):
     
     # Update statistics for solution after constraints are added
     v_c = H @ x  # Sinex Format description appendix equation 10
-    dset.meta["statistics"]["square sum of residuals"] += np.asscalar(v_c.T @ P_h @ v_c)
+    dset.meta["statistics"]["square sum of residuals"] += (v_c.T @ P_h @ v_c).item()
     dset.meta["statistics"]["degrees of freedom"] += len(H) + num_abs_constraints + num_rel_constraints
     dset.meta["statistics"]["variance factor"] = (
         np.float64(dset.meta["statistics"]["square sum of residuals"]) / np.float64(dset.meta["statistics"]["degrees of freedom"])

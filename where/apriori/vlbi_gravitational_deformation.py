@@ -25,14 +25,24 @@ def get_gravitational_deformation(rundate):
         A dictionary of interpolator functions.
     """
 
-    versions = list(config.files.glob_variable("vlbi_gravitational_deformation", "version", r"[\w]+"))
+    # Find the file with the highest date in the filename
+    versions_1 = list(config.files.glob_variable("vlbi_gravitational_deformation", "version", r"[\w]+"))
+    versions_2 = list(config.files.glob_variable("vlbi_gravitational_deformation", "version", r"[\w]+[-][\w]+[-][\w]+"))
 
-    dates = [datetime.strptime(d, "%Y%b%d") for d in versions]
-    if dates:
-        max_idx = dates.index(max(dates))
-        file_vars = dict(version=versions[max_idx])
+    dates_1 = [datetime.strptime(d, "%Y%b%d") for d in versions_1]
+    dates_2 = [datetime.strptime(d,"%Y-%m-%d") for d in versions_2]
+
+    # Earlier versions used the date format 2018Nov12
+    if dates_1:
+        max_date = dates_1.index(max(dates_1))
+        file_vars = dict(version=versions_1[max_date])
     else:
         file_vars = dict()
+
+    # Later versions uses the date format 2023-01-20
+    if dates_2:
+        max_date = dates_2.index(max(dates_2))
+        file_vars = dict(version=versions_2[max_date])
 
     parser = parsers.parse_key(file_key="vlbi_gravitational_deformation", file_vars=file_vars)
     log.debug(f"Using {parser.file_path} as a priori gravitional deformation")

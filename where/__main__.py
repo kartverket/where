@@ -65,7 +65,7 @@ Here are some concrete examples of how to run Where:
 
 Run a VLBI analysis for August 4 2015:
 
-    {exe} 2015 8 4 -v --session_code=r1669
+    {exe} 2015 8 4 -v --session_code=R1699
 
 Run an SLR analysis for September 1 2015 using day-of-year:
 

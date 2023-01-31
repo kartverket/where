@@ -24,11 +24,14 @@ class GravitationalDeformationParser(Parser):
             current_station = ""
 
             for line in fid:
-                if line.startswith("#") or not line:
+                if line.startswith("#"):
                     continue
 
                 line = line.split()
-                if len(line) == 3:
+                if not line:
+                    continue
+
+                if len(line) == 3 and not line[0].isnumeric():
                     # block header line
                     if line[0] == "EPOCH":
                         self.data[current_station]["start"] = datetime.strptime(line[1], "%Y%M%d")

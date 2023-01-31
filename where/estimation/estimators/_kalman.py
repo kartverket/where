@@ -148,8 +148,8 @@ class KalmanFilter(object):
         deg_freedom = dset.num_obs - num_unknowns
         v = dset.residual[:, None]
         P = np.diag(1 / self.r[: dset.num_obs])
-        sq_sum_residuals = np.asscalar(v.T @ P @ v)
-        sq_sum_omc_terms = np.asscalar(2 * b.T @ g - g.T @ N @ g)
+        sq_sum_residuals = (v.T @ P @ v).item()
+        sq_sum_omc_terms = (2 * b.T @ g - g.T @ N @ g).item()
         variance_factor = sq_sum_residuals / deg_freedom if deg_freedom != 0 else np.inf
         log.info(f"Variance factor = {variance_factor:.4f}, degrees of freedom = {deg_freedom:d}")
 

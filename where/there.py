@@ -1303,7 +1303,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         for plot_num, (num_y, num_x) in enumerate(itertools.product(range(nrows), range(ncols))):
             ax = self.figure.add_subplot(sub_gs[plot_num])
             ax.clear()
-            ax.scatter(0, 0, s=0, picker=self.dbl_click_pick, cmap=self.cmap)
+            ax.scatter(0, 0, s=0, picker=self.dbl_click_pick)
             idx_x = slice(None) if x_data.ndim == 1 else (slice(None), num_x)
             idx_y = slice(None) if y_data.ndim == 1 else (slice(None), num_y)
             xlim = self._pad_range(self.xlim if x_data.ndim == 1 else self.xlim[num_x])
@@ -1504,7 +1504,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         ax.set_zlabel(z_name)
 
     def _convert_datetime_to_sec(self, plot_data):
-        if np.issubdtype(plot_data.dtype, np.datetime64) or plot_data.dtype == np.object:
+        if np.issubdtype(plot_data.dtype, np.datetime64) or plot_data.dtype == np.object_:
             time_data = np.array([t.timestamp() for t in plot_data])
             plot_data = time_data - time_data[0]
         plot_range = self._calculate_range(plot_data)
@@ -1516,7 +1516,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
         for _, event_type, _ in events:
             self.add_event_color(event_type)
 
-        if events and (np.issubdtype(plot_data.dtype, np.datetime64) or plot_data.dtype == np.object):
+        if events and (np.issubdtype(plot_data.dtype, np.datetime64) or plot_data.dtype == np.object_):
             return plot_data, events
         else:
             return plot_data, list()
