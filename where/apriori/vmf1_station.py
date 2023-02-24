@@ -6,11 +6,11 @@ Usage:
 from where import apriori
 
 vmf1_station = apriori.get("vmf1_station", time=time)
-ah = vmf1_station[station]["aw"](time.mjd)
+ah = vmf1_station[station]["ah"](time.mjd)
 
 References:
 -----------
-    http://ggosatm.hg.tuwien.ac.at/DELAY/readme.txt
+    https://ggosatm.hg.tuwien.ac.at/DELAY/readme.txt
 
 """
 # External library imports

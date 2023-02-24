@@ -58,6 +58,10 @@ class VlbiSkdParser(Parser):
             if not line:
                 continue
 
+            if line.isspace():
+                # Skip lines with only whitespaces
+                continue
+
             if line.startswith("*"):
                 # Assume the line is a comment
                 continue

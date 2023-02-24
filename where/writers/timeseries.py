@@ -293,7 +293,6 @@ def method_state(dset, field, idx_values, func):
     else:
         return None, None, None
 
-
     if idx.any():
         val[idx] = mean
     else:
@@ -314,12 +313,16 @@ def _parse_params(params, idx_names):
     # Parameters connected to the idx_values, e.g. station params
     for idx_name in idx_names:
         for param in subparams:
-            idx = param.find(idx_name)
+            idx = param.find(idx_name) # Assumption: If found idx is always 0.
             if idx >= 0:
-                name.append(param[idx:idx+len(idx_name)])
-                if len(idx_name) < len(param):
-                    name2.append(param[idx+len(idx_name):])
-
+                if len(idx_name) < len(param) and param[idx+len(idx_name)] == "_":
+                    # Style of param: {station}_{subparam}
+                    name.append(param[idx:idx+len(idx_name)])
+                    if len(idx_name) < len(param):
+                        name2.append(param[idx+len(idx_name):])
+                elif len(idx_name) == len(param):
+                    # Style of param: {station}
+                    name.append(param[idx:idx+len(idx_name)])
     # Parameters not connected the idx_values, e.g. global params
     if not name:
         name = [p.split("_", maxsplit=1)[0] for p in subparams]

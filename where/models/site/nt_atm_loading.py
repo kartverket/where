@@ -53,14 +53,29 @@ def non_tidal_atmospheric_loading_station(ntapl, dset):
     """
     lat, lon, _ = dset.site_pos.pos.llh.T
     try:
+
         dup = ntapl["up"](dset.time, lon, lat)
         deast = ntapl["east"](dset.time, lon, lat)
         dnorth = ntapl["north"](dset.time, lon, lat)
     except KeyError:
-        log.warn(f"No non-tidal atmospheric loading available for {dset.rundate}")
+        log.debug(f"No gridded non-tidal atmospheric loading available for {dset.rundate}. Using yearly station files.")
+
+        ntapl_sta = apriori.get("non_tidal_atmospheric_loading_yearly_station", time=dset.time)
+
         dup = np.zeros(len(dset.time))
         deast = np.zeros(len(dset.time))
         dnorth = np.zeros(len(dset.time))
+
+        for sta in np.unique(dset.station):
+            idx = dset.station == sta
+            try:
+                dup[idx] = ntapl_sta[sta]["up"](dset.time.mjd[idx])
+                deast[idx] = ntapl_sta[sta]["east"](dset.time.mjd[idx])
+                dnorth[idx] = ntapl_sta[sta]["north"](dset.time.mjd[idx])
+            except KeyError:
+                # Already set to zero
+                log.warn(f"No non-tidal atmospheric loading available for {sta} for {dset.rundate}")
+                pass
 
     denu = np.stack((deast, dnorth, dup), axis=1)
     if position.is_position(dset.site_pos):

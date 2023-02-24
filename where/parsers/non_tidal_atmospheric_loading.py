@@ -3,7 +3,7 @@
 Description:
 ------------
 
-Supports the format from http://vmf.geo.tuwien.ac.at/APL_products/GRID
+Supports the format from https://vmf.geo.tuwien.ac.at/APL_products/GRID
 """
 # External library imports
 import numpy as np

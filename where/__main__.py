@@ -75,9 +75,9 @@ Change the sampling_rate option of the GNSS analysis:
 
     {exe} 2016 3 1 -g --station=stas --sampling_rate=30
 
-Look at the configuration of all VLBI analyses set up for November 2 2009:
+Look at the configuration of VLBI analysis set up for August 4 2015:
 
-    {exe} 2009 11 2 --vlbi -S
+    {exe} 2009 11 2 --vlbi -S --session_code=R1699
 
 
 Current Maintainers:

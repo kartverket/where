@@ -121,7 +121,7 @@ def check_help_and_version(doc_module=None):
 
     # Version information
     if check_options("--version"):
-        _print_version_from_doc(doc_module)
+        print(_get_program_version())
         raise SystemExit
   
   
@@ -150,11 +150,10 @@ def parse_args(*param_types, doc_module=None):
         List of command line arguments parsed according to param_types.
     """
     # Log version of python and the program, and the configuration file used
-    if doc_module:
-        log.info(f"Start {_get_program_version(doc_module)} at {datetime.now().strftime(config.FMT_datetime)}")
-        log.debug(f"Receive command line arguments [{', '.join(sys.argv[1:])}]")
-        title, sources = get_configuration(cfg=get_program_name())
-        log.info(f"Use {title} configuration from {', '.join(sources)}")
+    log.info(f"Start {_get_program_version()} at {datetime.now().strftime(config.FMT_datetime)}")
+    log.debug(f"Receive command line arguments [{', '.join(sys.argv[1:])}]")
+    title, sources = get_configuration(cfg=get_program_name())
+    log.info(f"Use {title} configuration from {', '.join(sources)}")
 
     # Parse arguments
     try:
@@ -394,27 +393,13 @@ def _get_doc(doc_module=None):
     return "" if doc is None else doc
 
 
-def _get_program_version(doc_module=None):
-    """Get version info for the running program from SVN keywords
-
-    The version of the program is read from the main __init__.py-file of Where. In addition, the docstring of the
-    running script is parsed for revision information. In particular we look for the SVN keyword substitutions Revision
-    and Date. If no revision information is found, only the program name and version is returned.
-
-    Args:
-        doc_module:  String, name of the module to be searched for revision information. Default is __main__.
+def _get_program_version():
+    """Get program name and version as string
 
     Returns:
         String, information about the version of the given module (running script).
     """
-    doc = _get_doc(doc_module)
-    revision = re.search(r"\$Revision: (\d+) \$", doc)
-    last_changed = re.search(r"\$Date: (\d{4}-\d{2}-\d{2}) ", doc)
-    if revision and last_changed:
-        revision_text = ", revision {} ({})".format(revision.groups()[0], last_changed.groups()[0])
-    else:
-        revision_text = ""
-    return "{} v{}{}".format(get_program_name(), where.__version__, revision_text)
+    return "{} v{}".format(get_program_name(), where.__version__)
 
 
 def _print_help_from_doc(doc_module=None):
@@ -444,15 +429,6 @@ def _print_help_from_doc(doc_module=None):
         line = re.sub(r"::", ":", line)
         line = re.sub(r"^\$| ?\$$", "", line)
         print(line)
-
-
-def _print_version_from_doc(doc_module=None):
-    """Use docstring information to print a version string
-
-    Uses the $-keywords from SVN to create a string containing version
-    information.
-    """
-    print(_get_program_version(doc_module))
 
 
 def _next_argument():
