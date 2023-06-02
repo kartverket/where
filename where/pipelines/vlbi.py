@@ -219,7 +219,11 @@ def file_vars(file_vars=None):
             obs_file = config.files.path("vlbi_obs_vgosdb", file_vars=_file_vars).name
         else:
             obs_file = config.files.path("vlbi_obs_ngs", file_vars=_file_vars).name
-        _file_vars["input_data_name"] = obs_file[:obs_file.find("_V")]
+        input_data_name = obs_file[:obs_file.find("_V")]
+        if len(input_data_name) == 8 and len(_file_vars["dbc"]) == 1:
+            # append a underscore if the dbc code is only one letter
+            input_data_name = input_data_name + "_"
+        _file_vars["input_data_name"] = input_data_name
     return _file_vars
 
 

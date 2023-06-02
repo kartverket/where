@@ -42,13 +42,24 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
     save_to_file = config.tech.vlbi_baseline_length.save_to_file.bool
     bl_str = []
 
-    log_and_write("# " + f"{'Baseline'.ljust(18)} {'Num obs'.ljust(7)} {'Length'.rjust(14)} {'Formal error'.rjust(13)}", bl_str)
-    log_and_write("# " + f"{''.ljust(18)} {''.rjust(7)} {'[m]'.rjust(14)} {'[m]'.rjust(13)}", bl_str)
+    log_and_write("# " + f"{'Baseline'.ljust(18)} {'Num obs'.ljust(7)} {'Length'.rjust(14)} {'Formal error'.rjust(13)} " +
+                  f"{'Latitude sta_1'.rjust(15)} {'Latitude sta_2'.rjust(15)} {'Longitude sta_1'.rjust(15)} {'Longitude sta_2'.rjust(15)}",
+                  bl_str)
+    log_and_write("# " + f"{'sta_1/sta_2'.ljust(18)} {''.rjust(7)} {'[m]'.rjust(14)} {'[m]'.rjust(13)} " +
+                  f"{'[Degrees]'.rjust(15)} {'[Degrees]'.rjust(15)} {'[Degrees]'.rjust(15)} {'[Degrees]'.rjust(15)}",
+                  bl_str)
     for i, bl in enumerate(baselines):
         sta_1, _, sta_2 = bl.partition("/")
+        # Name the baseline in alphabetical station order to be consistent across sessions
+        bl_sorted = "/".join(sorted([sta_1, sta_2]))
+        sta_1_sorted, _, sta_2_sorted = bl_sorted.partition("/")
         pos_apriori_1 = trf[dset.meta["station"][sta_1]["cdp"]].pos
         pos_apriori_2 = trf[dset.meta["station"][sta_2]["cdp"]].pos
-        
+        lat_1 = np.degrees(dset.meta["station"][sta_1_sorted]["latitude"])
+        lat_2 = np.degrees(dset.meta["station"][sta_2_sorted]["latitude"])
+        lon_1 = np.degrees(dset.meta["station"][sta_1_sorted]["longitude"])
+        lon_2 = np.degrees(dset.meta["station"][sta_2_sorted]["longitude"])
+
         try:
             corr_1 = [
                 np.mean(dset.state[f"vlbi_site_pos-{sta_1}_x"]),
@@ -56,7 +67,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
                 np.mean(dset.state[f"vlbi_site_pos-{sta_1}_z"]),
             ]
         except AttributeError:
-            log_and_write("# " + f"{bl:18} {sta_1} position not estimated", bl_str)
+            log_and_write("# " + f"{bl_sorted:18} {sta_1} position not estimated", bl_str)
             continue
         
         try:
@@ -66,7 +77,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
                 np.mean(dset.state[f"vlbi_site_pos-{sta_2}_z"]),
             ]
         except AttributeError:
-            log_and_write("# " + f"{bl:18} {sta_2} position not estimated", bl_str)
+            log_and_write("# " + f"{bl_sorted:18} {sta_2} position not estimated", bl_str)
             continue
         
         pos_correction_1 = PositionDelta(corr_1, system="trs", ref_pos=pos_apriori_1)
@@ -93,13 +104,14 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
         
         bl_length_ferr = np.sqrt(A @ Q_sta @ A.T)
         
-        dset.meta.add("baseline_length", baseline.length, section=bl)
-        dset.meta.add("baseline_length_ferr", bl_length_ferr, section=bl)
-        dset.meta.add("__unit__", "meter", section=bl)
+        dset.meta.add("baseline_length", baseline.length, section=bl_sorted)
+        dset.meta.add("baseline_length_ferr", bl_length_ferr, section=bl_sorted)
+        dset.meta.add("__unit__", "meter", section=bl_sorted)
         
         num_obs = dset.num(baseline=bl)
         
-        log_and_write(f"{bl:20} {num_obs:7d} {baseline.length:14.4f} {bl_length_ferr:13.4f}", bl_str)
+        log_and_write(f"{bl_sorted:20} {num_obs:7d} {baseline.length:14.4f} {bl_length_ferr:13.4f} " +
+                      f"{lat_1:15.10f} {lat_2:15.10f} {lon_1:15.10f} {lon_2:15.10f}", bl_str)
         
         lengths.append(baseline.length)
         ferrs.append(bl_length_ferr)

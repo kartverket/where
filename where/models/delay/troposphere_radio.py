@@ -220,10 +220,10 @@ def meteorological_data(stations, latitude, longitude, height, time,
             model_pressure, model_temp, _ = gpt(latitude, longitude, height, time)
             model_e, model_tm, model_lambd = None, None, None
         elif model == "gpt2":
-            model_pressure, model_temp, _, model_e, _, _, _ = gpt2_meteo(latitude, longitude, height, time)
+            model_pressure, model_temp, _, model_e, _ = gpt2_meteo(latitude, longitude, height, time)
             model_tm, model_lambd = None, None, 
         elif model == "gpt2w":
-            model_pressure, model_temp, _, model_tm, model_e, _, _, model_lambd, _ = gpt2w(latitude, longitude, height, time)
+            model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt2w_meteo(latitude, longitude, height, time)
         elif model == "site_pressure":
             model_pressure = obs_pressure
             model_temp, model_e, model_tm, model_lambd = None, None, None, None
@@ -342,9 +342,9 @@ def mapping_function(latitude, longitude, height, time, zenith_distance):
         if model == "gmf":
             model_mh, model_mw = gmf_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "gpt2":
-            _, _, _, _, model_mh, model_mw, _ = gpt2_mapping_function(latitude, longitude, height, time, zenith_distance)
+            model_mh, model_mw = gpt2_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "gpt2w":
-            _, _, _, _, _, model_mh, model_mw, _, _ = gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance)
+            model_mh, model_mw = gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_gridded":
             model_mh, model_mw = vmf1_gridded_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_station":

@@ -42,18 +42,18 @@ class AprioriOrbit:
         # MURKS: Should it be done like that. The technique is normally not given for unittest routines (like
         #       test_broadcast.py).
         try:
-            pipeline = config.analysis.pipeline.str
+            pipeline = config.tech.pipeline.str
         except exceptions.MissingEntryError:
             pipeline = None
 
         # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
         try:
-            profile = config.analysis.profile.str
+            profile = config.tech.profile.str
         except exceptions.MissingEntryError:
             profile = None
 
         try:
-            id_ = config.analysis.id.str
+            id_ = config.tech.id.str
         except exceptions.MissingEntryError:
             id_ = None
 
@@ -125,12 +125,12 @@ class AprioriOrbit:
 
         # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
         try:
-            profile = config.analysis.profile.str
+            profile = config.tech.profile.str
         except exceptions.MissingEntryError:
             profile = None
 
         try:
-            id_ = config.analysis.id.str
+            id_ = config.tech.id.str
         except exceptions.MissingEntryError:
             id_ = None
 

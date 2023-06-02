@@ -545,8 +545,9 @@ class HasOrbit(orbit.AprioriOrbit):
                 "E1-C": ["C1A", "C1B", "C1C", "C1X", "C1Z", 
                          "L1A", "L1B", "L1C", "L1X", "L1Z"],
                 "E5a-Q": ["C5I", "C5Q", "C5X", "L5I", "L5Q", "L5X"],
-                "E6-C": ["C6A", "C6B", "C6C", "C6X", "C6Z", "C7I", "C7Q", "C7X",
-                         "L6A", "L6B", "L6C", "L6X", "L6Z", "L7I", "L7Q", "L7X"], 
+                "E5b-Q": ["C7I", "C7Q", "C7X", "L7I", "L7Q", "L7X"],
+                "E6-C": ["C6A", "C6B", "C6C", "C6X", "C6Z", 
+                         "L6A", "L6B", "L6C", "L6X", "L6Z", ], 
                 #"E??": ["C8I", "C8Q", "C8X", "L8I", "L8Q", "L8X"], # TODO: Not defined so ar.
             },
             "G": {
@@ -559,7 +560,7 @@ class HasOrbit(orbit.AprioriOrbit):
         }
 
         if system == "E":
-            signals = ["E1-C", "E5a-Q", "E6-C"]
+            signals = ["E1-C", "E5a-Q", "E5b-Q", "E6-C"]
         elif system == "G":
             signals = ["L1 C/A", "L2 CL", "L2 P"]
         else:

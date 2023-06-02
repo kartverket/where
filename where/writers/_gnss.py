@@ -71,6 +71,11 @@ def get_grc_csv_row(
     batch_def = { 
             "GALILEO-1": "IOV",
             "GALILEO-2": "FOC",
+            "BLOCK IIIA": "III",
+            "BLOCK IIF": "IIF",
+            "BLOCK IIR-A": "IIR",
+            "BLOCK IIR-B": "IIR",
+            "BLOCK IIR-M": "IIR-M",
     }
 
     business_def = {
@@ -99,6 +104,37 @@ def get_grc_csv_row(
     }
 
     slot_def = {
+            "G043": "F6",
+            "G045": "D3",
+            "G048": "A4",
+            "G050": "E3",
+            "G051": "E4",
+            "G052": "A2",
+            "G053": "C4",
+            "G055": "F2",
+            "G056": "B1",
+            "G057": "C1",
+            "G058": "B4",
+            "G059": "C5",
+            "G061": "D1",
+            "G062": "B2",
+            "G063": "D2",
+            "G064": "A3",
+            "G065": "A1",
+            "G066": "C2",
+            "G067": "D4",
+            "G068": "F3",
+            "G069": "E1",
+            "G070": "F1",
+            "G071": "B5",
+            "G072": "C3",
+            "G073": "E2",
+            "G074": "F4",
+            "G075": "D6",
+            "G076": "E5",
+            "G077": "B6",
+            "G078": "D5",
+            "G079": "A6",
             "GSAT0101": "B05",
             "GSAT0102": "B06",
             "GSAT0103": "C04",
@@ -171,7 +207,6 @@ def get_grc_csv_row(
         batch = batch_def[sat_info["sat_type"]] if sat_info["sat_type"] in batch_def.keys() else ""
         prn = sat_info["sat_code"].replace("E", "GSAT0") if sat_info["sat_code"].startswith("E") else sat_info["sat_code"]
         slot = slot_def[prn] if prn in slot_def.keys() else ""
-
 
     return [
         "Open Service", # Service Line

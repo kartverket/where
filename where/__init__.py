@@ -19,7 +19,7 @@ import platform as _platform
 # Version of Where.
 #
 # This is automatically set using the bumpversion tool
-__version__ = "2.1.0"
+__version__ = "2.1.2"
 
 
 # Authors of the software

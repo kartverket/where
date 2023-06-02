@@ -70,9 +70,6 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
         signal_modes= list(df_month.columns)
         signal_modes.remove("date")
 
-        # Get satellites
-        satellites = set(df.satellite)
-
         # Write header 
         writer.writerow(get_grc_csv_header())
 
@@ -93,7 +90,18 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
         # Write satellite-wise results to GRC CSV file
         for mode in signal_modes:
 
-            df_mode = df.pivot(index="time_gps", columns="satellite", values=mode)
+            # Filtering necessary to get only satellites related to one GNSS
+            if mode.startswith("E"):
+                system = "E"
+            elif mode.startswith("L"):
+                system = "G"
+
+            idx = df.system == system
+
+            # Get satellites
+            satellites = set(df[idx].satellite)
+
+            df_mode = df[idx].pivot(index="time_gps", columns="satellite", values=mode)
             df_mode = df_mode.resample("M").apply(lambda x: np.nanpercentile(x, q=95))
             df_mode.index = df_mode.index.strftime("%y-%b")
             df_mode.index.name = "date"
@@ -172,34 +180,25 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
         log.fatal(f"All given datasets are empty [{', '.join(dsets.keys())}].")
 
     # Generate monthly samples of 95th percentile SISRE based on epochwise SISRE RMS solutions(after SDD v1.1 version)
-    #
-    # NOTE: Following solutions assumes that SISRE solution in dataframe 'df' is only given for one GNSS
-    if len(set(df["system"])) == 1:
-        epochs = sorted(set(df["time_gps"]))
-        df_tmp = pd.DataFrame(index=epochs, columns=signal_types)
+    epochs = sorted(set(df["time_gps"]))
+    df_tmp = pd.DataFrame(index=epochs, columns=signal_types)
 
-        ## Loop over observation epochs
-        for epoch in epochs:
-            idx = df["time_gps"] == epoch
-            row = dict()
+    # Loop over observation epochs
+    for epoch in epochs:
+        idx = df["time_gps"] == epoch
+        row = dict()
 
-            # Determine RMS for each signal type over all given SISRE satellite solutions in each epoch
-            for signal_type in signal_types:
-                row[signal_type] = np.sqrt(np.nanmean(np.square(df[signal_type][idx])))
-            df_tmp.loc[epoch] = pd.Series(row)
+        # Determine RMS for each signal type over all given SISRE satellite solutions in each epoch
+        for signal_type in signal_types:
+            row[signal_type] = np.sqrt(np.nanmean(np.square(df[signal_type][idx])))
+        df_tmp.loc[epoch] = pd.Series(row)
 
-        df_month_perc_rms = df_tmp.resample("M").apply(lambda x: np.nanpercentile(list(x), q=95))
-        df_month_perc_rms.index = df_month_perc_rms.index.strftime("%y-%b")
+    df_month_perc_rms = df_tmp.resample("M").apply(lambda x: np.nanpercentile(list(x), q=95))
+    df_month_perc_rms.index = df_month_perc_rms.index.strftime("%y-%b")
 
-        # Prepare dataframes for writing
-        df_month_perc_rms.index.name = "date"
-        df_month_perc_rms = df_month_perc_rms.reset_index()
- 
-    else:
-        log.fatal(
-            f"Determination of 95th percentile SISRE based on epochwise SISRE RMS solutions can only be applied "
-            f"for one given GNSS and not for {set(df['system'])} together."
-        )
+    # Prepare dataframes for writing
+    df_month_perc_rms.index.name = "date"
+    df_month_perc_rms = df_month_perc_rms.reset_index()
 
     return df, df_month_perc_rms
 

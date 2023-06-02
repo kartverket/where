@@ -6,6 +6,9 @@
 # * Geir Arne Hjelle <geir.arne.hjelle@kartverket.no>
 
 # Programs and directories
+# Note from 'dahmic': It seems to be that 'f2py' could not be installed at on a Rocky 8.7 operativ system. 'numpy' has 
+#                     overtaken the 'f2py' project. Therefore I used 'F2PY = python -m numpy.f2py' instead of 
+#                     'F2PY=f2py.
 F2PY = f2py
 F2PYEXTENSION = .cpython-36m-x86_64-linux-gnu.so
 

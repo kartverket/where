@@ -35,5 +35,5 @@ def scheduled_obs(dset):
         log.info(f"{_SECTION}: Adding number of scheduled observations to metadata")
         for sta, num in data.items():
             sta_dict = dset.meta["station"].setdefault(sta, {})
-            sta_dict["scheduled_obs"] = num
+            sta_dict["num_obs_schedule"] = num
     

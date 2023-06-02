@@ -25,9 +25,10 @@ class BaselineLengths(LineParser):
         Returns:
             Dict:  Parameters needed by np.genfromtxt to parse the input file.
         """
-        return dict(names=["baseline", "num_obs", "length", "ferr"],
-                    dtype=["U20", "i8", "f8", "f8"])
+        return dict(names=["baseline", "num_obs", "length", "ferr", "lat_1", "lat_2", "lon_1", "lon_2"],
+                    dtype=["U20", "i8", "f8", "f8", "f8", "f8", "f8", "f8"])
     
     def structure_data(self):
         for item in self._array:
-            self.data[item["baseline"]] = dict(length=item["length"], ferr=item["ferr"], num_obs=item["num_obs"])
+            self.data[item["baseline"]] = dict(length=item["length"], ferr=item["ferr"], num_obs=item["num_obs"],
+                                               lat_1=item["lat_1"], lat_2=item["lat_2"], lon_1=item["lon_1"], lon_2=item["lon_2"])

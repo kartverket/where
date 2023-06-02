@@ -78,7 +78,7 @@ def _apply(df: pd.core.frame.DataFrame, sample: str, func: str) -> pd.core.frame
     Args:
         df:      Dataframe.
         sample:  Sample definition ("D": day, "M": month)
-        func:    Function to be applied ("mean", "percentile", "rms", "std")
+        func:    Function to be applied ("mean", "percentile_68", "percentile_90", "percentile_95", "rms", "std")
 
     Returns:
         Resampled dataframe by applying given function
@@ -87,7 +87,11 @@ def _apply(df: pd.core.frame.DataFrame, sample: str, func: str) -> pd.core.frame
 
     if func == "mean":
         df_sampled = df_sampled.mean()
-    elif func == "percentile":
+    elif func == "percentile_68":
+        df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=68))
+    elif func == "percentile_90":
+        df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=90))
+    elif func == "percentile_95":
         df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=95))
     elif func == "rms":
         df_sampled = df_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
@@ -111,18 +115,20 @@ def _add_to_report(
     Args:
         rpt:         Report object.
         figure_dir:  Figure directory.
-        dfs_day:     Dictionary with function type as keys ('mean', 'percentile', 'rms', 'std') and a dictionary as
+        dfs_day:     Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a dictionary as
                      values. The dictionary has fields as keys (e.g. hpe, vpe) and the belonging dataframe as value with
-                     DAILY samples of 95th percentile and stations as columns.
-        dfs_month    Dictionary with function type as keys ('mean', 'percentile', 'rms', 'std') and a dictionary as
+                     DAILY samples of e.g. 95th percentile and stations as columns.
+        dfs_month    Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a dictionary as
                      values. The dictionary has fields as keys (e.g. hpe, vpe) and the belonging dataframe as value with
-                     MONTHLY samples of 95th percentile and stations as columns.
+                     MONTHLY samples of e.g. 95th percentile and stations as columns.
         file_vars:   File variables used for file and plot title naming.
     """
 
     text_def = {
             "mean": "average",
-            "percentile": "95th percentile",
+            "percentile_68": "68th percentile",
+            "percentile_90": "90th percentile",
+            "percentile_95": "95th percentile",
             "std": "standard deviation",
             "rms": "RMS",
     }
@@ -230,41 +236,38 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         |----------------------|--------------------------------------------------------------------------------------|
         | dfs                  | Dictionary with station name as keys and the belonging dataframe as value with       |
         |                      | following dataframe columns: east, north, up, hpe, vpe, pos_3d                       |
-        | dfs_day              | Dictionary with function type as keys ('mean', 'percentile', 'rms', 'std') and a     |
-        |                      | dictionary as values. The dictionary has fields as keys (e.g. hpe, vpe) and the       |
-        |                      | belonging dataframe as value with DAILY samples of 95th percentile and stations as   | 
-        |                      | columns.                                                                             |
-        | dfs_month            | Dictionary with function type as keys ('mean', 'percentile', 'rms', 'std') and a     |
-        |                      | dictionary as values. The dictionary has fields as keys (e.g. hpe, vpe) and the       |
-        |                      | belonging dataframe as value with MONTHLY samples of 95th percentile and stations as | 
-        |                      | columns.                                                                             |
+        | dfs_day              | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
+        |                      | dictionary as values. The dictionary has fields as keys (e.g. hpe, vpe) and the      |
+        |                      | belonging dataframe as value with DAILY samples of e.g. 95th percentile_xx and       | 
+        |                      | stations as columns.                                                                 |
+        | dfs_month            | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
+        |                      | dictionary as values. The dictionary has fields as keys (e.g. hpe, vpe) and the      |
+        |                      | belonging dataframe as value with MONTHLY samples of e.g. 95th percentile and        | 
+        |                      | stations as columns.                                                                 |
     """
     dsets = dset
-    dfs = {}
-    fields = {
-        "east": pd.DataFrame(), 
-        "north": pd.DataFrame(), 
-        "up": pd.DataFrame(), 
-        "hpe": pd.DataFrame(), 
-        "vpe": pd.DataFrame(), 
-        "pos_3d": pd.DataFrame(),
-        "pdop": pd.DataFrame(),
-        "hdop": pd.DataFrame(),
-        "vdop": pd.DataFrame(),
-    }
-    dfs_day = { 
-        "mean": copy.deepcopy(fields), 
-        "percentile": copy.deepcopy(fields), 
-        "std": copy.deepcopy(fields),
-        "rms": copy.deepcopy(fields),
-    }
-    dfs_month = {
-        "mean": copy.deepcopy(fields), 
-        "percentile": copy.deepcopy(fields), 
-        "std": copy.deepcopy(fields),
-        "rms": copy.deepcopy(fields),
-    }
+    fields = dict()
+    dfs = dict()
+    dfs_day = dict()
+    dfs_month = dict()  
+ 
+    fields_def = ["east", "north", "up", "hpe", "vpe", "pos_3d", "hdop", "pdop", "vdop"]
+    statistics_def = ["mean", "percentile_68", "percentile_90", "percentile_95", "rms", "std"]
 
+    fields_cfg = config.tech.gnss_comparison_report.fields.list
+    statistics_cfg = config.tech.gnss_comparison_report.statistic.list
+
+    for field in fields_cfg:
+        if field not in fields_def:
+            log.fatal(f"Field {field} is not defined in 'dataset'.")
+        fields.update({field: pd.DataFrame()})
+
+    for statistic in statistics_cfg:
+        if statistic not in statistics_def:
+            log.fatal(f"Option '{statistic}' is not defined in 'statistic' option.")
+        dfs_day.update({ statistic: copy.deepcopy(fields)})
+        dfs_month.update({ statistic: copy.deepcopy(fields)})
+        
     for station, dset in dsets.items():
 
         if dset.num_obs == 0:
@@ -341,20 +344,22 @@ def _plot_position_error(
     """Plot horizontal and vertical position error plots 
 
     Args:
-        dfs_day:    Dictionary with function type as keys ('mean', 'percentile', 'rms', 'std') and a
+        dfs_day:    Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a
                     dictionary as values. The dictionary has fields as keys (e.g. hpe, vpe) and the 
-                    belonging dataframe as value with DAILY samples of 95th percentile and stations as
+                    belonging dataframe as value with DAILY samples of e.g. 95th percentile and stations as
                     columns.
-        dfs_month   Dictionary with function type as keys ('mean', 'percentile', 'rms', 'std') and a
+        dfs_month   Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a
                     dictionary as values. The dictionary has fields as keys (e.g. hpe, vpe) and the
-                    belonging dataframe as value with MONTHLY samples of 95th percentile and stations as
+                    belonging dataframe as value with MONTHLY samples of e.g. 95th percentile and stations as
                     columns.
        figure_dir:  Figure directory
     """
 
     ylabel_def = {
             "mean": "MEAN",
-            "percentile": "95%",
+            "percentile_68": "68%",
+            "percentile_90": "90%",
+            "percentile_95": "95%",
             "rms": "RMS",
             "std": "STD",
     }

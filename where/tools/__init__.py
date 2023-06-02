@@ -41,6 +41,8 @@ Version: {version}
 """
 
 # Standard library imports
+from copy import copy
+from datetime import date
 import sys
 
 # Midgard imports
@@ -111,8 +113,18 @@ def main():
         else:
             tool_args[key] = util.parse_args(param.annotation, doc_module=tool_module)
 
+    # Set up 'tech' configuration  # TODO: Should the update of 'tech' configuration be done like that? Could in principle the fallback config be used?
+    if "pipeline" in tool_args.keys():
+        if "rundate" in tool_args.keys():
+            rundate = tool_args["rundate"]
+        elif "date_from" in tool_args.keys():
+            rundate = tool_args["date_from"]
+        else:
+            rundate = date.today()
 
-    # Call tool
+        config.init_tech_from_where_config(rundate, tool_args["pipeline"])
+
+
     plugins.call(__name__, tool, **tool_args)
 
 

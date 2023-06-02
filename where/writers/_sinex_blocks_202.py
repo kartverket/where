@@ -310,7 +310,11 @@ class SinexBlocks:
         ecc = apriori.get("eccentricity", rundate=self.dset.analysis["rundate"])
         self.fid.write("+SITE/ECCENTRICITY\n")
         self.fid.write("*Code PT SBIN T Data_Start__ Data_End____ typ Apr --> Benchmark (m)_____\n")
-        for sta in self.dset.unique("station"):
+
+        fieldnames = config.tech.eccentricity.identifier.list
+        keys = np.array([self.dset.unique(f, sort=False) for f in fieldnames]).T
+
+        for sta, key in zip(self.dset.unique("station"), keys):
             site_id = self.dset.meta["station"][sta]["site_id"]
 
             self.fid.write(
@@ -322,10 +326,10 @@ class SinexBlocks:
                     _TECH[self.dset.meta["tech"]],
                     self.dset.time.yydddsssss[0],
                     self.dset.time.yydddsssss[-1],
-                    ecc[site_id]["coord_type"],
-                    ecc[site_id]["vector"][0],
-                    ecc[site_id]["vector"][1],
-                    ecc[site_id]["vector"][2],
+                    ecc[tuple(key)]["coord_type"],
+                    ecc[tuple(key)]["vector"][0],
+                    ecc[tuple(key)]["vector"][1],
+                    ecc[tuple(key)]["vector"][2],
                 )
             )
         self.fid.write("-SITE/ECCENTRICITY\n")
@@ -432,7 +436,7 @@ class SinexBlocks:
                 )
             value_sigma = np.sqrt(self.dset.meta["normal equation"]["covariance"][i - 1][i - 1])
             self.fid.write(
-                " {:>5} {:6} {:4} {:2} {:>4} {:12} {:4} {:1} {: 20.14e} {:11.5e}\n"
+                " {:>5} {:6} {:4} {:>2} {:>4} {:12} {:4} {:1} {: 20.14e} {:11.5e}\n"
                 "".format(
                     i,
                     param_type,
@@ -471,7 +475,7 @@ class SinexBlocks:
             param_unit = self.dset.meta["normal equation"]["unit"][i - 1]
             value = self._get_apriori_value(param, param_unit, time)
             self.fid.write(
-                " {:>5} {:6} {:4} {:2} {:>4} {:12} {:4} {:1} {: 20.14e} {:11.5e}\n"
+                " {:>5} {:6} {:4} {:>2} {:>4} {:12} {:4} {:1} {: 20.14e} {:11.5e}\n"
                 "".format(
                     i,
                     param_type,
@@ -536,7 +540,7 @@ class SinexBlocks:
                 continue
             param_unit = self.dset.meta["normal equation"]["unit"][i - 1]
             self.fid.write(
-                " {:>5} {:6} {:4} {:2} {:>4} {:12} {:4} {:1} {: 20.14e}\n"
+                " {:>5} {:6} {:4} {:>2} {:>4} {:12} {:4} {:1} {: 20.14e}\n"
                 "".format(
                     i,
                     param_type,

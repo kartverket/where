@@ -92,8 +92,8 @@ def concatenate(from_date: "datedoy", to_date: "datedoy", pipeline: "pipeline", 
     station = util.read_option_value("--station", default="")
     writers = util.read_option_value("--writers", default="").replace(",", " ").split()
 
-    # Update configuration of Where analysis
-    config.where.update_from_options(_clean_sys_argv(pipeline))
+    # Update configuration of analysis
+    config.tech.update_from_options(_clean_sys_argv(pipeline))
 
     dset_vars = dict(pipeline=pipeline, stage=stage, station=station, label=label, id=id_)
     dset = _concatenate_datasets(from_date, to_date, dset_vars, only_for_rundate)
@@ -169,7 +169,11 @@ def _concatenate_datasets(
 
         date_to_read += timedelta(days=1)
 
-    dset_merged.analysis.update(id=f"{dset_merged.analysis['id']}_concatenated")
+    if not dset_merged:
+        dset_merged = dset
+    else:
+        dset_merged.analysis.update(id=f"{dset_merged.analysis['id']}_concatenated")
+
     return dset_merged
 
 

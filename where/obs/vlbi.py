@@ -191,6 +191,7 @@ def _write_to_dataset(parser, dset, rundate, session_code):
         dset.meta["station"].setdefault(ivsname, {})["longitude"] = longitude
         dset.meta["station"].setdefault(ivsname, {})["latitude"] = latitude
         dset.meta["station"].setdefault(ivsname, {})["height"] = height
+        dset.meta["station"].setdefault(ivsname, {})["num_obs_read"] = dset.num(station=ivsname)
         if sta_name != ivsname:
             dset.meta["station"].setdefault(sta_name, {})["cdp"] = cdp
             dset.meta["station"].setdefault(sta_name, {})["site_id"] = cdp
@@ -200,6 +201,7 @@ def _write_to_dataset(parser, dset, rundate, session_code):
             dset.meta["station"].setdefault(sta_name, {})["longitude"] = longitude
             dset.meta["station"].setdefault(sta_name, {})["latitude"] = latitude
             dset.meta["station"].setdefault(sta_name, {})["height"] = height
+            dset.meta["station"].setdefault(sta_name, {})["num_obs_read"] = dset.num(station=sta_name)
 
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish

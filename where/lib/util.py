@@ -20,6 +20,7 @@ import os.path
 import platform
 import re
 import sys
+from typing import Tuple
 
 # Midgard imports
 from midgard.collections import enums
@@ -134,6 +135,21 @@ def check_write_level(write_level: enums.WriteLevel) -> bool:
     cfg_write_level = config.where.write_level.str
     return True if enums.get_value("write_level", write_level) >= enums.get_value("write_level", cfg_write_level) else False
 
+
+def get_day_limits(dset: "Dataset") -> Tuple[datetime, datetime]:
+    """Get start and end time for given run date
+
+    Args:
+            dset:      A dataset containing the data.
+
+    Returns:
+            Start and end date. 
+        """
+    day_start = min(dset.time.datetime)
+    day_end = max(dset.time.datetime)
+
+    return day_start, day_end
+    
 
 @no_traceback
 def parse_args(*param_types, doc_module=None):

@@ -11,6 +11,7 @@ Example:
 
 """
 # Standard library imports
+import copy
 from collections import namedtuple
 from typing import Dict
 
@@ -84,7 +85,7 @@ FIELDS = (
         11,
         "EAST",
         "meter",
-        "95th percentile of East component of position given in topocentric coordinate system vs. reference position",
+        "xxth percentile of East component of position given in topocentric coordinate system vs. reference position",
     ),
     WriterField(
         "north",
@@ -93,7 +94,7 @@ FIELDS = (
         11,
         "NORTH",
         "meter",
-        "95th percentile of North component of position given in topocentric coordinate system vs. reference position",
+        "xxth percentile of North component of position given in topocentric coordinate system vs. reference position",
     ),
     WriterField(
         "up",
@@ -102,7 +103,7 @@ FIELDS = (
         11,
         "UP",
         "meter",
-        "95th percentile of Up component of position given in topocentric coordinate system vs. reference position",
+        "xxth percentile of Up component of position given in topocentric coordinate system vs. reference position",
     ),
     WriterField(
         "hpe",
@@ -111,7 +112,7 @@ FIELDS = (
         11,
         "HPE",
         "meter",
-        "95th percentile of Horizontal Position Error of station position vs. reference position",
+        "xxth percentile of Horizontal Position Error of station position vs. reference position",
     ),
     WriterField(
         "vpe",
@@ -120,7 +121,7 @@ FIELDS = (
         11,
         "VPE",
         "meter",
-        "95th percentile of Vertical Position Error of station position vs. reference position",
+        "XXth percentile of Vertical Position Error of station position vs. reference position",
     ),
     WriterField(
         "pos_3d",
@@ -130,7 +131,7 @@ FIELDS = (
         11,
         "3D POS",
         "meter",
-        "95th percentile of 3D position error of station position vs. reference position",
+        "xxth percentile of 3D position error of station position vs. reference position",
     ),
     WriterField("pdop", float, "%7.2f", 7, "PDOP", "", "Position dilution of precision"),
     WriterField("hdop", float, "%7.2f", 7, "HDOP", "", "Horizontal dilution of precision"),
@@ -215,9 +216,9 @@ FIELDS_SUM = (
     #    float,
     #    "%9.4f",
     #    9,
-    #    "95TH",
+    #    "xxth",
     #    "meter",
-    #    "95th percentile for given column",
+    #    "xxth percentile for given column",
     #),
     #WriterField(
     #    "rms",
@@ -241,60 +242,94 @@ def gnss_comparison(dset: "Dataset") -> None:
     output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
+    file_vars["solution"] = config.tech.gnss_comparison.solution.str.lower()
+    samples = config.tech.gnss_comparison.samples.list
     
      # Get dataframes for writing
-    _, df_day, df_month, _, _ = _generate_dataframes(dset)
+    _, dfs_day, dfs_month = _generate_dataframes(dset)
 
-    # Prepare dataframes for writing
-    df_day.index = df_day.index.strftime('%Y-%m-%d')
-    df_day.index.name = "date"
-    df_day = df_day.reset_index()
-    df_month = df_month.reset_index()
- 
     # Write files for daily and monthly solutions
-    samples = config.tech.gnss_comparison.samples.list
-    if "daily" in samples:
-        output_defs.update({
-              "day": df_day,
-              "day_summary": _generate_dataframe_summary(df_day, index="station"),
-        })
+    for type_ in dfs_day.keys():
 
-    if "monthly" in samples:
-        output_defs.update({
-              "month": df_month, 
-              "month_summary": _generate_dataframe_summary(df_month, index="station"), 
-        })
-    
-    for type_, output_array in output_defs.items():
+        # Prepare dataset for writing
+        dfs_day[type_] = dfs_day[type_].reset_index()
+        dfs_month[type_] = dfs_month[type_].reset_index()
         
-        file_vars_tmp = file_vars.copy()
-        file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}")
-        file_path = config.files.path("output_gnss_comparison", file_vars=file_vars_tmp)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        log.info(f"Write '{type_}' comparison file {file_path}.")
-        
-        fields = FIELDS_SUM if "summary" in type_ else FIELDS
-        summary = "Summary of GNSS comparison results (95th percentile)" if "summary" in type_ else "GNSS comparison results (95th percentile)"
+        if "daily" in samples:
+            output_defs.update({
+                  "day": dfs_day[type_],
+                  "day_summary": _generate_dataframe_summary(dfs_day[type_], index="station"),
+            })
+
+        if "monthly" in samples:
+            output_defs.update({
+                  "month": dfs_month[type_], 
+                  "month_summary": _generate_dataframe_summary(dfs_month[type_], index="station"), 
+            })
+
+        for sample, output_array in output_defs.items():
             
-        # Get header
-        header = get_header(
-            fields,
-            pgm_version=f"where {where.__version__}",
-            run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
-            summary=summary,
-        )
-        
-        # Write to disk
-        np.savetxt(
-            file_path,
-            output_array[[f.name for f in fields]].to_numpy(),
-            fmt=tuple(f.format for f in fields),
-            header=header,
-            delimiter="",
-            encoding="utf8",
-        )
+            file_vars_tmp = file_vars.copy()
+            file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}_{sample}")
+            file_path = config.files.path("output_gnss_comparison", file_vars=file_vars_tmp)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            log.info(f"Write '{sample}' comparison file {file_path}.")
+            
+            fields = FIELDS_SUM if "summary" in sample else FIELDS
+            summary = "Summary of GNSS comparison results (xxth percentile)" if "summary" in sample else "GNSS comparison results (xxth percentile)"
+                
+            # Get header
+            header = get_header(
+                fields,
+                pgm_version=f"where {where.__version__}",
+                run_by=util.get_user_info()["inst_abbreviation"] if "inst_abbreviation" in util.get_user_info() else "",
+                summary=summary,
+            )
+            
+            # Write to disk
+            np.savetxt(
+                file_path,
+                output_array[[f.name for f in fields]].to_numpy(),
+                fmt=tuple(f.format for f in fields),
+                header=header,
+                delimiter="",
+                encoding="utf8",
+            )
+
+
+#
+# AUXILIARY FUNCTIONS
+#
+def _apply(df: pd.core.frame.DataFrame, sample: str, func: str) -> pd.core.frame.DataFrame:
+    """Resample dataframe and apply given function 
+
+    Args:
+        df:      Dataframe.
+        sample:  Sample definition ("D": day, "M": month)
+        func:    Function to be applied ("mean", "percentile_68", "percentile_90", "percentile_95", "rms", "std")
+
+    Returns:
+        Resampled dataframe by applying given function
+    """
+    df_sampled = df.set_index("time_gps").resample(sample)
+
+    if func == "mean":
+        df_sampled = df_sampled.mean()
+    elif func == "percentile_68":
+        df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=68))
+    elif func == "percentile_90":
+        df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=90))
+    elif func == "percentile_95":
+        df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=95))
+    elif func == "rms":
+        df_sampled = df_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
+    elif func == "std":
+        df_sampled = df_sampled.std()
+    else:
+        log.fatal(f"Function '{func}' is not defined.")
+
+    return df_sampled  
       
              
 def _generate_dataframe_summary(df: pd.core.frame.DataFrame, index: str) -> pd.core.frame.DataFrame:
@@ -364,8 +399,8 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
                     1      2019-03-01 00:00:00  0.710014  0.186791 -0.235267  0.669903  0.186791
 
 
-    Example for "df_day" dictionary:
-
+    Example for "dfs_day" dictionary for "mean" key:
+        'mean':{
                             pdop      hdop      vdop  ...       vpe    pos_3d  station
             date                                      ...                             
             2020-07-01  2.523569  1.371987  2.135124  ...  0.752227  0.870759     krss
@@ -373,10 +408,11 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             2020-07-01  2.622492  1.289113  2.330969  ...  1.084772  1.220454     hofs
             2020-07-01  2.699645  1.246052  2.456847  ...  1.044877  1.266227     hons
             2020-07-01  2.695779  1.156999  2.448314  ...  1.461449  1.619489     nabd
+        }
 
 
-    Example for "df_month" dictionary:
-
+    Example for "dfs_month" dictionary for "mean" key:
+        'mean':{
                           pdop      hdop      vdop  ...       vpe    pos_3d  station
             date
             Jul-2020  2.523569  1.371987  2.135124  ...  0.752227  0.870759     krss
@@ -384,32 +420,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             Jul-2020  2.622492  1.289113  2.330969  ...  1.084772  1.220454     hofs
             Jul-2020  2.699645  1.246052  2.456847  ...  1.044877  1.266227     hons
             Jul-2020  2.695779  1.156999  2.448314  ...  1.461449  1.619489     nabd
-
-
-    Example for "dfs_day_field" dictionary:
-
-            'hpe':                 nabf      vegs      hons      krss
-                    date                                          
-                    2019-03-01  1.368875  0.935687  1.136763  0.828754
-                    2019-03-02  0.924839  0.728280  0.911677  0.854832
-
-
-            'vpe':                 nabf      vegs      hons      krss
-                    date                                          
-                    2019-03-01  1.715893  1.147265  1.600330  0.976541
-                    2019-03-02  1.533437  1.307373  1.476295  1.136991
-
-
-    Example for "dfs_month_field" dictionary:
-
-            'hpe':                nabf      vegs      hons      krss
-                        Mar-2019  1.186240  0.861718  1.095827  1.021354
-                        Apr-2019  0.891947  0.850343  0.977908  0.971099
-
-            'vpe':                nabf      vegs      hons      krss
-                        Mar-2019  1.854684  1.291406  1.450466  1.225467
-                        Apr-2019  1.964404  1.706507  1.687994  1.500742
-
+        }
 
     Args:
         dset: Dictionary with station name as keys and the belonging Dataset as value
@@ -421,33 +432,29 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         |----------------------|--------------------------------------------------------------------------------------|
         | dfs                  | Dictionary with station name as keys and the belonging dataframe as value with       |
         |                      | following dataframe columns: east, north, up, hpe, vpe, pos_3d                       |
-        | df_day               | Dataframe with daily entries with columns like date, station, hpe, vpe, ...          |
-        | df_month             | Dataframe with monthly entries with columns like date, stationm hpe, vpe, ...        |
-        | dfs_day_field        | Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value  |
-        |                      | with DAILY samples of 95th percentile and stations as columns.                       |
-        | dfs_month_field      | Dictionary with fields as keys (e.g. hpe, vpe) and the belonging dataframe as value  |
-        |                      | with MONTHLY samples of 95th percentile and stations as columns.                     |
+        | dfs_day              | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
+        |                      | dataframe as values with daily entries with columns like date, station, hpe, vpe, ...|
+        | dfs_month            | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
+        |                      | dataframe as values with monthly entries with columns like date, station, hpe,       |
+        |                      | vpe, ...                                                                             |
     """
     dsets = dset
-    dfs = {}
-    df_day = pd.DataFrame()
-    dfs_day_field = {
-        "hpe": pd.DataFrame(), 
-        "vpe": pd.DataFrame(), 
-        "pos_3d": pd.DataFrame(),
-        "pdop": pd.DataFrame(),
-        "hdop": pd.DataFrame(),
-        "vdop": pd.DataFrame(),
-    }
-    df_month = pd.DataFrame()
-    dfs_month_field = {
-        "hpe": pd.DataFrame(), 
-        "vpe": pd.DataFrame(), 
-        "pos_3d": pd.DataFrame(),
-        "pdop": pd.DataFrame(),
-        "hdop": pd.DataFrame(),
-        "vdop": pd.DataFrame(),
-    }
+    fields = dict()
+    dfs = dict()
+    dfs_day = dict()
+    dfs_month = dict()
+
+    fields_def = ["east", "north", "up", "hpe", "vpe", "pos_3d", "hdop", "pdop", "vdop"]
+    fields_cfg = config.tech.gnss_comparison_report.fields.list
+
+    statistics_def = ["mean", "percentile_68", "percentile_90", "percentile_95", "rms", "std"]
+    statistics_cfg = config.tech.gnss_comparison_report.statistic.list
+
+    for statistic in statistics_cfg:
+        if statistic not in statistics_def:
+            log.fatal(f"Option '{statistic}' is not defined in 'statistic' option.")
+        dfs_day.update({ statistic:  pd.DataFrame()})
+        dfs_month.update({ statistic:  pd.DataFrame()})
 
     for station, dset in dsets.items():
 
@@ -490,32 +497,26 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
         # Determine dataframe 
         df = dset.as_dataframe(fields=["enu.enu", "time.gps", "hpe", "vpe", "pos_3d", "pdop", "vdop", "hdop"])
-        df = df.rename(columns={"enu_enu_0": "east", "enu_enu_1": "north", "enu_enu_2": "up", "time_gps": "date"})
+        df = df.rename(columns={"enu_enu_0": "east", "enu_enu_1": "north", "enu_enu_2": "up"})
 
         if df.empty:
             continue
         else:
             # Save data in dictionaries
             dfs.update({station: df})
-            df_day_tmp = df.set_index("date").resample("D").apply(lambda x: np.nanpercentile(x, q=95))
-            for field in dfs_day_field.keys():
-                if dfs_day_field[field].empty:
-                    dfs_day_field[field][station] = df_day_tmp[field]
-                else:
-                    dfs_day_field[field] = pd.concat([dfs_day_field[field], df_day_tmp[field]], axis=1)
-                dfs_day_field[field] = dfs_day_field[field].rename(columns={field: station})
 
-            df_day_tmp["station"] = np.repeat(station, df_day_tmp.shape[0])
-            df_day = pd.concat([df_day, df_day_tmp], axis=0)
+            for type_ in dfs_day.keys():
 
-            df_month_tmp = df.set_index("date").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
-            df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
-            for field in dfs_month_field.keys():
-                dfs_month_field[field][station] = df_month_tmp[field]
+                df_day_tmp = _apply(df, "D", type_)
+                df_day_tmp.index = df_day_tmp.index.strftime("%Y-%m-%d")
+                df_day_tmp["station"] = np.repeat(station, df_day_tmp.shape[0])
+                dfs_day[type_] = pd.concat([dfs_day[type_], df_day_tmp], axis=0)
+                dfs_day[type_].index.name = "date"
 
-            df_month_tmp["station"] = np.repeat(station, df_month_tmp.shape[0])
-            df_month = pd.concat([df_month, df_month_tmp], axis=0)
+                df_month_tmp = _apply(df, "M", type_)
+                df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
+                df_month_tmp["station"] = np.repeat(station, df_month_tmp.shape[0])
+                dfs_month[type_] = pd.concat([dfs_month[type_], df_month_tmp], axis=0)
+                dfs_month[type_].index.name = "date"
 
-    df_month.index.name = "date"
-
-    return dfs, df_day, df_month, dfs_day_field, dfs_month_field
+    return dfs, dfs_day, dfs_month

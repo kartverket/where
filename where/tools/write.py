@@ -70,8 +70,8 @@ def write(rundate: "datedoy", pipeline: "pipeline", stage: "option", writers: "o
     station = util.read_option_value("--station", default="")
     writers = writers.replace(",", " ").split()
 
-    # Update configuration of Where analysis
-    config.where.update_from_options(_clean_sys_argv(pipeline))
+    # Update configuration of analysis 
+    config.tech.update_from_options(_clean_sys_argv(pipeline))
 
     dset_vars = dict(pipeline=pipeline, stage=stage, station=station, label=label, id=id_)
 

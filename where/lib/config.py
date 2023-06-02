@@ -68,7 +68,7 @@ from midgard.config.config import Configuration
 from midgard.config.files import FileConfiguration
 
 # Where imports
-from where.lib import enums  # noqa  # Register Where enums
+from where.lib import enums, log  # noqa  # Register Where enums
 
 
 # Base directory of the Where installation
@@ -107,6 +107,29 @@ def init(rundate, pipeline, **cfg_vars):
     tech.update_from_file(cfg_path)
     if pipeline in tech.section_names:
         tech.master_section = pipeline
+
+
+def init_tech_from_where_config(rundate, pipeline, **cfg_vars):
+    """Initialize 'tech' configuration with Where configuration
+
+    This can be necessary to set 'tech' configuration, if no 'tech' specific configuration file exists. This can be 
+    the case if the program where_tools is used. 
+
+    TODO: Check if the fallback config functionality should be used instead!!!
+    """
+    # Update Analysis-configuration
+    set_analysis(rundate, pipeline=pipeline, **cfg_vars)
+
+    # Add variables to Files-configuration
+    set_file_vars(create_file_vars(rundate, pipeline, **cfg_vars))
+
+    # Set Tech-configuration, and set Where-configuration as parent
+    tech.clear()
+    for file_path in config_paths("where", pipeline=pipeline, **cfg_vars):
+        tech.update_from_file(file_path, interpolate=True)
+
+    if pipeline in tech.section_names:
+        tech.master_section = "all"
 
 
 def read_pipeline(pipeline):
@@ -257,6 +280,7 @@ def timestamps(rundate, pipeline, **kwargs):
 def read_where_config(**path_vars):
     """Read Where-configuration"""
     where.clear()
+    log.debug(f"Read Where configuration from {', '.join([str(v) for v in config_paths('where', **path_vars)])}")
     for file_path in config_paths("where", **path_vars):
         where.update_from_file(file_path, interpolate=True)
     where.master_section = "all"
@@ -265,6 +289,7 @@ def read_where_config(**path_vars):
 def read_files_config(**path_vars):
     """Read Files-configuration"""
     files.clear()
+    log.debug(f"Read Files configuration from {', '.join([str(v) for v in config_paths('files', **path_vars)])}")
     for file_path in config_paths("files", **path_vars):
         files.update_from_file(file_path, interpolate=False)
     set_file_vars()
@@ -273,6 +298,7 @@ def read_files_config(**path_vars):
 def read_there_config(**path_vars):
     """Read There-configuration"""
     there.clear()
+    log.debug(f"Read There configuration from {', '.join([str(v) for v in config_paths('there', **path_vars)])}")
     for file_path in config_paths("there", **path_vars):
         there.update_from_file(file_path, interpolate=True, case_sensitive=True)
     there.master_section = "general"

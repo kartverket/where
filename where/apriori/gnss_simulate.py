@@ -62,7 +62,7 @@ class GnssSimulate:
         # MURKS: Should it be done like that. The technique is normally not given for unittest routines (like
         #       test_broadcast.py).
         try:
-            pipeline = config.analysis.pipeline.str
+            pipeline = config.tech.pipeline.str
         except:
             pipeline = "gnss"
 

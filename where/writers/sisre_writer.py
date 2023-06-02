@@ -19,8 +19,7 @@ from midgard.writers._writers import get_field, get_header
 
 # Where imports
 import where
-from where.lib import config
-from where.lib import util
+from where.lib import config, log, util
 from where import pipelines
 from where.writers import sisre_output_buffer
 
@@ -244,6 +243,7 @@ def sisre_writer(dset: "Dataset") -> None:
     # Write to disk
     # NOTE: np.savetxt is used instead of having a loop over all observation epochs, because the performance is better.
     file_path = config.files.path(f"output_sisre_{dset.vars['label']}", file_vars={**dset.vars, **dset.analysis})
+    log.info(f"Write file {file_path}")
     np.savetxt(
         file_path,
         output_array,

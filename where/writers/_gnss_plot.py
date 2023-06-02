@@ -8,7 +8,6 @@ TODO
 # Standard liberay imports
 from dataclasses import dataclass
 from collections import namedtuple
-from datetime import datetime
 import pathlib
 from typing import List, Tuple, Union
 
@@ -26,7 +25,7 @@ from midgard.plot.matplotext import MatPlotExt
 from where.data import dataset3 as dataset
 from where.lib import config
 from where.lib import log
-from where.writers._gnss import get_day_limits
+from where.lib.util import get_day_limits
     
 
 

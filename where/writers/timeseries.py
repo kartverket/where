@@ -243,7 +243,7 @@ def method_meta_index(dset, field, idx_values, func):
     for i, n in enumerate(names):
         if n == "all":
             continue
-        val[i] = dset.meta[key][n].get("scheduled_obs", np.nan)
+        val[i] = dset.meta[key][n].get(field, np.nan)
         
     return val, "add_float", None
 

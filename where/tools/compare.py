@@ -100,8 +100,8 @@ def compare(date: "datedoy", pipeline: "pipeline", items: "option", specifier: "
     station = util.read_option_value("--station", default="")
     id_ = util.read_option_value("--id", default="")
 
-    # Update configuration of Where analysis
-    config.where.update_from_options(_clean_sys_argv(pipeline))
+    # Update configuration of analysis
+    config.tech.update_from_options(_clean_sys_argv(pipeline))
 
     # Get dataset variables
     dset_vars = config.create_file_vars(rundate=date, pipeline=pipeline)

@@ -22,7 +22,7 @@ from midgard.plot.matplotext import MatPlotExt
 from where import apriori
 from where.lib import config
 from where.lib import log
-from where.writers._gnss import get_day_limits
+from where.lib.util import get_day_limits
 from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
 
