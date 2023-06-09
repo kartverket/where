@@ -1,0 +1,72 @@
+Let us look at a few examples on how to run the Where software. One of our
+guiding principles is that the software should be as easy to use as possible.
+
+{\bfseries A VLBI analysis}
+
+To start a VLBI analysis, we simply need to provide the date we want to analyse:
+
+\texttt{> where 2016 6 22 --vlbi}
+
+Doing this will show the default configuration for VLBI analyses, including
+options like which models to run, which ephemerides (positions for planets etc)
+to use and which output to create. All of these options can be changed, or we
+can accept the defaults and run the analysis.
+
+As the model runs, all intermediary calculations are stored, allowing us to
+later look at data at each step. For instance can we compare raw observation
+numbers with calculated results, or look at the residuals before or after
+estimation. The simplest way to do this is to use the There GUI-companion:
+
+\texttt{> there}
+
+\includegraphics[width=\linewidth]{figure/vlbi_20160622_nyales20}
+
+{\itshape Residuals based on models (no estimation) from a VLBI analysis for the
+  station at Ny-{\AA}lesund, Norway. Colors indicate the other station in the
+  baseline.}
+
+After a model run, we can also explore the data interactively. In practice, this
+means that we get access to the datasets and can use the Python datastack to
+manipulate them:
+
+\texttt{> where 2016 6 22 --interactive}
+
+\begin{verbatim}
+Available datasets:
+    v0, vlbi_calculate_XA_1
+    v1, vlbi_calculate_XA_2
+    v2, vlbi_edit_data_XA_0
+    [...]
+
+In [1]:  v1.residual
+array([ 0.47276345, -0.05613388,
+       -0.50012711, ...,  0.05031952,
+       -0.00214976,  0.04906757])
+
+In [2]: v1.unique('station')
+['BADARY', 'MEDICINA', 'NOTO',
+ 'NYALES20', 'SVETLOE', 'WETTZELL',
+ 'YEBES40M', 'ZELENCHK']
+\end{verbatim}
+
+The final output of the analysis can be stored in many different formats. Sinex
+is typically used when sharing analysis with others. However, one interesting
+output format Where supports is Jupyter Notebooks. These allow us to for
+instance run each model independently, and easily create live demonstrations of
+the software highlighting particular parts of the analysis.
+
+{\bfseries A GPS analysis}
+
+Doing a GPS analysis is done in the same way as the VLBI analysis. We only need
+to specify a different technique:
+
+\texttt{> where 2016 6 22 --gnss}
+
+The technique is specified as \texttt{--gnss} because Where will support
+analyses of several of the systems, including GLONASS and Galileo, in addition
+to GPS. Running Where like this will again bring up all the default options. For
+GNSS these options will now include how to handle satellite orbits and which
+stations to analyse.
+
+
+\endinput

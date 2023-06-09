@@ -1,0 +1,73 @@
+Where is a new software for geodetic analysis, currently being developed at the
+Norwegian Mapping Authority (Kartverket). Where is based on our experiences with
+the GEOSAT software~\cite{kierulf2010}, and will be able to analyse and combine
+data from VLBI, SLR, GNSS and DORIS.
+
+
+{\large\bfseries Why?}\\
+
+The last decade the Norwegian Mapping Authority has increased its contributions
+on global reference frames.  We are currently building a new fundamental station
+at Ny-{\AA}lesund with VLBI, SLR, GNSS and DORIS. We have contributed to passing
+a UN resolution on global geodesy and the importance of Global Geodetic
+Reference Frames~\cite{un_ggrf}. The Where project is the third leg in this
+effort, developing a new tool for the analysis of geodetic data and giving us
+more insight into such analysis.
+
+
+{\large\bfseries How?}\\
+
+Where is mainly implemented in Python. The Python ecosystem for data science is
+very rich and Where utilizes several well known packages such as \texttt{numpy}
+and \texttt{scipy}, as well as more specialized packages
+like \texttt{astropy}~\cite{astropy2013}
+and \texttt{jplephem}~\cite{jplephem}. Data can easily be visualized with
+and \texttt{matplotlib}. In addition, Python smoothly interfaces with other
+languages like C and Fortran, which allows Where to use
+the \texttt{SOFA}~\cite{sofa_software} and \texttt{IERS}~\cite{iers_software}
+Fortran libraries directly. Python is also Open Source and freely available on
+all major platforms.
+
+
+{\large\bfseries What?}\\
+
+Where works on the basis of a pipeline. First, observation data are read and
+edited. Editing can for instance involve discarding bad observations or applying
+an elevation cut off angle. Next, theoretical delays are calculated and a
+quadratic clock polynomial is estimated. Station positions and other target
+parameters such as EOP can then be estimated next. Finally, results are written
+to disk in proper formats (Figure~\ref{fig:architecture}).
+
+The implementation of the individual models follow the 2010 IERS
+Conventions~\cite{iers2010}, and when possible we have used software libraries
+made available at the IERS web page~\cite{iers_software}. Table~\ref{tbl:models}
+gives an overview of the models available for Where. The estimation is done
+using a Kalman filter with a Modified Bryson-Frazier smoother. Currently we are
+using continuous piecewise linear functions to model the clock and troposphere
+~\cite{mysen2017b}.
+
+
+{\large\bfseries Where?}\\
+
+A VLBI model consistent with current conventions is fully implemented.
+Comparisons with other softwares (see box below) yield promising results. The
+estimation module is implemented, but further testing is needed to get a good
+solution. Where can read both NGS and vgosDb files, but requires that the
+ionosphere and ambiguities are already solved.
+
+
+{\large\bfseries When?}\\
+
+We are an associated analysis center within the IVS and a report of our
+activities the last two years will soon be published~\cite{kirkvik2017}. Our
+short term plans are to finish a stable version of Where capable of producing
+normal equations that can be used for IVS products~\cite{mysen2017}.
+Additionally, we plan to implement support for the post-seismic deformation
+models in ITRF2014.
+
+The next step is to implement the possibility to create a reference frame based
+on the individual session solutions. Later, we will investigate the
+possibilities for solving the ionosphere and ambiguities in the next step
+towards creating an independent analysis software.
+
+\endinput

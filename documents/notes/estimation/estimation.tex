@@ -1,0 +1,588 @@
+\documentclass[twoside=true,fontsize=12pt,paper=a4,titlepage=on]{kv_article}
+
+\usepackage{graphicx}
+\usepackage{amssymb, amsmath, bm}
+\usepackage{multirow}
+\usepackage{mathtools}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{arydshln}
+
+\begin{document}
+
+\title{Estimation in Where}
+\subtitle{\vspace{2cm}Norwegian Mapping Authority}
+\author{Ann-Silje Kirkvik}
+\date{\today}
+
+\maketitle
+%\thispagestyle{empty}   % Use titlepage=on instead
+%\newpage
+
+\section{Introduction}
+Kalman Filter and Smoother with Continuous Piecewise Linear Functions. \cite{gibbs2011} and \cite{bierman2006}.
+Notation: boldface is vector or matrix
+
+\section{Basic algorithm}
+
+Given observations at the epochs $t_j, j = 1, 2, \ldots, n$. $j=0$ indicates the apriori information. 
+\begin{flalign}
+\bm{x}_{j+1} &= \bm{\phi}_j\bm{x}_j + \bm{w}_j \label{eq:model1} \\
+\bm{y}_j &= \bm{H}_j\bm{x}_j + \bm{e}_j \label{eq:model2}
+\end{flalign}
+
+\noindent with $\bm{x}_0 \sim \mathcal{N}(0, \bm{P}_0)$, $\bm{w}_j \sim \mathcal{N}(0,\bm{Q}_j)$ and $\bm{e}_j \sim
+\mathcal{N}(0,\bm{R}_j)$.
+
+Symbols:
+\begin{description}[align=right, labelwidth=1cm]
+\item [$\bm{x}_j$] : true value of state vector at epoch $t_j$. Dimension: $u \times 1$
+\item [$\bm{\phi}_j$] : state transistion matrix. Dimension: $u \times u$
+\item [$\bm{w}_j$] : process noise. Dimension: $u \times 1$
+\item [$\bm{Q}_j$] : process noise covariance $u \times u$
+\item [$\bm{y}_j$] : measurement/observation (or reduced observation/residual). Dimension: $m \times 1$
+\item [$\bm{H}_j$] : design matrix, partial derivatives, jacobian matrix. Dimension: $m \times u$
+\item [$\bm{e}_j$] : observation noise. Dimension: $m \times 1$
+\item [$\bm{R}_j$] : observation noise covariance. Dimension: $m \times m$
+\item [$\bm{x}_0$] : apriori state vector. Dimension: $u \times 1$
+\item [$\bm{P}_0$] : apriori state vector covariance: $u \times u$
+\item [$n$] : total number of observation epochs, $t_1,\ldots, t_n$
+\item [$m$] : number of observations at epoch $t_j$, often equal to 1.
+\item [$u$] : number of unknowns
+\end{description}
+
+Kalman filter time update equations:
+\begin{flalign}
+\tilde{\bm{x}}_{j+1} &= \bm{\phi}_j \hat{\bm{x}}_j \label{eq:time1}\\
+\tilde{\bm{P}}_{j+1} &= \bm{\phi}_j \hat{\bm{P}}_j \bm{\phi}_j^\mathsf{T} + \bm{Q}_j \label{eq:time2}
+\end{flalign}
+
+Symbols:
+\begin{description}[align=right, labelwidth=1cm]
+\item[$\tilde{\bm{x}}_{j+1}$] : predicted state vector at epoch $t_{j+1}$ based on measurements up to and including
+epoch $t_j$. Dimension: $u \times 1$
+\item[$\hat{\bm{x}}_j$] : estimated state vector at epoch $t_j$ based on measurements up to and including epoch
+$t_j$.
+Dimension: $u \times 1$
+\item[$\tilde{\bm{P}}_{j+1}$] : predicted state vector covariance at epoch $t_{j+1}$ based on measurements up to and
+including epoch $t_j$. Dimension: $u \times u$
+\item[$\hat{\bm{P}}_j$] : estimated state vector covariance at epoch $t_j$ based on measurements up to and including
+epoch $t_j$. Dimension: $u \times u$
+\end{description}
+
+Kalman filter measurement update equations:
+\begin{flalign}
+\hat{\bm{x}}_j &= \tilde{\bm{x}}_j + \bm{K}_j\bm{z}_j \label{eq:measure1}\\
+\bm{z}_j &= \bm{y}_j - \bm{H}_j\tilde{\bm{x}}_j \label{eq:measure2}\\
+\hat{\bm{P}}_j &= (\bm{I} - \bm{K}_j\bm{H}_j)\tilde{\bm{P}}_j \label{eq:measure3}\\
+\bm{K}_j &= \tilde{\bm{P}}_j\bm{H}_j^\mathsf{T}\bm{N}_j^{-1} \label{eq:measure4}\\
+\bm{N}_j &= \bm{H}_j\tilde{\bm{P}}_j\bm{H}_j^\mathsf{T} + \bm{R}_j \label{eq:measure5}
+\end{flalign}
+
+Symbols:
+\begin{description}[align=right, labelwidth=1cm]
+\item[$\bm{K}_j$] : Kalman gain. Dimension $u \times m$
+\item[$\bm{z}_j$] : innovation. Dimension $m \times 1$
+\item[$\bm{N}_j$] : innovation covariance. Dimension $m \times m$
+\end{description}
+
+Modified Bryson-Frazier smoother equations:
+\begin{flalign}
+\hat{\bm{\lambda}}_n &= 0 \label{eq:smooth1}\\
+\tilde{\bm{\lambda}}_j &= (-\bm{H}_j^\mathsf{T}\bm{N}_j^{-1}\bm{z}_j) + (\bm{I} -
+\bm{K}_j\bm{H}_j)^\mathsf{T} \hat{\bm{\lambda}}_j \label{eq:smooth2}\\
+\hat{\bm{\lambda}}_j &= \bm{\phi}_j^\mathsf{T} \tilde{\bm{\lambda}}_{j+1} \label{eq:smooth3}\\
+%
+\hat{\bm{\Lambda}}_n &= 0 \label{eq:smooth4}\\
+\tilde{\bm{\Lambda}}_j &= \bm{H}_j^\mathsf{T}\bm{N}_j^{-1}\bm{H}_j + (\bm{I} -
+\bm{K}_j\bm{H}_j)^\mathsf{T}\hat{\bm{\Lambda}}_j(\bm{I} - \bm{K}_j\bm{H}_j) \label{eq:smooth5}\\
+\hat{\bm{\Lambda}}_j &= \bm{\phi}_j^\mathsf{T} \tilde{\bm{\Lambda}}_{j+1} \bm{\phi}_j \label{eq:smooth6}
+\end{flalign}
+
+\begin{flalign}
+\bm{P}_j^\ast &= \hat{\bm{P}}_j - \hat{\bm{P}}_j \hat{\bm{\Lambda}}_j \hat{\bm{P}}_j =
+\tilde{\bm{P}}_j - \tilde{\bm{P}}_j \tilde{\bm{\Lambda}}_j \tilde{\bm{P}}_j \label{eq:smooth7}\\
+\bm{x}_j^\ast &= \hat{\bm{x}}_j - \hat{\bm{P}}_j \hat{\bm{\lambda}}_j = \tilde{\bm{x}}_j -
+\tilde{\bm{P}}_j \tilde{\bm{\lambda}}_j \label{eq:smooth8}
+\end{flalign}
+
+Symbols:
+\begin{description}[align=right, labelwidth=1cm]
+\item[$\tilde{\bm{\lambda}}_j, \hat{\bm{\lambda}}_j$] : intermediate variable. Dimension: $u \times 1$
+\item[$\tilde{\bm{\Lambda}}_j, \hat{\bm{\Lambda}}_j$] : intermediate variable. Dimension: $u \times u$
+\item[$\bm{P}_j^\ast$] : smoothed state vector covariance at epoch $t_j$ based on measurements up to and including
+epooch $t_n$
+\item[$\bm{x}_j^\ast$] : smoothed state vector at epoch $t_j$ based on measurements up to and including epooch
+$t_n$
+\end{description}
+
+\section{State vector}
+
+The state vector $\bm{x}_j$ can consist of both constant parameters and continuous piecewise linear (cpwl) parameters. 
+
+\begin{flalign}
+\begin{array}{cc}
+\multirow{8}{*}{$
+	\bm{x}_j =
+	\begin{bmatrix}
+	x_1     \\
+	x_2     \\
+	\ldots  \\
+	x_c     \\
+	x_{c+1} \\
+	x_{c+2} \\
+	\ldots  \\
+	x_u
+	\end{bmatrix}$} & \begin{rcases} \\ \\ \\ \\ \end{rcases} \text{constant parameters} \\
+                    & \begin{rcases} \\ \\ \\  \end{rcases} \text{cpwl parameters}
+\end{array}
+\end{flalign}
+
+The first $c$ parameters in the state vector are the constant parameters while the remaining $u-c$ parameters are the
+cpwl parameters. To represent a parameter with a cpwl function two parameters are actually needed, an offset and a
+rate. For instance, if the state vector contains cpwl zenith wet delay for five stations, then 10 parameters are needed
+in the state vector. If parameter $x_i$ is the offset of a cpwl parameter then parameter $x_{i+1}$ is the rate of that
+parameter.
+
+Typically, the apriori state vector is zero and the final estimate represents the correction to the value of the
+parameters in the state vector used to calculate the reduced observations.
+
+\section{State transition matrix}
+The state transition matrix contains a model for how the state vector $\bm{x}_j$ changes from one epoch to the next.
+When combining constant and cpwl parameters the state transition matrix is:
+\begin{flalign}
+\bm{\phi}_j =
+\left[\begin{array}{ccc:ccccc}
+1      & \ldots & 0      & 0      & \ldots     & \ldots & \ldots & 0          \\
+\vdots & \ddots & \vdots & 0      & \ldots     & \ldots & \ldots & 0          \\
+0      & \ldots & 1      & 0      & \ldots     & \ldots & \ldots & 0          \\ \hdashline
+0      & 0      & 0      & 1      & \Delta t_j & \ldots & \ldots & 0          \\
+\vdots & \vdots & \vdots & 0      & 1          & 0      & \ddots & 0          \\
+\vdots & \vdots & \vdots & \vdots & \ddots     & \ddots & \vdots & 0          \\
+\vdots & \vdots & \vdots & \vdots & \ddots     & \ddots & 1      & \Delta t_j \\
+0      & 0      & 0      & 0      & \ldots     & \ldots & 0      & 1
+\end{array}\right]
+\end{flalign}
+
+with $\Delta t_j = t_{j+1} - t_j$. The dashed lines represent the boundaries between the constant parameters and the 
+cpwl parameters. For the constant parameters the model does not predict any changes and the upper left corner is just an
+identity matrix. For the cpwl parameters the offset is predicted to increment by a linear rate multiplied by the time
+passed. The rate itself is a constant. For instance, if the state vector contains only one cpwl function $\bm{x}_j =
+[a \, b]^\mathsf{T}$ the state transistion matrix will work like this:
+
+\begin{flalign}
+\begin{bmatrix}
+1 & \Delta t_j \\
+0 & 1
+\end{bmatrix}
+\begin{bmatrix}
+a \\
+b
+\end{bmatrix}
+=
+\begin{bmatrix}
+1\cdot a + \Delta t_j \cdot b \\
+0\cdot a + 1 \cdot b
+\end{bmatrix}
+\end{flalign}
+
+The predicted offset is then $\tilde{a}_{j+1} = \hat{a}_j + \hat{b}\Delta t_j$ and the predicted rate is just
+$\tilde{b}_{j+1}=\hat{b}_j$.
+
+\section{Reduced observations}
+The vector $\bm{y}_j$ contains the reduced observations for epoch $t_j$, also known as observed minus computed.
+Computed refers to the theoretical observation one should expect based on the model. The difference between the theoretical observation
+and the actual observations is then the reduced observations that enter the Kalman filter algorithm.
+
+\begin{flalign}
+\bm{y}_j &=
+\begin{bmatrix}
+y_1 \\
+y_2 \\
+\vdots \\
+y_m \\
+\end{bmatrix}
+\end{flalign}
+
+\noindent for $j=1,\ldots,n$. If $m=1$, then $\bm{y}_j$ is reduced to a scalar.
+
+\section{Design matrix}
+
+\begin{flalign}
+\bm{H}_j =
+\begin{bmatrix}
+\frac{\partial \bm{y}_j}{\partial \bm{x}_j} 
+\end{bmatrix}
+=
+\begin{bmatrix}
+\frac{\partial y_1}{\partial x_1} & \frac{\partial y_1}{\partial x_2} & \ldots & \frac{\partial y_1}{\partial x_u} \\
+\vdots                              & \vdots                              & \vdots & \vdots \\
+\frac{\partial y_m}{\partial x_1} & \frac{\partial y_m}{\partial x_2} & \ldots & \frac{\partial y_m}{\partial x_u}\\
+\end{bmatrix}
+\end{flalign}
+
+\noindent for $j=1,\ldots,n$. $\partial y_k / \partial x_i$ referes to the partial derivative of the model for a
+theoretical observation $y_k$ with respect to the a parameter $x_i$ in the state vector. Again, if $m=1$ the $\bm{H}_j$
+is reduced to a row vector.
+
+\section{Process noise covariance}
+The process noise covariance is a what enables the Kalman filter to model stochastic or cpwl paramters. (Stochastic
+parameters is not covered in this text, yet.) For cpwl parameters the process noise covariance is given by:
+\begin{flalign}
+\bm{Q}_j =
+\left[\begin{array}{ccc:ccccc}
+0      & \ldots & 0      & 0      & \ldots     & \ldots & \ldots & 0 \\
+\vdots & \ddots & \vdots & 0      & \ldots     & \ldots & \ldots & 0 \\
+0      & \ldots & 0      & 0      & \ldots     & \ldots & \ldots & 0 \\ \hdashline
+0      & 0      & 0      & 0      & 0          & \ldots & \ldots & 0 \\
+\vdots & \vdots & \vdots & 0      & q_i & \ddots & \ddots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \ddots     & \ddots & \vdots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \ddots     & \ddots & 0      & 0 \\
+0      & 0      & 0      & 0      & \ldots     & \ldots & 0      & q_u
+\end{array}\right]
+\end{flalign}
+
+where $q_i$ is a large number for parameter $x_i$ and $x_i$ is the rate in a cpwl offset and rate pair. The dashed lines
+represent the boundaries between the constant parameters and the cpwl parameters. For constant parameters noise is
+never introduced and consequently the upper left corner of the matrix is always zero. This matrix $\bm{Q}_j$ has values
+for $q_i$ at the epochs $t_j$ that represents the endpoint of a linear segment. Different parameters may use different
+epochs to segment the cpwl function. For epochs where no rates should be reset $\bm{Q}_j$ is a null matrix.
+
+When modeling cpwl functions the purpose of the process noise $q_i$ is to introduce a large amount of noise for the
+rate of that specific parameter. The consequence of this is that the predicted covariance for the next epoch
+$t_{j+1}$ is very large and all prior knowlegde about this parameter is lost in the noise. The rate parameter is then
+free to obtain a new value based on the new incoming data. $q_i$ needs to be large enough to let $x_i$ reset, but not so
+large that it causes numerical issues. todo: example
+
+
+\section{Rescaling the design matrix}
+If $\bm{H}_j$ is ill-conditioned it will cause numerical problems. These problems can be mitigated by rescaling the
+matrix $\bm{H}_j$. The condition number is a property of the problem being solved, and is independent of the algorithm
+being used to solve the problem. The condition number for a typical VLBI analysis is addressed in \cite{artz2015}. The
+author suggests to rescale the design matrix for the the least squares estimator by selecting appropriate units for the
+parameters being estimated. This strategy will not yield the optimal condition number, but a still a fairly decent
+condition number and the work of calculating the optimal scaling can be skipped. Below, the impact of rescaling
+$\bm{H}_j$ in the Kalman filter and smoother equations is derived.
+
+Start by modifying equations \ref{eq:model2} and \ref{eq:model1} by multiplying with the identiy matrix $\bm{I} =
+\bm{S}\bm{S}^{-1}$:
+
+\begin{equation}
+\bm{y}_j = \bm{H}_j\bm{S}\bm{S}^{-1}\bm{x}_j + \bm{e}_j
+\end{equation}
+
+\begin{equation}
+\bm{x}_{j+1} = \bm{\phi}_j\bm{S}\bm{S}^{-1}\bm{x}_j + \bm{w}_j \label{eq:model1_1}
+\end{equation}
+
+\noindent where $\bm{S}$ is a diagonal $u \times u$ matrix, whose purpose is to rescale the columns in $\bm{H}_j$ to
+improve the numerical qualities of the matrix. The same scaling matrix $\bm{S}$ must be applied for all epochs. Then multiply
+equation \ref{eq:model1_1} from the left with $\bm{S}^{-1}$ to obtain:
+\begin{equation}
+\bm{S}^{-1}\bm{x}_{j+1} = \bm{S}^{-1}\bm{\phi}_j\bm{S}\bm{S}^{-1}\bm{x}_j + \bm{S}^{-1}\bm{w}_j
+\end{equation}
+
+\noindent Then define:
+
+\begin{flalign}
+\overline{\bm{x}}_j &\equiv \bm{S}^{-1}\bm{x}_j \\
+\overline{\bm{x}}_{j+1} &\equiv \bm{S}^{-1}\bm{x}_{j+1} \\
+\overline{\bm{H}}_j &\equiv \bm{H}_j\bm{S} \\
+\overline{\bm{\phi}}_j &\equiv \bm{S}^{-1}\bm{\phi}_j\bm{S} \\
+\overline{\bm{w}}_j &\equiv \bm{S}^{-1}\bm{w}_j
+\end{flalign}
+
+\noindent Note that $\bm{y}_j$ and $\bm{e}_j$ is not affected by the scaling.
+
+A linear transformation $\bm{Y} = \bm{A} + \bm{B}\bm{X}$ of a multivariate normal random vector 
+$\bm{X} \sim \mathcal{N}(\mu, \bm{V})$ gives another multivariate normal distribution $\bm{Y} \sim \mathcal{N}(\bm{A} +
+\bm{B}\mu, \bm{B}\bm{V}\bm{B}^\mathsf{T})$. Since $\bm{S}$ is a diagonal matrix $\bm{S}=\bm{S}^\mathsf{T}$ and
+$\bm{S}^{-1}=(\bm{S}^{-1})^\mathsf{T}$. This implies
+
+\begin{flalign}
+\overline{\bm{w}}_j &\sim \mathcal{N}(0, \overline{\bm{Q}}_j) \equiv \mathcal{N}(0, \bm{S}^{-1}\bm{Q}_j\bm{S}^{-1}) \\
+\overline{\bm{x}}_0 &\sim \mathcal{N}(0, \overline{\bm{P}}_0) \equiv \mathcal{N}(0, \bm{S}^{-1}\bm{P}_0\bm{S}^{-1})
+\end{flalign}
+
+\noindent and $\bm{R}_j$ is left unchanged since $\bm{e}_j$ is unchanged.
+
+The Kalman time update equations \ref{eq:time1} and \ref{eq:time2} then relate the scaled predicted state vector
+and covariance to their unscaled versions according to:
+
+\begin{flalign}
+\nonumber \overline{\tilde{\bm{x}}}_{j+1} &= \overline{\bm{\phi}}_j \overline{\hat{\bm{x}}}_j =
+\bm{S}^{-1}\bm{\phi}_j\bm{S} \bm{S}^{-1}\hat{\bm{x}}_j = \bm{S}^{-1}\bm{\phi}_j\hat{\bm{x}}_j \quad \Rightarrow \\
+\overline{\tilde{\bm{x}}}_{j+1} &= \bm{S}^{-1}\tilde{\bm{x}}_{j+1} \\
+\nonumber\\
+%
+\nonumber \overline{\tilde{\bm{P}}}_{j+1} &= \overline{\bm{\phi}}_j \overline{\hat{\bm{P}}}_j
+\overline{\bm{\phi}}_j^\mathsf{T} +
+\overline{\bm{Q}}_j = \bm{S}^{-1}\bm{\phi}_j\bm{S} \bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1}
+(\bm{S}^{-1}\bm{\phi}_j\bm{S})^\mathsf{T} + \bm{S}^{-1}\bm{Q}_j\bm{S}^{-1} \\
+\nonumber &= \bm{S}^{-1}\bm{\phi}_j\hat{\bm{P}}_j\bm{\phi}_j^\mathsf{T}\bm{S}^{-1} + \bm{S}^{-1}\bm{Q}_j\bm{S}^{-1} \\
+\nonumber &= \bm{S}^{-1}(\bm{\phi}_j\hat{\bm{P}}_j\bm{\phi}_j^\mathsf{T} + \bm{Q}_j)\bm{S}^{-1} \quad \Rightarrow \\
+\overline{\tilde{\bm{P}}}_{j+1} &= \bm{S}^{-1}\tilde{\bm{P}}_{j+1}\bm{S}^{-1}
+\end{flalign}
+
+Similarly, the Kalman measurement update equations \ref{eq:measure1}-\ref{eq:measure5} is related to their unscaled
+versions according to:
+
+\begin{flalign}
+\nonumber \overline{\bm{N}}_j &= \overline{\bm{H}}_j\overline{\tilde{\bm{P}}}_j\overline{\bm{H}}_j^\mathsf{T} + \bm{R}_j
+\\ 
+\nonumber &= \bm{H}_j\bm{S} \bm{S}^{-1}\tilde{\bm{P}}_{j}\bm{S}^{-1} (\bm{H}_j\bm{S})^\mathsf{T} + \bm{R}_j =
+\bm{H}_j\tilde{\bm{P}}_{j}\bm{H}_j^\mathsf{T} + \bm{R}_j \quad \Rightarrow \\
+\overline{\bm{N}}_j &= \bm{N}_j \\
+\nonumber \\
+%
+\nonumber \overline{\bm{z}}_j &= \bm{y}_j - \overline{\bm{H}}_j\overline{\tilde{\bm{x}}}_j  = \bm{y}_j -
+\bm{H}_j\bm{S}\bm{S}^{-1}\tilde{\bm{x}}_{j} \quad \Rightarrow \\
+\overline{\bm{z}}_j &= \bm{z}_j \\
+\nonumber \\
+%
+\nonumber \overline{\bm{K}}_j &= \overline{\tilde{\bm{P}}}_j\overline{\bm{H}}_j^\mathsf{T}\overline{\bm{N}}_j^{-1} =
+\bm{S}^{-1}\tilde{\bm{P}}_{j}\bm{S}^{-1} (\bm{H}_j\bm{S})^\mathsf{T}\bm{N}_j^{-1} =
+\bm{S}^{-1}\tilde{\bm{P}}_{j}\bm{H}_j^\mathsf{T}\bm{N}_j^{-1} \quad \Rightarrow \\
+\overline{\bm{K}}_j &= \bm{S}^{-1}\bm{K}_j \\
+\nonumber \\
+%
+\nonumber \overline{\hat{\bm{x}}}_j &= \overline{\tilde{\bm{x}}}_j + \overline{\bm{K}}_j\overline{\bm{z}}_j =
+\bm{S}^{-1}\tilde{\bm{x}}_{j} + \bm{S}^{-1}\bm{K}_j\bm{z}_j = \bm{S}^{-1}(\tilde{\bm{x}}_{j} + \bm{K}_j\bm{z}_j) \quad
+\Rightarrow \\
+\overline{\hat{\bm{x}}}_j &= \bm{S}^{-1}\hat{\bm{x}}_j \\
+\nonumber \\
+%
+\nonumber \overline{\hat{\bm{P}}}_j &= (\bm{I} - \overline{\bm{K}}_j\overline{\bm{H}}_j)\overline{\tilde{\bm{P}}}_j =
+(\bm{I} - \bm{S}^{-1}\bm{K}_j\bm{H}_j\bm{S})\bm{S}^{-1}\tilde{\bm{P}}_{j}\bm{S}^{-1} \\
+\nonumber &= \bm{S}^{-1}\tilde{\bm{P}}_{j}\bm{S}^{-1} - \bm{S}^{-1}\bm{K}_j\bm{H}_j\tilde{\bm{P}}_{j}\bm{S}^{-1}\\
+\nonumber &= \bm{S}^{-1}(\tilde{\bm{P}}_{j} - \bm{K}_j\bm{H}_j\tilde{\bm{P}}_{j})\bm{S}^{-1}
+= \bm{S}^{-1}((\bm{I} - \bm{K}_j\bm{H}_j)\tilde{\bm{P}}_{j})\bm{S}^{-1} \quad \Rightarrow \\
+\overline{\hat{\bm{P}}}_j &= \bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1}
+\end{flalign}
+
+Finally, the modified Bryson-Frazier smoother equations \ref{eq:smooth1}-\ref{eq:smooth8} are related to their unscaled
+versions according to:
+
+\begin{flalign}
+\overline{\hat{\bm{\lambda}}}_n &\equiv \hat{\bm{\lambda}}_n = 0 \\
+\nonumber \\
+%
+\nonumber \overline{\tilde{\bm{\lambda}}}_n &= (-\overline{\bm{H}}_n^\mathsf{T}\bm{N}_n^{-1}\bm{z}_n) + (\bm{I} -
+\overline{\bm{K}}_n\overline{\bm{H}}_n)^\mathsf{T} \overline{\hat{\bm{\lambda}}}_n \\
+\nonumber &= (-(\bm{H}_n\bm{S})^\mathsf{T}\bm{N}_n^{-1}\bm{z}_n) = (-\bm{S}\bm{H}_n^\mathsf{T}\bm{N}_n^{-1}\bm{z}_n)
+\quad \Rightarrow \\
+\overline{\tilde{\bm{\lambda}}}_n &= \bm{S}\tilde{\bm{\lambda}}_n \\
+\nonumber \\
+%
+\nonumber \overline{\hat{\bm{\lambda}}}_{n-1} &= \overline{\bm{\phi}}_{n-2}^\mathsf{T}
+\overline{\tilde{\bm{\lambda}}}_{n-1} \\
+\nonumber &= (\bm{S}^{-1}\bm{\phi}_{n-2}\bm{S})^\mathsf{T}\bm{S}\tilde{\bm{\lambda}}_{n-1} =
+\bm{S}\bm{\phi}_{n-2}^\mathsf{T}\bm{S}^{-1}\bm{S}\tilde{\bm{\lambda}}_{n-1} =
+\bm{S}\bm{\phi}_{n-2}^\mathsf{T}\tilde{\bm{\lambda}}_{n-1} \quad \Rightarrow \\
+\overline{\hat{\bm{\lambda}}}_{n-1} &= \bm{S}\hat{\bm{\lambda}}_{n-1} \\
+\nonumber \\
+%
+\nonumber \overline{\tilde{\bm{\lambda}}}_{n-1} &= (-\overline{\bm{H}}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + (\bm{I} -
+\overline{\bm{K}}_{n-1}\overline{\bm{H}}_{n-1})^\mathsf{T} \overline{\hat{\bm{\lambda}}}_{n-1} \\
+\nonumber &= (-(\bm{H}_{n-1}\bm{S})^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + (\bm{I} -
+\bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S})^\mathsf{T}\bm{S}\hat{\bm{\lambda}}_{n-1} \\
+\nonumber &= (-\bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + (\bm{I}^\mathsf{T} -
+\bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T}\bm{S}^{-1})\bm{S}\hat{\bm{\lambda}}_{n-1} \\
+\nonumber &= (-\bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + \bm{S}\hat{\bm{\lambda}}_{n-1} -
+\bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T}\bm{S}^{-1}\bm{S}\hat{\bm{\lambda}}_{n-1} \\
+\nonumber &= \bm{S}((-\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + \hat{\bm{\lambda}}_{n-1} -
+\bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T}\hat{\bm{\lambda}}_{n-1}) \\
+\nonumber &= \bm{S}((-\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + (\bm{I} -
+\bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T})\hat{\bm{\lambda}}_{n-1}) \\
+\nonumber &= \bm{S}((-\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{z}_{n-1}) + (\bm{I} -
+\bm{K}_{n-1}\bm{H}_{n-1})^\mathsf{T}\hat{\bm{\lambda}}_{n-1}) \quad \Rightarrow\\
+\overline{\tilde{\bm{\lambda}}}_{n-1} &= \bm{S}\tilde{\bm{\lambda}}_{n-1} \\
+\end{flalign}
+
+\noindent Mathematical induction then gives
+\begin{flalign}
+\overline{\tilde{\bm{\lambda}}}_{j} &= \bm{S}\tilde{\bm{\lambda}}_{j} \\
+\overline{\hat{\bm{\lambda}}}_{j} &= \bm{S}\hat{\bm{\lambda}}_{j}
+\end{flalign}
+%
+\begin{flalign}
+\overline{\hat{\bm{\Lambda}}}_n &\equiv \hat{\bm{\Lambda}}_n = 0 \\
+\nonumber \overline{\tilde{\bm{\Lambda}}}_n &= \overline{\bm{H}}_n^\mathsf{T}\bm{N}_n^{-1}\overline{\bm{H}}_n + (\bm{I}
+- \overline{\bm{K}}_n\overline{\bm{H}}_n)^\mathsf{T}\overline{\hat{\bm{\Lambda}}}_n(\bm{I} -
+\overline{\bm{K}}_n\overline{\bm{H}}_n) \\
+\nonumber &= (\bm{H}_n\bm{S})^\mathsf{T}\bm{N}_n^{-1}\bm{H}_n\bm{S} =
+\bm{S}\bm{H}_n^\mathsf{T}\bm{N}_n^{-1}\bm{H}_n\bm{S} \quad \Rightarrow\\
+\overline{\tilde{\bm{\Lambda}}}_n &= \bm{S}\tilde{\bm{\Lambda}}_n\bm{S}\\
+\nonumber\\
+%
+\nonumber \overline{\hat{\bm{\Lambda}}}_{n-1} &=
+\overline{\bm{\phi}}_{n-2}^\mathsf{T}\overline{\tilde{\bm{\Lambda}}}_{n-1}\overline{\bm{\phi}}_{n-2}
+= (\bm{S}^{-1}\bm{\phi}_{n-2}\bm{S})^\mathsf{T}\bm{S}\tilde{\bm{\Lambda}}_{n-1}\bm{S}\bm{S}^{-1}\bm{\phi}_{n-2}\bm{S}\\
+\nonumber &=
+\bm{S}\bm{\phi}_{n-2}^\mathsf{T}\bm{S}^{-1}\bm{S}\tilde{\bm{\Lambda}}_{n-1}\bm{S}\bm{S}^{-1}\bm{\phi}_{n-2}\bm{S}
+= \bm{S}\bm{\phi}_{n-2}^\mathsf{T}\tilde{\bm{\Lambda}}_{n-1}\bm{\phi}_{n-2}\bm{S} \quad \Rightarrow \\
+\overline{\hat{\bm{\Lambda}}}_{n-1} &= \bm{S}\hat{\bm{\Lambda}}_{n-1}\bm{S}\\
+\nonumber \\
+%
+\nonumber \overline{\tilde{\bm{\Lambda}}}_{n-1} &= \overline{\bm{H}}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\overline{\bm{H}}_{n-1} +
+(\bm{I} - \overline{\bm{K}}_{n-1}\overline{\bm{H}}_{n-1})^\mathsf{T}\overline{\hat{\bm{\Lambda}}}_{n-1}(\bm{I} -
+\overline{\bm{K}}_{n-1}\overline{\bm{H}}_{n-1}) \\
+\nonumber &= (\bm{H}_{n-1}\bm{S})^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1}\bm{S} \\
+\nonumber&+ (\bm{I} - \bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S})^\mathsf{T}\bm{S}\hat{\bm{\Lambda}}_{n-1}\bm{S}(\bm{I} -
+\bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S}) \\
+\nonumber &= \bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1}\bm{S} \\
+\nonumber&+ (\bm{I}^\mathsf{T} -
+\bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T}\bm{S}^{-1})\bm{S}\hat{\bm{\Lambda}}_{n-1}\bm{S}(\bm{I}
+- \bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S}) \\
+\nonumber &= \bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1}\bm{S} \\
+\nonumber&+ (\bm{S} -
+\bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T}\bm{S}^{-1}\bm{S})\hat{\bm{\Lambda}}_{n-1}\bm{S}(\bm{I}
+- \bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S}) \\
+\nonumber &= \bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1}\bm{S} \\
+\nonumber&+ \bm{S}(\bm{I} - \bm{H}_{n-1}^\mathsf{T}\bm{K}_{n-1}^\mathsf{T})\hat{\bm{\Lambda}}_{n-1}\bm{S}(\bm{I}
+- \bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S}) \\
+\nonumber &= \bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1}\bm{S} \\
+\nonumber&+ \bm{S}(\bm{I} - \bm{K}_{n-1}\bm{H}_{n-1})^\mathsf{T}\hat{\bm{\Lambda}}_{n-1}(\bm{S}
+- \bm{S}\bm{S}^{-1}\bm{K}_{n-1}\bm{H}_{n-1}\bm{S}) \\
+\nonumber &= \bm{S}\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1}\bm{S} \\
+\nonumber&+ \bm{S}(\bm{I} - \bm{K}_{n-1}\bm{H}_{n-1})^\mathsf{T}\hat{\bm{\Lambda}}_{n-1}(\bm{I}
+- \bm{K}_{n-1}\bm{H}_{n-1})\bm{S} \\
+\nonumber &= \bm{S}(\bm{H}_{n-1}^\mathsf{T}\bm{N}_{n-1}^{-1}\bm{H}_{n-1} \\
+\nonumber&+ (\bm{I} - \bm{K}_{n-1}\bm{H}_{n-1})^\mathsf{T}\hat{\bm{\Lambda}}_{n-1}(\bm{I}
+- \bm{K}_{n-1}\bm{H}_{n-1}))\bm{S} \quad \Rightarrow \\
+\overline{\tilde{\bm{\Lambda}}}_{n-1} &= \bm{S}\tilde{\bm{\Lambda}}_{n-1}\bm{S}
+\end{flalign}
+
+\noindent Again, mathematical induction gives:
+
+\begin{flalign}
+\overline{\tilde{\bm{\Lambda}}}_{j} &= \bm{S}\tilde{\bm{\Lambda}}_{j}\bm{S} \\
+\overline{\hat{\bm{\Lambda}}}_{j} &= \bm{S}\hat{\bm{\Lambda}}_{j}\bm{S}
+\end{flalign}
+
+\noindent Which give the final smoothing relations:
+
+\begin{flalign}
+\nonumber \overline{\bm{P}}_j^\ast &= \overline{\hat{\bm{P}}}_j - \overline{\hat{\bm{P}}}_j
+\overline{\hat{\bm{\Lambda}}}_j \overline{\hat{\bm{P}}}_j \\
+\nonumber &= \bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1} -
+\bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1}\bm{S}\hat{\bm{\Lambda}}_{j}\bm{S}
+\bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1}\\
+\nonumber &= \bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1}
+- \bm{S}^{-1}\hat{\bm{P}}_j\hat{\bm{\Lambda}}_{j}\hat{\bm{P}}_j\bm{S}^{-1}\\
+\nonumber &= \bm{S}^{-1}(\hat{\bm{P}}_j - \hat{\bm{P}}_j\hat{\bm{\Lambda}}_{j}\hat{\bm{P}}_j)\bm{S}^{-1} \quad
+\Rightarrow\\
+\overline{\bm{P}}_j^\ast &= \bm{S}^{-1}\bm{P}_j^\ast\bm{S}^{-1}\\
+\nonumber\\
+%
+\nonumber \overline{\bm{x}}_j^\ast &= \overline{\hat{\bm{x}}}_j -
+\overline{\hat{\bm{P}}}_j\overline{\hat{\bm{\lambda}}}_j \\
+\nonumber &= \bm{S}^{-1}\hat{\bm{x}}_j - \bm{S}^{-1}\hat{\bm{P}}_j\bm{S}^{-1}\bm{S}\hat{\bm{\lambda}}_{j}
+= \bm{S}^{-1}(\hat{\bm{x}}_j - \hat{\bm{P}}_j\hat{\bm{\lambda}}_{j}) \quad \Rightarrow \\
+\overline{\bm{x}}_j^\ast &= \bm{S}^{-1}\bm{x}_j^\ast
+\end{flalign}
+
+\section{Reduced normal equations from Kalman Filter solution}
+todo: \cite{mysen2017} equation (116) and (117).
+
+Normal equation:
+\begin{equation}
+\bm{N}\bm{x} = \bm{b}
+\label{eq:normal}
+\end{equation}
+
+\section{Adding NNR and NNT constraints}
+The normal equation matrix is usually singular (or numerically close to being singular) and the normal equation is
+unsolvable. A commonly applied method to solve this problem is to add No-Net-Translation and No-Net-Rotation constraints
+relative to the apriori reference frame. 
+\subsection{TRF}
+The following method is taken from \cite{thaller2008}. Given apriori coordinates $(X_0, Y_0,Z_0)$ for a station $i$, the 
+calculated station coordinate $(X, Y, Z)$ is related to the apriori coordinate by the Helmert transformation:
+
+\begin{flalign}
+\begin{bmatrix}
+X \\
+Y \\
+Z \\
+\end{bmatrix}_i
+=
+\begin{bmatrix}
+X_0 \\
+Y_0 \\
+Z_0 \\
+\end{bmatrix}_i
++
+\begin{bmatrix}
+1 & 0 & 0 & \phantom{-}0   & -Z_0           & \phantom{-}Y_0 & X_0 \\
+0 & 1 & 0 & \phantom{-}Z_0 & \phantom{-}0   & -X_0           & Y_0 \\
+0 & 0 & 1 & -Y_0           & \phantom{-}X_0 & \phantom{-}0   & Z_0 \\ 
+\end{bmatrix}_i
+\begin{bmatrix}
+T_X \\
+T_Y \\
+T_Z \\
+\alpha \\
+\beta \\
+\gamma \\
+\mu \\
+\end{bmatrix}
+\end{flalign}
+\noindent or with matrix notation: 
+\begin{flalign}
+\bm{X}_i = \bm{X}_{0i}+ \bm{B}_i \bm{\zeta}
+\end{flalign}
+
+The NNR and NNT condition tries to align the axis and the origin of the calculated solution with the apriori frame. That
+means that the parameters $T_X$, $T_Y$, $T_Z$, $\alpha$, $\beta$ and $\gamma$ should be zero. The scale factor is left unchanged.
+
+Naming the subset of the Helmert parameters coefficient matrix $\bm{D}_i$
+
+\begin{equation}
+\bm{D}_i = 
+\begin{bmatrix}
+1 & 0 & 0 & \phantom{-}0   & -Z_0           & \phantom{-}Y_0 \\
+0 & 1 & 0 & \phantom{-}Z_0 & \phantom{-}0   & -X_0           \\
+0 & 0 & 1 & -Y_0           & \phantom{-}X_0 & \phantom{-}0   \\ 
+\end{bmatrix}_i
+\end{equation}
+
+\noindent and with $\bm{D} = {\left[\bm{D}_0 \ldots \bm{D}_i \ldots \bm{D}_n \right]}^{\mathsf{T}}$, the Jacobian matrix
+$\bm{H}$ becomes
+\begin{equation}
+\bm{H} = (\bm{D}^\mathsf{T}\bm{D})^{-1}\bm{D}^{\mathsf{T}}
+\label{eq:constraint_jacobi}
+\end{equation}
+with the associated weight matrix $\bm{P}_h$ which is a diagonal matrix with $1/\sigma_h^2$ on the diagonal. 
+\subsection{CRF}
+todo
+
+\subsection{Normal equations}
+Applying the NNR and NNT constraints to the singular normal equation system in equation \ref{eq:normal} results in a new
+system of equations:
+\begin{equation}
+\left(\bm{N} + \bm{H}^\mathsf{T}\bm{P}_h\bm{H}\right)\bm{x} = \bm{b}
+\end{equation}
+
+\subsection{Kalman filter}
+Applying the NNR and NNT constraints to the Kalman filter solution directly involes extending the filter with these six
+new pseudo observations. This includes using the Jacobian matrix $\bm{H}$ in equation \ref{eq:constraint_jacobi} for the six
+measurement updates. The time difference $\Delta t_j$ between these observations are set to zero, which gives the 
+idenity matrix as the state transition matrix $\bm{\Phi}_j$ in the time update equations. No noise is added so the $\bm{Q}_j$ matrix remains 
+zero for these observations. The same applies for the residuals $\bm{y}_j$. The observation noise covariance $\bm{R}_j$ is set to 
+$\sigma_h^2$.
+
+
+\newpage
+\bibliographystyle{../../where}
+\bibliography{../../where}
+
+\end{document}
+
+
+
+
+
+
+
+
+

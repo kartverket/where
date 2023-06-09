@@ -1,0 +1,30 @@
+Update instructions for running the Sphinx documentation tool for WHERE
+=======================================================================
+
+To update the documentation, it should be enough to run
+
+    make html
+
+This will run sphinx based on what is available in the source directory, and
+output html-files to the build/html-directory. To see the documentation, either
+
++ open the file build/html/index.html in your browser, or
+
++ copy the build/html-directory to nnrite015:/home/geosat/doc-where/html and
+  access the documentation at http://nnriap039/where/doc-where/
+
+If new source files need to be included in the documentation, you should run
+sphinx-apidoc from this folder as follows
+
+    sphinx-apidoc -M -P -e -o source/ ../../where/
+
+See sphinx-apidoc --help for an explanation of the flags. After doing an api-doc
+update you should also run the following sed-magic:
+
+    sed -i -e '1h;2,$H;$!d;g' -e 's/Submodules\n----------\n\n.. toctree::/Submodules\n----------\n\n.. toctree::\n   :maxdepth: 1/g' source/where.*rst
+
+Unfortunately, there is no way to set maxdepth on Submodules using the
+sphinx-apidoc program (and without it, we get a lot of noise from section
+headers in the list of Submodules). This sed command takes care of that (we
+specify Submodules very explicitly because Subpackages should not have a
+maxdepth).

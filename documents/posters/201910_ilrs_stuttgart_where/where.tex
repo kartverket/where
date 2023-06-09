@@ -1,0 +1,74 @@
+
+{\large\bfseries Geodesy in Norway}\\
+
+The Norwegian Mapping Authority has increased its contributions
+on global reference frames over the last decade.  We are currently building a
+new fundamental station at Ny-{\AA}lesund supporting VLBI, SLR, GNSS and DORIS.
+We have been involved in the establishment of a UN resolution on global geodesy
+and reference frames~\cite{un_ggrf}, and will work on the establishment of a
+Global Geodetic Centre of Excellence, as proposed by the UN Subcommittee on
+Geodesy. 
+
+The Where software project completes the norwegian contribution, by
+giving us a new tool for the analysis of geodetic data and giving us more
+insight into such analysis along the way. 
+
+
+{\large\bfseries How Where works}\\
+
+Where is mainly implemented in Python. The Python ecosystem for data science is
+very rich and Where utilizes several well known packages such as
+\texttt{numpy}, \texttt{scipy} and \texttt{matplotlib}, as well as more
+specialized packages like \texttt{jplephem}~\cite{jplephem}. In addition,
+Python easily interfaces with other languages like C and Fortran, and Where
+uses the \texttt{SOFA}~\cite{sofa_software} and
+\texttt{IERS}~\cite{iers_software} Fortran libraries directly.
+
+Using Python has several advantages, including rapid development, flexible and
+easy to read code. Where is a command line tool, and comes with a configuration
+file that can be used to customize the behavior of the program. This makes the
+program quite easy to use, while at the same time having the possibility to use
+different models and input for the analysis.
+
+The results can be inspected using the graphical tool called There that has
+been developed alongside Where (Figure~\ref{fig:there}).
+
+
+{\large\bfseries The Where Workflow}\\
+
+First, observation data are read and edited, and stored in an internal data
+format. We use hdf5, which is a hierarchical data format compatible with the
+dictionary structure in Python. Next, for SLR, the orbit and the theoretical
+range observations are calculated, before station positions and EOP's are
+estimated on the basis of those theoretical ranges.
+
+The implementation of the individual models follow the 2010 IERS
+Conventions~\cite{iers2010}, and when possible we have used software libraries
+made available at the IERS web page~\cite{iers_software}. Table~\ref{tbl:models}
+gives an overview of the models implemented in Where. The estimation of EOP
+parameters and station positions is done using a Kalman
+filter~\cite{mysen2017}. We use continuous piecewise linear functions for the
+estimation.
+
+
+{\large\bfseries Orbit determination}\\
+
+We have implemented all models for orbit determination, see
+Table~\ref{tbl:models}. Force models, variational equations and orbit
+estimation is computed following~\cite{montenbruck2012}, and we have
+implemented a Cowell orbit integrator following~\cite{oesterwinter1972}. The
+observation equation for SLR is following~\cite{beutler2005}.  
+
+
+{\large\bfseries Computation time}\\
+
+The original Python program was slow, but we have done some improvements. Using
+\texttt{numpy}, doing most operations on vectors (instead of sequentially) and
+caching results when possible gives us a fairly fast program. Running Where for
+one week of SLR analysis with the four satellites Lageos1, Lageos2, Etalon1 and
+Etalon2 now takes about 18 minutes. We have programmed the orbit computation in
+Cython, a programming language which gives us the combined power of Python and
+C. It lets us tune readable Python code into plain C performance by adding
+static type declarations in Python syntax. 
+
+\endinput

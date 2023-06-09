@@ -1,0 +1,185 @@
+\documentclass{beamer}
+
+\usepackage{lipsum}      % Use for dummy text, for instance \lipsum[1-4] prints 4 paragraphs
+
+\mode<presentation>{\usetheme{Ringerike}} \usepackage[english]{babel} \usepackage[latin1]{inputenc}
+\usepackage{siunitx}
+\usepackage{subcaption}
+\usepackage{multicol}
+\usepackage{colortbl}
+\usepackage{multirow}
+\usepackage{tabularx}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+% \usepackage{amsmath,amsthm, amssymb, latexsym} \boldmath
+
+% Size of poster
+\usepackage[size=a0,orientation=portrait]{beamerposter}
+
+\addtobeamertemplate{block begin}{}{\setlength{\parskip}{30pt plus 1pt minus 1pt}}
+\setbeamertemplate{caption}[numbered]
+
+% Bibliography colors and labels
+\setbeamertemplate{bibliography item}{\color{white}\insertbiblabel}
+\setbeamercolor{bibliography entry item}{fg=white}
+\setbeamercolor{bibliography entry author}{fg=white}
+\setbeamercolor{bibliography entry title}{fg=white} 
+\setbeamercolor{bibliography entry location}{fg=white} 
+\setbeamercolor{bibliography entry note}{fg=white}
+
+\title{Galileo SISRE analysis with Where}
+%\subtitle{Progress Report}
+\author{Michael D\"ahnn, Geir Arne Hjelle, Ingrid Fausk, Ann-Silje Kirkvik, Mohammed Ouassou, Anders Martin Solberg}
+\newcommand{\contact}{michael.daehnn@kartverket.no}
+\institute{Norwegian Mapping Authority, Geodetic Institute}
+\date{September 3-6, 2018}
+
+\usebackgroundtemplate{\includegraphics[width=\paperwidth]{figure/earth}}
+
+\begin{document}
+\begin{frame}[t]
+  % Top title area
+  %_____________________________________________________________________________________________
+  \color{white} 
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.97\textwidth}
+      {\bfseries\fontsize{88}{120}\selectfont \inserttitle}
+      %{\fontsize{88}{120}\selectfont\kern2cm---\kern2cm\insertsubtitle}
+    \end{column}
+  \end{columns}
+
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.25\textwidth}
+      {\fontsize{30}{36}\selectfont\insertauthor\\[0.5cm]
+        \fontsize{30}{36}\selectfont{\itshape\insertinstitute}\\
+        \fontsize{24}{18}\selectfont\texttt{\contact}}
+    \end{column}
+
+    \begin{column}[t]{.7\textwidth}
+      {\fontsize{30}{36}\selectfont\setlength{\parskip}{15pt}\input{introduction}}
+      \raisebox{-2cm}{\kern52.5cm\color{white}\tiny PHOTO: GETTY IMAGES}
+    \end{column}  
+  \end{columns}
+
+
+
+  \vspace*{1.5cm}
+  \begin{columns}
+    % Content area
+    %_____________________________________________________________________________________________
+    \begin{column}[t]{.68\textwidth}
+      \begin{block}{}%Signal-in-space range error computation in Where}
+        \begin{multicols}{2}
+
+          {\fontsize{21}{36}\setlength{\parskip}{16pt}\input{sisre}}
+          %\input{sisre}
+        \end{multicols}
+      \end{block}
+
+
+      % Input data table strip
+      %_____________________________________________________________________________________________
+      \begin{alertblock}{}
+           \begin{table}
+              \color{black}
+              \caption{Input data used for SISRE analysis.}
+              \label{tab:data}
+              \begin{tabular}{lll}
+              \hline
+              \rowcolor{kvgreen}\textcolor{white}{\textbf{Data}} & \textcolor{white}{\textbf{Institution  }} & \textcolor{white}{\textbf{URL}}\\
+              \hline
+              Broadcast orbit & DLR & ftp://cddis.gsfc.nasa.gov/gnss/data/campaign/mgex/daily/rinex3/\textit{yyyy}/\textit{ddd}/\textit{yy}p/brdm\textit{ddd}0.\textit{yy}p.Z\\
+              Precise orbit & CODE & ftp://igs.ign.fr/pub/igs/products/mgex/\textit{wwww}/COD0MGXFIN\_\textit{yyyyddd}0000\_01D\_05M\_ORB.SP3.gz\\
+              Precise clock & CODE & ftp://igs.ign.fr/pub/igs/products/mgex/\textit{wwww}/COD0MGXFIN\_\textit{yyyyddd}0000\_01D\_30S\_CLK.CLK.gz\\
+              Antenna PCO (precise) & IGS & ftp://igs.org/pub/station/general/igs14.atx \\
+              Antenna PCO (broadcast) & GSC & https://www.gsc-europa.eu/support-to-developers/galileo-satellite-metadata \\
+                            
+              Satellite bias & CAS & ftp://igs.ign.fr/pub/igs/products/mgex/dcb/\textit{yyyy}/CAS0MGXRAP\_\textit{yyyyddd}0000\_01D\_01D\_DCB.BSX.gz\\
+              \hline
+              \end{tabular}
+           \end{table}
+      \end{alertblock} 
+    \end{column}
+
+    % Figure strip
+    %_____________________________________________________________________________________________
+    \begin{column}[t]{.28\textwidth}
+
+     \vspace*{1cm}
+     \begin{figure}
+       \includegraphics[width=\linewidth]{figure/plot_scatter_sisre_galileo}
+       \caption{Global average SISRE for Galileo signal combination E1/E5a and use of F/NAV navigation message}
+       \label{fig:sisre}
+     \end{figure}
+
+     \vspace*{1.5cm}
+
+     \begin{figure}
+       \includegraphics[width=\linewidth]{figure/plot_bar_stacked_sisre}
+       \caption{SISRE RMS results of Galileo satellites for the period January 1st until June 30th 2018 and the signal combination E1/E5a with use of F/NAV navigation message. The sum of blue and orange bars illustrates the SISRE RMS, which includes orbit, clock and bias errors. The orbit-only SISRE RMS ($\Delta t^s = 0$ in SISRE equation) is represented by blue bars and includes only orbit errors.
+}
+       \label{fig:sisre_stacked}
+     \end{figure}
+
+     \vspace*{1.5cm}
+
+     \begin{figure}
+       \includegraphics[width=\linewidth]{figure/plot_bar_sisre_signal_combination_percentile}
+       \caption{Signal combination for Galileo single- and dual-frequency users, whereby E1 and E1/E5b users apply I/NAV and E1/E5a users F/NAV navigation message}
+       \label{fig:sisre_signal_comb}
+     \end{figure}
+
+     \vspace*{1.5cm}
+
+     \begin{table}
+        \color{black}
+        \caption{SISRE RMS and 95th percentile results for \textbf{Where} and GSC (\cite{galileo-is-os-2018-jan}, \cite{galileo-is-os-2018-apr}) solution are given for the complete Galileo satellite constellation and the period January 1st until June 30th 2018. The average is determined of the GSC monthly SISRE 95th percentiles given in \cite{galileo-is-os-2018-jan} and \cite{galileo-is-os-2018-apr}.}
+        \label{tab:sisre_results}
+        \begin{tabular}{lcccc}
+        \hline
+        \rowcolor{kvgreen}\textcolor{white}{\textbf{Signal}} & \textcolor{white}{\textbf{Nav. type}} & \textcolor{white}{\textbf{RMS}} & \textcolor{white}{\textbf{95th perc.}} & \textcolor{white}{\textbf{95th perc.}}\\
+        \rowcolor{kvgreen}\textcolor{white}{} &  & \textcolor{white}{\textit{Where}} & \textcolor{white}{\textit{Where}} & \textcolor{white}{\textit{GSC}}\\
+        \rowcolor{kvgreen}\textcolor{white}{} &  & \textcolor{white}{[cm]} & \textcolor{white}{[cm]} & \textcolor{white}{[cm]}\\
+
+        \hline
+        E1     & I/NAV & 20 & 38 & 41\\
+        E1/E5b & I/NAV & 19 & 35 & 40\\
+        E1/E5a & F/NAV & 17 & 31 & 41\\
+        \hline
+        \end{tabular}
+     \end{table}
+
+
+    \end{column}
+   \end{columns}
+
+
+
+  % References box
+  \vspace*{1cm}
+  \begin{columns}
+    \begin{column}[t]{.15\textwidth}
+      % Spacing (for Kartverket logo)
+    \end{column}
+
+    \begin{column}[t]{.82\textwidth}
+      \begin{block}{}%References and Acknowledgements}
+        \vspace*{-1cm}                   % Too much space on top inside block
+        \begin{minipage}{.98\textwidth}  % Add space left and right
+          \begin{multicols}{4}
+            {\normalsize\bfseries References}\\
+            \input{references}
+            \columnbreak
+
+            {\normalsize\bfseries Acknowledgements}\\
+
+            The authors would like to thank IGS for providing the needed input data and the Norwegian Space Centre for the financial support. A special thank to Peter Steigenberger (DLR) for his effort and patience answering our questions related to the SISRE analysis and be so kind to deliver SISRE test datasets. 
+          \end{multicols}
+        \end{minipage}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+\end{document}

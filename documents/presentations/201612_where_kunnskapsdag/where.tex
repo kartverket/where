@@ -1,0 +1,45 @@
+\documentclass[12pt,table,t]{beamer}
+
+% Packages
+\usepackage{xcolor}
+\usepackage{eulervm}
+\usepackage[norsk]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{tabularx}
+\usepackage{cancel}
+
+
+% Theme
+\mode<presentation>
+{
+  \usetheme{Honefoss}
+%  \setbeamercovered{transparent}
+  \setbeamertemplate{blocks}[rounded]
+  \AtBeginPart{\frame[c]{\partpage}}
+}
+
+\newcommand{\comment}[1]{{\slshape\color{kvred}#1}}
+
+\title{Hva er Where?}
+\author{Geir Arne Hjelle}
+\date{Kunnskapsdagen om Geodesi, desember 2016}
+%\titlegraphic{\includegraphics[width=\paperwidth]{figure/vlbi}}
+
+\begin{document}
+\frame[plain]{\titlepage}
+
+{\setbeamercolor{background canvas}{bg=black}
+  \begin{frame}[c]{}
+    \begin{center}
+      \includegraphics[width=\textwidth]{figure/komplisert_verden}
+    \end{center}
+  \end{frame}
+}
+
+\begin{frame}[c]{}
+  \begin{center}
+    \includegraphics<1>[width=\textwidth]{figure/samle_data}
+    \includegraphics<2>[width=\textwidth]{figure/where}
+  \end{center}
+\end{frame}
+\end{document}

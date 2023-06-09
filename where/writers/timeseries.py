@@ -85,15 +85,16 @@ def add_to_full_timeseries(dset):
             func = func if func else field_in
             dset_str = dset_str if dset_str else default_dset_str
             if dset_str not in dsets:
-                stage, _, dset_id = dset_str.partition("/")
-                dset_id = int(dset_id) if dset_id else "last"
+                stage, _, label = dset_str.partition("/")
+                label = int(label) if label else "last"
                 dsets[dset_str] = dataset.Dataset.read(
                     rundate=dset.analysis["rundate"],
                     pipeline=dset.vars["pipeline"],
                     stage=stage,
                     session_code=dset.vars["session_code"],
-                    label=dset_id,
+                    label=label,
                     id=dset.analysis["id"],
+                    user=dset.analysis["user"],
                 )
 
             val, adder, unit = method_func(dsets[dset_str], field_in, idx_values, func)
@@ -108,17 +109,19 @@ def add_to_full_timeseries(dset):
         _add_solved_neq_fields(dset, dset_session, idx_values)
 
     # Read timeseries dataset and extend it with session dataset
-    dset_id = config.tech.timeseries.dataset_id.str.format(**dset.vars)
+    label = config.tech.timeseries.dataset_id.str.format(**dset.vars)
+
     try:
         # Read existing dataset
         dset_ts = dataset.Dataset.read(
             rundate=date(1970, 1, 1),
             pipeline=dset.vars["pipeline"],
             stage="timeseries",
-            label=dset_id,
+            label=label,
             session_code="",
             use_options=False,
             id=dset.analysis["id"],
+            user=dset.analysis["user"],
         )
     except OSError:
         # Start new timeseries dataset
@@ -126,10 +129,11 @@ def add_to_full_timeseries(dset):
             rundate=date(1970, 1, 1),
             pipeline=dset.vars["pipeline"],
             stage="timeseries",
-            label=dset_id,
+            label=label,
             session_code="",
             use_options=False,
             id=dset.analysis["id"],
+            user=dset.analysis["user"],
         )
 
     if dset_ts.num_obs > 0:

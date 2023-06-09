@@ -1,0 +1,61 @@
+GEOSAT combines VLBI, SLR, GNSS, and DORIS data at the observation level as follows.
+
+First, a 24h data set (an arc) (SLR: 1 week) is sorted in batches of
+passes (FIGURE 1) for each geodetic technique. A pass is defined by observing a specific radio source or satellite from one or several specific ground or satellite based receivers. A transition from one pass to the next is defined
+by a switch of one or more objects that are involved in the
+computation of the residual. For instance, for VLBI the objects are
+two stations and one radio source, for SLR the objects are one station
+and one satellite. Each pass has its own copy of the state vector so
+that it is possible to re-estimate all or parts of the state vector
+for each pass as part of the next step: reducing the residuals by
+least-squares estimation of some subset of 
+parameters (clock, troposphere, range biases, ...). However, by increasing the state vector dimension it is
+also possible to allow parameters to have an impact on the calculated
+observations for time spans that are not restricted by the length of a
+pass.
+
+In the residual reduction step, in which the different observation techniques
+are treated separately, outliers are removed and the impact of
+discontinuities like VLBI clock breaks on the residuals are
+reduced. This is essential for the next computation step in which the
+techniques are combined sequentially, observation epoch by observation
+epoch, by a UD (Upper Diagonal) Kalman filter. Especially, since sequential filters are more
+susceptible to outliers than batch algorithms.
+
+In the combination step it is important to note that the full state
+vector and its a posteriori variance-covariance matrix are updated at
+each epoch according to the postulated observation noise. In this way
+information from one technique can resolve the parameter correlations
+of a different technique in a natural way since these are described by
+the full variance-covariance matrix. For instance, if we truncate the a posteriori variance-covariance matrix for each technique separately (for instance VLBI or SLR) before combination,
+then important technique specific correlations, and therefore
+information on the weaknesses of the individual solutions, could be lost. These
+weaknessess of the solution are commonly re-established by applying a
+Helmert type transformation to it before combination with other data
+types.
+
+As a first approach we will combine SLR and VLBI data so that the only parameters that
+are shared by both techniques are Earth Rotation Parameters. However, in order to exploit that we
+account for all correlations while combining the data types epoch by epoch it is possible that we
+need a stronger connection between SLR and VLBI. Therefore we consider
+implementing local ties at collocation sites as the first observation
+in all data sets. An issue here will be, when added as
+constraints in all data sets, and not only once as they should, the effective constraint imposed by the local
+ties will be unrealistically strong.
+
+When the sequential processing of data from all techniques within the
+specified data set ($N_\mathrm{e}$ epochs) is finished we are left with an a posteriori state
+vector, which is derived without any neglectance
+of parameter correlations. The end state vector will typically consist
+of $N_\mathrm{g}$ global parameters that are constant across the data set, like
+station coordinates, and $N_\mathrm{s}$ stochastic parameters, describing the
+troposphere or clock model errors, at the last epoch. Ideally, we
+would then have backward filtered (smoothed) the state vector and
+variance-covariance matrix to establish a larger matrix and state vector with dimension
+\begin{equation}\nonumber
+N=N_\mathrm{g}+N_\mathrm{s}\,N_\mathrm{e},
+\end{equation}
+formally containing all available information. However, using the complete variance-covariance information in the combination of data sets (arcs) (FIGURE 2), to obtain solutions spanning years,
+is not feasible since the effective state vector will contain millions $\sim{}N_\mathrm{s}\,N_\mathrm{e}$ of parameters.
+
+\endinput

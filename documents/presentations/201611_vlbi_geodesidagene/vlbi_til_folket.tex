@@ -1,0 +1,137 @@
+\documentclass[12pt,table,t]{beamer}
+
+% Packages
+\usepackage{xcolor}
+\usepackage{eulervm}
+\usepackage[norsk]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{tabularx}
+\usepackage{cancel}
+
+
+% Theme
+\mode<presentation>
+{
+  \usetheme{Honefoss}
+%  \setbeamercovered{transparent}
+  \setbeamertemplate{blocks}[rounded]
+  \AtBeginPart{\frame[c]{\partpage}}
+}
+
+\newcommand{\comment}[1]{{\slshape\color{kvred}#1}}
+
+\title{VLBI til folket}
+\author{Geir Arne Hjelle}
+\date{Geodesi- og hydrografidagene 2016}
+\titlegraphic{\includegraphics[width=\paperwidth]{figure/vlbi}}
+
+\begin{document}
+\frame[plain]{\titlepage}
+
+\part{Hvorfor?}
+
+\begin{frame}[c]{}
+  \begin{center}
+    \includegraphics<1>[width=\textwidth]{figure/trenger_koords}
+    \includegraphics<2>[width=\textwidth]{figure/altimetri_01}
+    \includegraphics<3>[width=\textwidth]{figure/altimetri_02}
+    \includegraphics<4>[width=\textwidth]{figure/koordinater_01}
+    \includegraphics<5>[width=\textwidth]{figure/koordinater_02}
+    \includegraphics<6>[width=\textwidth]{figure/itrf_01}
+    \includegraphics<7>[width=\textwidth]{figure/itrf_02}
+    \includegraphics<8>[width=\textwidth]{figure/itrf_03}
+  \end{center}
+\end{frame}
+
+\part{Er det så vanskelig da?}
+
+\begin{frame}[c]{}
+  \begin{center}
+    \includegraphics<1>[width=\textwidth]{figure/fysiske_koords}
+    \includegraphics<2>[width=\textwidth]{figure/mmpapir_01}
+    \includegraphics<3>[width=\textwidth]{figure/mmpapir_02}
+    \includegraphics<4>[width=\textwidth]{figure/mmpapir_03}
+    \includegraphics<5>[width=\textwidth]{figure/mmpapir_04}
+    \includegraphics<6>[width=\textwidth]{figure/usikkerheter_01}
+    \includegraphics<7>[width=\textwidth]{figure/usikkerheter_02}
+    \includegraphics<8>[width=\textwidth]{figure/usikkerheter_03}
+    \includegraphics<9>[width=\textwidth]{figure/bevegelse_01}
+    \includegraphics<10>[width=\textwidth]{figure/bevegelse_02}
+    \includegraphics<11>[width=\textwidth]{figure/bevegelse_03}
+    \includegraphics<12>[width=\textwidth]{figure/mm_bevegelse}
+    \includegraphics<13>[width=\textwidth]{figure/origo}
+  \end{center}
+\end{frame}
+
+\part{Men, VLBI?}
+
+\begin{frame}[c]{}
+  \begin{center}
+    \includegraphics<1>[width=\textwidth]{figure/vlbi_koords}
+    \includegraphics<2>[width=\textwidth]{figure/ref_punkter_01}
+    \includegraphics<3>[width=\textwidth]{figure/ref_punkter_02}
+    \includegraphics<4>[width=\textwidth]{figure/ref_punkter_03}
+    \includegraphics<5>[width=\textwidth]{figure/vlbi_kart}
+    \includegraphics<6>[width=\textwidth]{figure/antagelser_01}
+    \includegraphics<7>[width=\textwidth]{figure/antagelser_02}
+    \includegraphics<8>[width=\textwidth]{figure/antagelser_03}
+    \includegraphics<9>[width=\textwidth]{figure/estimering_01}
+    \includegraphics<10>[width=\textwidth]{figure/estimering_02}
+  \end{center}
+\end{frame}
+
+\begin{frame}[c]{}
+  \begin{center}
+    \includegraphics[height=0.8\textheight]{figure/vlbi_baseline_100_pts_labels}
+  \end{center}
+\end{frame}
+
+{\setbeamercolor{background canvas}{bg=black}
+  \begin{frame}[c]{}
+    \begin{center}
+      \includegraphics<1>[height=0.8\textheight]{figure/vlbi_baseline_100_pts_labels}
+      \includegraphics<2>[height=0.8\textheight]{figure/vlbi_baseline_100_src}
+      \includegraphics<3>[height=0.8\textheight]{figure/vlbi_baseline_100_baseline}
+      \includegraphics<4>[height=0.8\textheight]{figure/vlbi_baseline_100}
+      \includegraphics<5>[height=0.8\textheight]{figure/vlbi_baseline_090}
+      \includegraphics<6>[height=0.8\textheight]{figure/vlbi_baseline_080}
+      \includegraphics<7>[height=0.8\textheight]{figure/vlbi_baseline_070}
+      \includegraphics<8>[height=0.8\textheight]{figure/vlbi_baseline_060}
+      \includegraphics<9>[height=0.8\textheight]{figure/vlbi_baseline_050}
+      \includegraphics<10>[height=0.8\textheight]{figure/vlbi_baseline_040}
+      \includegraphics<11>[height=0.8\textheight]{figure/vlbi_baseline_030}
+      \includegraphics<12>[height=0.8\textheight]{figure/vlbi_baseline_020}
+      \includegraphics<13>[height=0.8\textheight]{figure/vlbi_baseline_010}
+      \includegraphics<14>[height=0.8\textheight]{figure/vlbi_baseline_000}
+      \includegraphics<15>[height=0.8\textheight]{figure/vlbi_baseline_350}
+      \includegraphics<16>[height=0.8\textheight]{figure/vlbi_baseline_340}
+      \includegraphics<17>[height=0.8\textheight]{figure/vlbi_baseline_330}
+      \includegraphics<18>[height=0.8\textheight]{figure/vlbi_baseline_320}
+      \includegraphics<19>[height=0.8\textheight]{figure/vlbi_baseline_310}
+    \end{center}
+  \end{frame}
+}
+
+\begin{frame}[c]{}
+  \begin{center}
+    \includegraphics<1>[height=0.8\textheight]{figure/vlbi_baseline_310}
+    \includegraphics<2>[height=0.8\textheight]{figure/vlbi_ligning_01}
+    \includegraphics<3>[height=0.8\textheight]{figure/vlbi_ligning_02}
+    \includegraphics<4>[height=0.8\textheight]{figure/malinger}
+    \includegraphics<5>[height=0.8\textheight]{figure/vlbi_ligning_02}
+    \includegraphics<6>[height=0.8\textheight]{figure/vlbi_ligning_03}
+    \includegraphics<7>[height=0.8\textheight]{figure/vlbi_ligning_04}
+    \includegraphics<8>[height=0.8\textheight]{figure/vlbi_ligning_05}
+    \includegraphics<9>[height=0.8\textheight]{figure/malinger_alle_kilder}
+    \includegraphics<10>[height=0.8\textheight]{figure/residualer_alle_kilder}
+    \includegraphics<11>[height=0.8\textheight]{figure/residualer_alle_baselinjer}
+    \includegraphics<12>[width=\textwidth]{figure/klokker}
+    \includegraphics<13>[height=0.8\textheight]{figure/residualer_klokke_alle_kilder}
+    \includegraphics<14>[height=0.8\textheight]{figure/residualer_klokke_alle_baselinjer}
+    \includegraphics<15>[width=\textwidth]{figure/andre_effekter}
+    \includegraphics<16>[height=0.8\textheight]{figure/residualer_endelige_alle_baselinjer}
+    \includegraphics<17>[width=\textwidth]{figure/takk_for_meg}
+  \end{center}
+\end{frame}
+
+\end{document}

@@ -1,0 +1,119 @@
+\documentclass{beamer}
+
+\usepackage{lipsum}      % Use for dummy text, for instance \lipsum[1-4] prints 4 paragraphs
+
+\mode<presentation>{\usetheme{Ringerike}}
+\usepackage[english]{babel}
+\usepackage[latin1]{inputenc}
+\usepackage{caption}
+\usepackage[normalem]{ulem}
+\usepackage{multicol}
+\usepackage{vwcol}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{subfig}
+\usepackage{makecell}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\newcolumntype{Y}{<{\centering\arraybackslash}Y}
+
+%\usepackage{amsmath,amsthm, amssymb, latexsym}
+%\boldmath
+
+% Size of poster
+\usepackage[size=a0,orientation=portrait]{beamerposter}
+
+\addtobeamertemplate{block begin}{}{\setlength{\parskip}{30pt plus 1pt minus 1pt}}
+\setbeamertemplate{caption}[numbered]
+
+% Bibliography colors and labels
+\setbeamertemplate{bibliography item}{\color{white}\insertbiblabel}
+\setbeamercolor{bibliography entry item}{fg=white}
+\setbeamercolor{bibliography entry author}{fg=white}
+\setbeamercolor{bibliography entry title}{fg=white} 
+\setbeamercolor{bibliography entry location}{fg=white} 
+\setbeamercolor{bibliography entry note}{fg=white}
+
+\title{First results from the new station NYALE13S}
+%\subtitle{A New Software for Geodetic Analysis}
+\author{Ann-Silje Kirkvik, Michael D\"ahnn, Ingrid Fausk}
+\newcommand{\contact}{ann-silje.kirkvik@kartverket.no}
+\institute{Norwegian Mapping Authority, Geodetic Institute}
+\date{March 14th-18th, 2021}
+
+\usebackgroundtemplate{\includegraphics[width=\paperwidth]{figure/earth}}
+
+\begin{document}
+\begin{frame}[t]
+  % Top title area
+  \color{white} 
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.97\textwidth}
+      {\bfseries\fontsize{88}{120}\selectfont \inserttitle}
+      %{\fontsize{88}{120}\selectfont\kern2cm---\kern2cm\insertsubtitle}
+    \end{column}
+  \end{columns}
+
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.25\textwidth}
+      {\fontsize{30}{36}\selectfont\insertauthor\\[0.5cm]
+        \fontsize{30}{36}\selectfont{\itshape\insertinstitute}\\
+        \fontsize{24}{18}\selectfont\texttt{\contact}}
+    \end{column}
+
+    \begin{column}[t]{.7\textwidth}
+      {\fontsize{30}{36}\selectfont\setlength{\parskip}{30pt}\input{ingress}}
+      \raisebox{0cm}{\kern52.5cm\color{white}\tiny PHOTO: GETTY IMAGES}
+    \end{column}
+  \end{columns}
+
+  \begin{columns}
+
+    % Text area
+    \begin{column}[t]{.48\textwidth}
+      \begin{block}{Data}
+        \begin{multicols}{2}
+          \input{data}
+        \end{multicols}
+      \end{block}
+      
+      \begin{block}{Analysis}
+          \input{analysis}
+      \end{block}
+    
+      \begin{block}{Conclusions}
+        \begin{multicols}{2}
+          \input{conclusions}
+        \end{multicols}
+      \end{block}
+      
+    \end{column}
+
+    \begin{column}[t]{.48\textwidth}
+      \input{images}
+    \end{column}
+    
+  \end{columns}
+
+
+  % References box
+  \vspace*{1cm}
+  \begin{columns}
+    \begin{column}[t]{.15\textwidth}
+      % Spacing (for Kartverket logo)
+    \end{column}
+    
+    \begin{column}[t]{.85\textwidth}
+      \begin{block}{References}
+        \vspace*{-1cm}                   % Too much space on top inside block
+        \begin{minipage}{.98\textwidth}  % Add space left and right
+          \begin{multicols}{4}
+            \input{references}
+          \end{multicols}
+        \end{minipage}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+\end{document}

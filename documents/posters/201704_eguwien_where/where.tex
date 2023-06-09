@@ -1,0 +1,85 @@
+Where is a new software for geodetic analysis, currently being developed at the
+Norwegian Mapping Authority (Kartverket). Where is built on our experiences with
+the GEOSAT software~\cite{kierulf2010}, and will be able to analyse and combine
+data from VLBI, SLR, GNSS and DORIS.
+
+
+{\large\bfseries Why?}\\
+
+The last decade the Norwegian Mapping Authority has increased its contributions
+on global reference frames.  We are currently building a new fundamental station
+at Ny-{\AA}lesund supporting VLBI, SLR, GNSS and DORIS. We have taken initiative
+to passing a UN resolution on global geodesy and the importance of Global
+Geodetic Reference Frames~\cite{un_ggrf}. The Where project is the third leg in
+this effort, developing a new tool for the analysis of geodetic data and giving
+us more insight into such analysis.
+
+
+{\large\bfseries How?}\\
+
+Where is mainly implemented in Python. The Python ecosystem for data science is
+very rich and Where utilizes several well known packages such
+as \texttt{numpy}, \texttt{scipy} and \texttt{matplotlib}, as well as more
+specialized packages like \texttt{astropy}~\cite{astropy2013}
+and \texttt{jplephem}~\cite{jplephem}. In addition, Python easily interfaces
+with other languages like C and Fortran, and Where uses
+the \texttt{SOFA}~\cite{sofa_software} and \texttt{IERS}~\cite{iers_software}
+Fortran libraries directly.
+
+Using Python has several advantages, including rapid development, flexible and
+easy to read code. It has some challenges, in particular pure Python code can be
+slow. However, using \texttt{numpy}, doing most operations on vectors (instead
+of sequentially) and caching results when possible gives us a fairly fast
+program. There are now many tools for optimization of Python, and there is always
+the option to rewrite critical components in lower level languages.
+
+Where is a command line tool, and comes with a configuration file that can be
+used to customize the behavior of the program. This makes the program quite easy
+to use, while at the same time having the possibility to use different models
+and input for the analysis. The results can be inspected using the graphical
+tool called There that has been developed alongside Where (Figure~\ref{fig:there}).
+
+
+{\large\bfseries What?}\\
+
+Where works on the basis of a pipeline. First observation data are read and
+edited. Next, theoretical delays are calculated, before station positions are
+estimated on the basis of those delays. Finally, results are written to disk in
+proper formats (Figure~\ref{fig:architecture}).
+
+The implementation of the individual models follow the 2010 IERS
+Conventions~\cite{iers2010}, and when possible we have used software libraries
+made available at the IERS web page~\cite{iers_software}. Table~\ref{tbl:models}
+gives an overview of the models available for Where.
+
+The estimation is done using a Kalman filter~\cite{mysen2017}. Currently we are
+using continuous piecewise linear functions to model the clock and troposphere.
+Different methods for detecting outliers are being explored~\cite{mysen2017b}.
+
+
+{\large\bfseries Where?}\\
+
+Currently VLBI is fully implemented (using NGS-files) and we are testing models
+(see the box on the right) and the estimation. For SLR we have implemented all
+models for orbit determination, but these still need improvements. For GNSS we
+will first do a PPP-solution for GPS based on precise orbits. This is well under
+way, although some models are still yet to be implemented. The DORIS analysis
+has not yet been started.
+
+
+{\large\bfseries When?}\\
+
+We are an associated analysis center within the IVS and a report of our
+activities the last two years will soon be published~\cite{kirkvik2017}. For
+VLBI our short-term plans are to implement the VGOS-DB-format, better support
+for TRFs for apriori positions (currently Where can only use the ITRF2014
+without seismic deformations), and start testing of a production line.
+
+The SLR development has more or less been on hold the last year due to maternity
+leave, but will be taken up again this fall. The first priority will be to
+improve the orbit integrator, and work on determining precise orbits.
+
+For GNSS we will next finish implementing all necessary models and add a framework
+for editing the data. DORIS development will be started as soon as resources allow.
+
+\endinput

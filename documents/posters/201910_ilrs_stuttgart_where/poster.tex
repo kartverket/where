@@ -1,0 +1,122 @@
+\documentclass{beamer}
+\usepackage{lipsum}
+
+\mode<presentation>{\usetheme{Ringerike}}
+\usepackage[english]{babel}
+\usepackage[latin1]{inputenc}
+\usepackage{multicol}
+\usepackage{tabularx}
+
+%\usepackage{amsmath,amsthm, amssymb, latexsym}
+%\usepackage{lipsum}
+%\boldmath
+\usepackage[orientation=portrait, size=a0]{beamerposter}
+
+\addtobeamertemplate{block begin}{}{\setlength{\parskip}{30pt plus 1pt minus 1pt}}
+\setbeamertemplate{caption}[numbered]
+
+% Bibliography colors and labels
+\setbeamertemplate{bibliography item}{\color{white}\ \insertbiblabel}
+\setbeamercolor{bibliography entry item}{fg=white}
+\setbeamercolor{bibliography entry author}{fg=white}
+\setbeamercolor{bibliography entry title}{fg=white} 
+\setbeamercolor{bibliography entry location}{fg=white} 
+\setbeamercolor{bibliography entry note}{fg=white}
+
+\title{Where}
+\subtitle{Software for Geodetic Analysis}
+\author{Ingrid Fausk, Michael D\"ahnn, Ann-Silje Kirkvik}
+\newcommand{\contact}{ingrid.fausk@kartverket.no\\ {\url https://github.com/kartverket/where}}
+\institute{Norwegian Mapping Authority, Geodetic Institute}
+\date{October 2019}
+
+\usebackgroundtemplate{\includegraphics[width=\paperwidth]{figure/earth}}
+
+\begin{document}
+\begin{frame}[t]
+
+  % Top title area
+  %_____________________________________________________________________________________________
+  \color{white}
+  \vspace*{4cm}
+  \begin{columns}
+    \begin{column}[t]{.97\textwidth}
+      {\bfseries\fontsize{88}{120}\selectfont \inserttitle}
+      {\fontsize{88}{120}\selectfont\kern2cm---\kern2cm\insertsubtitle}
+    \end{column}
+  \end{columns}
+
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.24\textwidth}
+      {\fontsize{30}{36}\selectfont\insertauthor\\[0.5cm]
+        \fontsize{30}{36}\selectfont{\itshape\insertinstitute}\\ \ \\
+        \fontsize{24}{18}\selectfont\texttt{\contact}}\\
+        \vspace*{7cm}
+        {\color{white}\tiny PHOTO: GETTY IMAGES}
+    \end{column}
+
+    \begin{column}[t]{.70\textwidth}
+      {\fontsize{30}{36}\selectfont\setlength{\parskip}{15pt}\input{introduction}}
+    \end{column}
+
+  \end{columns}
+  
+  \vspace*{3cm}
+
+  \begin{columns}
+    % Content area
+    \begin{column}[t]{.9\textwidth}
+      \begin{block}{Where}
+        \begin{multicols}{2}
+          \input{where}
+        \end{multicols}
+      \end{block}
+    \end{column}
+  \end{columns}
+  
+  \vspace*{3cm}
+ 
+  \begin{columns}
+    \begin{column}[t]{.37\textwidth}
+
+      \begin{figure}
+        \includegraphics[width=\textwidth]{figure/there}
+        \caption{A screenshot of There - a graphical tool developed
+	  to look into the results and analysis done by Where. The plot shows
+          the observation residuals for the four satellites Lageos1,
+          Lageos2, Etalon1 and Etalon2, in meters, for a one week run.} \label{fig:there}
+      \end{figure}
+    \end{column}
+     
+    \begin{column}[t]{0.4\textwidth}
+      \begin{block}{Future Analysis Centers for VLBI and SLR with Where}
+    %    \begin{multicols}{2}
+          \input{analysis_center}
+    %    \end{multicols}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace*{3cm}
+  
+  \begin{columns} 
+    \begin{column}[t]{.48\textwidth}
+      \begin{table}
+        \input{model_table}
+        \caption{Models and apriori data supported by Where}
+        \label{tbl:models}
+      \end{table}
+    \end{column}
+
+    \begin{column}[t]{.26\textwidth}
+      \begin{block}{References}
+%        \begin{multicols}{2}
+        \input{references}
+%        \end{multicols}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+\end{document}

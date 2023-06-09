@@ -1,0 +1,226 @@
+\documentclass{beamer}
+
+%\usepackage{lipsum}      % Use for dummy text, for instance \lipsum[1-4] prints 4 paragraphs
+
+\mode<presentation>{\usetheme{Ringerike}}
+\usepackage[english]{babel}
+\usepackage[latin1]{inputenc}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{tabularx}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+%\usepackage{amsmath,amsthm, amssymb, latexsym}
+%\boldmath
+
+% Size of poster
+\usepackage[size=a0,orientation=portrait]{beamerposter}
+
+\addtobeamertemplate{block begin}{}{\setlength{\parskip}{30pt plus 1pt minus 1pt}}
+\setbeamertemplate{caption}[numbered]
+
+% Bibliography colors and labels
+\setbeamertemplate{bibliography item}{\color{white}\insertbiblabel}
+\setbeamercolor{bibliography entry item}{fg=white}
+\setbeamercolor{bibliography entry author}{fg=white}
+\setbeamercolor{bibliography entry title}{fg=white} 
+\setbeamercolor{bibliography entry location}{fg=white} 
+\setbeamercolor{bibliography entry note}{fg=white}
+
+\title{Where}
+\subtitle{A New Software for Geodetic Analysis}
+\author{Ann-Silje Kirkvik, Geir Arne Hjelle, Michael D\"ahnn, Ingrid Fausk, Eirik Mysen}
+\newcommand{\contact}{ann-silje.kirkvik@kartverket.no geir.arne.hjelle@kartverket.no}
+\institute{Norwegian Mapping Authority, Geodetic Institute}
+\date{May 15th, 2017}
+
+\usebackgroundtemplate{\includegraphics[width=\paperwidth]{figure/earth}}
+
+\begin{document}
+\begin{frame}[t]
+  % Top title area
+  \color{white} 
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.97\textwidth}
+      {\bfseries\fontsize{88}{120}\selectfont \inserttitle}
+      {\fontsize{88}{120}\selectfont\kern2cm---\kern2cm\insertsubtitle}
+    \end{column}
+  \end{columns}
+
+  \vspace*{2cm}
+  \begin{columns}
+    \begin{column}[t]{.25\textwidth}
+      {\fontsize{30}{36}\selectfont\insertauthor\\[0.5cm]
+        \fontsize{30}{36}\selectfont{\itshape\insertinstitute}\\
+        \fontsize{24}{18}\selectfont\texttt{\contact}}
+    \end{column}
+
+    \begin{column}[t]{.7\textwidth}
+      {\fontsize{30}{36}\selectfont\setlength{\parskip}{30pt}\input{ingress}}
+      \raisebox{0cm}{\kern52.5cm\color{white}\tiny PHOTO: GETTY IMAGES}
+    \end{column}
+  \end{columns}
+
+  \begin{columns}
+
+    % Content area
+    \begin{column}[t]{.48\textwidth}
+      \begin{block}{Where - VLBI}
+        \begin{multicols}{2}
+          \input{where}
+        \end{multicols}
+      \end{block}
+    \end{column}
+
+    \begin{column}[t]{.48\textwidth}
+      \vspace*{2cm}     % Align image row below headline of box to the left
+      \begin{columns}
+        % Top image row
+        \begin{column}[t]{.24\textwidth}
+          \includegraphics[width=\textwidth]{figure/vlbi}
+          \raisebox{0.2cm}{\kern-6.8cm\color{white}\tiny PHOTO: BJ{\O}RN-OWE HOLMBERG}
+          \vskip-1ex
+          \begin{block}{VLBI}
+            \vskip-3.3ex
+          \end{block}
+        \end{column}
+
+        \begin{column}[t]{.24\textwidth}
+          \includegraphics[width=\textwidth]{figure/slr}
+          \raisebox{0.2cm}{\kern-5.8cm\color{white}\tiny PHOTO: FELIPE HALL / HTSI}
+          \vskip-1ex
+          \begin{block}{SLR}
+            \vskip-3.3ex
+          \end{block}
+        \end{column}
+
+        \begin{column}[t]{.24\textwidth}
+          \includegraphics[width=\textwidth]{figure/gnss}
+          \raisebox{0.2cm}{\kern-5cm\color{white}\tiny PHOTO: ESA -- J. HUART}
+          \vskip-1ex
+          \begin{block}{GNSS}
+            \vskip-3.3ex
+          \end{block}
+        \end{column}
+
+        \begin{column}[t]{.24\textwidth}
+          \includegraphics[width=\textwidth]{figure/doris}
+          \raisebox{0.2cm}{\kern-8.3cm\color{white}\tiny PHOTO: ESA -- DENNMAN PRODUCTIONS}
+          \vskip-1ex
+          \begin{block}{DORIS}
+            \vskip-3.3ex
+          \end{block}
+        \end{column}
+      \end{columns}
+
+      \vspace*{2cm}     % Some space between image row and table
+      \begin{table}
+        \input{model_table}
+        \caption{VLBI Models and apriori data supported by Where}
+        \label{tbl:models}
+      \end{table}
+
+      \begin{columns}
+        \begin{column}[t]{.48\textwidth}
+          \begin{figure}
+            \includegraphics[width=\textwidth]{figure/code_structure}
+            \caption{An overview of the architecture of Where. The pipeline for
+              the analysis of the different techniques, as well as orbit
+              determination and combination of different techniques is shown.}
+            \label{fig:architecture}
+          \end{figure}
+        \end{column}
+
+        \begin{column}[t]{.48\textwidth}
+          \begin{table}
+            \input{vascc_rms_table}
+            \caption{RMS of difference [mm] between Where, c5++ and VieVS for
+              the northern (NH) and southern (SH) network}
+            \label{tbl:vascc_rms}
+          \end{table}
+
+          \begin{table}
+            \input{vascc_max_table}
+            \caption{Maximum absolute difference [mm] between Where, c5++ and
+              VieVS for the northern (NH) and southern (SH) network}
+            \label{tbl:vascc_max}
+          \end{table}
+        \end{column}
+      \end{columns}
+    \end{column}
+  \end{columns}
+
+  \begin{columns}
+    \begin{column}[t]{.98\textwidth}
+      \begin{block}{Comparison to current software packages}
+        \begin{multicols}{4}
+          \input{comparisons}
+        \end{multicols}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  % Figure strip
+  \vspace*{1cm}
+  \begin{columns}
+    \begin{column}[t]{.24\textwidth}
+      \begin{figure}
+        \includegraphics[width=.8\textwidth]{figure/there}
+        \caption{A screenshot of There. There is a graphical tool developed to
+          look into the results and analysis done by Where.}
+        \label{fig:there}
+      \end{figure}
+    \end{column}
+
+    \begin{column}[t]{.24\textwidth}
+      \begin{figure}
+        \includegraphics[width=\textwidth]{figure/where_vs_c5++_NH}
+        \caption{Difference in theoretical delay between Where and c5++ for each
+          baseline in the northern network used in the VASCC. The RMS of all
+          differences is 0.49~mm.}
+        \label{fig:where_c5++_sh}
+      \end{figure}
+    \end{column}
+
+    \begin{column}[t]{.24\textwidth}
+      \begin{figure}
+        \includegraphics[width=\textwidth]{figure/where_vs_vievs_NH}
+        \caption{Difference in theoretical delay between Where and VieVS for each
+          baseline in the northern network used in the VASCC. The RMS of all
+          differences is 0.44~mm.}
+        \label{fig:where_vievs_sh}
+      \end{figure}
+    \end{column}
+
+    \begin{column}[t]{.24\textwidth}
+      \begin{figure}
+        \includegraphics[width=\textwidth]{figure/c5++_vs_vievs_NH}
+        \caption{Difference in theoretical delay between c5++ and VieVS for each
+          baseline in the northern network used in the VASCC. The RMS of all
+          differences is 0.21~mm.}
+        \label{fig:c5++_vievs_sh}
+      \end{figure}
+    \end{column}
+  \end{columns}
+
+  % References box
+  \vspace*{1cm}
+  \begin{columns}
+    \begin{column}[t]{.15\textwidth}
+      % Spacing (for Kartverket logo)
+    \end{column}
+    
+    \begin{column}[t]{.82\textwidth}
+      \begin{block}{References}
+        \vspace*{-1cm}                   % Too much space on top inside block
+        \begin{minipage}{.98\textwidth}  % Add space left and right
+          \begin{multicols}{4}
+            \input{references}
+          \end{multicols}
+        \end{minipage}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+\end{document}

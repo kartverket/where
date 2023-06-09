@@ -1,0 +1,34 @@
+GEOSAT: Combining VLBI, SLR, GPS, and DORIS at the observation level
+====================================================================
+
+Per Helge Andersen, Michael Dähnn, Ingrid Fausk, Geir Arne Hjelle,
+Ann-Silje Kirkvik, and Eirik Mysen
+
+Poster presentation in session "G2.2 The ITRF: Elaboration, Usage and
+Applications" at the EGU General Assembly, Vienna, Austria, 12 - 17
+April 2015.
+
+Abstract:
+
+GEOSAT is a multi-technique geodetic software that has been under
+development for about 30 years [P. H. Andersen, "Multilevel arc
+combination with stochastic parameters". Journal of Geodesy 01/2000;
+74(7): 531 - 551]. The last couple of years the development efforts
+have been headed by a team at the Norwegian Mapping Authority.
+
+The GEOSAT software can be used in the analysis of space geodetic data
+by combining data from VLBI, SLR, GPS and DORIS at the observation
+level epoch by epoch. As a result technique dependent systematic
+errors will be visible as anomalous a posteriori residuals, and can be
+compensated for by introducing technique dependent empirical
+models. GEOSAT is based on factorized Kalman filters which allow the
+estimation of stochastic parameters common for several techniques.
+
+GEOSAT contributed to the IVS solution used in the upcoming ITRF. In
+addition to VLBI analysis the software can process SLR and GPS data,
+while DORIS based analysis is under development. Experiments in
+combining data from different techniques according to the GEOSAT
+philosophy are currently being done. This presentation will be a
+description of how GEOSAT combines data from the different techniques,
+while at the same time reporting the current state of the project and
+our plans going forward.

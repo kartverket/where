@@ -1,0 +1,452 @@
+\documentclass[natbib,twocolumn,twoside]{svmultiag}
+%
+%\usepackage[dvips]{graphicx}
+\usepackage{graphicx}
+% ============================================================================
+\graphicspath{{./figures/}}
+
+\title*{CONT08 - First Results and High Frequency Earth Rotation}
+\titlerunning{CONT08 - First Results and HF-ERPs}
+
+\author{T. Artz, S. B{\"o}ckmann, A. Nothnagel}
+\authorrunning{Artz et al.}
+
+\institute{Thomas Artz, Axel Nothnagel and Sarah Tesmer %
+           \at Rheinische Friedrich-Wilhelms Universit{\"a}t Bonn, IGG,
+               Nu{\ss}allee 17, D-53115 Bonn, Germany
+           % Additional author \at Affiliation, Adress, ...
+          }
+% ============================================================================
+\begin{document}
+\maketitle
+% ----------------------------------------------------------------------------
+\abstract{
+First results from the most recent continuous VLBI campaign (CONT08) are
+shown. 
+CONT08 took place in August 2008. One of the scientific goals was the
+generation of high precision Earth Orientation Parameters (EOP) with sub-daily
+resolution.
+A general quality assessment of CONT08 is performed investigating station
+position variations and daily EOP. 
+In addition, high-resolution Earth rotation time series are generated in a
+way that ensures consistency over the whole time span. 
+Here, we demonstrate the effect of a modified scheduling procedure concerning
+\mbox{(in-)consistency} of sub-daily EOP at session borders.
+Results of prior continuous campaigns have differed significantly from each 
+other in amplitude and phase of the spectral components.
+Thus, we also compare the CONT08 amplitude spectra with results from CONT02 
+and CONT05.
+}
+
+\keywords{CONT08, High Frequency Earth Rotation}
+
+
+% ----------------------------------------------------------------------------
+\section{Introduction}                                \label{sec:introduction}
+% ----------------------------------------------------------------------------
+The International VLBI Service for Geodesy and Astrometry (IVS) conducts 
+continuous VLBI observations of up to 14 days duration (CONT) in irregular
+intervals. 
+In contrast to the routine 24~h VLBI observations, which are performed two or
+three times per week, those CONT-campaigns are around-the-clock observations
+over several days.
+The last three CONT campaigns carried out in 2002, 2005 and 2008 took place
+over fortnightly time-spans.
+CONT-sessions  should always demonstrate the highest available accuracy that
+can be achieved by VLBI observations.
+Additionally, one of the main scientific goals is the generation and
+interpretation of highly resolved Earth orientation parameters (EOP) due to
+the continuity of the campaign.
+
+Most recently, CONT08 took place in 2008 from August 12-26 with individual
+sessions being set up for 0~h to 24~h UTC each.
+The observing network was arranged by 11 globally distributed VLBI telescopes
+(s. Fig. \ref{fig:network}).
+The network has a strong European part since the stations in North-America at
+Fairbanks and Algonquin Park (that were part of prior continuous campaigns)
+were powered off and replaced by Medicina and Zelenchukskaya.
+% ............................................................................
+% Fig.: CONT08 network
+\begin{figure}[tb]
+         \includegraphics[width=7.4cm]{artz01}
+         \caption{CONT08 observing network}
+         \label{fig:network}
+\end{figure}
+% ............................................................................
+
+There are several changes in the scheduling of CONT08 with respect to prior
+continuous campaigns.
+The keypoint is the necessity of system checks that have to be performed on a
+daily basis.
+For CONT08 these have been decoupled in view on the observing sites.
+Prior to CONT08, the system checks were performed in the last $\approx$ 30~min
+of each session for all stations.
+Now, subsequent 2~h slots for each site have been planned for each session
+with exception of the first one.
+In those slots, the 30~min system checks should be performed (see Tab. 
+\ref{tab:slots}).
+In reality, this idea has been fullfilled.
+Moreover, some stations performed system checks so quickly that nearly no
+gaps are visible in the observations.
+% ............................................................................
+% table with time slots
+\begin{table}[t]
+ \centering
+ \begin{tabular}{c||c|c}
+    Station & Weekends [UT] & Weekdays [UT] \\ 
+    \hline
+    Hr  & 13-15& 12-14\\
+    Kk  & 00-02& 18-20\\
+    Mc  & 15-17& 06-08\\
+    Ny  & 17-19& 10-12\\
+    On  & 11-13& 08-10\\
+    Sv  & 05-07& 04-06\\
+    Tc  & 21-23& 16-18\\
+    Ts  & 07-09& 00-02\\
+    Wf  & 19-21& 14-16\\
+    Wz  & 07-09& 18-20\\
+    Zc  & 09-11& 02-04
+ \end{tabular}
+ \caption{Time slots for system checks during CONT08
+          (http://ivscc.gsfc.nasa.gov/program/cont08/cont08-notes.txt)}
+ \label{tab:slots}
+\end{table}
+% ............................................................................
+
+Focussing on the observations itself, one can state that each session has an
+overall number of 9000 to 11000 observations.
+This is a great increase w.r.t. CONT02 (mean: 3000) and CONT05 (mean: 6000)
+due to a raise of the recording rate and, thus, shorter scan lengths.
+The variation between the individual sessions mainly depends on station
+problems.
+TIGO/Conception missed 3 sessions and had several interruptions of up to 6~h.
+Zelenchukskaya is absent in one session because of lost disks. 
+Furthermore, post fit residuals of observations with Zelenchukskaya show 
+bi-modal patterns suggesting the existence of sub-ambiguities. 
+Since these could not be fixed, the observations affected have been
+eliminated from the solution.
+
+In this paper, first results of the analysis of CONT08 observations are given
+with a special focus on the estimation of sub-daily EOP.
+In particular, the impact of the modified scheduling on the estimates is
+evaluated.
+Furthermore, CONT-campaigns of 2002, 2005 and 2008 are compared on the basis
+of station position estimates and the frequency representation of polar
+motion.
+
+
+% ----------------------------------------------------------------------------
+\section{Solution Description}                                 \label{sec:sol}
+% ----------------------------------------------------------------------------
+Three different solutions have been performed for the analysis of CONT08 
+as well as of CONT02 and of CONT05.
+\begin{enumerate}
+\item Solution for session-wise station position estimates. The datum 
+      defect has been solved by NNR/NNT conditions w.r.t. ITRF2005
+      over the whole set of stations.
+\item EOP solution with daily estimates of polar motion, $\Delta$UT1
+      and their rates as well as nutation offsets.
+\item EOP solution with hourly PM and $\Delta$UT1 parameterized as
+      continuous-pice-wise-linear-functions (CPWLF). Nutation
+      parameters are fixed to a~priori values estimated in a separate
+      solution.
+\end{enumerate}
+In solutions 2. and 3., the station positions are estimated only once for the
+middle epoch of the fortnightly time-span to de-correlate the estimates as
+shown by \cite{Artz2007}.
+
+All of these solutions have in common the same modelling and parameterization
+of nuisance parameters (Clocks and atmospheres).
+Source positions are fixed to ICRF and its extensions.
+Station clocks are estimated w.r.t. Kokee Park clock by a $2^{nd}$ order
+polynomial with additional clock parameters modelled by 60~min CPWLF. 
+Troposphere parameters are estimated as CPWLF, too.
+The zenith wet delay is parameterized with a temporal resolution of 20~min 
+and gradients in 12~h intervals.
+
+For all of these solutions a~priori EOP are taken from USNO finals 
+\footnote{ftp://maia.usno.navy.mil/ser7/finals.daily}.
+Nutation is modelled by IAU2000A \citep{iers_conv2004} plus additional 
+corrections from a global VLBI solution.
+Ocean loading is modelled according to FES2004 \citep{fes2004}, furthermore,
+thermal expansion of the radio telescopes \citep{nothnagel2008} and
+atmospheric pressure loading \citep{aplo} have been applied.
+
+The solutions presented here are all run in a two step procedure.
+First, the data is processed by the VLBI analysis software Calc/Solve 
+\citep{solve} and the normal equation system (NEQ) is exported.
+In a second step the NEQ is solved with a Perl backend to Calc/Solve.
+To ensure the continuity of the campaign and to stabilize parameters at the 
+session borders, a modified solution strategy is used.
+The NEQ are build up for each single session.
+Clock parameters are treated as session parameter, thus, they have been
+reduced from each individual session NEQ.
+Finally, the individual NEQ are added to a single one for the complete
+campaign by adding elements of parameters of the same type and the same epoch.
+Thereby, parameters at the session borders are stabilized and estimated only
+once \citep{Artz2007}.
+
+
+% ---------------------------------------------------------------------------
+\section{Quality Assessment}
+% ---------------------------------------------------------------------------
+On the basis of solutions 1 and 2, an assessment of the quality of CONT08
+can be achieved.
+On the one hand, station position estimates will be compared within the
+campaign.
+On the other hand, the repeatabilities are compared to those in CONT02
+and CONT05.
+Furthermore, an external validation is performed on the basis of daily EOP.
+These are compared to those estimated from GPS observations.
+
+% ............................................................................
+% Fig: Station position estimates
+\begin{figure}[tb]
+         \centering
+         \includegraphics[width=.5\textwidth]{artz04}
+         \includegraphics[width=.5\textwidth]{artz03}
+         \includegraphics[width=.5\textwidth]{artz02}
+         \includegraphics[width=.3\textwidth]{artz05}
+         \caption{Differences of the individual session estimates to the 
+                  campaign mean in CONT08.}
+         \label{fig:sta_est}
+\end{figure}
+% ............................................................................
+The differences of the individual station position estimates and the 
+campaign mean are quite homogeneous (Fig.~\ref{fig:sta_est}).
+Most of them are below 10~mm for the horizontal and 20~mm for the up 
+component.
+Only the variability of the east component of Kokee Park and Tsukuba is large
+compared to the other sites.
+Nevertheless, the impact on the estimation of other parameters is not big 
+e.g. excluding these sites from the datum definition has nearly no impact 
+on the other station positions.
+The bigger deviations of TIGO/Conception in the session of August 18$^{th}$
+can be explained by the minor contribution to this session.
+Here, TIGO had only a few hours of observations due to some station problems
+and, thus, the error bars of these estimates are huge.
+As a consequence, there is no big impact on the estimation of other parameters
+as well.
+
+In general, the station position estimates are as stable as those of the prior
+campaigns.
+Figure~\ref{fig:sta_rep} shows the station position repeatabilities for
+CONT02, CONT05 and CONT08.
+Only observing sites that were in at least two campaigns are displayed.
+% ............................................................................
+% Fig: Station posistion RMS differences
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=.5\textwidth, trim=0 .06cm 0 0, clip]{artz08}
+ \includegraphics[width=.5\textwidth, trim=0 .06cm 0 0, clip]{artz07}
+ \includegraphics[width=.5\textwidth]{artz06}
+ \caption{Station position repeatabilities for each campaign. 
+          The datum definition has been applied by NNR/NNT conditions
+          over all stations in CONT02 (red) and over all stations
+          but Kokee Park and Tsukuba in CONT05 (black) and CONT08 
+          (purple). The two stations that were active in CONT08, only,
+          (Medicina and Zelenchukskaya) are excluded from this figure.}
+ \label{fig:sta_rep}
+\end{figure}
+% ............................................................................
+Most of the repeatabilities in CONT08 are of comparable size as in the prior
+campaigns or even better.
+Only the repeatabilities of Kokee Park, Tsukuba and Westford have become
+worse.
+The main cause can be seen in the switch-off of the telescopes at Fairbanks 
+and Algonquin Park reducing the geometric links between these sites.
+As a general consequence, it can be stated that the CONT08 network was not
+that well distributed over the Earth as it was in CONT05.
+
+Calculating the WRMS of the daily EOP differences between the VLBI estimates
+and external EOP series leads to an insight in the quality of the EOP from a 
+continuous campaign.
+These WRMS differences are shown in Fig~\ref{fig:erp_rep}, where the official
+combined EOP series of the International GNSS Service
+\footnote{ftp://igscb.jpl.nasa.gov/pub/product/igs00p03.erp.Z} has been used
+for polar motion.
+For $\Delta$UT1 the USNO finals have been used to calculate the EOP
+repeatabilities.
+The differences have been detrended to eliminate the impact of differences
+in the underlying terrestrial reference frame.
+The UT1 variations from the three continuous VLBI campaigns agree with the 
+reference series at the same level, whereas the CONT08 polar motion agrees
+much better with the IGS time series than those from CONT02 or CONT05.
+% ............................................................................
+% Fig: ERP RMS differences
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=.3\textwidth]{artz09}
+ \caption{EOP repeatabilities for each campaign. 
+          The WRMS values are calculated w.r.t. IGS EOP series
+          for polar motion and USNO finals for $\Delta$UT1.}
+ \label{fig:erp_rep}
+\end{figure}
+% ............................................................................
+
+% ---------------------------------------------------------------------------
+\section{Sub-daily Earth Rotation}
+The estimation of EOP with a sub-daily resolution from CONT campaigns is of
+great interest.
+Hourly EOP estimates over a time-span of two weeks provide the opportunity
+to analyze the characteristics of the EOP in the frequency domain.
+
+Furthermore, the time series of hourly EOP shows the effects of the modified
+scheduling used in CONT08.
+Figure \ref{fig:xpole} displays the X~pole differences w.r.t. the IGS time
+series for CONT05 and CONT08 from a solution where each session is analyzed
+independently.
+There are huge outliers in the CONT05 time series at the session borders.
+Those are due to the lack of observations in the last $\approx$~30~min of
+each 24~h block where the system checks were performed.
+Such outliers are not visible in the CONT08 time series.
+For CONT08 the scheduling was changed in a way that the observations are
+really continuous as described in Sec.~\ref{sec:introduction}.
+Thus, the estimates in the last interval of each individual session are
+already stabilized through this type of scheduling.
+% ............................................................................
+% Fig: hourly resolved X-pole
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=.4\textwidth]{artz10}
+ \includegraphics[width=.4\textwidth]{artz11}
+ \caption{X pole differences to IGS with a hourly resolution from CONT05 
+          (upper plot) and CONT08 (lower plot) from an independent solution.}
+ \label{fig:xpole}
+\end{figure}
+% ............................................................................
+
+In addition to the scheduling, the modified solution strategy of stacking the
+normal equations helps to further improve the sub-daily EOP estimates.
+Here, parameters at the session boundaries are estimated using observations
+from the last interval of the first session and the first interval of the
+second session and so on.
+The resulting time series are shown in Fig.~\ref{fig:stack}.
+Nearly all of the outliers in CONT05 are eliminated or at least minimized
+by the modified stacking approach.
+A minor improvement can be seen for CONT08 as well.
+% ............................................................................
+% Fig: hourly resolved X-pole (modified solution approach)
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=.4\textwidth]{artz12}
+ \includegraphics[width=.4\textwidth]{artz13}
+ \caption{X pole differences to IGS with a hourly resolution from CONT05 
+          (upper plot) and CONT08 (lower plot) where the modified
+          solution strategy has been applied.}
+ \label{fig:stack}
+\end{figure}
+% ............................................................................
+
+In the spectral domain several authors have reported about a retrograde
+ter-diurnal signal in the CONT02 Polar Motion data (e.g. \cite{haas2006a}).
+This signal is visible in our analysis, too, as it is shownin
+Fig.~\ref{fig:spectrum}.
+However, there is no such signal present in the other campaigns.
+To derive the spectra, total EOP series are reduced by the IERS sub-daily 
+tidal model \citep{iers_conv2004}.
+The reason for this phenomena is still an open issue and under investigation.
+Subsequently, those values have been detrended by CPWLF with a resolution of 
+one day.
+Afterwards, a FFT of the residuals has been calculated.
+Some peaks can be seen at the diurnal and semi-diurnal bands.
+The prograde diurnal and semi-diurnal as well as the semi-diurnal retrograde
+signal can be interpreted as inconsistency between the IERS sub-daily tidal
+model and the VLBI observations.
+The remaining retrograde diurnal signal is due to mismodelling of nutation.
+Nutation is fixed to a~priori values for the estimation of sub-daily
+EOP, thus, some of the remaining signal appears as a near diurnal retrograde 
+term.
+% ............................................................................
+% Fig: amplitude spectra
+\begin{figure}[t]
+ \centering
+ \includegraphics[width=.5\textwidth]{artz14}\\
+ \includegraphics[width=.5\textwidth]{artz15}\\
+ \includegraphics[width=.5\textwidth]{artz16}
+ \caption{Polar Motion spectra from CONT-campaigns.}
+ \label{fig:spectrum}
+\end{figure}
+% ............................................................................
+In the $\Delta$UT spectra no significant variations besides the diurnal and
+semi-diurnal bands can be seen.
+There is a small irregular variation at a period of 6h in the CONT05 data
+only.
+
+% ---------------------------------------------------------------------------
+\section{Conclusions}
+% ---------------------------------------------------------------------------
+CONT08 serves as a high quality continuous data-set from VLBI observations.
+The variations of the station position estimates is quite homogeneous 
+besides some bigger variations in the east component of Kokee Park and Tsukuba.
+
+The modified scheduling improves the estimation of parameters with a sub-daily 
+resolution as shown for the hourly EOP estimates.
+Not only EOP but all parameters with a sub-daily resolution as zenith wet 
+delay or clock parameters benefit from this procedure.
+
+The sub-daily EOP estimates match the GPS series quite well for all campaigns.
+The derived spectra for polar motion are inhomogeneous.
+The peaks at the well known tidal bands with periods around 12h and 24h vary.
+Furthermore, the retrograde ter-diurnal term is present in CONT02 polar motion
+but not in CONT05 or CONT08.
+For variations in $\Delta$UT, no significant irregular variations could be 
+found.
+
+% ---------------------------------------------------------------------------
+\begin{thebibliography}{7}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Artz et~al.(2007)Artz, B{\"o}ckmann, Nothnagel, and Tesmer]{Artz2007}
+T.~Artz, S.~B{\"o}ckmann, A.~Nothnagel, and V.~Tesmer.
+\newblock ERP time series with daily and sub-daily resolution determined from
+  CONT05.
+\newblock In J.~B{\"o}hm, A.~Pany, and H.~Schuh, editors, \emph{Proceedings of
+  the 18th Workshop Meeting on European VLBI for Geodesy and Astrometry},
+  volume~79 of \emph{Geowissenschaftliche Mitteilungen, Schriftenreihe
+  Vermessung und Geoinformation der TU Wien}, pages 69--74. TU Wien, 2007.
+
+\bibitem[Haas and W{\"u}nsch(2006)]{haas2006a}
+R.~Haas and J.~W{\"u}nsch.
+\newblock Sub-diurnal earth rotation variations from the VLBI CONT02 campaign.
+\newblock \emph{J. Geodyn.}, 41:\penalty0 94--99, 2006.
+
+\bibitem[{{Letellier} et~al.(2004){Letellier}, {Lyard}, and {Lefevre}}]{fes2004}
+T. {Letellier}, F.~{Lyard}, and F.~{Lefevre} (2004), {The new global tidal solution: FES2004}, 
+\textit{Proceeding of the Ocean Surface Topography Science Team Meeting, St. Petersburg, Florida} 
+
+\bibitem[{McCarthy} and {Petit}(2004)]{iers_conv2004}
+D.~D. {McCarthy} and G.~{Petit}.
+\newblock \emph{IERS Conventions (2003)}.
+\newblock IERS Conventions (2003).~Dennis D.~McCarthy and G{\'e}rard Petit
+  (eds.), International Earth Rotation and Reference Systems Service
+  (IERS).~IERS Technical Note, No.~32, Frankfurt am Main, Germany: Verlag des
+  Bundesamtes f{\"u}r Kartographie und Geod{\"a}sie, ISBN 3-89888-884-3, 2004,
+  127 pp.,  2004.
+
+\bibitem[Nothnagel(2008)]{nothnagel2008}
+A.~Nothnagel.
+\newblock Conventions on thermal expansion modelling of radio telescopes for
+  geodetic and astrometric VLBI.
+\newblock \emph{J. Geodesy}, 2008.
+\newblock \doi{10.1007/s00190-008-0284-z}.
+
+\bibitem[Petrov(2008)]{solve}
+L.~Petrov.
+\newblock Mark-5 vlbi analysis software calc/solve.
+\newblock Web document http://gemini.gsfc.nasa.gov/solve/, 07 2008.
+
+\bibitem[{Petrov} and {Boy}(2004)]{aplo}
+L.~{Petrov} and J.-P. {Boy}.
+\newblock Study of the atmospheric pressure loading signal in very long
+  baseline interferometry observations.
+\newblock \emph{Journal of Geophysical Research (Solid Earth)}, 109:\penalty0
+  3405--+, Mar. 2004.
+\newblock \doi{10.1029/2003JB002500}.
+
+\end{thebibliography}
+\end{document}

@@ -1,0 +1,125 @@
+\documentclass{beamer}
+
+\mode<presentation>{\usetheme{Ringerike}}
+\usepackage[english]{babel}
+\usepackage[latin1]{inputenc}
+\usepackage{multicol}
+\usepackage{ragged2e}
+\usepackage{changepage}
+
+%\usepackage{amsmath,amsthm, amssymb, latexsym}
+\boldmath
+\usepackage[size=a0,orientation=portrait]{beamerposter}
+
+\addtobeamertemplate{block begin}{}{\justifying\setlength{\parskip}{20pt plus 1pt minus 1pt}\begin{adjustwidth}{1cm}{1cm}}
+\addtobeamertemplate{block end}{\end{adjustwidth}}{}
+%\setbeamertemplate{caption}[numbered]
+
+\title{Where}
+\subtitle{High Precision Positioning using Python}
+\author{Michael D\"ahnn, Ingrid Fausk, Geir Arne Hjelle, Ann-Silje Kirkvik, Eirik Mysen}
+\institute{Norwegian Mapping Authority, Geodetic Institute}
+\date{August 2016}
+
+\newlength{\techheight}
+\setlength{\techheight}{8cm}
+\setlength{\columnsep}{1cm}
+\usebackgroundtemplate{\includegraphics[width=\paperwidth]{figure/earth}}
+
+\begin{document}
+\begin{frame}
+  \color{white} 
+  \vspace*{2cm} \\
+  {\bfseries\fontsize{70}{120}\selectfont\inserttitle\kern2cm}
+  {\fontsize{70}{120}\selectfont ---\kern2cm
+    \insertsubtitle}\\[2cm]
+  {\fontsize{45}{45}\selectfont
+    \insertauthor\\[0.5cm]\itshape\insertinstitute}\\[1cm]
+
+  \parbox[t]{0.8\textwidth}{\fontsize{36}{42}\selectfont
+    \setlength{\parskip}{36pt}\input{ingress}}
+  \raisebox{-3cm}{\kern75cm\color{white}\footnotesize PHOTO: GETTY IMAGES}
+
+  \vspace*{3cm}
+
+  % Content area 
+  \begin{columns}
+    \begin{column}{.22\textwidth}
+      \includegraphics[width=\textwidth]{figure/vlbi}
+      \raisebox{0.3cm}{\kern-7cm\tiny
+        PHOTO: BJØRN-OWE HOLMBERG}
+      \vskip-1ex
+      \begin{block}{VLBI}
+        \vskip-3ex
+        \parbox[t][\techheight]{\linewidth}{\input{vlbi}}
+      \end{block}
+    \end{column}
+    \begin{column}{.22\textwidth}
+      \includegraphics[width=\textwidth]{figure/slr}
+      \raisebox{0.3cm}{\kern-6cm\color{white}\tiny
+        PHOTO: FELIPE HALL / HTSI}
+      \vskip-1ex
+      \begin{block}{SLR}
+        \vskip-3ex
+        \parbox[t][\techheight]{\linewidth}{\input{slr}}
+      \end{block}
+    \end{column}
+    \begin{column}{.22\textwidth}
+      \includegraphics[width=\textwidth]{figure/gnss}
+      \raisebox{0.3cm}{\kern-5cm\color{white}\tiny
+        PHOTO: ESA -- J. HUART}
+      \vskip-1ex
+      \begin{block}{GNSS}
+        \vskip-3ex
+        \parbox[t][\techheight]{\linewidth}{\input{gnss}}
+      \end{block}
+    \end{column}
+    \begin{column}{.22\textwidth}
+      \includegraphics[width=\textwidth]{figure/doris}
+      \raisebox{0.3cm}{\kern-8.3cm\color{white}\tiny
+        PHOTO: ESA -- DENNMAN PRODUCTIONS}
+      \vskip-1ex
+      \begin{block}{DORIS}
+        \vskip-3ex
+        \parbox[t][\techheight]{\linewidth}{\input{doris}}
+      \end{block}
+    \end{column}
+  \end{columns}
+  
+  \vspace*{1cm}
+
+  \begin{columns}
+    \begin{column}[t]{.47\textwidth}
+      \begin{block}{Where}
+        \begin{multicols}{2}
+          \input{where}
+        \end{multicols}
+      \end{block}
+
+      \vspace*{3cm}
+  
+      \begin{figure}
+        \includegraphics[width=0.7\textwidth]{figure/architecture}
+        \caption{The software architecture.}
+      \end{figure}
+    \end{column}
+      
+    \begin{column}[t]{.47\textwidth}
+      \begin{block}{Examples}
+        \begin{multicols}{2}
+          \input{examples}
+        \end{multicols}
+      \end{block}
+
+      \begin{block}{Future}
+        \begin{multicols}{2}
+          \input{future}
+        \end{multicols}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+\end{document}
+
+% Keep getting a ! LaTeX Error: There's no line here to end.
+% Not sure why ... the output looks ok

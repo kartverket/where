@@ -1,0 +1,20 @@
+At the moment we work on challenges connected to the combination of VLBI and SLR epoch by epoch. One important issue in
+this respect will be how we tie the VLBI and SLR network together. For instance, it will be important that the networks
+are closely connected at an early stage (during epoch by epoch processing with UD Kalman filter) so that the techniques
+may fully complement each other, before we truncate the state vector and its variance-covariance matrix for the
+accumulated combination solution. To what extent will the Earth Rotation Parameters, shared by both techniques, connect
+the different networks and, alternatively, how will we use local ties? Shall we use all available local ties, or only
+the most reliable?
+
+The output of each data set will be a state vector consisting of global (station coordinates) and stochastic parameters
+(clock, troposphere) at the last epoch of the data set. Although no approximations regarding correlations have been
+made at this stage, the solution's a posteriori variance-covariance matrix does not contain all available information
+on parameter correlations. If we use only this limited information (state and covariance at last epoch), as we intend
+to due to practical reasons (see Combination), it is possible that we during day by day combination have to involve
+Helmert transformations to describe the weaknesses of daily solutions.
+
+In the future we will include GNSS and DORIS in our processing chain, which we anticipate will require the introduction
+of new parameter types to achieve intra-technique consistency.
+
+
+\endinput

@@ -1,0 +1,49 @@
+Multiple solutions were tested to see how the parameterization might affect the final results. The number of observations
+available from NYALE13S is very limited and the quality is for the most part poor due to the warm receiver and other
+problems with the sessions. This lowers the degrees of freedom and increases the uncertainty in the estimates. Different
+setups for troposphere parameterizations and fixing the celestial reference frame have been tested.
+
+The analysis has been done using \textbf{Where} \cite{hjelle2018}. The default solution is the same which is used for 
+regular R1 and R4 processing. This means all station and source coordinates, EOPs, clocks and troposphere are estimated, 
+for more information see \cite{kirkvik2017b} and \cite{kirkvik2019}. The results are summarized in table 
+\ref{tab:solutions} and selected plots from the two extremes in terms of estimated parameters (solution 0 and solution 9) 
+are shown in figure \ref{fig:plots}. A priori coordinates for NYALE13S used in the analysis are computed based on the local 
+tie vector since the coordinates in the original database is off by almost a meter. The baseline length and repeatability is 
+calculated according to \cite{hofmeister2016}.
+ 
+
+\begin{table}
+\captionsetup{labelfont={color=kvlightgreen}}
+	\begin{tabularx}{\columnwidth}{l|l|C|C|C}
+	~\#~ & ~Setup~ & WBL & WBLR & dL \\
+	\hline
+	~0~ & ~\makecell[tl]{Default}~ & 1539.1932 [m] & 0.0032 [m] & 0.0001 [m] \\
+	~1~ & ~\makecell[tl]{Troposphere gradients fixed (Ns)}~ & 1539.1943 [m] & 0.0026 [m] & 0.0012 [m] \\
+	~2~ & ~\makecell[tl]{Troposphere gradients fixed (Ns and Ny) \\ 
+	Zenith wet delay fixed (Ns and Ny)}~ & 1539.1936 [m] & 0.0025 [m] & 0.0005 [m] \\
+	~3~ & ~\makecell[tl]{Troposphere gradients fixed (Ns) \\ 
+	Two hour zenith wet delay (Ns)}~ & 1539.1936 [m] & 0.0025 [m]  & 0.0010 [m] \\
+	~4~ & ~\makecell[tl]{Troposphere gradients fixed (Ns and Ny) \\ 
+	Two hour zenith wet delay (Ns and Ny)}~ & 1539.1931 [m] & 0.0021 [m] & 0.0000 [m] \\
+	~5~ & ~\makecell[tl]{Radio sources fixed}~ & 1539.1939 [m] & 0.0021 [m] & 0.0008 [m] \\
+	~6~ & ~\makecell[tl]{Radio sources fixed \\ 
+	Troposphere gradients fixed (Ns)}~ & 1539.1945 [m] & 0.0025 [m] & 0.0014 [m] \\
+	~7~ & ~\makecell[tl]{Radio sources fixed \\ 
+	Troposphere gradients fixed (Ns and Ny) \\ 
+	Zenith wet delay fixed (Ns and Ny)}~  & 1539.1936 [m] & 0.0027 [m] & 0.0005 [m] \\
+	~8~ & ~\makecell[tl]{Radio sources fixed \\ 
+	Troposphere gradients fixed (Ns) \\ 
+	Two hour zenith wet delay (Ns)}~ & 1539.1943 [m] & 0.0022 [m] & 0.0012 [m] \\
+	~9~ & ~\makecell[tl]{Radio sources fixed \\ 
+	Troposphere gradients fixed (Ns and Ny) \\ 
+	Two hour zenith wet delay (Ns and Ny)}~ & 1539.1943 [m] & 0.0022 [m] & 0.0000 [m] \\
+	\hline
+	\end{tabularx}
+\caption{\textcolor{white}{Weighted baseline length (WBL), weighted baseline length repeatability (WBLR) and difference 
+between weighted baseline length and local tie vector (dL) for the different solutions. The second column described how 
+a solution differs from the default solution.
+}}
+\label{tab:solutions}
+\end{table}
+
+\endinput

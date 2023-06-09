@@ -1,0 +1,49 @@
+In 2015 and 2016 Grzegorz Klopotek carried out a VLBI Analysis Software
+Comparison Campaign (VASCC). The goal of the campaign was to compare computed
+theoretical delays from different software packages. In total 11 different
+software packages contributed to the campaign and the results where presented at
+the IVS General Meeting in South Africa in 2016~\cite{klopotek2016}.
+
+The Norwegian Mapping Authority provided solutions to VASCC using the legacy
+software GEOSAT~\cite{kierulf2010}. However, as development of the new software
+progressed we redid the analysis from the VASCC campaign using Where and
+compared the results with the computed theoretical delays from the
+c5++-software~\cite{hobiger2010}. The results from this comparison are presented
+here.
+
+The VASCC dataset includes two networks of stations: one with four stations on
+the southern hemisphere and one with five stations on the northern hemisphere.
+Virtual observations of one radio source for each network are scheduled every
+minute for 15 days, from June 22nd to July 7th 2015. A leap second is introduced
+at midnight June 30th.
+
+The VASCC delay model includes geometric and gravitational delay from the IERS
+2010 Conventions~\cite{iers2010}. Also the delay through the
+troposphere~\cite{iers2010} (hydrostatic delay with GMF mapping function) and
+delay due to thermal deformations and axis offset as described
+by~\cite{nothnagel2009} are included. Delays due to cable calibration, the
+ionosphere and clocks are ignored. Site displacement models includes solid
+earth tides, solid earth pole tides, ocean tidal loading and ocean loading pole
+tides according to~\cite{iers2010}. Atmospheric pressure loading and
+eccentricity vectors are ignored. The apriori EOP time series is corrected for
+ocean tides and liberation effects with periods less than two days according
+to~\cite{iers2010}.
+
+In the original campaign six software packages got sub-millimeter agreement when
+comparing the RMS of the difference in theoretical delays. The absolute value of
+the largest difference in residual was 2.68~mm and the smallest difference was
+0.83~mm. One of the these six software packages was c5++~\cite{hobiger2010}.
+Comparing c5++ with Where yields a RMS of 0.72~mm for the southern hemisphere
+with a maximum residual of 2.26~mm. See Figure~\ref{fig:c5_where_sh}. Comparing
+the northern hemisphere we get RMS of 0.68~mm and a maximum residual of
+1.97~mm. Figure~\ref{fig:c5_where_nh} shows the difference in theoretical delays
+between c5++ and Where for the Northern network.
+
+These results indicate that the VLBI delay model in Where is consistent with
+existing software packages and current conventions. When creating the new
+software, the VASCC dataset has been valuable and an extension of the campaign
+to include for instance the VMF1 mapping function and partial derivatives is
+recommended. Other techniques such as SLR and DORIS might also benefit from
+doing a similar comparison campaign.
+
+\endinput

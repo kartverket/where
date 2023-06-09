@@ -1,0 +1,48 @@
+Where is a software currently under development at the Norwegian Mapping
+Authority. Where will be able to process and analyse data from the space
+geodetic techniques VLBI, SLR, GNSS and DORIS, and combine these together to
+provide very precise positioning of geodetic stations around the world.
+
+{\bfseries The International Terrestrial Reference Frame}
+
+The International Terrestrial Reference Frame (ITRF) is a coordinate system for
+the Earth, which is necessary for climate monitoring where we want to track
+minuscle movements over long time periods and for tracking satellites as they
+orbit the Earth. Every few years the ITRF is updated through a collective effort
+of several international research institutions. One of the goals of Where is to
+be a tool that can support the further development of the ITRF.
+
+{\bfseries Python}
+
+As in many other research fields, Fortran is still heavily used in Geodesy. When
+we started work on Where we opted for using Python as our main programming
+language instead. Our motivations mainly came from Python's flexibility and ease
+of use, combined with the rich ecosystem that exists for doing data analysis as
+well as interfacing with established C and Fortran libraries.
+
+Where is using the core of the Python datastack, including \texttt{numpy},
+\texttt{scipy}, \texttt{pandas} and \texttt{matplotlib}, for a lot of
+functionality. In addition, we rely on more specialized packages like
+\texttt{astropy} and \texttt{jplephem} where special handling of geodetic data
+is needed. Furthermore, we are custom building important parts of the
+architecture, including a powerful caching mechanism and a flexible
+datastructure for handling the data.
+
+{\bfseries The datastructure}
+
+We need an effective, flexible and powerful datastructure to handle the big
+amounts of data related to one model analysis, and have chosen to implement
+something we call a \texttt{where.dataset}. The \texttt{where.dataset} organizes
+data in rows each representing one observation and fields with data for that
+observation. Fields can be of different datatypes, where some are simply based
+on existing types like strings, \texttt{numpy}-arrays or
+\texttt{astropy}-times. Other fields are more specialized like a
+\texttt{position}-datatype that is represented by \texttt{numpy}-3-vectors, but
+knows how to transform themselves to other coordinate systems or calculate
+things like azimuth and elevation to other \texttt{position}s. The
+\texttt{where.dataset} is stored to disk using HDF5 (\texttt{h5py}) and JSON.
+Accessing fields can be done both
+using \texttt{dict}-notation: \texttt{dset['field']}
+and \texttt{property}-notation: \texttt{dset.field}.
+
+\endinput
