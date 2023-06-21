@@ -4,7 +4,7 @@ PELICANOPTS=
 
 BASEDIR=$(CURDIR)
 INPUTDIR=$(BASEDIR)/content
-OUTPUTDIR=$(BASEDIR)/output
+OUTPUTDIR= ../../docs
 CONFFILE=$(BASEDIR)/pelicanconf.py
 PUBLISHCONF=$(BASEDIR)/publishconf.py
 
@@ -44,7 +44,7 @@ html:
 	$(PELICAN) $(INPUTDIR) -o $(OUTPUTDIR) -s $(CONFFILE) $(PELICANOPTS)
 
 clean:
-	[ ! -d $(OUTPUTDIR) ] || rm -rf $(OUTPUTDIR)
+	[ ! -d $(OUTPUTDIR) ] || rm -rf $(OUTPUTDIR)/*
 
 regenerate:
 	$(PELICAN) -r $(INPUTDIR) -o $(OUTPUTDIR) -s $(CONFFILE) $(PELICANOPTS)
