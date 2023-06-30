@@ -5,6 +5,12 @@ Description:
 Remove observations epochs for satellites, which are related to unhealthy GNSS broadcast ephemeris
 
 """
+# Standard library imports
+from typing import Union
+
+# Third party imports
+import numpy as np
+
 # Midgard imports
 from midgard.dev import plugins
 
@@ -14,7 +20,11 @@ from where.lib import log
 
 
 @plugins.register
-def gnss_ignore_unhealthy_satellite(dset):
+def gnss_ignore_unhealthy_satellite(
+                        dset: "Dataset", 
+                        orbit: Union["AprioriOrbit", None] = None, 
+                        dset_brdc_idx: Union[None, np.ndarray] = None,
+) -> np.ndarray:
     """Remove observations epochs for satellites, which are related to unhealthy GNSS broadcast ephemeris
 
     If a satellite is set to unhealthy in one of the given broadcast ephemeris blocks, then the related satellite 
@@ -29,19 +39,23 @@ def gnss_ignore_unhealthy_satellite(dset):
 
     Args:
         dset (Dataset):   A Dataset containing model data.
+        orbit:            Apriori orbit object containing broadcast orbit data
+        dset_brdc_idx:    Broadcast ephemeris block indices for given observation epochs. Should be used together with
+                          'orbit' argument.
 
     Returns:
         numpy.ndarray:    Array containing False for observations to throw away
     """
     # Get signal health status information from GNSS broadcast orbits
-    brdc = apriori.get(
-        "orbit",
-        rundate=dset.analysis["rundate"],
-        station=dset.vars["station"],
-        system=tuple(dset.unique("system")),
-        apriori_orbit="broadcast",
-    )
-    remove_idx = brdc.signal_health_status(dset) > 0
+    if not orbit: 
+        orbit = apriori.get(
+            "orbit",
+            rundate=dset.analysis["rundate"],
+            station=dset.vars["station"],
+            system=tuple(dset.unique("system")),
+            apriori_orbit="broadcast",
+        )
+    remove_idx = orbit.signal_health_status(dset) > 0
 
     unhealthy_satellites = sorted(set(dset.satellite[remove_idx]))
     log.info(f"Discarding observations for unhealthy satellites: {', '.join(unhealthy_satellites)}")

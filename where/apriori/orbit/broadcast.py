@@ -114,6 +114,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             self._dset_edit.vars["station"] = station.lower()
             self._dset_edit.vars["STATION"] = self._dset_raw.vars["station"].upper()
 
+
     def _read(self, dset_raw):
         """Read RINEX navigation file data and save it in a Dataset
 
@@ -123,25 +124,22 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         (GPS: *.n, Galileo: *.l, GLONASS: *.g, ...). Therefore we have defined for each GNSS the navigation file
         name in the Where configuration file `files.conf`. In addition mixed navigation files exists, which includes
         navigation messages of different GNSS. We use following file keys in `files.conf`:
-            =========  ==================
-             System     File key
-            =========  ==================
-             Galileo    gnss_rinex_nav_E
-             GLONASS    gnss_rinex_nav_R
-             GPS        gnss_rinex_nav_G
-             Mixed      gnss_rinex_nav_M
-            =========  ==================
+           
+           | System   |  File key         |
+           | :------- | :---------------- |
+           | Galileo  | gnss_rinex_nav_E  |
+           | GLONASS  | gnss_rinex_nav_R  |
+           | GPS      | gnss_rinex_nav_G  |
+           | Mixed    | gnss_rinex_nav_M  |
 
         Depending on the configuration options `systems` and `use_mixed_brdc_file` following navigation files are read:
 
-         ======================  ==================  =======================================
-          Option                  File key            What kind of navigation file is read?
-         ======================  ==================  =======================================
-          systems = G             gnss_rinex_nav_G    Only the GPS navigation file
-          systems = G E           gnss_rinex_nav_G    GPS and Galileo navigation files
-                                  gnss_rinex_nav_E
-          use_mixed_brdc_file     gnss_rinex_nav_M    Mixed GNSS navigation file
-         ======================  ==================  =======================================
+         | Option                | File key          | What kind of navigation file is read? |
+         | :---------------------| :-----------------| :-------------------------------------|
+         | systems = G           | gnss_rinex_nav_G  | Only the GPS navigation file          |
+         | systems = G E         | gnss_rinex_nav_G  | GPS and Galileo navigation files      |
+         |                       | gnss_rinex_nav_E  |                                       |
+         | use_mixed_brdc_file   | gnss_rinex_nav_M  | Mixed GNSS navigation file            |
 
         Args:
             dset_raw (Dataset):     Dataset representing raw data from RINEX navigation file
@@ -203,6 +201,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         if "E" in dset_raw.unique("system"):
             self._galileo_signal_health_status()
 
+
     def _edit(self, dset_edit: "Dataset") -> "Dataset":
         """Edit RINEX navigation file data and save it in a Dataset
 
@@ -224,6 +223,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Args:
             dset_edit (Dataset):     Dataset representing edited data from RINEX navigation file
         """
+
         # TODO: This does not work. -> Can not find remover ignore_duplicated_navigation_messages().
         # cleaners.removers.ignore_duplicated_navigation_messages(dset_edit) #MURKS
 
@@ -292,6 +292,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 unit = self.dset_raw.unit(field)[0] if self.dset_raw.unit(field) else None
                 dset_edit.add_float(field, val=nav_np[:, idx].astype(float), unit=unit)
 
+
     def _calculate(self, dset_out: "Dataset", dset_in: "Dataset", time: str = "time") -> None:
         """Calculate broadcast ephemeris and satellite clock correction for given observation epochs
 
@@ -302,31 +303,23 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Args:
             dset_out: Output Dataset representing calculated broadcast ephemeris with following fields:
 
-        ========================  ===============  =======  ========================================================
-         Field                     Type             Unit     Description
-        ========================  ===============  =======  ========================================================
-         gnss_satellite_clock     numpy.ndarray     m       Satellite clock correction
-         gnss_relativistic_clock  numpy.ndarray     m       Relativistic clock correction due to orbit eccentricity
-         sat_posvel               PosVelTable       m       Satellite position and velocity
-         satellite                numpy.ndarray             Satellite numbers
-         system                   numpy.ndarray             GNSS identifiers
-         time                     TimeTable                 Observation epochs
-         used_iode                numpy.ndarray             IODE of selected broadcast ephemeris block
-         used_transmission_time   TimeTable                 Transmission time of selected broadcast ephemeris block
-         used_toe                 TimeTable                 Time of ephemeris (TOE) of selected broadcast ephemeris
-                                                            block
-        =======================  ===============  =======  ========================================================
-
+        | Field                   | Type          | Unit    | Description                                             |
+        | :-----------------------| :------------ | :------ | :------------------------------------------------------ |
+        | gnss_satellite_clock    | numpy.ndarray | m       | Satellite clock correction                              |
+        | gnss_relativistic_clock | numpy.ndarray | m       | Relativistic clock correction due to orbit eccentricity |
+        | sat_posvel              | PosVelTable   | m       | Satellite position and velocity                         |
+        | satellite               | numpy.ndarray |         | Satellite numbers                                       |
+        | system                  | numpy.ndarray |         | GNSS identifiers                                        |
+        | time                    | TimeTable     |         | Observation epochs                                      |
+        | used_iode               | numpy.ndarray |         | IODE of selected broadcast ephemeris block              |
+        | used_transmission_time  | TimeTable     |         | Transmission time of selected broadcast ephemeris block |
+        | used_toe                | TimeTable     |         | Time of ephemeris (TOE) of selected broadcast ephemeris |
+        |                         |               |         | block                                                   |
+        
             dset_in:  Input Dataset containing model data for which broadcast ephemeris should be determined.
             time:     Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
                       observation time and 'sat_time' to satellite transmission time.
         """
-        apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
-        
-        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
-        # navigation records
-        cleaners.apply_remover("gnss_clean_orbit", dset_in, orbit_flag="broadcast")
-
         not_implemented_sys = set(dset_in.system) - set("EG")
         if not_implemented_sys:
             log.warn(
@@ -341,9 +334,13 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             f"{', '.join(self.dset_edit.meta['parser']['file_path'])}"
         )
 
-        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
-        # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset_in, time=time)
+        apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
+        
+        # Get navigation block index for given observation epochs and clean orbits by removing unavailable satellites, 
+        # unhealthy satellites and checking validity length of navigation records
+        if "navigation_idx" not in dset_in.fields:
+            cleaners.apply_remover("gnss_clean_orbit", dset_in, orbit_flag="broadcast", orbit=self)
+        dset_brdc_idx = dset_in.navigation_idx.astype(int)
 
         # Loop over all observations
         # TODO: Generation of vectorized solution, if possible?
@@ -353,7 +350,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         sat_pos = np.zeros((dset_in.num_obs, 3))
         sat_vel = np.zeros((dset_in.num_obs, 3))
         for obs_idx, (time_gpsweek, time_gpssec, brdc_idx, sys) in enumerate(
-            # zip(dset_in[time].gps.gpsweek, dset_in[time].gps.gpssec, dset_brdc_idx, dset_in.system)
+            # zip(dset_in[time].gps.gpsweek, dset_in[time].gps.gpssec, dset.navigation_idx.as_type(int), dset_in.system)
             zip(dset_in[time].gps.gps_ws.week, dset_in[time].gps.gps_ws.seconds, dset_brdc_idx, dset_in.system)
         ):
 
@@ -420,8 +417,38 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         #                     dset_out.gnss_satellite_clock[num_obs],
         #                     dset_out.gnss_relativistic_clock[num_obs])
         # -DEBUG
-        
-        
+    
+
+
+    #
+    # CLASS METHODS
+    #  
+    def add_satellite_clock_parameter(self, dset: "Dataset", time: str = "time") -> np.ndarray:
+        """Add satellite clock parameters to dataset
+
+        Args:
+            dset: A Dataset containing model data.
+            time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
+                  observation time and 'sat_time' to satellite transmission time.
+
+        """
+        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
+        # Dataset
+        if "navigation_idx" not in dset.fields:
+            dset_brdc_idx = self._get_brdc_block_idx(dset)
+        else:
+            dset_brdc_idx = dset.navigation_idx.astype(int)
+
+        # Add satellite clock parameters to dataset
+        dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx], write_level="analysis")
+        dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx], write_level="analysis")
+        dset.add_float(
+            "sat_clock_drift_rate", 
+            val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx], 
+            write_level="analysis",
+        )
+
+         
     def get_ephemeris_field(self, field, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Get given ephemeris field values for belonging navigation records
 
@@ -434,11 +461,48 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Returns:
             Values for given field
         """
-        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
-        # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset)
+        return self.dset_edit[field][dset.navigation_idx.astype(int)]
 
-        return self.dset_edit[field][dset_brdc_idx]
+
+    def get_nearest_idx(
+                self, 
+                idx: np.ndarray, 
+                obs_epoch: float, 
+                time_key: str, 
+                positive: bool,
+                satellite: str,
+                log_level: str = "fatal",
+        ) -> float:
+            """Get nearest navigation message data index for given observation epoch
+            
+            Args:
+                idx:        Index used to filter navigation message e.g. after satellite, GNSS IOD
+                obs_epoch:  Observation epoch in modified Julian day
+                time_key:   Time key
+                positive:   Difference between observation epoch and broadcast navigation messate has to be positive
+                satellite:  Satellite name
+                log_level:  Define log level in case no broadcast navigation message data are available 
+
+            Returns:
+                Nearest broadcast navigation messages indices for given observation epochs or None in case no 
+                corresponding broadcast navigation message could be found (this is only valid if 'log_level=fatal')
+            """
+            
+            diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
+            if positive:
+                data = np.array([99999 if v < 0 else v for v in diff])
+                if np.all(data == 99999): # No broadcast navigation message epochs larger than observation epoch
+                    getattr(log, log_level)(f"No valid broadcast navigation message could be found for satellite " 
+                              f"{satellite} before observation epoch {obs_epoch} (nearest broadcast navigation message "
+                              f"receiver reception time: {min(self.dset_edit[time_key].gps.mjd[idx])})") 
+                    return None
+                
+                nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
+            else:
+                nearest_idx = np.array([abs(diff)]).argmin()
+                
+            return nearest_idx 
+
 
     def satellite_clock_correction(self, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Determine satellite clock correction
@@ -456,7 +520,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         """
         # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
         # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset)
+        if "navigation_idx" not in dset.fields:
+            dset_brdc_idx = self._get_brdc_block_idx(dset)
+        else:
+            dset_brdc_idx = dset.navigation_idx.astype(int)
 
         # Elapsed time referred to clock data reference epoch toc in [s]
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
@@ -487,7 +554,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         """
         # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
         # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset)
+        if "navigation_idx" not in dset.fields:
+            dset_brdc_idx = self._get_brdc_block_idx(dset)
+        else:
+            dset_brdc_idx = dset.navigation_idx.astype(int)
 
         # Elapsed time referred to clock data reference epoch toc in [s]
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
@@ -502,79 +572,19 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             + 2 * self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk
         ) * constant.c
 
-    def add_satellite_clock_parameter(self, dset: "Dataset", time: str = "time") -> np.ndarray:
-        """Add satellite clock parameters to dataset
 
-        Args:
-            dset: A Dataset containing model data.
-            time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
-                  observation time and 'sat_time' to satellite transmission time.
-
-        """
-        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
-        # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset, time=time)
-
-        # Add satellite clock parameters to dataset
-        dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx], write_level="analysis")
-        dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx], write_level="analysis")
-        dset.add_float(
-            "sat_clock_drift_rate", 
-            val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx], 
-            write_level="analysis",
-        )
-        
-
-    def _galileo_signal_health_status(self):
-        """Determine Galileo signal health status and add sis_status_<signal> fields to Dataset
-       
-        The determination of the signal health status is defined for Galileo in Section 2.3 of :cite:`galileo-os-sdd`.
-
-        The signal health status is indicated by different numbers:
-
-        | Number | Status          | Description                                               |
-        |--------|-----------------|-----------------------------------------------------------|
-        | 0      | Healthy         |                                                           |
-        | 1      | Marginal (SISA) | Marginal status based on signal-in-space accuracy (SISA). |
-        | 2      | Marginal (DVS)  | Marginal status based on data validity status.            |
-        | 3      | Unhealthy       |                                                           |
-
-        Args:
-            dset: A Dataset containing model data.
-        """
-
-        data = dict()
-        idx = self.dset_raw.filter(system="E")
-
-        for signal in ["e1", "e5a", "e5b"]:
-
-            field = "sis_status_" + signal
-            data = np.zeros(self.dset_raw.num_obs)
-            data_tmp = np.zeros(len(self.dset_raw.system[idx]))
-
-            # Check Signal-in-space Accuracy (SISA)
-            idx_obs = np.logical_or(self.dset_raw.sv_accuracy[idx] < 0, self.dset_raw.sv_accuracy[idx] >= 126)
-            data_tmp[idx_obs] = 1
-
-            # Check Data Validity Status (DVS)
-            idx_obs = self.dset_raw["dvs_" + signal][idx] == True
-            data_tmp[idx_obs] = 2
-
-            # Check Signal Health Status (SHS)
-            idx_obs = self.dset_raw["shs_" + signal][idx] == True
-            data_tmp[idx_obs] = 3
-
-            data[idx] = data_tmp
-            self.dset_raw.add_float(field, val=data)
-
-    def signal_health_status(self, dset: "Dataset", frequencies: Union[None, List] = None) -> np.ndarray:
+    def signal_health_status(
+                self, 
+                dset: "Dataset", 
+                frequencies: Union[None, List] = None,
+    ) -> np.ndarray:
         """Determine signal health status
 
         How the signal health status has to be handled depends on GNSS, used observation type and navigation message
         type. The determination of the signal health status is defined for:
 
         | System   | Type  | Section       | Reference                          |
-        |----------|-------|---------------|------------------------------------|
+        | :------- | :---- | :------------ | :--------------------------------- |
         | GPS      | LNAV  | 20.3.3.3.1.4  | :cite:`is-gps-200h`                |
         |          | CNAV  | 30.3.3.1.1.2  | :cite:`is-gps-200h`                |
         | Galileo  | all   | 2.3           | :cite:`galileo-os-sdd`             |
@@ -583,7 +593,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         The signal health status is indicated by different numbers:
 
         | Number | Status          | Description                                                                     |
-        |--------|-----------------|---------------------------------------------------------------------------------|
+        | :----- | :-------------- | :------------------------------------------------------------------------------ |
         | 0      | Healthy         |                                                                                 |
         | 1      | Marginal (SISA) | Defined only for Galileo and describes marginal status based on signal-in-space |
         |        |                 | accuracy (SISA)                                                                 |
@@ -594,18 +604,21 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         TODO: Add handling of BeiDou, QZSS and IRNSS signal health status.
 
         Args:
-            dset: A Dataset containing model data.
+            dset:           A Dataset containing model data.
+            frequencies:    TODO: Why was this arguments introduced???
 
         Returns:
             Array with GNSS signal health status for each observation
         """
-
         signal_health_status = np.zeros(dset.num_obs, dtype=bool)
         nav_type = config.tech.get("navigation_message_type", default="").dict
 
         # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
         # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset)
+        if "navigation_idx" not in dset.fields:
+            dset_brdc_idx = self._get_brdc_block_idx(dset)
+        else:
+            dset_brdc_idx = dset.navigation_idx.astype(int)
 
         for sys in dset.unique("system"):
             idx = dset.filter(system=sys)
@@ -658,6 +671,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         return signal_health_status
 
+
     def total_group_delay(self, dset: "Dataset") -> np.ndarray:
         """Determine total group delay
 
@@ -675,7 +689,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         """
         # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
         # Dataset
-        dset_brdc_idx = self._get_brdc_block_idx(dset)
+        if "navigation_idx" not in dset.fields:
+            dset_brdc_idx = self._get_brdc_block_idx(dset)
+        else:
+            dset_brdc_idx = dset.navigation_idx.astype(int)
 
         for sys, obstype in dset.meta["obstypes"].items():
 
@@ -716,7 +733,11 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                         tgd = f_E1 ** 2 / f_E5b ** 2 * self.dset_edit.bgd_e1_e5b[dset_brdc_idx][idx] * constant.c
 
         return tgd
-    
+   
+     
+    #
+    # AUXILIARY FUNCTIONS
+    #
 
     def _add_dim(self, array: np.ndarray) -> np.ndarray:
         """Add dimension to 0 dimensional array
@@ -737,6 +758,49 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         return output
 
 
+    def _galileo_signal_health_status(self):
+        """Determine Galileo signal health status and add sis_status_<signal> fields to Dataset
+       
+        The determination of the signal health status is defined for Galileo in Section 2.3 of :cite:`galileo-os-sdd`.
+
+        The signal health status is indicated by different numbers:
+
+        | Number | Status          | Description                                               |
+        |--------|-----------------|-----------------------------------------------------------|
+        | 0      | Healthy         |                                                           |
+        | 1      | Marginal (SISA) | Marginal status based on signal-in-space accuracy (SISA). |
+        | 2      | Marginal (DVS)  | Marginal status based on data validity status.            |
+        | 3      | Unhealthy       |                                                           |
+
+        Args:
+            dset: A Dataset containing model data.
+        """
+
+        data = dict()
+        idx = self.dset_raw.filter(system="E")
+
+        for signal in ["e1", "e5a", "e5b"]:
+
+            field = "sis_status_" + signal
+            data = np.zeros(self.dset_raw.num_obs)
+            data_tmp = np.zeros(len(self.dset_raw.system[idx]))
+
+            # Check Signal-in-space Accuracy (SISA)
+            idx_obs = np.logical_or(self.dset_raw.sv_accuracy[idx] < 0, self.dset_raw.sv_accuracy[idx] >= 126)
+            data_tmp[idx_obs] = 1
+
+            # Check Data Validity Status (DVS)
+            idx_obs = self.dset_raw["dvs_" + signal][idx] == True
+            data_tmp[idx_obs] = 2
+
+            # Check Signal Health Status (SHS)
+            idx_obs = self.dset_raw["shs_" + signal][idx] == True
+            data_tmp[idx_obs] = 3
+
+            data[idx] = data_tmp
+            self.dset_raw.add_float(field, val=data)
+
+
     def _get_brdc_block_idx(self, dset: "Dataset", time: str = "time") -> List[int]:
         """Get GNSS broadcast ephemeris block indices for given observation epochs
 
@@ -746,22 +810,20 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         or the transmission time. Afterwards the broastcast block is selected with the smallest time difference.
         Following option can be choosen for configuration file option 'brdc_block_nearest_to':
 
-        ==============================  ================================================================================
-         Option                           Description
-        ==============================  ================================================================================
-          toc                            Broadcast block for given observation epoch is selected nearest to navigation
-                                         epoch (time of clock (TOC)).
-          toc:positive                   Same as 'toc' option, but the difference between observation epoch and TOC has
-                                         to be positive.
-          toe                            Broadcast block for given observation epoch is selected nearest to time of
-                                         ephemeris (TOE).
-          toe:positive                   Same as 'toe' option, but the difference between observation epoch and TOE has
-                                         to be positive.
-          transmission_time              Broadcast block for given observation epoch is selected nearest to transmission
-                                         time.
-          transmission_time:positive     Same as 'transmission_time' option, but the difference between observation
-                                         epoch and transmission time has to be positive.
-        =============================  =================================================================================
+        | Option                       | Description                                                                  |
+        | :--------------------------- | :--------------------------------------------------------------------------- |
+        | toc                          | Broadcast block for given observation epoch is selected nearest to           |
+        |                              | navigation epoch (time of clock (TOC)).                                      | 
+        | toc:positive                 | Same as 'toc' option, but the difference between observation epoch and TOC   |
+        |                              | has to be positive.                                                          |
+        | toe                          | Broadcast block for given observation epoch is selected nearest to time of   |
+        |                              | ephemeris (TOE).                                                             |
+        | toe:positive                 | Same as 'toe' option, but the difference between observation epoch and TOE   |
+        |                              | has to be positive.                                                          |
+        | transmission_time            | Broadcast block for given observation epoch is selected nearest to           |
+        |                              | transmission time.                                                           |
+        | transmission_time:positive   | Same as 'transmission_time' option, but the difference between observation   |
+        |                              | epoch and transmission time has to be positive.                              |
 
         Args:
             dset: A Dataset containing model data.
@@ -820,21 +882,20 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                     log.fatal(f"No valid broadcast navigation message could be found for satellite {sat}, HAS message "
                               f"IOD {iode} and observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit' remover.") 
                
-                nearest_idx = self._get_nearest_idx(idx, obs_epoch.gps.mjd, time_key, positive)
+                nearest_idx = self.get_nearest_idx(idx, obs_epoch.gps.mjd, time_key, positive, sat)
                 brdc_idx.append(idx.nonzero()[0][nearest_idx])
             
         else:    
 
             # Determine broadcast ephemeris block index for a given satellite and observation epoch
             for sat, obs_epoch in zip(dset.satellite, dset[time]): # TODO: Is _add_time needed for dset[time]?
-    
+ 
                 idx = self.dset_edit.filter(satellite=sat)
                
                 if np.any(idx) == False:
                     log.fatal(f"No valid broadcast navigation message could be found for satellite {sat} and "
-                              f"observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit' remover.") 
-                    
-                nearest_idx = self._get_nearest_idx(idx, obs_epoch.gps.mjd, time_key, positive)
+                              f"observation epoch {obs_epoch.isot}. Use 'gnss_clean_orbit' remover.")   
+                nearest_idx = self.get_nearest_idx(idx, obs_epoch.gps.mjd, time_key, positive, sat)
                 brdc_idx.append(idx.nonzero()[0][nearest_idx])
 
         return brdc_idx
@@ -856,19 +917,18 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Returns:
             dict:   Selected and prepared broadcast ephemeris dictionary with following entries:
 
-        ===============  ======  =============================================================
-         Keys             Unit    Description
-        ===============  ======  =============================================================
-         a                m       Semimajor axis
-         E                rad     Eccentric anomaly
-         i                rad     Inclination
-         lambda_          rad     Instantaneous Greenwich longitude of the ascending node
-         n                rad/s   Corrected mean motion
-         r                m       Orbit radius
-         tk               s       Eclapsed time referred to ephemeris reference epoch
-         u                rad     Argument of latitude
-         vega             rad     True anomaly
-        ===============  ======  =============================================================
+        | Keys           | Unit  | Description
+        | :------------- | :---- | :-------------------------------------------------------- |
+        | a              | m     | Semimajor axis                                            |
+        | E              | rad   | Eccentric anomaly                                         |
+        | i              | rad   | Inclination                                               |
+        | lambda_        | rad   | Instantaneous Greenwich longitude of the ascending node   |
+        | n              | rad/s | Corrected mean motion                                     |
+        | r              | m     | Orbit radius                                              |
+        | tk             | s     | Eclapsed time referred to ephemeris reference epoch       |
+        | u              | rad   | Argument of latitude                                      |
+        | vega           | rad   | True anomaly                                              |
+
         """
         # BUG: Use of GPSSEC does not work for GPS WEEK crossovers. MJD * Unit.day2second() would a better solution. The
         #     problem is that use of GPSSEC compared to MJD * Unit.day2second() is not consistent!!!!
@@ -901,6 +961,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         i = self.dset_edit.i0[idx] + self.dset_edit.idot[idx] * tk + di  # Inclination in [rad]
 
         return {"a": a, "E": E, "i": i, "lambda_": lambda_, "n": n, "r": r, "tk": tk, "u": u, "vega": vega}
+
 
     @staticmethod
     def _get_eccentric_anomaly(M, e):
@@ -941,33 +1002,26 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         return E
     
-    
-    def _get_nearest_idx(self, idx: np.ndarray, obs_epoch: float, time_key: str, positive: bool) -> np.ndarray:
-        """Get nearest HAS message data index for given observation epoch
-        
+
+    def _get_relativistic_clock_correction(self, t_sat_gpsweek, t_sat_gpssec, idx, sys):
+        """Determine relativistic clock correction due to orbit eccentricity for given observation epoch (satellite
+        transmission time) based on Section 20.3.3.3.3.1 in :cite:`is-gps-200h`.
+
         Args:
-            idx:        Index used to filter HAS messages e.g. after satellite, GNSS IOD
-            obs_epoch:  Observation epoch in modified Julian day
-            time_key:   Time key
-            positive:   Difference between observation epoch and broadcast navigation messate has to be positive
+            t_sat_gpsweek (float):  GPS week of satellite transmission time.
+            t_sat_gpssec (float):   GPS seconds of satellite transmission.
+            idx (int):              Index for broadcast ephemeris dataset valid for observation time of receiver
+            sys (str):              GNSS identifier
 
         Returns:
-            Nearest broadcast navigation messages indices for given observation epochs
+            float64:      Relativistic orbit eccentricity correction in [m]
         """
-        
-        diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
-        if positive:
-            data = np.array([99999 if v < 0 else v for v in diff])
-            if np.all(data == 99999): # No broadcast navigation message epochs larger than observation epoch
-                log.fatal(f"No valid broadcast navigation message could be found before observation epoch {obs_epoch} " 
-                          f"(nearest broadcast navigation message receiver reception time: {min(self.dset_edit[time_key].gps.mjd)})")
-            
-            nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
-        else:
-            nearest_idx = np.array([abs(diff)]).argmin()
-            
-        return nearest_idx 
-    
+        # Correct broadcast ephemeris
+        bdict = self._get_corrected_broadcast_ephemeris(t_sat_gpsweek, t_sat_gpssec, idx, sys)
+
+        # Compute relativistic orbit eccentricity in [m]
+        return -2 / constant.c * np.sqrt(bdict["a"] * GM[sys]) * self.dset_edit.e[idx] * np.sin(bdict["E"])   
+
 
     def _get_satellite_position_vector(self, bdict):
         """Determine satellite position vector in Earth centered Earth fixed (ECEF) coordinate system.
@@ -977,31 +1031,27 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Args:
             bdict (dict):       Selected and prepared broadcast ephemeris dictionary with following entries
 
-        ===============  ======  =============================================================
-         Keys             Unit    Description
-        ===============  ======  =============================================================
-         a                m       Semimajor axis
-         e                        Eccentricity of the orbit
-         E                rad     Eccentric anomaly
-         i                rad     Inclination
-         lambda_          rad     Instantaneous Greenwich longitude of the ascending node
-         n                rad/s   Corrected mean motion
-         r                m       Orbit radius
-         tk               s       Eclapsed time referred to ephemeris reference epoch
-         u                rad     Argument of latitude
-         vega             rad     True anomaly
-        ===============  ======  =============================================================
+        | Keys           | Unit  | Description                                               |
+        | :------------- | :---- | :-------------------------------------------------------- |
+        | a              | m     | Semimajor axis                                            |
+        | e              |       | Eccentricity of the orbit                                 |
+        | E              | rad   | Eccentric anomaly                                         |
+        | i              | rad   | Inclination                                               |
+        | lambda_        | rad   | Instantaneous Greenwich longitude of the ascending node   |
+        | n              | rad/s | Corrected mean motion                                     |
+        | r              | m     | Orbit radius                                              |
+        | tk             | s     | Eclapsed time referred to ephemeris reference epoch       |
+        | u              | rad   | Argument of latitude                                      |
+        | vega           | rad   | True anomaly                                              |
 
         Returns:
             dict:    Following entries are added to broadcast ephemeris dictionary
 
-        ===============  ======  ==================================================================================
-         Keys             Unit    Description
-        ===============  ======  ==================================================================================
-         r_ecef           m       3-dimensional numpy array with satellite position in Earth centered Earth fixed (ECEF)
-                                  coordinate system
-         r_orb            m       3-dimensional numpy array with satellite position in orbital coordinate system
-        ===============  ======  ==================================================================================
+        | Keys           | Unit  | Description                                                                        |
+        | :------------- | :---- | :--------------------------------------------------------------------------------- |
+        | r_ecef         | m     | 3-dimensional numpy array with satellite position in Earth centered Earth fixed    |
+        |                |       | (ECEF) coordinate system                                                           |
+        | r_orb          | m     | 3-dimensional numpy array with satellite position in orbital coordinate system     |
         """
         # TODO: What should be done for GEO satellites (e.g. see in gLAB function getPositionBRDC() in model.c)?
 
@@ -1013,6 +1063,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         r_ecef = rotation.R3(-bdict["lambda_"]).dot(rotation.R1(-bdict["i"])).dot(r_orb.T)
 
         bdict.update({"r_ecef": r_ecef, "r_orb": r_orb})
+
 
     def _get_satellite_position_velocity(self, t_sat_gpsweek, t_sat_gpssec, idx, sys):
         """Determine satellite position and velocity vector based on broadcast ephemeris
@@ -1029,12 +1080,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Returns:
             tuple:         with following elements
 
-        ===============  ==================================================================================
-         Elements         Description
-        ===============  ==================================================================================
-         r_ecef           Satellite position vector in ECEF coordinate system in [m]
-         v_ecef           Satellite velocity vector in ECEF coordinate system in [m]
-        ===============  ==================================================================================
+        | Elements       | Description                                                 |
+        | :------------- | :---------------------------------------------------------- |
+        | r_ecef         | Satellite position vector in ECEF coordinate system in [m]  |
+        | v_ecef         | Satellite velocity vector in ECEF coordinate system in [m]  |
         """
         # TODO: get_row() from dataset based on idx
 
@@ -1049,6 +1098,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         return bdict["r_ecef"], bdict["v_ecef"]
 
+
     def _get_satellite_velocity_vector(self, idx, bdict, sys):
         """Determine satellite velocity vector in Earth centered Earth fixed (ECEF) coordinate system.
 
@@ -1058,35 +1108,32 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             idx (int):          Index for broadcast ephemeris dataset valid for observation time of receiver.
             bdict (dict):       Selected and prepared broadcast ephemeris dictionary with following entries
 
-        ===============  ======  ==================================================================================
-         Keys             Unit    Description
-        ===============  ======  ==================================================================================
-         a                m       Semimajor axis
-         E                rad     Eccentric anomaly
-         i                rad     Inclination
-         lambda_          rad     Instantaneous Greenwich longitude of the ascending node
-         n                rad/s   Corrected mean motion
-         r                m       Orbit radius
-         r_orb            m       3-dimensional numpy array with satellite position vector in orbital coordinate
-                                  system
-         r_ecef          m        3-dimensional numpy array with satellite position vector in Earth centered Earth-fixed
-                                  coordinate system
-         tk               s       Eclapsed time referred to ephemeris reference epoch
-         u                rad     Argument of latitude
-         vega             rad     True anomaly
-        ===============  ======  ==================================================================================
+
+        | Keys           | Unit  | Description
+        | :------------- | :---- | :--------------------------------------------------------------------------------- |
+        | a              | m     | Semimajor axis                                                                     |
+        | E              | rad   | Eccentric anomaly                                                                  |
+        | i              | rad   | Inclination                                                                        |
+        | lambda_        | rad   | Instantaneous Greenwich longitude of the ascending node                            |
+        | n              | rad/s | Corrected mean motion                                                              |
+        | r              | m     | Orbit radius                                                                       |
+        | r_orb          | m     | 3-dimensional numpy array with satellite position vector in orbital coordinate     |
+        |                |       | system                                                                             |
+        | r_ecef         | m     | 3-dimensional numpy array with satellite position vector in Earth centered         |
+        |                |       | Earth-fixed coordinate system                                                      |
+        | tk             | s     | Eclapsed time referred to ephemeris reference epoch                                |
+        | u              | rad   | Argument of latitude                                                               |
+        | vega           | rad   | True anomaly                                                                       |
 
         Returns:
             dict:   Following entries are added to broadcast ephemeris dictionary
 
-        ===============  ======  ==================================================================================
-         Keys             Unit    Description
-        ===============  ======  ==================================================================================
-         v_ecef          m        3-dimensional numpy array with satellite velocity vector in Earth centered Earth-fixed
-                                  coordinate system
-         v_orb            m       3-dimensional numpy array with satellite velocity vector in orbital coordinate
-                                  system
-        ===============  ======  ==================================================================================
+        | Keys           | Unit  | Description                                                                        |
+        | :------------- | :---- | :--------------------------------------------------------------------------------- |
+        | v_ecef         | m     | 3-dimensional numpy array with satellite velocity vector in Earth centered         |
+        |                |       | Earth-fixed coordinate system                                                      |
+        | v_orb          | m     | 3-dimensional numpy array with satellite velocity vector in orbital coordinate     |
+        |                |       | system                                                                             |
         """
         # Determine time derivatives of Keplerian elements
         M_dot = bdict["n"]  # Time derivative of mean anomaly in [rad/s]
@@ -1145,21 +1192,4 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
         bdict.update({"v_ecef": v_ecef, "v_orb": v_orb})
 
-    def _get_relativistic_clock_correction(self, t_sat_gpsweek, t_sat_gpssec, idx, sys):
-        """Determine relativistic clock correction due to orbit eccentricity for given observation epoch (satellite
-        transmission time) based on Section 20.3.3.3.3.1 in :cite:`is-gps-200h`.
 
-        Args:
-            t_sat_gpsweek (float):  GPS week of satellite transmission time.
-            t_sat_gpssec (float):   GPS seconds of satellite transmission.
-            idx (int):              Index for broadcast ephemeris dataset valid for observation time of receiver
-            sys (str):              GNSS identifier
-
-        Returns:
-            float64:      Relativistic orbit eccentricity correction in [m]
-        """
-        # Correct broadcast ephemeris
-        bdict = self._get_corrected_broadcast_ephemeris(t_sat_gpsweek, t_sat_gpssec, idx, sys)
-
-        # Compute relativistic orbit eccentricity in [m]
-        return -2 / constant.c * np.sqrt(bdict["a"] * GM[sys]) * self.dset_edit.e[idx] * np.sin(bdict["E"])
