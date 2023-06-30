@@ -228,7 +228,12 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         # cleaners.removers.ignore_duplicated_navigation_messages(dset_edit) #MURKS
 
         # Generate Pandas frame for all navigation message entries
-        nav = self.dset_raw.as_dataframe()
+        # TODO: self.dset_raw.as_dataframe() could also be used, but performance is quite bad.
+        nav = pd.DataFrame()
+        for field in self.dset_raw.fields:
+            if "midgard.data._time" in str(type(self.dset_raw[field])): #Handling of "Time" objects
+                nav[field] = self.dset_raw[field].gps.iso
+            nav[field] = self.dset_raw[field] 
 
         # Filter frame
         nav_filtered = nav.sort_values(by=["satellite", "time", "transmission_time"])
