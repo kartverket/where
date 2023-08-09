@@ -9,7 +9,7 @@ from midgard.config import config as mg_config
 from where.lib import config
 from where import parsers
 
-def run_session(session, setup):
+def run_session(session, setup, write_to_library):
     cmd = ["where"]
     cmd += session
     setup_name = setup.split(".")[0]
@@ -17,7 +17,7 @@ def run_session(session, setup):
     for section, values in cfg.as_dict().items():
         for k, v in values.items():
             cmd.append(f"--{section}:{k}={v}")
-    cmd = cmd + ["-v", "-N", f"--id={setup_name}", "--write_to_library=False"]
+    cmd = cmd + ["-v", "-N", f"--id={setup_name}", f"--write_to_library={write_to_library}"]
     subprocess.run(cmd)
     #print(cmd)
 
@@ -46,6 +46,7 @@ def main():
     parser.add_argument("--stations", help="Process sessions containing stations in this list.", nargs='+', default=["Ns", "Ny"])
     parser.add_argument("--years", help="Search for sessions in the master files from the years in this list.", default=[2020, 2021], nargs='+', type=int)
     parser.add_argument("--setups", help="Name of configurations to be run and dataset id to store it under. If omitted all existing configurations will be run", nargs='+')
+    parser.add_argument("--write_to_library", help="Enable writing to config library", action="store_true")
     args = parser.parse_args()
     
     config.read_pipeline("vlbi")
@@ -64,7 +65,7 @@ def main():
             continue
 
         for setup in setups:
-            run_session(session, setup)
+            run_session(session, setup, args.write_to_library)
 
 if __name__ == "__main__":
     main()
