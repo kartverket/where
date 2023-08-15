@@ -252,13 +252,14 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
                             satellite = satellite, 
                             log_level = "debug",
         )
-        idx_obs = idx_sat.nonzero()[0][idx_obs]
-        
+
         # Skip epochs for which no broadcast ephemeris are available
         if idx_obs is None:
             keep_idx[obs] = False
-            continue          
-        
+            continue  
+
+        idx_obs = idx_sat.nonzero()[0][idx_obs]
+                     
         if check_nav_validity_length:    
             status = _is_epoch_in_navigation_validity_interval(
                                 time, 
@@ -506,7 +507,7 @@ def _is_epoch_in_navigation_validity_interval(
 
     # Note: Epochs with negative tk has to be removed, if the difference between the observation epoch and TOE, TOC  
     #       or transmission time has to be positive. Only observation epochs after time of ephemeris should be used 
-    #       for Galileo. 
+    #       for Galileo.
     if (system == "E" and tk < 0) or ("positive" in brdc_block_nearest_to and tk < 0):
         return False
 
