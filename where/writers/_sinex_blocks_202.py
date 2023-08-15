@@ -314,9 +314,8 @@ class SinexBlocks:
         fieldnames = config.tech.eccentricity.identifier.list
         keys = np.array([self.dset.unique(f, sort=False) for f in fieldnames]).T
 
-        for sta, key in zip(self.dset.unique("station"), keys):
+        for sta, key in zip(self.dset.unique("station", sort=False), keys):
             site_id = self.dset.meta["station"][sta]["site_id"]
-
             self.fid.write(
                 " {:4} {:>2} {:>4} {:1} {:12} {:12} {:3} {: 8.4f} {: 8.4f} {: 8.4f}\n"
                 "".format(

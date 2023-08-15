@@ -4,6 +4,9 @@ Description:
 ------------
 
 """
+# Standard library imports
+import itertools
+
 # External library imports
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,7 +38,8 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
     """
     trf = apriori.get("trf", time=dset.time.utc.mean)
 
-    baselines = dset.unique("baseline")
+    baselines = itertools.combinations(dset.unique("station"), 2)
+
     lengths = []
     ferrs = []
     
@@ -48,9 +52,10 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
     log_and_write("# " + f"{'sta_1/sta_2'.ljust(18)} {''.rjust(7)} {'[m]'.rjust(14)} {'[m]'.rjust(13)} " +
                   f"{'[Degrees]'.rjust(15)} {'[Degrees]'.rjust(15)} {'[Degrees]'.rjust(15)} {'[Degrees]'.rjust(15)}",
                   bl_str)
-    for i, bl in enumerate(baselines):
-        sta_1, _, sta_2 = bl.partition("/")
+
+    for i, (sta_1, sta_2) in enumerate(baselines):
         # Name the baseline in alphabetical station order to be consistent across sessions
+        bl = sta_1 + "/" + sta_2
         bl_sorted = "/".join(sorted([sta_1, sta_2]))
         sta_1_sorted, _, sta_2_sorted = bl_sorted.partition("/")
         pos_apriori_1 = trf[dset.meta["station"][sta_1]["cdp"]].pos
@@ -108,7 +113,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
         dset.meta.add("baseline_length_ferr", bl_length_ferr, section=bl_sorted)
         dset.meta.add("__unit__", "meter", section=bl_sorted)
         
-        num_obs = dset.num(baseline=bl)
+        num_obs = dset.num(baseline=bl) or dset.num(baseline=bl_sorted)
         
         log_and_write(f"{bl_sorted:20} {num_obs:7d} {baseline.length:14.4f} {bl_length_ferr:13.4f} " +
                       f"{lat_1:15.10f} {lat_2:15.10f} {lon_1:15.10f} {lon_2:15.10f}", bl_str)
