@@ -166,11 +166,13 @@ def get_grc_csv_row(
     }
 
     station_def = {
+            "altc": "Alta (Norway)",
             "brux": "Brussels (Belgium)",
             "cpvg": "Cap-Vert (Cabo Verde)",
             "koug": "Kourou (French Guiana)",
             "hofs": "Hoefn (Iceland)",
             "hons": "Honningsvag (Norway)",
+            "janm": "Jan Mayen (Norway)",
             "krss": "Kristiansand (Norway)",
             "mas1": "Maspalomas (Spain)",
             "nabd": "Ny Alesund (Norway)",
