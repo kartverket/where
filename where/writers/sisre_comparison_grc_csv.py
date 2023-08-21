@@ -76,10 +76,17 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
         # Write constellation results to GRC CSV file
         for mode in signal_modes:
 
+            # Get constellation name
+            if mode.startswith("E"):
+                constellation = "Galileo"
+            elif mode.startswith("L"):
+                constellation = "GPS"
+
             for _, row in df_month.iterrows():
 
                 writer.writerow(
                     get_grc_csv_row(
+                        constellation=constellation,
                         kpi="sisre", 
                         mode=mode, 
                         date=row.date, 
