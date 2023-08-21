@@ -12,13 +12,14 @@ Example:
 """
 # Standard library imports
 import csv
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # External library imports
 import numpy as np
 import pandas as pd
 
 # Midgard imports
+from midgard.collections import enums
 from midgard.data import position
 from midgard.dev import plugins
 
@@ -47,9 +48,8 @@ def gnss_vel_comparison_grc_csv(dset: "Dataset") -> None:
     file_path = config.files.path("output_gnss_vel_comparison_grc_csv", file_vars=file_vars)
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
-     # Get dataframes for writing
-    df_month = _generate_dataframe(dset)
-
+    # Get dataframes for writing
+    constellation, df_month = _generate_dataframe(dset)
 
     # Write file
     # 
@@ -71,6 +71,7 @@ def gnss_vel_comparison_grc_csv(dset: "Dataset") -> None:
         for index, row in df_month.iterrows():
 
             row = get_grc_csv_row(
+                    constellation, 
                     kpi="site_vel_3d", 
                     mode=mode, 
                     date=row.date, 
@@ -81,21 +82,22 @@ def gnss_vel_comparison_grc_csv(dset: "Dataset") -> None:
             writer.writerow(row)
 
 
-def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.DataFrame]:
+def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Tuple[str, Dict[str, pd.core.frame.DataFrame]]:
     """Generate dataframe based on station datasets
 
     Example for "df_month" dictionary:
 
-               date           hpe           vpe station
-        0  Jul-2021  1.936327e-09  5.567021e-09    nabd
-        1  Jul-2021  3.034691e-09  5.419228e-09    hons
-        2  Jul-2021  3.865243e-09  5.229739e-09    vegs
+               date   site_vel_3d  station
+        0  Jul-2021  1.936327e-09     nabd
+        1  Jul-2021  3.034691e-09     hons
+        2  Jul-2021  3.865243e-09     vegs
 
     Args:
         dset: Dictionary with station name as keys and the belonging Dataset as value
 
     Returns:
-        Dataframe with monthly entries with columns like date, stationm hpe, vpe, ...
+        Tuple with GNSS constellation information and dataframe with monthly entries with columns like date, station,
+        site_vel_3d ...
 
     """
     dsets = dset
@@ -110,6 +112,11 @@ def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.D
             log.warn(f"Dataset '{station}' is empty.")
             continue
 
+        if dset.unique("system").size > 1:
+            log.fatal(f"Data from more than one GNSS is given in dataset. The writer '{__name__}' can only "
+                      f"handle data from one GNSS.")
+        else:
+            constellation = enums.gnss_id_to_name[dset.unique("system")[0]]
 
         # Determine dataframe 
         df = dset.as_dataframe(fields=["time.gps", "site_vel_3d"])
@@ -119,6 +126,9 @@ def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.D
             continue
         else:
 
+            if dset.unique("system").size > 1:
+                log.fatal(f"Data from more than one GNSS is given in dataset. The writer '{__name__}' can only "
+                          f"handle data from one GNSS.")
             df_month_tmp = df.set_index("date").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
             df_month_tmp.index = df_month_tmp.index.strftime("%y-%b")
             df_month_tmp["station"] = np.repeat(station, df_month_tmp.shape[0])
@@ -128,7 +138,7 @@ def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.D
     df_month.index.name = "date"
     df_month = df_month.reset_index()
 
-    return df_month
+    return constellation, df_month
 
 
 

@@ -93,8 +93,10 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
             # Filtering necessary to get only satellites related to one GNSS
             if mode.startswith("E"):
                 system = "E"
+                constellation = "Galileo"
             elif mode.startswith("L"):
                 system = "G"
+                constellation = "GPS"
 
             idx = df.system == system
 
@@ -111,6 +113,7 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
                 for sat in sorted(satellites):
                     writer.writerow(
                         get_grc_csv_row(
+                            constellation=constellation,
                             kpi="sisre_sat", 
                             mode=mode, 
                             date=row.date, 
