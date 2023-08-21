@@ -59,7 +59,7 @@ def get_grc_csv_row(
         constellation:  Constellation name (e.g. Galileo, GPS)
         kpi:            KPI name (e.g. hpe, vpe)
         mode:           Signal combination (e.g. e1, e1e5b)
-        date:           Date in format month-year (e.g. July-2021)
+        date:           Date in format year-month (e.g. 2021-Jul)
         result:         KPI value
         station:        Station name
         satellite:      Satellite name

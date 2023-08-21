@@ -105,7 +105,7 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
 
             df_mode = df[idx].pivot(index="time_gps", columns="satellite", values=mode)
             df_mode = df_mode.resample("M").apply(lambda x: np.nanpercentile(x, q=95))
-            df_mode.index = df_mode.index.strftime("%y-%b")
+            df_mode.index = df_mode.index.strftime("%Y-%b")
             df_mode.index.name = "date"
             df_mode = df_mode.reset_index()
 
@@ -139,9 +139,9 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
     Example for "df_month_perc_rms" dictionary:
 
                         E1    E1/E5b    E1/E5a
-        Jan-2019  0.335688  0.297593  0.326859
-        Feb-2019  0.380575  0.330701  0.352535
-        Mar-2019  0.353586  0.314817  0.344597
+        2021-Jul  0.335688  0.297593  0.326859
+        2021-Jul  0.380575  0.330701  0.352535
+        2021-Jul  0.353586  0.314817  0.344597
 
 
     Args:
@@ -197,7 +197,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
         df_tmp.loc[epoch] = pd.Series(row)
 
     df_month_perc_rms = df_tmp.resample("M").apply(lambda x: np.nanpercentile(list(x), q=95))
-    df_month_perc_rms.index = df_month_perc_rms.index.strftime("%y-%b")
+    df_month_perc_rms.index = df_month_perc_rms.index.strftime("%Y-%b")
 
     # Prepare dataframes for writing
     df_month_perc_rms.index.name = "date"

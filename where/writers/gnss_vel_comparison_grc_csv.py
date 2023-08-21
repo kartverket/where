@@ -69,17 +69,16 @@ def gnss_vel_comparison_grc_csv(dset: "Dataset") -> None:
 
         # Write results to GRC CSV file
         for index, row in df_month.iterrows():
-
-            row = get_grc_csv_row(
+            writer.writerow(
+                get_grc_csv_row(
                     constellation, 
                     kpi="site_vel_3d", 
                     mode=mode, 
                     date=row.date, 
                     result=row.site_vel_3d,
                     station=row.station, 
+                )
             )
-
-            writer.writerow(row)
 
 
 def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Tuple[str, Dict[str, pd.core.frame.DataFrame]]:
@@ -88,9 +87,9 @@ def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Tuple[str, Dict[str, pd.c
     Example for "df_month" dictionary:
 
                date   site_vel_3d  station
-        0  Jul-2021  1.936327e-09     nabd
-        1  Jul-2021  3.034691e-09     hons
-        2  Jul-2021  3.865243e-09     vegs
+        0  2021-Jul  1.936327e-09     nabd
+        1  2021-Jul  3.034691e-09     hons
+        2  2021-Jul  3.865243e-09     vegs
 
     Args:
         dset: Dictionary with station name as keys and the belonging Dataset as value
@@ -130,7 +129,7 @@ def _generate_dataframe(dset: Dict[str, "Dataset"]) -> Tuple[str, Dict[str, pd.c
                 log.fatal(f"Data from more than one GNSS is given in dataset. The writer '{__name__}' can only "
                           f"handle data from one GNSS.")
             df_month_tmp = df.set_index("date").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
-            df_month_tmp.index = df_month_tmp.index.strftime("%y-%b")
+            df_month_tmp.index = df_month_tmp.index.strftime("%Y-%b")
             df_month_tmp["station"] = np.repeat(station, df_month_tmp.shape[0])
             df_month = pd.concat([df_month, df_month_tmp], axis=0)
 
