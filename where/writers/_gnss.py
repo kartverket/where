@@ -215,7 +215,7 @@ def get_grc_csv_row(
 
     if satellite:
         atx = apriori.get("gnss_antenna_correction")
-        used_date = datetime.strptime(f"{date}-01", "%y-%b-%d")
+        used_date = datetime.strptime(f"{date}-01", "%Y-%b-%d")
         sat_info = atx.get_satellite_info(satellite, used_date)
 
         batch = batch_def[sat_info["sat_type"]] if sat_info["sat_type"] in batch_def.keys() else ""
