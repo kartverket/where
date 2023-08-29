@@ -125,6 +125,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
         return dset_raw
 
+
     def _edit(self, dset_edit):
         """Edit precise orbit data and save it in a Dataset
 
@@ -189,6 +190,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
         return dset_edit
 
+
     def _calculate(self, dset_out: "Dataset", dset_in: "Dataset", time: str = "time") -> None:
         """Calculate precise orbits and satellite clock correction for given observation epochs
 
@@ -243,14 +245,14 @@ class PreciseOrbit(orbit.AprioriOrbit):
 
             if np.min(dset_in[time][idx].gps.mjd) < np.min(self.dset_edit.time[orb_idx].mjd):
                 log.fatal(
-                    f"Interpolation range is exceeded by satellite {sat} ({np.max(dset_in[time][idx].gps.datetime)} "
-                    f"[epoch] < {np.max(self.dset_edit.time[orb_idx].gps.datetime)} [precise orbit])"
+                    f"Interpolation range is exceeded by satellite {sat} ({np.min(dset_in[time][idx].gps.mjd)} "
+                    f"[epoch] < {np.min(self.dset_edit.time[orb_idx].gps.mjd)} [precise orbit])"
                 )
 
             if np.max(dset_in[time][idx].gps.mjd) > np.max(self.dset_edit.time[orb_idx].mjd):
                 log.fatal(
-                    f"Interpolation range is exceeded by satellite {sat} ({np.max(dset_in[time][idx].gps.datetime)} "
-                    f"[epoch] > {np.max(self.dset_edit.time[orb_idx].gps.datetime)} [precise orbit])"
+                    f"Interpolation range is exceeded by satellite {sat} ({np.max(dset_in[time][idx].gps.mjd)} "
+                    f"[epoch] > {np.max(self.dset_edit.time[orb_idx].gps.mjd)} [precise orbit])"
                 )
 
             # Interpolation for given observation epochs (transmission time)
@@ -300,6 +302,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
         #                     dset_out.gnss_relativistic_clock[num_obs])
         # -DEBUG
 
+
     def _get_nearest_sample_point(self, satellite: Tuple[str], time: "Time") -> List[int]:
         """Get nearest sample point of precise orbits for given observation epochs
 
@@ -340,6 +343,7 @@ class PreciseOrbit(orbit.AprioriOrbit):
                 precise_idx.append(idx.nonzero()[0][nearest_idx])
 
         return precise_idx
+
 
     def satellite_clock_correction(self, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Determine satellite clock correction based on precise satellite clock product
