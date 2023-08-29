@@ -418,6 +418,7 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
                      f"left for satellite {sat} after orbit data cleaning.")
             keep_idx[sat_idx] = False
 
+    import IPython; IPython.embed()
     return keep_idx
 
 
