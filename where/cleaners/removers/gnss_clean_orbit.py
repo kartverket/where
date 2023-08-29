@@ -415,7 +415,7 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
         idx = dset.satellite[keep_idx] == sat
         if dset.satellite[keep_idx][idx].size == 1:
             log.warn(f"All observations of satellite {sat} are removed, because only a single observation epoch is "
-                     f"left for satellite {sat}.")
+                     f"left for satellite {sat} after orbit data cleaning.")
             keep_idx[sat_idx] = False
 
     return keep_idx
