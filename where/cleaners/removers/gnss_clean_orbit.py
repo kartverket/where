@@ -415,10 +415,17 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
         idx = dset.satellite[keep_idx] == sat
         if dset.satellite[keep_idx][idx].size == 1:
             log.warn(f"All observations of satellite {sat} are removed, because only a single observation epoch is "
-                     f"left for satellite {sat} after orbit data cleaning.")
+                     f"left for satellite {sat} after orbit data cleaning (no interpolation possible).")
             keep_idx[sat_idx] = False
+            continue
 
-    import IPython; IPython.embed()
+        data_period = (np.max(dset.time.gps.mjd[keep_idx][idx]) - np.min(dset.time.gps.mjd[keep_idx][idx])) * Unit.day2second
+        if data_period <= epoch_interval:
+            log.warn(f"All observations of satellite {sat} are removed, because the observation period of satellite "
+                     f"{sat} ({data_period} s) is below orbit data interval ({epoch_interval} s) and therefore is the "
+                     f" interpolation not possible.")
+            keep_idx[sat_idx] = False        
+
     return keep_idx
 
 
