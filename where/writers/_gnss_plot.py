@@ -36,9 +36,11 @@ class PlotField:
     Args:
         ylabel:   y-axis label description
         unit:     Unit used for plotting of y-axis
+        figsize:  Figure size
     """
     ylabel: str
     unit: str
+    figsize: Tuple[float, float]
     
 
 class GnssPlot:
@@ -190,53 +192,56 @@ class GnssPlot:
         fieldname = f"{collection}.{field}" if collection else field
         
         plot_def = {
-                "age_of_data": PlotField("Age of data", "s"),
-                "age_of_ephemeris": PlotField("Age of ephemeris", "s"),
-                "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns"),
-                "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns"),
-                "bgd_e1_e5a_diff_mean": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns"),
-                "bgd_e1_e5b": PlotField("BGD(E1,E5b)", "ns"),
-                "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns"),
-                "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns"),
-                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\Delta t$ (mean)", "m"),
-                "code_bias": PlotField("HAS code bias", "m"),
-                "delay.gnss_earth_rotation_drift": PlotField("Earth rotation drift", "m/s"),
-                "delay.gnss_ionosphere": PlotField("Ionospheric delay", "m"),
-                "delay.gnss_range": PlotField("Range", "m"),
-                "delay.gnss_range_rate": PlotField("Range rate", "m/s"),
-                "delay.gnss_relativistic_clock": PlotField("Relativistic clock", "m"),
-                "delay.gnss_relativistic_clock_rate": PlotField("Relativistic clock rate", "m/s"),
-                "delay.gnss_satellite_clock": PlotField("Satellite clock", "m"),
-                "delay.gnss_satellite_clock_rate": PlotField("Satellite clock rate", "m/s"),
-                "delay.gnss_total_group_delay": PlotField("Total group delay", "m"),
-                "delay.troposphere_radio": PlotField("Troposphere delay", "m"),
-                "delta_clock_c0": PlotField("Δclock-c0", "m"),
-                "delta_cross_track": PlotField("Δcross-track", "m"),
-                "delta_in_track": PlotField("Δin-track", "m"),
-                "delta_radial": PlotField("Δradial", "m"),
-                "gnssid": PlotField("HAS GNSS ID", ""),
-                "gnssiod": PlotField("HAS GNSS IOD", ""),
-                "iod": PlotField("HAS IOD", ""),
-                "multiplier": PlotField("Multiplier for Δclock-c0", ""),
-                "orb_diff_3d": PlotField("3D orbit error", "m"),
-                "phase_bias": PlotField("HAS phase bias", "cycle"),
-                "sisre": PlotField("SISE", "m"),
-                "sisre_orb": PlotField("orbit-only SISE", "m"),
-                "tgd": PlotField("TGD(L1,L2)", "ns"),
-                "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns"),
-                "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns"),
-                "tgd_b1_b3": PlotField("TGD(B1,B3)", "ns"),
-                "tgd_b1_b3_diff": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns"),
-                "tgd_b1_b3_diff_mean": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns"),
-                "tgd_b2_b3": PlotField("TGD(B2,B3)", "ns"),
-                "tgd_b2_b3_diff": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns"),
-                "tgd_b2_b3_diff_mean": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns"),
-                "validity": PlotField("HAS validity interval", "s"),
+                "age_of_ephemeris": PlotField("Age of ephemeris", "s", (7, 6)),
+                "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns", (7, 6)),
+                "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns", (7, 6)),
+                "bgd_e1_e5a_diff_mean": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns", (7, 6)),
+                "bgd_e1_e5b": PlotField("BGD(E1,E5b)", "ns", (7, 6)),
+                "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
+                "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
+                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\Delta t$ (mean)", "m", (7, 6)),
+                "delay.gnss_earth_rotation_drift": PlotField("Earth rotation drift", "m/s", (7, 6)),
+                "delay.gnss_ionosphere": PlotField("Ionospheric delay", "m", (7, 6)),
+                "delay.gnss_range": PlotField("Range", "m", (7, 6)),
+                "delay.gnss_range_rate": PlotField("Range rate", "m/s", (7, 6)),
+                "delay.gnss_relativistic_clock": PlotField("Relativistic clock", "m", (7, 6)),
+                "delay.gnss_relativistic_clock_rate": PlotField("Relativistic clock rate", "m/s", (7, 6)),
+                "delay.gnss_satellite_clock": PlotField("Satellite clock", "m", (7, 6)),
+                "delay.gnss_satellite_clock_rate": PlotField("Satellite clock rate", "m/s", (7, 6)),
+                "delay.gnss_total_group_delay": PlotField("Total group delay", "m", (7, 6)),
+                "delay.troposphere_radio": PlotField("Troposphere delay", "m", (7, 6)),
+                "orb_diff_3d": PlotField("3D orbit error", "m", (7, 6)),
+                "sisre": PlotField("SISE", "m", (7, 6)),
+                "sisre_orb": PlotField("orbit-only SISE", "m", (7, 6)),
+                "tgd": PlotField("TGD(L1,L2)", "ns", (7, 6)),
+                "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns", (7, 6)),
+                "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns", (7, 6)),
+                "tgd_b1_b3": PlotField("TGD(B1,B3)", "ns", (7, 6)),
+                "tgd_b1_b3_diff": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns", (7, 6)),
+                "tgd_b1_b3_diff_mean": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns", (7, 6)),
+                "tgd_b2_b3": PlotField("TGD(B2,B3)", "ns", (7, 6)),
+                "tgd_b2_b3_diff": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns", (7, 6)),
+                "tgd_b2_b3_diff_mean": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns", (7, 6)),
+
+                # Galileo HAS plots
+                "age_of_data": PlotField("Age of data", "s", (7, 5)),
+                "code_bias": PlotField("HAS code bias", "m", (7, 7)),
+                "delta_clock_c0": PlotField("Δclock-c0", "m", (7, 7)),
+                "delta_cross_track": PlotField("Δcross-track", "m", (7, 7)),
+                "delta_in_track": PlotField("Δin-track", "m", (7, 7)),
+                "delta_radial": PlotField("Δradial", "m", (7, 7)),
+                "gnssid": PlotField("HAS GNSS ID", "", (7, 7)),
+                "gnssiod": PlotField("HAS GNSS IOD", "", (7, 7)),
+                "iod": PlotField("HAS IOD", "", (7, 5)),
+                "multiplier": PlotField("Multiplier for Δclock-c0", "", (7, 7)),
+                "phase_bias": PlotField("HAS phase bias", "cycle", (7, 7)),
+                "validity": PlotField("HAS validity interval", "s", (7, 7)),
+
         }
 
         plot_def_qzss = {
-                "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns"),
-                "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns"),
+                "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns", (7, 6)),
+                "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1X,C2X)", "ns", (7, 6)),
         }
 
 
@@ -300,7 +305,7 @@ class GnssPlot:
                 labels=labels if use_labels else None,
                 figure_path=figure_path,
                 options={
-                    "figsize": (7, 6),
+                    "figsize": plot_def[fieldname].figsize if fieldname in plot_def.keys() else (7,6),
                     "legend": True,
                     "legend_ncol": 6,
                     "legend_location": "bottom",
@@ -1158,18 +1163,18 @@ class GnssPlot:
        
         plot_def = {
             "C": {
-                "tgd_b1_b3": PlotField("TGD(B1,B2), DCB(C2I,C6I)", "ns"),
-                "tgd_b2_b3": PlotField("TGD(B1,B3), DCB(C7I,C6I)", "ns"),
+                "tgd_b1_b3": PlotField("TGD(B1,B2), DCB(C2I,C6I)", "ns", (7, 4)),
+                "tgd_b2_b3": PlotField("TGD(B1,B3), DCB(C7I,C6I)", "ns", (7, 4)),
             },
             "E": {
-                "bgd_e1_e5a":  PlotField("BGD(E1,E5a), DCB(C1C,C5Q)", "ns"),
-                "bgd_e1_e5b":  PlotField("BGD(E1,E5b), DCB(C1C,C7Q)", "ns"),
+                "bgd_e1_e5a":  PlotField("BGD(E1,E5a), DCB(C1C,C5Q)", "ns", (7, 4)),
+                "bgd_e1_e5b":  PlotField("BGD(E1,E5b), DCB(C1C,C7Q)", "ns", (7, 4)),
             },
             "G": {
-                "tgd": PlotField("TGD(L1,L2), DCB(C1W,C2W)", "ns"),
+                "tgd": PlotField("TGD(L1,L2), DCB(C1W,C2W)", "ns", (7, 4)),
             },
             "J": {
-                "tgd": PlotField("TGD(L1,L2), DCB(C1X,C2X)", "ns"),
+                "tgd": PlotField("TGD(L1,L2), DCB(C1X,C2X)", "ns", (7, 4)),
             },
            
         }  
@@ -1260,7 +1265,7 @@ class GnssPlot:
                     options={
                         "ecolor": "grey",
                         "errorbar": True,
-                        "figsize": (7, 4),
+                        "figsize": plot_def[sys][field].figsize,
                         "marker": ".",
                         "markersize": 30,
                         "plot_to": "file",
@@ -1284,7 +1289,7 @@ class GnssPlot:
                     colors=["dodgerblue"],
                     figure_path=figure_path,
                     options={
-                        "figsize": (7, 4),
+                        "figsize": plot_def[sys][field].figsize,
                         "marker": ".",
                         "markersize": 30,
                         "plot_to": "file",
@@ -1308,7 +1313,7 @@ class GnssPlot:
                     colors=["dodgerblue"],
                     figure_path=figure_path,
                     options={
-                        "figsize": (7, 4),
+                        "figsize": plot_def[sys][field].figsize,
                         "marker": ".",
                         "markersize": 30,
                         "plot_to": "file",
