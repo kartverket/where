@@ -100,7 +100,7 @@ class HasOrbit(orbit.AprioriOrbit):
             if not file_path.exists():                       
                 log.fatal(f"File does not exists: {file_path}")
             
-            if _file_is_empty(file_path):
+            if self._file_is_empty(file_path):
                 log.fatal(f"File is empty: {file_path}")
                 
             p = parsers.parse("gnss_has_decoder", file_path=file_path)
@@ -580,6 +580,7 @@ class HasOrbit(orbit.AprioriOrbit):
 
 
     # TODO: Function should be placed e.g. in where/lib. 
+    @staticmethod
     def _file_is_empty(path: Union[str, PosixPath]) -> bool:
         """Check if given file path is empty
 
