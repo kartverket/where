@@ -18,6 +18,7 @@ Example:
 # Standard library imports
 from datetime import timedelta
 from typing import List, Union
+from pathlib import Path, PosixPath
 
 # External library imports
 import numpy as np
@@ -99,6 +100,9 @@ class HasOrbit(orbit.AprioriOrbit):
             if not file_path.exists():                       
                 log.fatal(f"File does not exists: {file_path}")
             
+            if _file_is_empty(file_path):
+                log.fatal(f"File is empty: {file_path}")
+                
             p = parsers.parse("gnss_has_decoder", file_path=file_path)
             if not p.data_available:
                 log.fatal(f"No observations in file {file_path}.")
@@ -573,6 +577,35 @@ class HasOrbit(orbit.AprioriOrbit):
                     return signal
 
         return None
+
+
+    # TODO: Function should be placed e.g. in where/lib. 
+    def _file_is_empty(path: Union[str, PosixPath]) -> bool:
+        """Check if given file path is empty
+
+        Args: 
+            path:  File path
+
+        Returns:
+            True if file is empty otherwise False
+        """
+        is_empty = False
+        path = Path(path)
+
+        if ".gz" in path.suffix:
+            from gzip import GzipFile
+            with GzipFile(path, "rb") as fid:
+                data = fid.read(1)
+
+            if len(data) == 0:
+                is_empty = True
+
+        else:
+            if file_path.stat().st_size == 0:
+                is_empty = True
+
+        return is_empty
+
 
     # TODO: Add functionality to .midgard/data/_position.py
     def _ric2trs(self, posvel: "PosVel") -> np.ndarray:
