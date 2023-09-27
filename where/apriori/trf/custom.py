@@ -15,9 +15,11 @@ from midgard.config.config import Configuration
 from midgard.dev import plugins
 from midgard.files import dependencies
 from midgard.math import ellipsoid
+from midgard.math.unit import Unit
 
 # Where imports
 from where.data.position import Position
+from where.data.time import Time
 from where.apriori.trf import TrfFactory
 from where.lib import config
 
@@ -48,8 +50,10 @@ class CustomTrf(TrfFactory):
 
         data = dict()
         for section in trf.sections:
-            info = {k: v for k, v in section.as_dict().items() if not k == "pos_itrs"}
+            info = {k: v for k, v in section.as_dict().items() if not k == "pos_itrs" and not k == "vel_itrs"}
             info["pos"] = np.array(section.pos_itrs.list, dtype=float)
+            if "vel_itrs" in section and "ref_epoch" in section:
+                info["vel"] = np.array(section.vel_itrs.list, dtype=float)
             data[section.name] = info
 
         return data
@@ -65,8 +69,19 @@ class CustomTrf(TrfFactory):
         Returns:
             Array:  Positions, one 3-vector for each time epoch.
         """
-        pos = self.data[site].pop("pos")[None, :].repeat(self.time.size, axis=0)
+        station_info = self.data[site]
         ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
-        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
+        if "vel" in station_info and "ref_epoch" in station_info:
+            ref_epoch = Time(float(info["ref_epoch"]), scale="utc", fmt="decimalyear")
+            ref_pos = station_info.pop("pos")
+            ref_vel = station_info.pop("vel")
+            interval_years = (self.time - ref_epoch).jd * Unit.day2julian_years
+            if isinstance(interval_years, float):
+                interval_years = np.array([interval_years])
 
+            pos = ref_pos + interval_years[:, None] * ref_vel[None, :]
+        else:
+            pos = station_info.pop("pos")[None, :].repeat(self.time.size, axis=0)
+
+        pos_trs = Position(pos, system="trs", ellipsoid=ell, time=self.time)
         return np.squeeze(pos_trs)
