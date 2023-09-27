@@ -17,7 +17,7 @@ and only for precise orbits:
 """
 
 # Standard library imports
-from typing import Union
+from typing import Union, Tuple
 
 # External library imports
 import numpy as np
@@ -84,7 +84,11 @@ def gnss_clean_orbit(dset: "Dataset", orbit_flag: str, orbit: Union["AprioriOrbi
 # AUXILIARY FUNCTIONS
 #
 
-def _check_first_epoch_sample_point(dset: "Dataset", precise, epoch_interval):
+def _check_first_epoch_sample_point(
+            dset: "Dataset", 
+            precise: "PreciseOrbit", 
+            epoch_interval: float,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Keep first observation epoch depending on existing precise orbit sample points
 
     Precise orbit sample points are needed to carry out interpolation of precise orbits for the first observation
@@ -92,12 +96,9 @@ def _check_first_epoch_sample_point(dset: "Dataset", precise, epoch_interval):
     epoch will be removed for this satellite.
 
     Args:
-        dset (Dataset):            A Dataset containing model data.
-        dset_idx (numpy.ndarray):  Array containing False for observations to throw away. The array is returned by
-                                   function `ignore_unavailable_orbit_satellites()`, which deletes unavailable
-                                   apriori orbit satellites.
-        precise (PreciseOrbit):    Precise orbit object with precise orbit information.
-        epoch_interval (float):    Epoch interval of precise orbit sample points
+        dset:            A Dataset containing model data.
+        precise:         Precise orbit object with precise orbit information.
+        epoch_interval:  Epoch interval of precise orbit sample points
 
     Returns:
         tuple: Tuple with array containing False for first observations to throw away and indices indicating first
@@ -135,7 +136,11 @@ def _check_first_epoch_sample_point(dset: "Dataset", precise, epoch_interval):
     return keep_idx, first_epoch_idx
 
 
-def _check_last_epoch_sample_point(dset, precise, epoch_interval):
+def _check_last_epoch_sample_point(
+            dset: "Dataset", 
+            precise: "PreciseOrbit", 
+            epoch_interval: float,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Keep last observation epoch depending on existing precise orbit sample points
 
     Precise orbit sample points are needed to carry out interpolation of precise orbits for the last observation
@@ -149,12 +154,9 @@ def _check_last_epoch_sample_point(dset, precise, epoch_interval):
                        -(precise orbit epoch interval + 1) < time difference < 0
 
     Args:
-        dset (Dataset):            A Dataset containing model data.
-        dset_idx (numpy.ndarray):  Array containing False for observations to throw away. The array is returned by
-                                   function `ignore_unavailable_orbit_satellites()`, which deletes unavailable
-                                   apriori orbit satellites.
-        precise (PreciseOrbit):    Precise orbit object with precise orbit information.
-        epoch_interval (float):    Epoch interval of precise orbit sample points
+        dset:            A Dataset containing model data.
+        precise:         Precise orbit object with precise orbit information.
+        epoch_interval:  Epoch interval of precise orbit sample points
 
     Returns:
         tuple: Tuple with array containing False for last observations to throw away and indices indicating last
@@ -176,6 +178,7 @@ def _check_last_epoch_sample_point(dset, precise, epoch_interval):
     time = Time(val=dset.time.gps.datetime[last_idx], fmt="datetime", scale=dset.time.scale) + TimeDelta(
         sampling_rate, fmt="seconds", scale=dset.time.scale
     )
+
     precise_idx = precise._get_nearest_sample_point(satellites, time)
 
     # Keep observations epochs, where a precise orbit sample point exists after the last observation epoch
@@ -252,13 +255,14 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
                             satellite = satellite, 
                             log_level = "debug",
         )
-        idx_obs = idx_sat.nonzero()[0][idx_obs]
-        
+
         # Skip epochs for which no broadcast ephemeris are available
         if idx_obs is None:
             keep_idx[obs] = False
-            continue          
-        
+            continue  
+
+        idx_obs = idx_sat.nonzero()[0][idx_obs]
+                     
         if check_nav_validity_length:    
             status = _is_epoch_in_navigation_validity_interval(
                                 time, 
@@ -405,6 +409,23 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
     log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_exceeding_interpolation_boundaries")
 
+    # Remove all observation of a satellite, if only a single observation epoch is left (no interpolation possible)
+    for sat in dset.unique("satellite"):
+        sat_idx = dset.filter(satellite=sat)
+        idx = dset.satellite[keep_idx] == sat
+        if dset.satellite[keep_idx][idx].size == 1:
+            log.warn(f"All observations of satellite {sat} are removed, because only a single observation epoch is "
+                     f"left for satellite {sat} after orbit data cleaning (no interpolation possible).")
+            keep_idx[sat_idx] = False
+            continue
+
+        data_period = (np.max(dset.time.gps.mjd[keep_idx][idx]) - np.min(dset.time.gps.mjd[keep_idx][idx])) * Unit.day2second
+        if data_period <= epoch_interval:
+            log.warn(f"All observations of satellite {sat} are removed, because the observation period of satellite "
+                     f"{sat} ({data_period} s) is below orbit data interval ({epoch_interval} s) and therefore is the "
+                     f" interpolation not possible.")
+            keep_idx[sat_idx] = False        
+
     return keep_idx
 
 
@@ -506,7 +527,7 @@ def _is_epoch_in_navigation_validity_interval(
 
     # Note: Epochs with negative tk has to be removed, if the difference between the observation epoch and TOE, TOC  
     #       or transmission time has to be positive. Only observation epochs after time of ephemeris should be used 
-    #       for Galileo. 
+    #       for Galileo.
     if (system == "E" and tk < 0) or ("positive" in brdc_block_nearest_to and tk < 0):
         return False
 

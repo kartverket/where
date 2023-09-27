@@ -24,6 +24,7 @@ def get_grc_csv_header() -> List[str]:
         Header line of GRC CSV format
     """
     return [
+            "Constellation",
             "Service Line",
             "Service Category",
             "Business Service",
@@ -38,12 +39,13 @@ def get_grc_csv_header() -> List[str]:
             "Mode",
             "Target",
             "Unit",
-            "Month/Year",
+            "Date",
             "Result",
     ]
 
 
 def get_grc_csv_row(
+            constellation: str, 
             kpi: str, 
             mode: str, 
             date: str, 
@@ -54,18 +56,19 @@ def get_grc_csv_row(
     """Create row in GRC CSV format in dependency of given arguments
 
     Args:
-        kpi:        KPI name (e.g. hpe, vpe)
-        mode:       Signal combination (e.g. e1, e1e5b)
-        date:       Date in format month-year (e.g. July-2021)
-        result:     KPI value
-        station:    Station name
-        satellite:  Satellite name
+        constellation:  Constellation name (e.g. Galileo, GPS)
+        kpi:            KPI name (e.g. hpe, vpe)
+        mode:           Signal combination (e.g. e1, e1e5b)
+        date:           Date in format year-month (e.g. 2021-Jul)
+        result:         KPI value
+        station:        Station name
+        satellite:      Satellite name
 
     Returns:
-        Line in GRC CSV format
+        Line in GRC CSV format as list
     """
     batch = ""
-    prn = ""
+    svn = ""
     slot = ""
 
     batch_def = { 
@@ -79,11 +82,20 @@ def get_grc_csv_row(
     }
 
     business_def = {
-            "hpe": "FOM-OS-0015 Horizontal Positioning Service Accuracy per Station over Month",
-            "site_vel_3d": "FOM-OS-0021 3D Velocity Service Accuracy per Station over Month",
-            "sisre": "SDD-OS-0012 SIS Ranging Accuracy over All Satellites over Month",
-            "sisre_sat": "SDD-OS-0013 SIS Ranging Accuracy per Satellite over Month",
-            "vpe": "FOM-OS-0016 Vertical Positioning Service Accuracy per Station over Month",
+            "Galileo": {
+                "hpe": "FOM-OS-08 Horizontal Positioning Service Accuracy per Station over Month",
+                "site_vel_3d": "FOM-OS-14 3D Velocity Service Accuracy per Station over Month",
+                "sisre": "SDD-OS-08 SIS Ranging Accuracy over All Satellites over Month",
+                "sisre_sat": "SDD-OS-09 SIS Ranging Accuracy per Satellite over Month",
+                "vpe": "FOM-OS-09 Vertical Positioning Service Accuracy per Station over Month",
+            },
+            "GPS": {
+                "hpe": "FOM-OS-08 Horizontal Positioning Service Accuracy per Station over Month",
+                "site_vel_3d": "FOM-OS-14 3D Velocity Service Accuracy per Station over Month",
+                "sisre": "SPS-OS-02 SIS Ranging Accuracy over All Satellites over Month",
+                "sisre_sat": "SPS-OS-04 SIS Ranging Accuracy per Satellite over Month",
+                "vpe": "FOM-OS-09 Vertical Positioning Service Accuracy per Station over Month",
+            },
     }
 
     category_def = {
@@ -104,37 +116,38 @@ def get_grc_csv_row(
     }
 
     slot_def = {
-            "G043": "F6",
-            "G045": "D3",
-            "G048": "A4",
-            "G050": "E3",
-            "G051": "E4",
-            "G052": "A2",
-            "G053": "C4",
-            "G055": "F2",
-            "G056": "B1",
-            "G057": "C1",
-            "G058": "B4",
-            "G059": "C5",
-            "G061": "D1",
-            "G062": "B2",
-            "G063": "D2",
-            "G064": "A3",
-            "G065": "A1",
-            "G066": "C2",
-            "G067": "D4",
-            "G068": "F3",
-            "G069": "E1",
-            "G070": "F1",
-            "G071": "B5",
-            "G072": "C3",
-            "G073": "E2",
-            "G074": "F4",
-            "G075": "D6",
-            "G076": "E5",
-            "G077": "B6",
-            "G078": "D5",
-            "G079": "A6",
+            "SVN43": "F6",
+            "SVN44": "B3",
+            "SVN45": "D3",
+            "SVN48": "A4",
+            "SVN50": "E3",
+            "SVN51": "E4",
+            "SVN52": "A2",
+            "SVN53": "C4",
+            "SVN55": "F2",
+            "SVN56": "B1",
+            "SVN57": "C1",
+            "SVN58": "B4",
+            "SVN59": "C5",
+            "SVN61": "D1",
+            "SVN62": "B2",
+            "SVN63": "D2",
+            "SVN64": "A3",
+            "SVN65": "A1",
+            "SVN66": "C2",
+            "SVN67": "D4",
+            "SVN68": "F3",
+            "SVN69": "E1",
+            "SVN70": "F1",
+            "SVN71": "B5",
+            "SVN72": "C3",
+            "SVN73": "E2",
+            "SVN74": "F4",
+            "SVN75": "D6",
+            "SVN76": "E5",
+            "SVN77": "B6",
+            "SVN78": "D5",
+            "SVN79": "A6",
             "GSAT0101": "B05",
             "GSAT0102": "B06",
             "GSAT0103": "C04",
@@ -166,11 +179,13 @@ def get_grc_csv_row(
     }
 
     station_def = {
+            "altc": "Alta (Norway)",
             "brux": "Brussels (Belgium)",
             "cpvg": "Cap-Vert (Cabo Verde)",
             "koug": "Kourou (French Guiana)",
             "hofs": "Hoefn (Iceland)",
             "hons": "Honningsvag (Norway)",
+            "janm": "Jan Mayen (Norway)",
             "krss": "Kristiansand (Norway)",
             "mas1": "Maspalomas (Spain)",
             "nabd": "Ny Alesund (Norway)",
@@ -181,8 +196,8 @@ def get_grc_csv_row(
     target_def = {
             "hpe": "",
             "site_vel_3d": "",
-            "sisre": 2,
-            "sisre_sat": "7",
+            "sisre": "< 2",
+            "sisre_sat": "< 7",
             "vpe": "",
     }
 
@@ -201,20 +216,27 @@ def get_grc_csv_row(
 
     if satellite:
         atx = apriori.get("gnss_antenna_correction")
-        used_date = datetime.strptime(f"{date}-01", "%y-%b-%d")
+        used_date = datetime.strptime(f"{date}-01", "%Y-%b-%d")
         sat_info = atx.get_satellite_info(satellite, used_date)
 
         batch = batch_def[sat_info["sat_type"]] if sat_info["sat_type"] in batch_def.keys() else ""
-        prn = sat_info["sat_code"].replace("E", "GSAT0") if sat_info["sat_code"].startswith("E") else sat_info["sat_code"]
-        slot = slot_def[prn] if prn in slot_def.keys() else ""
+
+        if sat_info["sat_code"].startswith("E"):
+            svn = sat_info["sat_code"].replace("E", "GSAT0")
+        elif sat_info["sat_code"].startswith("G"):
+            svn = sat_info["sat_code"].replace("G0", "SVN")
+        else:
+            svn = sat_info["sat_code"]
+        slot = slot_def[svn] if svn in slot_def.keys() else ""
 
     return [
+        constellation, # Constellation
         "Open Service", # Service Line
         category_def[kpi], # Service Category
-        business_def[kpi], # Business Service
+        business_def[constellation][kpi], # Business Service
         batch, # Batch
-        prn, # PRN
-        satellite, # Satellite
+        svn, # Satellite
+        satellite, # PRN
         slot, # Slot
         station_to_write, # GSS Site
         station.upper(), # Station

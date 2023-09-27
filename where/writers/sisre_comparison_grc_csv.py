@@ -76,10 +76,17 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
         # Write constellation results to GRC CSV file
         for mode in signal_modes:
 
+            # Get constellation name
+            if mode.startswith("E"):
+                constellation = "Galileo"
+            elif mode.startswith("L"):
+                constellation = "GPS"
+
             for _, row in df_month.iterrows():
 
                 writer.writerow(
                     get_grc_csv_row(
+                        constellation=constellation,
                         kpi="sisre", 
                         mode=mode, 
                         date=row.date, 
@@ -93,8 +100,10 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
             # Filtering necessary to get only satellites related to one GNSS
             if mode.startswith("E"):
                 system = "E"
+                constellation = "Galileo"
             elif mode.startswith("L"):
                 system = "G"
+                constellation = "GPS"
 
             idx = df.system == system
 
@@ -103,7 +112,7 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
 
             df_mode = df[idx].pivot(index="time_gps", columns="satellite", values=mode)
             df_mode = df_mode.resample("M").apply(lambda x: np.nanpercentile(x, q=95))
-            df_mode.index = df_mode.index.strftime("%y-%b")
+            df_mode.index = df_mode.index.strftime("%Y-%b")
             df_mode.index.name = "date"
             df_mode = df_mode.reset_index()
 
@@ -111,6 +120,7 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
                 for sat in sorted(satellites):
                     writer.writerow(
                         get_grc_csv_row(
+                            constellation=constellation,
                             kpi="sisre_sat", 
                             mode=mode, 
                             date=row.date, 
@@ -136,9 +146,9 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
     Example for "df_month_perc_rms" dictionary:
 
                         E1    E1/E5b    E1/E5a
-        Jan-2019  0.335688  0.297593  0.326859
-        Feb-2019  0.380575  0.330701  0.352535
-        Mar-2019  0.353586  0.314817  0.344597
+        2021-Jul  0.335688  0.297593  0.326859
+        2021-Jul  0.380575  0.330701  0.352535
+        2021-Jul  0.353586  0.314817  0.344597
 
 
     Args:
@@ -194,7 +204,7 @@ def _generate_dataframe(dsets: Dict[str, "Dataset"]) -> Tuple[pd.core.frame.Data
         df_tmp.loc[epoch] = pd.Series(row)
 
     df_month_perc_rms = df_tmp.resample("M").apply(lambda x: np.nanpercentile(list(x), q=95))
-    df_month_perc_rms.index = df_month_perc_rms.index.strftime("%y-%b")
+    df_month_perc_rms.index = df_month_perc_rms.index.strftime("%Y-%b")
 
     # Prepare dataframes for writing
     df_month_perc_rms.index.name = "date"

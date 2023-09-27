@@ -73,7 +73,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
     for figure_path in _plot_has_correction(dset, figure_dir):
         rpt.add_figure(
                 figure_path=figure_path, 
-                caption=f"HAS message entry for {enums.gnss_id_to_name[figure_path.stem.split('_')[2]]}", 
+                caption=f"HAS message entry for {enums.gnss_id_to_name[figure_path.stem.split('_')[2]].value}", 
                 clearpage=False,
         )
         
@@ -81,7 +81,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
         for figure_path in _plot_has_clock_availability(dset, figure_dir):
             rpt.add_figure(
                     figure_path=figure_path, 
-                    caption=f"HAS clock correction status for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                    caption=f"HAS clock correction status for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                     clearpage=False,
             )
           
@@ -89,7 +89,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
         for figure_path in _plot_has_orbit_availability(dset, figure_dir):
             rpt.add_figure(
                     figure_path=figure_path, 
-                    caption=f"HAS orbit correction status for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                    caption=f"HAS orbit correction status for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                     clearpage=True,
             )
             
@@ -141,11 +141,11 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
         
         for figure_path in _plot_latency(dset, orbit.dset_edit, figure_dir):
             if "system" in figure_path.stem:
-                caption = f"Latency between HAS messages data and broadcast ephemeris for {enums.gnss_id_to_name[figure_path.stem[-1]]}"
+                caption = f"Latency between HAS messages data and broadcast ephemeris for {enums.gnss_id_to_name[figure_path.stem[-1]].value}"
             elif "histogram" in figure_path.stem:
-                caption = f"Histogram for latency of HAS messages for {enums.gnss_id_to_name[figure_path.stem[-1]]}"
+                caption = f"Histogram for latency of HAS messages for {enums.gnss_id_to_name[figure_path.stem[-1]].value}"
             else:
-                caption = f"Latency between HAS messages data and broadcast ephemeris for satellite {figure_path.stem[-3:]}"
+                caption = f"Latency between HAS messages data and broadcast ephemeris for satellite {figure_path.stem[-3:].value}"
             rpt.add_figure(
                     figure_path=figure_path, 
                     caption=caption, 
