@@ -117,6 +117,7 @@ def get_grc_csv_row(
 
     slot_def = {
             "SVN43": "F6",
+            "SVN44": "B3",
             "SVN45": "D3",
             "SVN48": "A4",
             "SVN50": "E3",
@@ -195,8 +196,8 @@ def get_grc_csv_row(
     target_def = {
             "hpe": "",
             "site_vel_3d": "",
-            "sisre": "≤ 2",
-            "sisre_sat": "≤ 7",
+            "sisre": "< 2",
+            "sisre_sat": "< 7",
             "vpe": "",
     }
 
