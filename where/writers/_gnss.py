@@ -9,10 +9,6 @@ TODO
 from datetime import datetime
 from typing import List
 
-# External liberary imports
-import numpy as np
-
-
 # Where imports
 from where import apriori
 
