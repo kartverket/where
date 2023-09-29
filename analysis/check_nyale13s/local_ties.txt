@@ -1,4 +1,6 @@
 WETTZ13N/WETTZELL  123.3070 # https://ivscc.gsfc.nasa.gov/publications/gm2018/33_schueler_etal.pdf
 NYALE13S/NYALES20 1539.1931 # Oddvar
+NYALE13N/NYALES20 1624.4546 # Oddvar
+NYALE13S/NYALE13N   85.3312 # Oddvar
 HOBART26/HOBART12  295.9170 # http://www.oso.chalmers.se/evga/23_EVGA_2017_Gothenburg.pdf - The HOB experiments
 HARTRAO/HART15M    113.0895 # https://www.oan.es/evga2019/EVGA2019_PDF/P206_EVGA2019_Nickola.pdf 

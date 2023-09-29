@@ -205,7 +205,7 @@ def plot_residual_rms(dates, rms, rms1, rms2, sta_1, sta_2, colors):
     plt.suptitle("Root Mean Square of Postfit Residuals  [m]")
     #plt.tight_layout()
     fig.autofmt_xdate()
-    plt.savefig(f"img/{dset_id}/RMS_Postfit_Residuals_{dset_id}.png", bbox_inches='tight')
+    plt.savefig(f"img/{dset_id}/RMS_Postfit_Residuals_{sta_1}_{sta_2}_{dset_id}.png", bbox_inches='tight')
     plt.close()
 
 
@@ -343,7 +343,7 @@ parser.add_argument("--plot_residuals", help="Enable this flag to plot residuals
 args = parser.parse_args()
 
 dset_id = args.id
-station1, station2 = args.stations
+station1, station2 = sorted(args.stations)
 
 baseline1 = f"{station1}/{station2}"
 baseline2 = f"{station2}/{station1}"
@@ -441,9 +441,6 @@ for rundate, session_code in zip(dates, session_codes):
         baseline_dates.append(rundate)
         baseline_length.append(bl['baseline_length'])
         baseline_length_ferr.append(bl['baseline_length_ferr'])
-    
-
-    if baseline1 in dset_session.baseline or baseline2 in dset_session.baseline:
         num_obs_bs.append(dset_session.num(baseline=baseline1) + dset_session.num(baseline=baseline2))
 
     # Collect rms information for each session
