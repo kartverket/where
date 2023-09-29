@@ -13,14 +13,8 @@ RINEX observation file manipulation can be used for following tasks:
 from midgard.dev import plugins
 
 # Where imports
-from where import apriori
-from where import cleaners
-from where import parsers
-from where import postprocessors
-from where import writers
-from where.lib import config
-from where.lib import gnss
-from where.lib import log
+from where import apriori, cleaners, parsers, postprocessors, writers
+from where.lib import config, gnss, log, util
 
 # The name of this pipeline
 PIPELINE = __name__.split(".")[-1]
@@ -120,29 +114,8 @@ def read(stage, dset):
             log.fatal(f"Unknown RINEX format {version} is used in file {file_path}")
 
     dset.update_from(parser.as_dataset())
-    
-    # Apply HAS code and phase bias correction        
-    if config.tech.apply_has_correction.bool:
-
-        code_bias_has = apriori.get(
-            "orbit", 
-            rundate=dset.analysis["rundate"], 
-            file_key="gnss_has_cb",
-            day_offset=0, #MURKS: Should be 1
-            apriori_orbit="has",
-        )
-        code_bias_has.apply_code_bias_to_dataset(dset)
-
-        phase_bias_has = apriori.get(
-            "orbit", 
-            rundate=dset.analysis["rundate"], 
-            file_key="gnss_has_cp",
-            day_offset=0, #MURKS: Should be 1
-            apriori_orbit="has",
-        )
-        phase_bias_has.apply_phase_bias_to_dataset(dset)
-                
-    #dset.write_as(stage=stage)
+                    
+    dset.write_as(stage=stage)
 
 
 #
