@@ -28,12 +28,9 @@ from midgard.dev import plugins
 from midgard.math import nputil
 
 # Where imports
-from where import apriori
-from where import cleaners
-from where import parsers
+from where import apriori, cleaners, parsers
 from where.apriori import orbit
-from where.lib import config
-from where.lib import log
+from where.lib import config, log, util
 
 
 @plugins.register
@@ -100,7 +97,7 @@ class HasOrbit(orbit.AprioriOrbit):
             if not file_path.exists():                       
                 log.fatal(f"File does not exists: {file_path}")
             
-            if self._file_is_empty(file_path):
+            if util.is_file_empty(file_path):
                 log.fatal(f"File is empty: {file_path}")
                 
             p = parsers.parse("gnss_has_decoder", file_path=file_path)
@@ -414,7 +411,7 @@ class HasOrbit(orbit.AprioriOrbit):
         cleaners.apply_remover("gnss_clean_orbit_has", dset, orbit=self)
 
         # Determine HAS code bias correction    
-        for obs_type in dset.obs.fields:
+        for obs_type in sorted(dset.obs.fields):
             values = np.zeros(dset.num_obs)
 
             # Skip Doppler, carrier-phase and signal-to-noise observations types
@@ -460,7 +457,7 @@ class HasOrbit(orbit.AprioriOrbit):
 
             # Apply HAS code bias correction
             dset.obs[obs_type][:] = dset.obs[obs_type] + values
-
+            
 
     def apply_phase_bias_to_dataset(self, dset: "Dataset") -> None:
         """Apply HAS phase bias to corresponding observation types in dataset
@@ -577,35 +574,6 @@ class HasOrbit(orbit.AprioriOrbit):
                     return signal
 
         return None
-
-
-    # TODO: Function should be placed e.g. in where/lib. 
-    @staticmethod
-    def _file_is_empty(path: Union[str, PosixPath]) -> bool:
-        """Check if given file path is empty
-
-        Args: 
-            path:  File path
-
-        Returns:
-            True if file is empty otherwise False
-        """
-        is_empty = False
-        path = Path(path)
-
-        if ".gz" in path.suffix:
-            from gzip import GzipFile
-            with GzipFile(path, "rb") as fid:
-                data = fid.read(1)
-
-            if len(data) == 0:
-                is_empty = True
-
-        else:
-            if file_path.stat().st_size == 0:
-                is_empty = True
-
-        return is_empty
 
 
     # TODO: Add functionality to .midgard/data/_position.py
