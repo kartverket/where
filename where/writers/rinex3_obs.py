@@ -70,20 +70,22 @@ def rinex3_obs(dset):
         # G = GPS R = GLONASS E = GALILEO S = GEO M = MIXED           COMMENT
 
         # Add comments related applying HAS code bias corrections
-        if config.tech.get("apply_has_correction", default=False).bool:
-            if "has_corrected_obstypes" in meta:
-                meta["comment"].extend([
-                    # ----+----1----+----2----+----3----+----4----+----5----+----6
-                      "",
-                      "HAS corrections are applied for code observations by Where",
-                      "software. The corrected observations are listed for a given",
-                      "GNSS and used HAS code bias signal (after convention",
-                      "<sys> <sig>: <obs_codes>):",
-                ])
-                for sys in sorted(meta["has_corrected_obstypes"].keys()):
-                    for signal in sorted(meta["has_corrected_obstypes"][sys].keys()):
-                        line = f"{sys} {signal+':':6s} {' '.join(meta['has_corrected_obstypes'][sys][signal])}"
-                        meta["comment"].append(line)
+        if "has_corrected_obstypes" in meta:
+            if not "comment" in meta.keys():
+                meta["comment"] = list()
+                
+            meta["comment"].extend([
+                # ----+----1----+----2----+----3----+----4----+----5----+----6
+                  "",
+                  "HAS corrections are applied for code observations by Where",
+                  "software. The corrected observations are listed for a given",
+                  "GNSS and used HAS code bias signal (after convention",
+                  "<sys> <sig>: <obs_codes>):",
+            ])
+            for sys in sorted(meta["has_corrected_obstypes"].keys()):
+                for signal in sorted(meta["has_corrected_obstypes"][sys].keys()):
+                    line = f"{sys} {signal+':':6s} {' '.join(meta['has_corrected_obstypes'][sys][signal])}"
+                    meta["comment"].append(line)
 
         if "comment" in meta:
             for line in meta["comment"]:
