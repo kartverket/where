@@ -30,7 +30,7 @@ from midgard.math.unit import Unit
 # Where imports
 from where import apriori, cleaners
 from where.lib import config, log
-from where.data.time import Time, TimeDelta
+from where.data.time import TimeDelta
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -466,7 +466,7 @@ def _ignore_epochs_has(dset: "Dataset", orbit: "AprioriOrbit") -> np.ndarray:
                 keep_idx[idx_dset] = False
             
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
-    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs")
+    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_has")
     
     # Note: Observations have to be removed already here, otherwise further processing does not work.
     if num_removed_obs > 0:
