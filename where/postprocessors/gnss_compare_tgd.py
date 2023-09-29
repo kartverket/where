@@ -28,7 +28,6 @@ from midgard.dev import plugins
 
 # Where imports
 from where import apriori
-from where.lib import config
 from where.lib import log
 
 # Name of section in configuration
