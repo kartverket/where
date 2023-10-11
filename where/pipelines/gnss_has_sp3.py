@@ -7,6 +7,32 @@ SP3 files are generated, whereby broadcast navigation messages are read and corr
 The interval in the SP3 files depends on simulated observation epochs. For these observation epochs the orbit and
 clock are determined. 
 
+Following steps are normally carried out:
+    
+    1. Setup stage
+       Generate simulated dataset, which includes the fields 'time', 'system' and 'satellite' for a given sampling
+       rate.
+    2. Edit stage
+       Data are edited in dependency on defined removers (_ignore_satellites) in configuration file.
+    3. Orbit stage
+        a.) Read Galileo HAS orbit corrections and remove observations, which should be used due to
+            unavailable HAS messages.
+        b.) Remove observation epochs which are below HAS receiver reception time or exceeding validity
+            length of Galileo HAS orbit correction messages.
+        c.) Read broadcast navigation messages and remove duplicated messages, observation epochs exceeding validity
+            length of broadcast navigation message record and unhealthy satellites.
+        d.) Keep only observations, where IOD does match between HAS and broadcast navigation message.
+        e.) Apply antenna phase center offset in case SP3 file should be refered to Center of Mass.
+        f.) Apply Galileo orbit correction on broadcast ephemeris.
+    
+        g.) Read Galileo HAS clock corrections and remove observations, which should be used due to
+            unavailable HAS messages.
+        h.) Remove observation epochs which are below HAS receiver reception time or exceeding validity
+            length of Galileo HAS clock correction messages.
+        i.) Apply Galileo orbit correction on broadcast ephemeris.
+    4. Write stage
+       Write output files in dependency on defined writers.
+
 """
 
 # Standard library imports
