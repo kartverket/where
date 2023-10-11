@@ -71,7 +71,7 @@ def gnss_clean_orbit(dset: "Dataset", orbit_flag: str, orbit: Union["AprioriOrbi
     # GNSS observation epochs are rejected with no corresponding IOD between HAS messages and broadcast navigation 
     # messages and observation with timestamps less than HAS receiver reception time
     if (orbit_flag == "broadcast") and apply_has_correction:
-        _ignore_epochs_has(dset, orbit)
+        keep_idx = _ignore_epochs_has(dset, orbit)
 
     # Remove GNSS observations which exceeds the interpolation boundaries
     if orbit_flag == "precise":
@@ -215,9 +215,11 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
     Args:
         dset:   A Dataset containing model data.
         orbit:  Apriori orbit object containing orbit data (either broadcast or precise)
+        
+    Returns:
+        Array containing False for observations to throw away 
     """
     keep_idx = np.ones(dset.num_obs, dtype=bool)
-    remove_idx = np.zeros(dset.num_obs, dtype=bool)
     dset_brdc_idx = np.zeros(dset.num_obs, dtype=int)
 
     check_nav_validity_length = config.tech[_SECTION].check_nav_validity_length.bool
@@ -293,6 +295,8 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
 
         unhealthy_satellites = sorted(set(dset.satellite[remove_idx]))
         log.info(f"Discarding observations for unhealthy satellites: {', '.join(unhealthy_satellites)}")
+    else:
+        remove_idx = np.zeros(dset.num_obs, dtype=bool)
 
     return ~remove_idx
 
@@ -369,7 +373,7 @@ def _get_time_of_ephemeris_limit(fit_interval: float, system: str) -> float:
     return toe_limit
 
 
-def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "AprioriOrbit") -> None:
+def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "AprioriOrbit") -> np.ndarray:
     """Remove GNSS observations which exceeds the interpolation boundaries
 
     The interpolation boundaries are defined as +/- 'precise orbit epoch interval' related to GNSS observation epoch. If
@@ -378,6 +382,9 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
     Args:
         dset:   A Dataset containing model data.
         orbit:  Apriori orbit object containing orbit data (either broadcast or precise)
+        
+    Returns:
+        Array containing False for observations to throw away 
     """
     epoch_interval = float(orbit.dset_edit.meta[dset.analysis["rundate"].strftime("%Y-%m-%d")]["epoch_interval"])
     precise_idx = orbit._get_nearest_sample_point(dset.satellite, dset.time)
@@ -436,6 +443,9 @@ def _ignore_epochs_has(dset: "Dataset", orbit: "AprioriOrbit") -> np.ndarray:
     Args:
         dset:   A Dataset containing model data.
         orbit:  Apriori orbit object containing orbit data (either broadcast or precise)
+        
+    Returns:
+        Array containing False for observations to throw away 
     """    
     keep_idx = np.ones(dset.num_obs, dtype=bool)
     obs_epoch_nearest_positive = True if "positive" in config.tech.has_message_nearest_to.str else False
@@ -472,6 +482,8 @@ def _ignore_epochs_has(dset: "Dataset", orbit: "AprioriOrbit") -> np.ndarray:
     if num_removed_obs > 0:
         log.info(f"Keeping {sum(keep_idx)} of {dset.num_obs} observations.")
         dset.subset(keep_idx)
+        
+    return np.ones(dset.num_obs, dtype=bool)
    
 
 def _ignore_satellites(dset: "Dataset", orbit: "AprioriOrbit", orbit_flag: str) -> None:
