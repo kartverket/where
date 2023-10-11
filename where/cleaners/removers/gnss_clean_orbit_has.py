@@ -6,7 +6,6 @@ Description:
 
 The remover can be used for Galileo HAS orbits to remove GNSS observations. Following steps are carried out:
     - removing of GNSS observations if HAS messages are unavailable
-    - removing of GNSS observations with no corresponding IOD between HAS and broadcast navigation message
     - removing of GNSS observations with timestamps less than HAS receiver reception time
     - removing of GNSS observations which exceeds the validity length of a Galileo HAS record
 """
@@ -103,7 +102,7 @@ def _ignore_epochs_with_no_valid_has_message(dset: "Dataset", orbit: "Dataset") 
                 keep_idx[idx_dset] = False
             
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
-    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs")
+    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs (file key '{orbit.file_key}')")
     
     # Note: Observations have to be removed already here, otherwise further processing does not work.
     if num_removed_obs > 0:
@@ -149,7 +148,7 @@ def _ignore_epochs_exceeding_validity(dset: "Dataset", orbit: "HasOrbit") -> np.
     ##-DEBUG
 
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
-    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_exceeding_validity")
+    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_exceeding_validity (file key '{orbit.file_key}')")
 
     #log.debug('Following entries are removed: {}\n', 'DEBUG:  \n'.join([s+t.strftime('  %Y-%m-%d %H:%M:%S (GPS)')
     #                                                              for s, t in zip(np.array(dset.satellite)[keep_idx],
