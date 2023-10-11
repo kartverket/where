@@ -33,7 +33,7 @@ def rinex_obs_apply_has_correction(dset: "Dataset") -> None:
         )
         code_bias_has.apply_code_bias_to_dataset(dset)
     else:
-        log.warn("File path {file_path} does not exists or is empty. That means no code bias HAS corrections are "
+        log.warn(f"File path {file_path} does not exists or is empty. That means no code bias HAS corrections are "
                  "applied.")
 
     file_path = config.files.path("gnss_has_cp", file_vars={**dset.vars, **dset.analysis})
@@ -47,6 +47,6 @@ def rinex_obs_apply_has_correction(dset: "Dataset") -> None:
         )
         phase_bias_has.apply_phase_bias_to_dataset(dset)
     else:
-        log.warn("File path {file_path} does not exists or is empty. That means no phase bias HAS corrections are "
+        log.warn(f"File path {file_path} does not exists or is empty. That means no phase bias HAS corrections are "
                  "applied.")
 
