@@ -705,6 +705,9 @@ class HasOrbit(orbit.AprioriOrbit):
 
             cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
 
+	# Prepare mjd data
+	mjd = self._add_dim(self.dset_edit[time_key].gps.mjd)
+
         # Determine HAS message index for a given satellite, observation epoch and eventually system/signal
         indices = np.full(dset.num_obs, -1, dtype=int) # -1 is chosen to guarantee that not a wrong index is used 
                                                        # for getting correct HAS message
@@ -740,13 +743,13 @@ class HasOrbit(orbit.AprioriOrbit):
                     log.fatal(f"No valid HAS message could be found for satellite {sat}, and observation epoch "
                              f"{obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")
 
-            nearest_idx = self._get_nearest_idx(idx_has, obs_epoch, time_key, positive)
+            nearest_idx = self._get_nearest_idx(mjd[idx_has], obs_epoch, time_key, positive)
             indices[idx_dset] = idx_has.nonzero()[0][nearest_idx]
 
         return indices
 
     
-    def _get_nearest_idx(self, idx: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray:
+    def _get_nearest_idx(self, mjd: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray:
         """Get nearest HAS message data index for given observation epoch
         
         Args:
@@ -760,14 +763,14 @@ class HasOrbit(orbit.AprioriOrbit):
             for given observation epoch
         """
     
-        diff = obs_epoch.gps.mjd - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
+        diff = obs_epoch.gps.mjd - mjd
         if positive:
             data = np.array([99999 if v < 0  else v for v in diff])
             if np.all(data == 99999): # No HAS message epochs larger than observation epoch
                 log.fatal(f"No valid HAS message could be found before observation epoch {obs_epoch.gps.isot} (nearest HAS " 
                           f"message receiver reception time: {min(self.dset_edit[time_key].gps.isot)})")
             
-            nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
+            nearest_idx = data.argmin()
         else:
             nearest_idx = np.array([abs(diff)]).argmin()
             
