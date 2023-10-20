@@ -1238,6 +1238,7 @@ class Plot(FigureCanvasTkAgg, UpdateMixin):
             log.info(f"Adding {self.vars['filter_baseline']} to baseline_clock_offsets")
             with config.update_tech_config(use_options=False, **self.vars) as cfg:
                 current = cfg.vlbi_clock_poly.baseline_clock_offsets.as_list(", *")
+                # Sort alphabetically to avoid diff in config library when nothing has changed
                 updated = ", ".join(sorted(current + [self.vars["filter_baseline"]]))
                 cfg.update("vlbi_clock_poly", "baseline_clock_offsets", updated, source=util.get_program_name())
 

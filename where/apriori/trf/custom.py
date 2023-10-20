@@ -72,7 +72,7 @@ class CustomTrf(TrfFactory):
         station_info = self.data[site]
         ell = ellipsoid.get(config.tech.reference_ellipsoid.str.upper())
         if "vel" in station_info and "ref_epoch" in station_info:
-            ref_epoch = Time(float(info["ref_epoch"]), scale="utc", fmt="decimalyear")
+            ref_epoch = Time(float(station_info["ref_epoch"]), scale="utc", fmt="decimalyear")
             ref_pos = station_info.pop("pos")
             ref_vel = station_info.pop("vel")
             interval_years = (self.time - ref_epoch).jd * Unit.day2julian_years

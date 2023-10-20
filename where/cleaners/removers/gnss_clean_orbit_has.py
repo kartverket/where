@@ -101,9 +101,8 @@ def _ignore_epochs_with_no_valid_has_message(dset: "Dataset", orbit: "Dataset") 
     
             if np.all(diff < 0):
                 log.debug(f"No valid HAS message could be found for satellite {sat} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} ")
-                #log.debug(f"No valid HAS message could be found for satellite {sat} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} "  # slow
-                #          f"(nearest receiver reception time of HAS message: {min(orbit.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')},"   # slow
-                #          f"{min(orbit.dset_edit.time.gps_ws.week[idx]):.0f}-{min(orbit.dset_edit.time.gps_ws.seconds[idx]):.0f})")  # old code
+                #          f"(nearest receiver reception time of HAS message: {min(orbit.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')},"    # slow. enable if needed for debugging.
+                #          f"{min(orbit.dset_edit.time.gps_ws.week[idx]):.0f}-{min(orbit.dset_edit.time.gps_ws.seconds[idx]):.0f})")    # slow. enable if needed for debugging.
                 keep_idx[i] = False
             
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)

@@ -214,6 +214,7 @@ def parse_baseline_clock_offsets(dset, baseline_clock_offsets, ref_clock):
                 # for the same station is also estimated
                 baseline_clock_offsets.remove(bl)
 
+    baseline_clock_offsets = sorted(baseline_clock_offsets) # Sort alphabetically to avoid diff in config library when nothing has changed
     store_bco = config.tech.get("store_bco", section=MODEL).bool
 
     if store_bco:
