@@ -341,16 +341,13 @@ class HasOrbit(orbit.AprioriOrbit):
         # Relation between HAS signal definition and dataset naming, where RINEX convention are used
         #
         signal_def = {
-            "E1-C": "C1C",
-            "E5a-Q": "C5Q",
-            "E6-C": "C6C", 
-            "E5b-Q": "C7Q",
-            #E:"C8":, # Not defined so far.
-            #G:    "C1C":
-            #G:    "C1P":
-            #G:    "C2W":
-            #G:    "C2X":
-            #G:    "C5X":         
+            "E1-C": ("E","C1C"),
+            "E5a-Q": ("E","C5Q"),
+            "E6-C": ("E","C6C"), 
+            "E5b-Q": ("E","C7Q"),
+            "L1 C/A": ("G","C1C"),
+            "L2 CL": ("G","C2L"),
+            "L2 P": ("G","C2P"),
         }
     
         # Clean orbits by removing unavailable satellites, unhealthy satellites and checking validity length of
@@ -359,11 +356,20 @@ class HasOrbit(orbit.AprioriOrbit):
 
         # Get correct HAS message for given observations times and signal by determining the indices to HAS message
         # dataset
-        log.fatal("MURKS: add_code_bias_to_dataset() function has to be updated, that it handles GPS and GALILEO")
+        #TODO-MURKS: This should be improved, that several GNSS can be handled by this function!!!
+        if len(dset.unique("system")) > 1:
+            log.fatal(f"Function add_code_bias_to_dataset() can not handle observations from two GNSS ({dset.unique('system')}).")
+
         for signal in set(self.dset_edit.signal):
-            dset_has_idx = self._get_has_message_idx(dset, signal=signal)
+            system, rinex_code = signal_def[signal]
+            if system not in dset.unique("system"): # Skip not available GNSS
+                continue
+            if signal not in signal_def.keys():
+                log.fatal(f"Galileo HAS code bias for signal {signal} handling is not implemented so far in Where.")
+
+            dset_has_idx = self._get_has_message_idx(dset, system=system, signal=signal)
             dset.add_float(
-                f"has_code_bias_{signal_def[signal].lower()}", 
+                f"has_code_bias_{rinex_code.lower()}", 
                 val=self.dset_edit.code_bias[dset_has_idx],
                 unit="meters", 
                 write_level="operational",
@@ -705,9 +711,14 @@ class HasOrbit(orbit.AprioriOrbit):
 
             cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
 
+	# Prepare mjd data
+	mjd = self._add_dim(self.dset_edit[time_key].gps.mjd)
+
         # Determine HAS message index for a given satellite, observation epoch and eventually system/signal
         indices = np.full(dset.num_obs, -1, dtype=int) # -1 is chosen to guarantee that not a wrong index is used 
                                                        # for getting correct HAS message
+
+        has_epoch_mjd = self._add_dim(self.dset_edit[time_key].gps.mjd) 
         for idx_dset, (sat, obs_epoch) in enumerate(zip(dset.satellite, dset[time])):
 
             # Skip not relevant GNSS satellites, if GNSS system is defined
@@ -740,39 +751,39 @@ class HasOrbit(orbit.AprioriOrbit):
                     log.fatal(f"No valid HAS message could be found for satellite {sat}, and observation epoch "
                              f"{obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")
 
-            nearest_idx = self._get_nearest_idx(idx_has, obs_epoch, time_key, positive)
+            nearest_idx = self._get_nearest_idx(has_epoch_mjd[idx_has], obs_epoch, time_key, positive) 
             indices[idx_dset] = idx_has.nonzero()[0][nearest_idx]
 
         return indices
 
     
-    def _get_nearest_idx(self, idx: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray:
+    def _get_nearest_idx(self, has_epoch_mjd: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray: 
         """Get nearest HAS message data index for given observation epoch
         
         Args:
-            idx:        Index used to filter HAS messages e.g. after satellite, GNSS IOD
-            obs_epoch:  Observation epoch as Time object
-            time_key:   Time key
-            positive:   Difference between observation epoch and HAS message epoch has to be positive
+            has_epoch_mjd:  HAS message epoch filtered e.g. after satellite and GNSS IOD
+            obs_epoch: 	    Observation epoch as Time object
+            time_key:       Time key
+            positive:       Difference between observation epoch and HAS message epoch has to be positive
 
         Returns:
             Nearest HAS messages indices for given observation epochs
             for given observation epoch
         """
-    
-        diff = obs_epoch.gps.mjd - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
+        diff = obs_epoch.gps.mjd - has_epoch_mjd
+
         if positive:
             data = np.array([99999 if v < 0  else v for v in diff])
             if np.all(data == 99999): # No HAS message epochs larger than observation epoch
                 log.fatal(f"No valid HAS message could be found before observation epoch {obs_epoch.gps.isot} (nearest HAS " 
                           f"message receiver reception time: {min(self.dset_edit[time_key].gps.isot)})")
             
-            nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
+            nearest_idx = data.argmin()
         else:
             nearest_idx = np.array([abs(diff)]).argmin()
             
         return nearest_idx
-    
+        
 
         
 
