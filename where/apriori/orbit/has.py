@@ -715,7 +715,7 @@ class HasOrbit(orbit.AprioriOrbit):
         indices = np.full(dset.num_obs, -1, dtype=int) # -1 is chosen to guarantee that not a wrong index is used 
                                                        # for getting correct HAS message
 
-        has_epoch = self._add_dim(self.dset_edit[time_key].gps.mjd) 
+        has_epoch_mjd = self._add_dim(self.dset_edit[time_key].gps.mjd) 
         for idx_dset, (sat, obs_epoch) in enumerate(zip(dset.satellite, dset[time])):
 
             # Skip not relevant GNSS satellites, if GNSS system is defined
@@ -748,27 +748,27 @@ class HasOrbit(orbit.AprioriOrbit):
                     log.fatal(f"No valid HAS message could be found for satellite {sat}, and observation epoch "
                              f"{obs_epoch.isot}. Use 'gnss_clean_orbit_has' remover.")
 
-            nearest_idx = self._get_nearest_idx(has_epoch[idx_has], obs_epoch, time_key, positive) 
+            nearest_idx = self._get_nearest_idx(has_epoch_mjd[idx_has], obs_epoch, time_key, positive) 
             indices[idx_dset] = idx_has.nonzero()[0][nearest_idx]
 
         return indices
 
     
-    def _get_nearest_idx(self, mjd: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray: 
+    def _get_nearest_idx(self, has_epoch_mjd: np.ndarray, obs_epoch: "Time", time_key: str, positive: bool) -> np.ndarray: 
         """Get nearest HAS message data index for given observation epoch
         
         Args:
-            idx:        Index used to filter HAS messages e.g. after satellite, GNSS IOD
-            obs_epoch:  Observation epoch as Time object
-            time_key:   Time key
-            positive:   Difference between observation epoch and HAS message epoch has to be positive
+            has_epoch_mjd:  HAS message epoch filtered e.g. after satellite and GNSS IOD
+            obs_epoch: 	    Observation epoch as Time object
+            time_key:       Time key
+            positive:       Difference between observation epoch and HAS message epoch has to be positive
 
         Returns:
             Nearest HAS messages indices for given observation epochs
             for given observation epoch
         """
     
-        diff = obs_epoch.gps.mjd - mjd
+        diff = obs_epoch.gps.mjd - has_epoch_mjd
         if positive:
             data = np.array([99999 if v < 0  else v for v in diff])
             if np.all(data == 99999): # No HAS message epochs larger than observation epoch
