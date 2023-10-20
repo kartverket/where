@@ -62,8 +62,7 @@ def _ignore_satellites(dset: "Dataset", orbit: "Dataset") -> None:
     """
 
     # Account only for satellites missing for rundate
-    dates = np.array([d.date() for d in orbit.dset_edit.time.gps.datetime])
-    idx = dates == orbit.dset_edit.analysis["rundate"]
+    idx = orbit.dset_edit.time.gps.date == orbit.dset_edit.analysis["rundate"].strftime("%Y-%m-%d")
 
     not_available_sat = set(dset.satellite) - set(orbit.dset_edit.satellite[idx])
     file_paths = orbit.dset_edit.meta["parser"]["file_path"]
@@ -86,20 +85,26 @@ def _ignore_epochs_with_no_valid_has_message(dset: "Dataset", orbit: "Dataset") 
     keep_idx = np.ones(dset.num_obs, dtype=bool)
     obs_epoch_nearest_positive = True if "positive" in config.tech.has_message_nearest_to.str else False
 
-    for epoch, sat in zip(dset.time, dset.satellite):
-
+    # Make lookup table of gps seconds timestamps of the dataset for each satellite
+    gpssecs_by_sat = dict()
+    for sat in dset.unique("satellite"):
         idx = orbit.dset_edit.filter(satellite=sat)
-        
+        gpssecs = orbit.dset_edit.time.gps.gps_ws.seconds[idx]
+        gpssecs_by_sat.update({sat:(idx, gpssecs)})
+
+    for i, (epoch, sat) in enumerate(zip(dset.time, dset.satellite)):
+
         if obs_epoch_nearest_positive:
             
-            diff = epoch.gps.gps_ws.seconds - orbit.dset_edit.time.gps.gps_ws.seconds[idx]
+            idx = gpssecs_by_sat[sat][0]
+            diff = epoch.gps.gps_ws.seconds - gpssecs_by_sat[sat][1]
     
             if np.all(diff < 0):
-                log.debug(f"No valid HAS message could be found for satellite {sat} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} " 
-                          f"(nearest receiver reception time of HAS message: {min(orbit.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')}," 
-                          f"{min(orbit.dset_edit.time.gps_ws.week[idx]):.0f}-{min(orbit.dset_edit.time.gps_ws.seconds[idx]):.0f})")
-                idx_dset = np.logical_and(dset.filter(satellite=sat), epoch.gps.gps_ws.seconds == dset.time.gps.gps_ws.seconds)
-                keep_idx[idx_dset] = False
+                log.debug(f"No valid HAS message could be found for satellite {sat} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} ")
+                #log.debug(f"No valid HAS message could be found for satellite {sat} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} "  # slow
+                #          f"(nearest receiver reception time of HAS message: {min(orbit.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')},"   # slow
+                #          f"{min(orbit.dset_edit.time.gps_ws.week[idx]):.0f}-{min(orbit.dset_edit.time.gps_ws.seconds[idx]):.0f})")  # old code
+                keep_idx[i] = False
             
     num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
     log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs (file key '{orbit.file_key}')")
@@ -125,8 +130,6 @@ def _ignore_epochs_exceeding_validity(dset: "Dataset", orbit: "HasOrbit") -> np.
     """
     has_message_idx = orbit._get_has_message_idx(dset)
     keep_idx = np.ones(dset.num_obs, dtype=bool)
-    
-    orbit.dset_edit.validity[has_message_idx]
     
     # Age of HAS messages
     age_of_has_message = (dset.time.gps.mjd - orbit.dset_edit.tom.gps.mjd[has_message_idx]) * Unit.day2second
