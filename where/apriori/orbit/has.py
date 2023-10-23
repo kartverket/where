@@ -711,8 +711,8 @@ class HasOrbit(orbit.AprioriOrbit):
 
             cleaners.apply_remover("ignore_satellite", dset, satellites=not_available_sat)
 
-	# Prepare mjd data
-	mjd = self._add_dim(self.dset_edit[time_key].gps.mjd)
+        # Prepare mjd data
+        mjd = self._add_dim(self.dset_edit[time_key].gps.mjd)
 
         # Determine HAS message index for a given satellite, observation epoch and eventually system/signal
         indices = np.full(dset.num_obs, -1, dtype=int) # -1 is chosen to guarantee that not a wrong index is used 
