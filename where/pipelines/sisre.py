@@ -213,7 +213,7 @@ def calculate(stage: str, dset: "Dataset"):
     | sisre_orb              | numpy.ndarray     | Orbit-only signal-in-space range error in [m]                       |
     | sisre_orb_with_dr_mean | numpy.ndarray     | Orbit-only signal-in-space range error in with corrected average    |
     |                        |                   | constellation-mean radial orbit error [m]                           |
-    | used_iode              | numpy.ndarray     bias_brdc| IODE of selected broadcast ephemeris block                          |
+    | used_iode              | numpy.ndarray     | IODE of selected broadcast ephemeris block                          |
     | used_transmission_time | TimeTable         | Transmission time of selected broadcast ephemeris block             |
     | used_toe               | TimeTable         | Time of ephemeris (TOE) of selected broadcast ephemeris block       |
 
@@ -261,6 +261,7 @@ def calculate(stage: str, dset: "Dataset"):
     # Apply HAS correction
     if apply_has_correction:
       
+        log.info("Apply HAS correction to orbit and clock differences.")
         # TODO: Handling of HAS code bias correction should be improved. Flexible handling of signal type combinations needed.
         dset.add_float(
             "has_code_bias_correction",
@@ -451,7 +452,7 @@ def _additional_fields_to_dataset(
     for field, value in fields["float"].items():
         if field in dset.fields:
             continue
-        dset.add_float(field, val=value[0], unit=value[1])
+        dset.add_float(field, val=value[0], unit=value[1], write_level="operational")
 
     for field, value in fields["posvel_delta"].items():
         if field in dset.fields:
@@ -462,17 +463,27 @@ def _additional_fields_to_dataset(
         elif field == "pco_brdc":
             ref_pos = brdc.dset.sat_posvel
                         
-        dset.add_posvel_delta(field, time="time", val=value[0], system="trs", ref_pos=ref_pos)
+        dset.add_posvel_delta(
+            field, 
+            time="time", 
+            val=value[0], 
+            system="trs", 
+            ref_pos=ref_pos, 
+            write_level="operational",
+        )
 
     for field, value in fields["text"].items():
         if field in dset.fields:
             continue
-        dset.add_text(field, val=value)
+        dset.add_text(field, val=value, write_level="operational")
 
     for field, value in fields["time"].items():
         if field in dset.fields:
             continue
-        dset.add_time(field, val=value)
+        dset.add_time(field, val=value, write_level="operational")
+
+        #TODO: This does not work: dset._fields[field].write_level = enums.get_value("write_level", "operational")
+    
 
     # Add PCOs for broadcast and precise orbits and seleted configuration settings to Dataset meta
     dset.meta["pco_sat_brdc"] = brdc.dset.meta["pco_sat"]

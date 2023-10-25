@@ -15,7 +15,7 @@ import numpy as np
 # Midgard imports
 from midgard.dev import console
 from midgard.dev import plugins
-from midgard.writers._writers import get_field, get_header
+from midgard.writers._writers import get_existing_fields, get_field, get_header
 
 # Where imports
 import where
@@ -170,7 +170,94 @@ FIELDS = (
     ),
     WriterField("orb_diff_3d", "orb_diff_3d", (), float, "%16.4f", 16, "ORB_DIFF_3D", "meter", "3D orbit difference"),
     WriterField("sisre_orb", "sisre_orb", (), float, "%16.4f", 16, "SISRE_ORB", "meter", "Orbit-only SISRE"),
-    WriterField("sisre", "sisre", (), float, "%16.4f", 16, "SISRE", "meter", "Global averaged SISRE"),
+    WriterField(
+        "sisre", 
+        "sisre", 
+        (), 
+        float, 
+        "%16.4f", 
+        16, 
+        "SISRE", 
+        "meter", 
+        "Global averaged SISRE",
+    ),
+    WriterField(
+        "has_gnssiod_orb", 
+        "has_gnssiod_orb", 
+        (), 
+        float, 
+        "%6d", 
+        6, 
+        "H_IOD", 
+        "", 
+        "Galileo HAS IOD given by HAS orbit correction data",
+    ),
+    #WriterField(
+    #    "has_gnssiod_clk", 
+    #    "has_gnssiod_clk", 
+    #    (), 
+    #    float, 
+    #    "%6d", 
+    #    6, 
+    #    "HIODC", 
+    #    "", 
+    #    "Galileo HAS IOD given by HAS clock correction data",
+    #),
+    WriterField(
+        "has_orbit_correction_along",
+        "has_orbit_correction",
+        ("acr","along"),
+        float,
+        "%16.4f",
+        16,
+        "H_ΔALONG_TRACK", 
+        "meter", 
+        "Galileo HAS orbit correction in along-track direction",
+    ),
+    WriterField(
+        "has_orbit_correction_cross", 
+        "has_orbit_correction", 
+        ("acr","cross"), 
+        float, 
+        "%16.4f",
+        16,
+        "H_ΔCROSS_TRACK",
+        "meter", 
+        "Galileo HAS orbit correction in cross-track direction",
+    ),
+    WriterField(
+        "has_orbit_correction_radial",
+        "has_orbit_correction",
+        ("acr","radial"),
+        float, 
+        "%16.4f", 
+        16, 
+        "H_ΔRADIAL", 
+        "meter",
+        "Galileo HAS orbit correction in radial direction",
+    ),
+    WriterField(
+        "has_clock_correction",
+        "has_clock_correction",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "HAS_CLK_CORR",
+        "meter",
+        "Galileo HAS clock correction",
+    ),
+    WriterField(
+        "has_code_bias_correction",
+        "has_code_bias_correction",
+        (),
+        float,
+        "%16.4f",
+        16,
+        "HAS_BIA_CORR",
+        "",
+        "Galileo HAS code bias correction",
+    ),
 )
 
 
@@ -233,12 +320,15 @@ def sisre_writer(dset: "Dataset") -> None:
     #
     #    dset.add_float("dt_mean", val=dset.clk_diff - dset.clk_diff_with_dt_mean, unit="meter", write_level="detail")
 
+    # Select fields available in Dataset (e.g. DVS and SHS fields are only given for Galileo)
+    fields = get_existing_fields(dset, FIELDS)
+
     # List epochs ordered by satellites
     idx = np.concatenate([np.where(dset.filter(satellite=s))[0] for s in dset.unique("satellite")])
 
     # Put together fields in an array as specified by the fields-tuple
-    output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in FIELDS)))
-    output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in FIELDS])[idx]
+    output_list = list(zip(*(get_field(dset, f.field, f.attrs, f.unit) for f in fields)))
+    output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in fields])[idx]
 
     # Write to disk
     # NOTE: np.savetxt is used instead of having a loop over all observation epochs, because the performance is better.
@@ -247,7 +337,7 @@ def sisre_writer(dset: "Dataset") -> None:
     np.savetxt(
         file_path,
         output_array,
-        fmt=tuple(f.format for f in FIELDS),
+        fmt=tuple(f.format for f in fields),
         header=_get_header(dset),
         delimiter="",
         encoding="utf8",

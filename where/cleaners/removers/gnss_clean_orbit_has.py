@@ -93,7 +93,7 @@ def _ignore_epochs_with_no_valid_has_message(dset: "Dataset", orbit: "Dataset") 
         gpssecs_by_sat.update({sat:(idx, gpssecs)})
 
     for i, (epoch, sat) in enumerate(zip(dset.time, dset.satellite)):
-        
+
         if obs_epoch_nearest_positive:
             
             idx = gpssecs_by_sat[sat][0]
@@ -129,8 +129,6 @@ def _ignore_epochs_exceeding_validity(dset: "Dataset", orbit: "HasOrbit") -> np.
     """
     has_message_idx = orbit._get_has_message_idx(dset)
     keep_idx = np.ones(dset.num_obs, dtype=bool)
-    
-    orbit.dset_edit.validity[has_message_idx]
     
     # Age of HAS messages
     age_of_has_message = (dset.time.gps.mjd - orbit.dset_edit.tom.gps.mjd[has_message_idx]) * Unit.day2second
