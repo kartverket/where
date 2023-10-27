@@ -233,7 +233,10 @@ def calculate(stage: str, dset: "Dataset"):
 
     # Definition of GNSS frequencies for accessing correct PCOs for SISRE analysis:
     #   for broadcast orbits: PCOs of broadcast orbits are based for Galileo on the average of E1/E5/E6 PCOs defined
-    #                         by the European GNSS Service Centre and for GPS it is defined by the National Geospatial
+    #                         by the European GNSS Service Centre before 29th May 2018. Since 29th May 2018
+    #                         (around 4 p.m.) the generation of PCOs for the INAV/FNAV messages was changed. The
+    #                         average of the ionosphere-free linear combination of E1/E5a and E1/E5b PCOs is used
+    #                         based on PCOs of GSC webpage. The PCOs for GPS are defined by the National Geospatial
     #                         Intelligence Agency (NGA). An ANTEX file is created with these PCOs values, whereby the
     #                         Galileo E1 and respectively GPS L1 is used.
     #   for precise orbits_:  Normally precise Galileo orbits are based on ionosphere-free linear combination E1/E5a
@@ -242,7 +245,8 @@ def calculate(stage: str, dset: "Dataset"):
     brdc_sys_freq = {"E": "E1", "G": "L1"} #TODO: Do we need something like that? {"E": "E1_E5b", "G": "L1_L2"} if apply_has_correction else {"E": "E1", "G": "L1"} 
     precise_sys_freq = {"E": "E1_E5a", "G": "L1_L2"}
 
-    # Determine satellite position difference (orbit difference in ITRS)
+    # Determine satellite position difference (orbit difference in ITRS) related to CoM
+    # TODO: If sat_clock_related_to = "apc", then pco_sat.trs should also applied related to APC?
     pco_sat = ant_brdc.satellite_phase_center_offset(brdc.dset, brdc_sys_freq)
     orb_diff = (brdc.dset.sat_posvel.trs - pco_sat.trs) - precise.dset.sat_posvel.trs
 
@@ -265,12 +269,7 @@ def calculate(stage: str, dset: "Dataset"):
         # TODO: Handling of HAS code bias correction should be improved. Flexible handling of signal type combinations needed.
         dset.add_float(
             "has_code_bias_correction",
-            val = gnss.ionosphere_free_linear_combination(
-                dset.has_code_bias_c1c, 
-                dset.has_code_bias_c7q, 
-                enums.gnss_freq_E.E1, 
-                enums.gnss_freq_E.E5b,
-            ),
+            val = _get_bias_has(dset),
             unit="meter",
         )
         
@@ -499,12 +498,13 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
     Depending on the GNSS and navigation message type for broadcast and precise ephemeris following DCBs has to be
     applied:
 
-    |System |Type       | Signal  | Broadcast bias | Precise bias                                                      |
-    |-------|-----------|---------|----------------|-------------------------------------------------------------------|
-    |GPS    | LNAV      | G:L1L2  | 0              |0                                                                  |
-    |Galileo| INAV_E1   | E:E1    | bgd_e1_e5b     |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q}`      |
-    |       | INAV      | E:E1E5b | 0              |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} + \frac{f^2_{E5b}}{f^2_{E1}-f^2_{E5b}} DCB^s_{C1C-C7Q}`|
-    |       | FNAV_E5a  | E:E1E5a | 0              | 0                                                                 |
+    |System | Type      | Signal   | Broadcast bias | Precise bias                                                      |
+    |:------|:----------|:---------|:---------------|:------------------------------------------------------------------|
+    |GPS    | LNAV      | G:L1     | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W} + DCB^s_{C1C-C1W}`|
+    |       |           | G:L1_L2  | 0              |0                                                                  |
+    |Galileo| INAV_E1   | E:E1     | bgd_e1_e5b     |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q}`      |
+    |       | INAV      | E:E1_E5b | 0              |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} + \frac{f^2_{E5b}}{f^2_{E1}-f^2_{E5b}} DCB^s_{C1C-C7Q}`|
+    |       | FNAV_E5a  | E:E1_E5a | 0              | 0                                                                 |
 
     Args:
         dset:       Simulated observation data.
@@ -601,6 +601,57 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
     dset.meta["bias_precise"] = meta_bias_precise
 
     return bias_brdc, bias_precise
+
+
+def _get_bias_has(dset: "Dataset") -> np.ndarray:
+    """Determine Galileo HAS code bias correction needed for correcting Galileo HAS satellite clock 
+    correction to be equivalent to precise satellite clocks
+
+    Depending on GNSS frequency type following Galileo HAS code bias corrections has to be applied:
+
+    |System  | Signal   | Galileo HAS code bias corrections |
+    |:-------|:---------|:----------------------------------|
+    |GPS     | G:L1_L2  | :math:`-\frac{bias_L2 - \frac{f^2_{L1}-f^2_{L2}} bias_L1 + DCB_{C1C,C1P}}{\frac{f^2_{L1}-f^2_{L2}} - 1}` |
+    |Galileo | E:E1_E5b | :math:`-\frac{bias_E5b - \frac{f^2_{E1}-f^2_{E5b}} bias_E1}{\frac{f^2_{E1}-f^2_{E5b}} - 1}` |
+
+    Args:
+        dset:       Simulated observation data.
+
+    Returns:
+        Galileo HAS code bias correction needed for correcting Galileo HAS satellite clock
+    """
+    correction = np.zeros(dset.num_obs)
+    frequencies = config.tech.frequencies.list
+
+    for sys in dset.unique("system"):
+        idx = dset.filter(system=sys)
+
+        if (sys == "E") and ("E:E1_E5b" in frequencies):    
+            correction[idx] = gnss.ionosphere_free_linear_combination(
+                dset.has_code_bias_c1c[idx], 
+                dset.has_code_bias_c7q[idx], 
+                enums.gnss_freq_E.E1, 
+                enums.gnss_freq_E.E5b,
+            )
+            
+        elif (sys == "G") and ("G:L1_L2" in frequencies):
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            for sat in dset.unique("satellite"):
+                if not sys == sat[0:1]:
+                    continue
+                idx_sat = dset.filter(satellite=sat)
+                #TODO: Ideally C1C-CP1 DCB should be used?
+                correction[idx_sat] = gnss.ionosphere_free_linear_combination(
+                    dset.has_code_bias_c1c[idx_sat] + dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"],
+                    dset.has_code_bias_c2p[idx_sat], 
+                    enums.gnss_freq_G.L1, 
+                    enums.gnss_freq_G.L2,
+                )
+        else:
+            log.fatal(f"Galileo code bias corrections for correcting Galileo HAS clock corrections can not be "
+                      f"implemented for frequencies {','.join(frequencies)} (only E:E1_E5b and G:L1_L2 are defined).")
+
+    return correction
 
 
 def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dataset"]:
