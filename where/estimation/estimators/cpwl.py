@@ -211,7 +211,6 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
                 h = np.vstack((h, H2[:, :, None]))
 
         z = np.hstack((z, np.zeros(num_constraints))).T
-        # phi = np.vstack((phi, np.repeat(np.eye(n)[None, :, :], num_constraints, axis=0)))
         phi = phi + [scipy.sparse.csr_matrix(np.eye(n))] * num_constraints
 
     # Initialize and run the Kalman filter
