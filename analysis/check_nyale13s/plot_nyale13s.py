@@ -108,7 +108,7 @@ def plot_station_pos(dset_ts, station):
     session_code = dset_ts.session_code[idx]
 
     t = Time(val=dates, scale="utc", fmt="datetime")
-    trf = apriori.get("trf", time=t, reference_frames="itrf:2014, vtrf, custom")
+    trf = apriori.get("trf", time=t, reference_frames="itrf:2020, vtrf, custom")
     names = apriori.get("vlbi_station_codes")
 
     pos = trf[names[station]["cdp"]].pos
@@ -333,7 +333,8 @@ def get_state_values(dset, fieldname, fill_value=np.nan):
 # Program starts execution here
     
 
-parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id nyale13s0 --stations NYALE13S NYALES20 --plot_skycoverage --plot_num_obs --plot_trop --plot_residuals")
+parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id nyale13s0 --stations NYALE13S NYALES20 --plot_skycoverage --plot_num_obs --plot_trop --plot_residuals",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the two stations in the baseline", nargs=2, type=str, default=["NYALE13S", "NYALES20"])
 parser.add_argument("--plot_skycoverage", help="Enable this flag to plot sky coverage.", action="store_true")

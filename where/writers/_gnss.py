@@ -192,8 +192,8 @@ def get_grc_csv_row(
     target_def = {
             "hpe": "",
             "site_vel_3d": "",
-            "sisre": "< 2",
-            "sisre_sat": "< 7",
+            "sisre": "2",
+            "sisre_sat": "7",
             "vpe": "",
     }
 

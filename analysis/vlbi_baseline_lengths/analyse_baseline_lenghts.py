@@ -55,7 +55,8 @@ def read_session_baseline(dset_id=None):
                     bl.setdefault("lat_2", []).append(value["lat_2"])
                     bl.setdefault("lon_1", []).append(value["lon_1"])
                     bl.setdefault("lon_2", []).append(value["lon_2"])
-    return baselines
+    # Convert data to np.array
+    return {k1:{k2:np.array(v2) for k2, v2 in v1.items()} for k1,v1 in baselines.items()}
 
 
 def read_baselines(id_txt="default"):
@@ -80,7 +81,7 @@ def read_baselines(id_txt="default"):
         #print(f"Reading {bl_file}")
         data = np.genfromtxt(bl_file, names="date, session_code, num_obs, length, ferr", dtype="object, U7, i8, f8, f8", converters={0: str2date})
         data = np.atleast_1d(data)
-        baselines[baseline] = {k:list(data[k]) for k in data.dtype.names}
+        baselines[baseline] = {k:np.array(data[k]) for k in data.dtype.names}
     return baselines
 
 
@@ -135,9 +136,9 @@ def plot_baselines(baselines, id_txt):
     for baseline, data in baselines.items():
         sta_1, _, sta_2 = baseline.partition("/")
         dates = data["date"]
-        baseline_length = np.array(data["length"])
-        baseline_length_ferr = np.array(data["ferr"])
-        color = np.array(data["num_obs"])
+        baseline_length = data["length"]
+        baseline_length_ferr = data["ferr"]
+        color = data["num_obs"]
         repeatability = data.get("repeatability", np.nan)
         trend = data.get("trend", [np.nan]*len(dates))
         
@@ -219,7 +220,6 @@ def plot_repeatability(baselines, id_txt="default", interactive=False):
     
     repeat = [bl_data["repeatability"] for bl, bl_data in baselines.items() if "repeatability" in bl_data ]
     norm = colors.Normalize(vmin=min(repeat), vmax=max(repeat))
-    #import IPython; IPython.embed()
     for baseline, bl_data in baselines.items():
         if not "repeatability" in bl_data:
             continue
@@ -262,11 +262,15 @@ def compute_repeatability(baselines):
             l = data["length"]
             e = data["ferr"]
             #repeatability, length = wblr(l, t.mjd, e)
-            repeatability, length, trend = blr(l, t.mjd, e)
+            repeatability, length, trend, keep_idx  = blr(l, t.mjd, e)
             data["repeatability"] = repeatability
             data["mean_length"] = length
-            data["repeatability_num_obs"] = num_obs
+            data["repeatability_num_obs"] = np.sum(keep_idx)
             data["trend"] = trend
+
+            # update original data based on keep_idx
+            if data["repeatability_num_obs"] < num_obs:
+                print(f"Discarded baseline lengths for computation of repeatability for {baseline} for {t.date[~keep_idx]} because ferr is zero")        
 
         
 
@@ -289,9 +293,6 @@ def wblr(bl, mjd, ferr):
     """
     
     # TODO: discontinuities, itrf snx?
-    bl = np.array(bl)
-    mjd = np.array(mjd)
-    ferr = np.array(ferr)
 
     w = 1 / ferr ** 2
     w_sum = np.sum(w)
@@ -319,26 +320,23 @@ def blr(bl, mjd, ferr):
         trend
         
     """
-    bl = np.array(bl)
-    mjd = np.array(mjd)
-    ferr = np.array(ferr)
-    
-    w = 1 / ferr ** 2
+    keep_idx = ferr != 0
+
+    w = 1 / ferr[keep_idx] ** 2
     w_sum = np.sum(w)
-    
-    lin_func = np.polynomial.Polynomial.fit(mjd, bl, 1, w=w)
+
+    lin_func = np.polynomial.Polynomial.fit(mjd[keep_idx], bl[keep_idx], 1, w=w)
     trend = lin_func(mjd)
 
-    
     bl_mean = np.mean(trend)
-    blr = np.sqrt(np.sum(w * (bl - trend) ** 2) / (w_sum - np.sum(w ** 2) / w_sum))
+    blr = np.sqrt(np.sum(w * (bl[keep_idx] - trend[keep_idx]) ** 2) / (w_sum - np.sum(w ** 2) / w_sum))
     
-    return blr, bl_mean, trend
+    return blr, bl_mean, trend, keep_idx
 
 def parse_args():
     """Define and parse input arguments to the script"""
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--id", help="Dataset id", type=str, default="")
     parser.add_argument(
         "--save_baselines",

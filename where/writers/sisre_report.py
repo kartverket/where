@@ -20,6 +20,7 @@ import pandas as pd
 from midgard.collections import enums 
 from midgard.dev import plugins
 from midgard.plot.matplotext import MatPlotExt
+from midgard.writers._writers import get_existing_fields
 
 # Where imports
 from where import apriori
@@ -704,6 +705,7 @@ def _generate_satellite_index_dataframe(dset):
     functions = [rms, np.mean, np.std, np.min, np.max, percentile]
     columns = ["type", "rms", "mean", "std", "min", "max", "percentile"]
     field_dfs = dict()
+    satellites = sorted(dset.unique("satellite"))
 
     # Generate field DataFrames with the satellites as indices and functional values (rms, mean, ...) as columns
     #
@@ -712,63 +714,64 @@ def _generate_satellite_index_dataframe(dset):
     # E11  GALILEO-1  0.175557  0.138370  0.108046  0.014441  0.701326    0.259400
     # E12  GALILEO-1  0.366780  0.310270  0.195602  0.039986  0.945892    0.765318
     # E19  GALILEO-1  0.154111  0.141690  0.060615  0.013444  0.284842    0.244182
-    for field in FIELDS:
+    fields = set([v.name for v in FIELDS]).intersection(dset.fields)
+    for field in fields:
         extra_row_names = list()
         extra_rows = list()
-        df_field = pd.DataFrame(columns=columns)
+        list_field = list()
 
         # Determine functional values for each satellite
-        for satellite in sorted(dset.unique("satellite")):
+        for satellite in satellites:
             row = [_get_satellite_type(dset, satellite)]
             for function in functions:
                 try:
-                    value = dset.apply(function, field.name, satellite=satellite)
+                    value = dset.apply(function, field, satellite=satellite)
                 except:
                     value = float("nan")
                 row.append(value)
-            df_row = pd.DataFrame([row], columns=columns, index=[satellite])
-            df_field = df_field.append(df_row)
 
-        # Sort dataframe after satellite type -> TODO: Better solution for sorting after index?
-        df_field["satellite"] = df_field.index
-        df_field = df_field.sort_values(by=["type", "satellite"])
-        del df_field["satellite"]
+            list_field.append(row)
 
         # Determine functional values for each system
         for system in sorted(dset.unique("system")):
             row = [""]  # Append satellite type
             for function in functions:
                 try:
-                    value = dset.apply(function, field.name, system=system)
+                    value = dset.apply(function, field, system=system)
                 except:
                     value = float("nan")
                 row.append(value)
             system_name = f"__SYSTEM_{system}__"
             extra_row_names.append(system_name)
-            extra_rows.append(pd.DataFrame([row], columns=columns, index=[system_name]))
+            extra_rows.append(row)
 
         # Determine functional values for each satellite type
         for type_ in sorted(dset.unique("satellite_type")):
             row = [""]  # Append satellite type
             for function in functions:
                 try:
-                    value = dset.apply(function, field.name, satellite_type=type_)
+                    value = dset.apply(function, field, satellite_type=type_)
                 except:
                     value = float("nan")
                 row.append(value)
             type_name = f"__{type_}__"
             extra_row_names.append(type_name)
-            extra_rows.append(pd.DataFrame([row], columns=columns, index=[type_name]))
+            extra_rows.append(row)
+
+        # Sort dataframe after satellite type -> TODO: Better solution for sorting after index?
+        df_field = pd.DataFrame(list_field, index=satellites, columns=columns)
+        df_field["satellite"] = df_field.index
+        df_field = df_field.sort_values(by=["type", "satellite"])
+        del df_field["satellite"]
 
         # Append extra rows
-        for row in extra_rows:
-            df_field = df_field.append(row)
+        df_field = pd.concat([df_field, pd.DataFrame(extra_rows, index=extra_row_names, columns=columns)])
         df_field = df_field.reindex(
             columns=columns
-        )  # TODO: Why is the column order be changed by appending extra rows?
+        )  # TODO: Why is the column order be changed by appending extra rows? #TODO2: Is it still necessary to do?
 
         # Add field Dataframe to field Dataframe dictionary
-        field_dfs.update({field.name: df_field})
+        field_dfs.update({field: df_field})
 
     return field_dfs, extra_row_names
 
@@ -782,6 +785,10 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset, rpt):
         dset (Dataset):             Dataset
         rpt (Report):               Report object
     """
+    used_fields = list()
+    for field in FIELDS:
+        if field.name in dset.fields:
+            used_fields.append(field)
 
     field_dfs, extra_row_names = _generate_satellite_index_dataframe(dset)
 
@@ -794,10 +801,10 @@ def _satellite_statistics_and_plot(fid, figure_dir, dset, rpt):
     fid.write("\n\n# Statistics\n\n")
     fid.write(
         "In this Section statistics are represented for: \n\n{}".format(
-            "".join(["* " + v.caption + "\n" for v in FIELDS])
+            "".join(["* " + v.caption + "\n" for v in used_fields])
         )
     )
-    for field in FIELDS:
+    for field in used_fields:
         
         if f"{field.collection}.{field.name}" in dset.fields or f"{field.name}" in dset.fields:  
             df = field_dfs[field.name]

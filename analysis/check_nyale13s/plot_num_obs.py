@@ -39,7 +39,8 @@ def make_barplot(data, station):
 
 
 # Program starts execution here
-parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id nyale13s0 --stations NYALE13S NYALES20 NYALE13N")
+parser = argparse.ArgumentParser(epilog="Example: python plot_num_obs.py --id nyale13s0 --stations NYALE13S NYALES20 NYALE13N",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the stations", nargs="+", type=str, default=["NYALE13S", "NYALES20", "NYALE13N"])
 args = parser.parse_args()

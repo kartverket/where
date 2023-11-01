@@ -237,7 +237,7 @@ def is_file_empty(path: Union[str, PosixPath]) -> bool:
             is_empty = True
 
     else:
-        if file_path.stat().st_size == 0:
+        if path.stat().st_size == 0:
             is_empty = True
 
     return is_empty
