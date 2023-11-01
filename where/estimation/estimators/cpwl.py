@@ -95,7 +95,6 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
 
     # Initialize variables
     z = dset.obs - dset.calc
-    # phi = np.repeat(np.eye(n)[None, :, :], num_obs, axis=0)
     phi = list()
 
     delta_phi = np.eye(n, k=1)
@@ -105,14 +104,18 @@ def estimate_cpwl(dset, partial_vectors, obs_noise):
     Q = dict()
 
     for epoch in range(num_obs - 1):
-        # TODO: Check that 24 is correct here (and use unit instead)
         delta_t = (dset.time.utc[epoch + 1].mjd - dset.time.utc[epoch].mjd) * 24
-        # phi[epoch] += delta_phi * delta_t
-        phi.append(scipy.sparse.csr_matrix(np.eye(n) + delta_phi * delta_t))
+
+        if delta_t == 0:
+            # set phi to 1 to indicate an identity matrix
+            phi.append(1)
+        else:
+            phi.append(scipy.sparse.csr_matrix(np.eye(n) + delta_phi * delta_t))
 
         idx = np.logical_and(process_noise, dset.time.utc[epoch + 1].mjd > ref_time + knot_interval)
         indicies = np.where(idx)[0]
-        Q[epoch] = {(i, i): process_noise[i] ** 2 for i in indicies}
+        if len(indicies) > 0:
+            Q[epoch] = {(i, i): process_noise[i] ** 2 for i in indicies}
 
         ref_time[idx] += knot_interval[idx] * ((dset.time.utc[epoch + 1].mjd - ref_time[idx]) // knot_interval[idx])
         num_unknowns += int(sum(idx))

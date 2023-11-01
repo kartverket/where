@@ -74,7 +74,8 @@ Kalman filter measurement update equations:
 \begin{flalign}
 \hat{\bm{x}}_j &= \tilde{\bm{x}}_j + \bm{K}_j\bm{z}_j \label{eq:measure1}\\
 \bm{z}_j &= \bm{y}_j - \bm{H}_j\tilde{\bm{x}}_j \label{eq:measure2}\\
-\hat{\bm{P}}_j &= (\bm{I} - \bm{K}_j\bm{H}_j)\tilde{\bm{P}}_j \label{eq:measure3}\\
+\hat{\bm{P}}_j &= \bm{B}_j\tilde{\bm{P}}_j \label{eq:measure3}\\
+\bm{B_j} &= \bm{I} - \bm{K}_j\bm{H}_j \label{eq:measure:6} \\
 \bm{K}_j &= \tilde{\bm{P}}_j\bm{H}_j^\mathsf{T}\bm{N}_j^{-1} \label{eq:measure4}\\
 \bm{N}_j &= \bm{H}_j\tilde{\bm{P}}_j\bm{H}_j^\mathsf{T} + \bm{R}_j \label{eq:measure5}
 \end{flalign}
@@ -82,6 +83,7 @@ Kalman filter measurement update equations:
 Symbols:
 \begin{description}[align=right, labelwidth=1cm]
 \item[$\bm{K}_j$] : Kalman gain. Dimension $u \times m$
+\item[$\bm{B}_j$] : intermediate variable. Dimension $u \times u$
 \item[$\bm{z}_j$] : innovation. Dimension $m \times 1$
 \item[$\bm{N}_j$] : innovation covariance. Dimension $m \times m$
 \end{description}
@@ -89,13 +91,11 @@ Symbols:
 Modified Bryson-Frazier smoother equations:
 \begin{flalign}
 \hat{\bm{\lambda}}_n &= 0 \label{eq:smooth1}\\
-\tilde{\bm{\lambda}}_j &= (-\bm{H}_j^\mathsf{T}\bm{N}_j^{-1}\bm{z}_j) + (\bm{I} -
-\bm{K}_j\bm{H}_j)^\mathsf{T} \hat{\bm{\lambda}}_j \label{eq:smooth2}\\
+\tilde{\bm{\lambda}}_j &= (-\bm{H}_j^\mathsf{T}\bm{N}_j^{-1}\bm{z}_j) + \bm{B}_j^\mathsf{T} \hat{\bm{\lambda}}_j \label{eq:smooth2}\\
 \hat{\bm{\lambda}}_j &= \bm{\phi}_j^\mathsf{T} \tilde{\bm{\lambda}}_{j+1} \label{eq:smooth3}\\
 %
 \hat{\bm{\Lambda}}_n &= 0 \label{eq:smooth4}\\
-\tilde{\bm{\Lambda}}_j &= \bm{H}_j^\mathsf{T}\bm{N}_j^{-1}\bm{H}_j + (\bm{I} -
-\bm{K}_j\bm{H}_j)^\mathsf{T}\hat{\bm{\Lambda}}_j(\bm{I} - \bm{K}_j\bm{H}_j) \label{eq:smooth5}\\
+\tilde{\bm{\Lambda}}_j &= \bm{H}_j^\mathsf{T}\bm{N}_j^{-1}\bm{H}_j + \bm{B}_j^\mathsf{T}\hat{\bm{\Lambda}}_j\bm{B}_j \label{eq:smooth5}\\
 \hat{\bm{\Lambda}}_j &= \bm{\phi}_j^\mathsf{T} \tilde{\bm{\Lambda}}_{j+1} \bm{\phi}_j \label{eq:smooth6}
 \end{flalign}
 

@@ -110,8 +110,14 @@ class KalmanFilter(object):
             x_hat[epoch] = x_tilde + k[epoch] * innovation[epoch]
             p_hat = (I - k[epoch] @ h[epoch].T) @ p_tilde
 
-            x_tilde = phi[epoch] @ x_hat[epoch]
-            p_tilde = phi[epoch] @ p_hat @ phi[epoch].T
+            if isinstance(phi[epoch], int):
+                # phi is identity matrix. Save computation time by skipping multiplication with identity matrix
+                x_tilde = x_hat[epoch]
+                p_tilde = p_hat
+            else:
+                x_tilde = phi[epoch] @ x_hat[epoch]
+                p_tilde = phi[epoch] @ p_hat @ phi[epoch].T
+
             for (idx1, idx2), noise in Q.get(epoch, {}).items():
                 p_tilde[idx1, idx2] += noise
 
@@ -123,10 +129,17 @@ class KalmanFilter(object):
             # TODO smooth covariance matrix
             p_hat = self._get_p_hat(epoch)
             x_smooth[epoch] = x_hat[epoch] + p_hat.T @ lam
-            lam = (
-                phi[epoch - 1].T @ h[epoch] * innovation[epoch] / sigma[epoch]
-                + phi[epoch - 1].T @ (I - k[epoch] @ h[epoch].T).T @ lam
-            )
+            if isinstance(phi[epoch - 1], int):
+                # phi is identity matrix. Remove it from equation to speed up computation
+                lam = (
+                    h[epoch] * innovation[epoch] / sigma[epoch]
+                    + (I - k[epoch] @ h[epoch].T).T @ lam
+                )
+            else:
+                lam = (
+                    phi[epoch - 1].T @ h[epoch] * innovation[epoch] / sigma[epoch]
+                    + phi[epoch - 1].T @ (I - k[epoch] @ h[epoch].T).T @ lam
+                )
 
     def update_dataset(self, dset, param_names, normal_idx, num_unknowns):
         """Update the given dataset with results from the filtering
