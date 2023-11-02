@@ -61,12 +61,14 @@ for station in stations:
     sta_data["used"] = dset_ts.num_obs_estimate[idx]
     data[station] = sta_data
     
-    max_scheduled = sta_data["scheduled"].max()
+    max_scheduled = np.nan_to_num(sta_data["scheduled"]).max()
     max_ylim = max_scheduled if max_scheduled > max_ylim else max_ylim
     min_year_sta = sta_data["date"].min().year
     max_year_sta = sta_data["date"].max().year
     min_year = min_year_sta if min_year_sta < min_year else min_year
     max_year = max_year_sta if max_year_sta > max_year else max_year
+
+ylim = (0, max_ylim + max_ylim * 0.01)
 
 if args.years:
     years = args.years
@@ -88,7 +90,6 @@ for year in years:
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             axs[i].set_xlim(xlim)
             if args.same_scale:
-                ylim = (0, max_ylim + max_ylim * 0.01)
                 axs[i].set_ylim(ylim)
             axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
             axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
@@ -115,7 +116,6 @@ for year in years:
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             axs[i].set_xlim(xlim)
             if args.same_scale:
-                ylim = (0, max_ylim + max_ylim * 0.01)
                 axs[i].set_ylim(ylim)
 
             axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
@@ -141,7 +141,6 @@ for year in years:
         xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
         plt.xlim(xlim)
         if args.same_scale:
-            ylim = (0, max_ylim + max_ylim * 0.01)
             plt.ylim(ylim)
 
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
@@ -168,7 +167,6 @@ for year in years:
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             plt.xlim(xlim)
             if args.same_scale:
-                ylim = (0, max_ylim + max_ylim * 0.01)
                 plt.ylim(ylim)
 
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
