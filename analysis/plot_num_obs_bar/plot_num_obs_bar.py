@@ -19,7 +19,8 @@ parser.add_argument("--id", help="Dataset id of result files.", type=str, defaul
 parser.add_argument("--stations", help="Name of the stations", nargs="+", type=str, default=["NYALE13S", "NYALES20", "NYALE13N"])
 parser.add_argument("--normalized", help="Enable this flag to plot normalized bar plots.", action="store_true")
 parser.add_argument("--combined", help="Enable this flag to plot all stations in one plots.", action="store_true")
-parser.add_argument("--export_to_csv", help="Save data to one csv file per station", action="store_true")
+parser.add_argument("--export_to_csv", help="Save data to one csv file per station.", action="store_true")
+parser.add_argument("--years", help="Which year to create plots for. Default is all years found in result files.", nargs="+", type=int)
 
 args = parser.parse_args()
 
@@ -63,7 +64,10 @@ for station in stations:
     min_year = min_year_sta if min_year_sta < min_year else min_year
     max_year = max_year_sta if max_year_sta > max_year else max_year
 
-years = list(range(min_year, max_year+1))
+if args.years:
+    years = args.years
+else:
+    years = list(range(min_year, max_year+1))
 
 for year in years:
     
