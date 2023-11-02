@@ -21,6 +21,7 @@ parser.add_argument("--normalized", help="Enable this flag to plot normalized ba
 parser.add_argument("--combined", help="Enable this flag to plot all stations in one plots.", action="store_true")
 parser.add_argument("--export_to_csv", help="Save data to one csv file per station.", action="store_true")
 parser.add_argument("--years", help="Which year to create plots for. Default is all years found in result files.", nargs="+", type=int)
+parser.add_argument("--same_scale", help="Enable this flag to force all plots to use the same scale.", action="store_true")
 
 args = parser.parse_args()
 
@@ -46,6 +47,7 @@ dset_ts = dataset.Dataset.read(
 num_sta = len(stations)
 min_year = 9999
 max_year = 0
+max_ylim = 0
 data = {}
 
 for station in stations:
@@ -59,6 +61,8 @@ for station in stations:
     sta_data["used"] = dset_ts.num_obs_estimate[idx]
     data[station] = sta_data
     
+    max_scheduled = sta_data["scheduled"].max()
+    max_ylim = max_scheduled if max_scheduled > max_ylim else max_ylim
     min_year_sta = sta_data["date"].min().year
     max_year_sta = sta_data["date"].max().year
     min_year = min_year_sta if min_year_sta < min_year else min_year
@@ -83,6 +87,9 @@ for year in years:
             axs[i].bar(plot_data["date"][idx], plot_data["used"][idx], label="Used", width=3)
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             axs[i].set_xlim(xlim)
+            if args.same_scale:
+                ylim = (0, max_ylim + max_ylim * 0.01)
+                axs[i].set_ylim(ylim)
             axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
             axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
             axs[i].set_ylabel(station)
@@ -107,6 +114,10 @@ for year in years:
             axs[i].bar(plot_data["date"][idx], plot_data["used"][idx]*norm_factor, label="Used", width=3)
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             axs[i].set_xlim(xlim)
+            if args.same_scale:
+                ylim = (0, max_ylim + max_ylim * 0.01)
+                axs[i].set_ylim(ylim)
+
             axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
             axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
             axs[i].set_ylabel(station)
@@ -129,6 +140,10 @@ for year in years:
         plt.bar(plot_data["date"][idx], plot_data["used"][idx], label="Used", width=3)
         xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
         plt.xlim(xlim)
+        if args.same_scale:
+            ylim = (0, max_ylim + max_ylim * 0.01)
+            plt.ylim(ylim)
+
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
         plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))
         plt.ylabel(station)
@@ -152,6 +167,10 @@ for year in years:
             plt.bar(plot_data["date"][idx], plot_data["used"][idx]*norm_factor, label="Used", width=3)
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             plt.xlim(xlim)
+            if args.same_scale:
+                ylim = (0, max_ylim + max_ylim * 0.01)
+                plt.ylim(ylim)
+
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
             plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))
             plt.ylabel(station)
