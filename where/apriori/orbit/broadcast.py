@@ -437,12 +437,9 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                   observation time and 'sat_time' to satellite transmission time.
 
         """
-        # Get correct navigation block for given observations times by determining the indices to broadcast ephemeris
-        # Dataset
         if "navigation_idx" not in dset.fields:
-            dset_brdc_idx = self._get_brdc_block_idx(dset)
-        else:
-            dset_brdc_idx = dset.navigation_idx.astype(int)
+            log.fatal("Dataset field 'navigation_idx' does not exists. Remover 'gnss_clean_orbit' should be used.")
+        dset_brdc_idx = dset.navigation_idx.astype(int)
 
         # Add satellite clock parameters to dataset
         dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx], write_level="analysis")
@@ -476,6 +473,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 time_key: str, 
                 positive: bool,
                 satellite: str,
+                iode: Union[float, None] = None,
                 log_level: str = "fatal",
         ) -> float:
             """Get nearest navigation message data index for given observation epoch
@@ -484,16 +482,28 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 idx:        Index used to filter navigation message e.g. after satellite, GNSS IOD
                 obs_epoch:  Observation epoch in modified Julian day
                 time_key:   Time key
-                positive:   Difference between observation epoch and broadcast navigation messate has to be positive
+                positive:   Difference between observation epoch and broadcast navigation message has to be positive
                 satellite:  Satellite name
+                iode:       IODE, which should be used to select broadcast navigation message (e.g. relevant in case
+                            to match GNSS IOD of Galileo HAS message against broadcast navigation message IODE)
                 log_level:  Define log level in case no broadcast navigation message data are available 
 
             Returns:
                 Nearest broadcast navigation messages indices for given observation epochs or None in case no 
                 corresponding broadcast navigation message could be found (this is only valid if 'log_level=fatal')
             """
-            
-            diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
+            # Select nearest navigation message related to a given IODE and observation epoch
+            if iode:
+                idx_iode = self.dset_edit.iode[idx] == iode
+    
+                diff = np.full(len(self.dset_edit.iode[idx]), 99999.0)
+                diff[idx_iode] = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx][idx_iode]
+
+            # Select nearest naviation message related to given observation epoch
+            else: 
+                diff = obs_epoch - self._add_dim(self.dset_edit[time_key].gps.mjd)[idx]
+                
+                
             if positive:
                 data = np.array([99999 if v < 0 else v for v in diff])
                 if np.all(data == 99999): # No broadcast navigation message epochs larger than observation epoch
@@ -502,7 +512,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                               f"receiver reception time: {min(self.dset_edit[time_key].gps.mjd[idx])})") 
                     return None
                 
-                nearest_idx = np.array([99999 if v < 0 else v for v in diff]).argmin()
+                nearest_idx = data.argmin()
             else:
                 nearest_idx = np.array([abs(diff)]).argmin()
                 
