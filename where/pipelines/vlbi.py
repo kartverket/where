@@ -208,7 +208,7 @@ def file_vars(file_vars=None):
         if fringe_versions:
             _file_vars["fringe_version"] = max(fringe_versions)
 
-        if not "obs_version" in _file_vars and not "acengy" in _file_vars:
+        if not "obs_version" in _file_vars and not "agency" in _file_vars:
             log.fatal(f"No VGOSDB wrapper file found ({config.files.path('vlbi_obs_vgosdb')}).")
 
     # Sinex file vars

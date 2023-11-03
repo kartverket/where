@@ -293,36 +293,6 @@ def wblr(bl, mjd, ferr):
     return wblr1, b_wmean
 
 
-def plot_session_hist(num_obs_sta1, num_obs_sta2):
-    
-    def make_hist(data, station):
-        fig = plt.figure(figsize=(12, 8), dpi=150)
-        plt.bar(data["date"], data["schedule"], label="Scheduled", width=3)
-        plt.bar(data["date"], data["read"], label="Recovered", width=3)
-        plt.bar(data["date"], data["estimate"], label="Used", width=3)
-        plt.legend()
-        xlim = (data['date'].min()-timedelta(days=1), data['date'].max()+timedelta(days=1))
-        plt.xlim(xlim)
-        plt.gca().get_xaxis().set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-        plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))
-        plt.gca().yaxis.get_major_formatter().set_useOffset(False)
-        plt.ylabel("Number of observations")
-        plt.xlim((data['date'].min(),data['date'].max()))
-        fig.autofmt_xdate()
-        plt.savefig(f"img/{dset_id}/Num_obs_{station}_{dset_id}.png", bbox_inches='tight')
-        plt.close()
-
-        with open(f"session_stats_{station}.txt", "w") as fid:
-            fid.write(f"session code, date, scheduled, recovered, used\n")
-            schedule = np.nan_to_num(data["schedule"])
-            read = np.nan_to_num(data["read"])
-            estimate = np.nan_to_num(data["estimate"])
-            for sc, d, s, r, u in zip(data["session_code"], data["date"], schedule, read, estimate): 
-                fid.write(f"{sc:8}, {d:%Y-%m-%d}, {int(s)}, {int(r)}, {int(u)} \n")
-
-    make_hist(num_obs_sta1, station1)
-    make_hist(num_obs_sta2, station2)
-
 def get_state_values(dset, fieldname, fill_value=np.nan):
     try:
         values = dset.state[fieldname]
@@ -338,7 +308,6 @@ parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id n
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the two stations in the baseline", nargs=2, type=str, default=["NYALE13S", "NYALES20"])
 parser.add_argument("--plot_skycoverage", help="Enable this flag to plot sky coverage.", action="store_true")
-parser.add_argument("--plot_num_obs", help="Enable this flag to plot num obs histogram.", action="store_true")
 parser.add_argument("--plot_trop", help="Enable this flag to plot troposphere parameters for each session for specified stations", action="store_true")
 parser.add_argument("--plot_residuals", help="Enable this flag to plot residuals for each session for specified stations", action="store_true")
 args = parser.parse_args()
@@ -373,8 +342,6 @@ colors = [dset_ts.num_obs_estimate[idx],
 
 
 num_obs_bs = []
-num_obs_sta1 = {}
-num_obs_sta2 = {}
 rms = []
 rms_sta_1 = []
 rms_sta_2 = []
@@ -387,17 +354,6 @@ variance_factor = []
 
 idx_sta1 = dset_ts.filter(station=station1)
 idx_sta2 = dset_ts.filter(station=station2)
-
-num_obs_sta1["date"] = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx_sta1]])
-num_obs_sta2["date"] = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx_sta2]])
-num_obs_sta1["session_code"] = dset_ts.session_code[idx_sta1]
-num_obs_sta2["session_code"] = dset_ts.session_code[idx_sta2]
-num_obs_sta1["schedule"] = dset_ts.num_obs_schedule[idx_sta1]
-num_obs_sta2["schedule"] = dset_ts.num_obs_schedule[idx_sta2]
-num_obs_sta1["read"] = dset_ts.num_obs_read[idx_sta1]
-num_obs_sta2["read"] = dset_ts.num_obs_read[idx_sta2]
-num_obs_sta1["estimate"] = dset_ts.num_obs_estimate[idx_sta1]
-num_obs_sta2["estimate"] = dset_ts.num_obs_estimate[idx_sta2]
 
 
 # Plot per session
@@ -465,9 +421,6 @@ local_tie = data.get(baseline1) or data.get(baseline2)
 
 plot_statistics(dates, dof, variance_factor, colors[0])
 plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs, station1, station2, local_tie)
-
-if args.plot_num_obs:
-    plot_session_hist(num_obs_sta1, num_obs_sta2)
 
 plot_residual_rms(dates, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
 
