@@ -48,8 +48,7 @@ def gnss_clean_orbit(dset: "Dataset", orbit_flag: str, orbit: Union["AprioriOrbi
     Returns:
         numpy.ndarray:   Array containing False for observations to throw away.
     """
-    apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
-
+   
     # Get orbit data, if not given already
     if not orbit:
         orbit = apriori.get(
@@ -68,10 +67,14 @@ def gnss_clean_orbit(dset: "Dataset", orbit_flag: str, orbit: Union["AprioriOrbi
     if (orbit_flag == "broadcast"):
         keep_idx = _get_navigation_records_and_ignore_epochs(dset, orbit)  
 
-    # GNSS observation epochs are rejected with no corresponding IOD between HAS messages and broadcast navigation 
-    # messages and observation with timestamps less than HAS receiver reception time
-    if (orbit_flag == "broadcast") and apply_has_correction:
-        keep_idx = _ignore_epochs_has(dset, orbit)
+
+    # TODO: Can probabely deleted, because this is handled directly in _get_navigation_records_and_ignore_epochs() via
+    #       use of dset.has_gnssiod_orb
+    ## GNSS observation epochs are rejected with no corresponding IOD between HAS messages and broadcast navigation 
+    ## messages and observation with timestamps less than HAS receiver reception time
+    #apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
+    #if (orbit_flag == "broadcast") and apply_has_correction:
+    #    keep_idx = _ignore_epochs_has(dset, orbit)
 
     # Remove GNSS observations which exceeds the interpolation boundaries
     if orbit_flag == "precise":
@@ -224,6 +227,7 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
 
     check_nav_validity_length = config.tech[_SECTION].check_nav_validity_length.bool
     ignore_unhealthy_satellite = config.tech[_SECTION].ignore_unhealthy_satellite.bool
+    apply_has_correction = config.tech.get("apply_has_correction", default=False).bool
 
     # Get configuration option
     brdc_block_nearest_to_options = [
@@ -255,8 +259,10 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
                             time_key = time_key, 
                             positive = positive, 
                             satellite = satellite, 
+                            iode = dset.has_gnssiod_orb[obs] if apply_has_correction else None,
                             log_level = "debug",
         )
+
 
         # Skip epochs for which no broadcast ephemeris are available
         if idx_obs is None:
@@ -269,6 +275,7 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
             status = _is_epoch_in_navigation_validity_interval(
                                 time, 
                                 orbit.dset_edit.toe.gps.mjd[idx_obs], 
+                                orbit.dset_edit.transmission_time.gps.mjd[idx_obs], 
                                 orbit.dset_edit.fit_interval[idx_obs], 
                                 orbit.dset_edit.iode[idx_obs],
                                 satellite,
@@ -435,55 +442,57 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
 
     return keep_idx
 
-
-def _ignore_epochs_has(dset: "Dataset", orbit: "AprioriOrbit") -> np.ndarray:
-    """Remove GNSS observations for which no corresponding IOD can be found for HAS and broadcast navigation message
-    and observation epoch with timestamps less than HAS message receiver reception time
-
-    Args:
-        dset:   A Dataset containing model data.
-        orbit:  Apriori orbit object containing orbit data (either broadcast or precise)
-        
-    Returns:
-        Array containing False for observations to throw away 
-    """    
-    keep_idx = np.ones(dset.num_obs, dtype=bool)
-    obs_epoch_nearest_positive = True if "positive" in config.tech.has_message_nearest_to.str else False
-    
-    for epoch, sat, iode in zip(dset.time, dset.satellite, dset.has_gnssiod_orb):
-
-        idx = orbit.dset_edit.filter(satellite=sat, iode=iode)
-        
-        if np.any(idx) == False:
-            idx_dset = dset.filter(satellite=sat, has_gnssiod_orb=iode)
-            keep_idx[idx_dset] = False
-            log.debug(f"No valid broadcast navigation message could be found for satellite {sat} and HAS message IOD "
-                      f"{iode}. Removing {sum(~keep_idx[idx_dset])} observations.")
-            continue
-        
-        if obs_epoch_nearest_positive:
-           
-            diff = epoch.gps.gps_ws.seconds - orbit.dset_edit.time.gps.gps_ws.seconds[idx]
-    
-            if np.all(diff < 0):
-                log.debug(f"No valid broadcast navigation message could be found for satellite {sat}, HAS message IOD " 
-                         f"{iode} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} (nearest " 
-                         f"receiver reception time of HAS message: " 
-                         f"{min(orbit.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')}, "
-                         f"{min(orbit.dset_edit.time.gps_ws.week[idx]):.0f}-"
-                         f"{min(orbit.dset_edit.time.gps_ws.seconds[idx]):.0f})")
-                idx_dset = np.logical_and(dset.filter(satellite=sat, has_gnssiod_orb=iode), epoch.gps.gps_ws.seconds == dset.time.gps.gps_ws.seconds)
-                keep_idx[idx_dset] = False
-            
-    num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
-    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_has")
-    
-    # Note: Observations have to be removed already here, otherwise further processing does not work.
-    if num_removed_obs > 0:
-        log.info(f"Keeping {sum(keep_idx)} of {dset.num_obs} observations.")
-        dset.subset(keep_idx)
-        
-    return np.ones(dset.num_obs, dtype=bool)
+# TODO: Can probabely deleted, because this handled directly in _get_navigation_records_and_ignore_epochs() via
+#       use of dset.has_gnssiod_orb
+#
+#def _ignore_epochs_has(dset: "Dataset", orbit: "AprioriOrbit") -> np.ndarray:
+#    """Remove GNSS observations for which no corresponding IOD can be found for HAS and broadcast navigation message
+#    and observation epoch with timestamps less than HAS message receiver reception time
+#
+#    Args:
+#        dset:   A Dataset containing model data.
+#        orbit:  Apriori orbit object containing orbit data (either broadcast or precise)
+#        
+#    Returns:
+#        Array containing False for observations to throw away 
+#    """    
+#    keep_idx = np.ones(dset.num_obs, dtype=bool)
+#    obs_epoch_nearest_positive = True if "positive" in config.tech.has_message_nearest_to.str else False
+#    
+#    for epoch, sat, iode in zip(dset.time, dset.satellite, dset.has_gnssiod_orb):
+#
+#        idx = orbit.dset_edit.filter(satellite=sat, iode=iode)
+#        
+#        if np.any(idx) == False:
+#            idx_dset = dset.filter(satellite=sat, has_gnssiod_orb=iode)
+#            keep_idx[idx_dset] = False
+#            log.debug(f"No valid broadcast navigation message could be found for satellite {sat} and HAS message IOD "
+#                      f"{iode}. Removing {sum(~keep_idx[idx_dset])} observations.")
+#            continue
+#        
+#        if obs_epoch_nearest_positive:
+#           
+#            diff = epoch.gps.gps_ws.seconds - orbit.dset_edit.time.gps.gps_ws.seconds[idx]
+#    
+#            if np.all(diff < 0):
+#                log.debug(f"No valid broadcast navigation message could be found for satellite {sat}, HAS message IOD " 
+#                         f"{iode} and observation epoch {epoch.datetime.strftime('%Y-%d-%mT%H:%M:%S')} (nearest " 
+#                         f"receiver reception time of HAS message: " 
+#                         f"{min(orbit.dset_edit.time.gps.datetime[idx]).strftime('%Y-%d-%mT%H:%M:%S')}, "
+#                         f"{min(orbit.dset_edit.time.gps_ws.week[idx]):.0f}-"
+#                         f"{min(orbit.dset_edit.time.gps_ws.seconds[idx]):.0f})")
+#                idx_dset = np.logical_and(dset.filter(satellite=sat, has_gnssiod_orb=iode), epoch.gps.gps_ws.seconds == dset.time.gps.gps_ws.seconds)
+#                keep_idx[idx_dset] = False
+#            
+#    num_removed_obs = dset.num_obs - np.count_nonzero(keep_idx)
+#    log.info(f"Removing {num_removed_obs} observations based on _ignore_epochs_has")
+#    
+#    # Note: Observations have to be removed already here, otherwise further processing does not work.
+#    if num_removed_obs > 0:
+#        log.info(f"Keeping {sum(keep_idx)} of {dset.num_obs} observations.")
+#        dset.subset(keep_idx)
+#        
+#    return np.ones(dset.num_obs, dtype=bool)
    
 
 def _ignore_satellites(dset: "Dataset", orbit: "AprioriOrbit", orbit_flag: str) -> None:
@@ -515,7 +524,8 @@ def _ignore_satellites(dset: "Dataset", orbit: "AprioriOrbit", orbit_flag: str) 
 
 def _is_epoch_in_navigation_validity_interval(
                     time: float, 
-                    toe: float, 
+                    toe: float,
+                    transmission_time: float,
                     fit_interval: float, 
                     iode: float, 
                     satellite: str, 
@@ -523,34 +533,44 @@ def _is_epoch_in_navigation_validity_interval(
     """Check if GNSS observation epoch is in validity length of a broadcast navigation record 
 
     Args:
-        time:         Observation epoch in Modified Julian Day
-        toe:          Time of ephemeris (reference ephemeris epoch) in Modified Julian Day
-        fit_interval: Validity interval limit of navigation message
-        iode:         Ephemeris issue of data (meaning depending on GNSS)
-        satellite:    Satellite name
+        time:               Observation epoch in Modified Julian Day
+        toe:                Time of ephemeris (reference ephemeris epoch) in Modified Julian Day
+        transmission_time:  Transmission time (receiver reception time) of navigation message
+        fit_interval:       Validity interval limit of navigation message
+        iode:               Ephemeris issue of data (meaning depending on GNSS)
+        satellite:          Satellite name
 
     Returns:
         True if GNSS observation epoch is in validity length of broadcast navigation record, otherwise False
     """
     brdc_block_nearest_to = config.tech.brdc_block_nearest_to.str
 
-    tk = (time - toe) * Unit.day2second
+    tk = round((time - toe) * Unit.day2second, 1) #Note: Rounding to 1 decimal digit is necessary to numerical uncertainties.
     system = satellite[0:1]
 
-    # Note: Epochs with negative tk has to be removed, if the difference between the observation epoch and TOE, TOC  
-    #       or transmission time has to be positive. Only observation epochs after time of ephemeris should be used 
-    #       for Galileo.
-    if (system == "E" and tk < 0) or ("positive" in brdc_block_nearest_to and tk < 0):
+    # Note: Only observation epochs after time of ephemeris should be used for Galileo.
+    if (system == "E" and tk < 0): 
+        log.debug('{:8s} {:4s} {:4.0f} {}  TRANS({})  TOE({})  abs({:7.0f}) < 0 (not positive)'.format(
+                        'REJECT', 
+                        satellite, 
+                        iode, 
+                        Time(time, scale='gps', fmt='mjd').datetime,
+                        Time(transmission_time, scale='gps', fmt='mjd').datetime, 
+                        Time(toe, scale='gps', fmt='mjd').datetime, 
+                        tk, 
+            )
+        )
         return False
 
     # Remove observations, if they exceed fit interval limit 'toe_limit'
     toe_limit = _get_time_of_ephemeris_limit(fit_interval, system)
     if abs(tk) > toe_limit:
-        log.debug('{:6s} {:4s} {:4.0f} {}  TOE({})  abs({:7.0f}) > {:6.0f}'.format(
+        log.debug('{:8s} {:4s} {:4.0f} {}  TRANS({})  TOE({})  abs({:7.0f}) > {:6.0f}'.format(
                             'REJECT', 
                             satellite, 
                             iode, 
                             Time(time, scale='gps', fmt='mjd').datetime,
+                            Time(transmission_time, scale='gps', fmt='mjd').datetime, 
                             Time(toe, scale='gps', fmt='mjd').datetime, 
                             tk, 
                             toe_limit,
@@ -558,17 +578,18 @@ def _is_epoch_in_navigation_validity_interval(
         )
         return False
 
-    log.debug('{:6s} {:4s} {:4.0f} {}  TOE({})  abs({:7.0f}) <={:6.0f}'.format(
+    log.debug('{:8s} {:4s} {:4.0f} {}  TRANS({})  TOE({})  abs({:7.0f}) <={:6.0f}'.format(
                         'KEEP', 
                          satellite, 
                          iode,
                          Time(time, scale='gps', fmt='mjd').datetime,
+                         Time(transmission_time, scale='gps', fmt='mjd').datetime, 
                          Time(toe, scale='gps', fmt='mjd').datetime, 
                          tk, 
                          toe_limit,
         )
     )
-
+    
     return True
 
 
