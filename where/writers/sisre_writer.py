@@ -192,6 +192,50 @@ FIELDS = (
         "", 
         "Galileo HAS IOD given by HAS orbit correction data",
     ),
+    WriterField(
+        "has_reception_time_of_message_orb_gpsweek",
+        "has_reception_time_of_message_orb_gpsweek",
+        (),
+        object,
+        "%15s",
+        15,
+        "H_TRANS_TIME",
+        "wwwwd:ssssss",
+        "Transmission time (receiver reception time) of Galileo HAS orbit corrections",
+    ),
+    WriterField(
+        "has_time_of_message_orb_gpsweek", 
+        "has_time_of_message_orb_gpsweek", 
+        (), 
+        object, 
+        "%15s", 
+        15, 
+        "TOM", 
+        "wwwwd:ssssss", 
+        "Time of Galileo HAS orbit correction message"
+    ),
+    WriterField(
+        "diff_htrans_tom",
+        "diff_htrans_tom",
+        (),
+        float,
+        "%8d",
+        8,
+        "TM-TOM",
+        "second",
+        "Difference between Galileo HAS transmission time and time of message",
+    ),
+    WriterField(
+        "age_of_data",
+        "age_of_data",
+        (),
+        float,
+        "%8d",
+        8,
+        "T-TOM",
+        "second",
+        "Age of data, which is the difference between the observation time and the time of message " "(TOM)",
+    ),
     #WriterField(
     #    "has_gnssiod_clk", 
     #    "has_gnssiod_clk", 
@@ -306,6 +350,31 @@ def sisre_writer(dset: "Dataset") -> None:
         unit=dset.unit("orb_diff.acr.radial"),
         write_level="detail",
     )
+    
+    # Add additional Galileo HAS related fields used by the writer
+    if "has_reception_time_of_message_orb" in dset.fields:
+        dset.add_text(
+            "has_reception_time_of_message_orb_gpsweek", 
+            val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.has_reception_time_of_message_orb],
+            write_level="detail",
+        )
+        dset.add_text(
+            "has_time_of_message_orb_gpsweek",
+            val=[
+                f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.has_time_of_message_orb
+            ],
+            write_level="detail",
+        )
+        dset.add_float(
+            "diff_htrans_tom",
+            val=dset.has_reception_time_of_message_orb.gps.gps_ws.seconds - dset.has_time_of_message_orb.gps.gps_ws.seconds,
+            write_level="detail",
+        )
+        dset.add_float(
+            "age_of_data",
+            val=dset.time.gps.gps_ws.seconds - dset.has_time_of_message_orb.gps.gps_ws.seconds,
+            write_level="detail",
+        )
 
     ## Add 'detail' fields used by the writer
     # write_level = config.tech.get("write_level", default="operational").as_enum("write_level")
