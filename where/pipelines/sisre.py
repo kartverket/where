@@ -718,14 +718,12 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     brdc.dset_raw.write()
     brdc.dset_edit.write()
     brdc.calculate_orbit(dset)
-    brdc.dset.write()
     
     # Read, edit and calculate precise orbit
     precise = apriori.get("orbit", rundate=dset.analysis["rundate"], apriori_orbit="precise")
     precise.dset_raw.write()
     precise.dset_edit.write()
     precise.calculate_orbit(dset)
-    precise.dset.write()
 
     # Generate common Dataset for broadcast and precise ephemeris
     # TODO: General solution in dataset.py would be better, then this workaround. Check this solution e.g. on day 12.07.2019.
@@ -751,6 +749,10 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     not_common_sat = set(precise.dset.unique("satellite")).difference(set(brdc.dset.unique("satellite")))
     if not_common_sat:
         log.warn(f"The following satellites are not common in brodcast and precise ephemeris: {not_common_sat}")
+        
+    # Write dataset to file        
+    brdc.dset.write_as(stage="calculate", label="brdc")
+    precise.dset.write_as(stage="calculate", label="precise")
 
     return brdc, precise
 
