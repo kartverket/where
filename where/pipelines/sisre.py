@@ -272,7 +272,6 @@ def calculate(stage: str, dset: "Dataset"):
             val = _get_bias_has(dset),
             unit="meter",
         )
-        
         orb_diff = orb_diff + dset.has_orbit_correction
         #clk_diff = brdc.dset.gnss_satellite_clock - brdc.dset.bgd_e1_e5b * constant.c - precise.dset.gnss_satellite_clock + brdc.dset.bgd_e1_e5a * constant.c + dset.has_clock_correction + dcb_e1_e5b 
         clk_diff = clk_diff + dset.has_clock_correction + dset.has_code_bias_correction
@@ -642,7 +641,7 @@ def _get_bias_has(dset: "Dataset") -> np.ndarray:
                 idx_sat = dset.filter(satellite=sat)
                 #TODO: Ideally C1C-CP1 DCB should be used?
                 correction[idx_sat] = gnss.ionosphere_free_linear_combination(
-                    dset.has_code_bias_c1c[idx_sat] + dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"],
+                    dset.has_code_bias_c1c[idx_sat] + dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"] * constant.c,
                     dset.has_code_bias_c2p[idx_sat], 
                     enums.gnss_freq_G.L1, 
                     enums.gnss_freq_G.L2,
