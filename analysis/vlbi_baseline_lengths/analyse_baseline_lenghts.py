@@ -121,7 +121,7 @@ def save_baselines(baselines, id_txt):
                 fid.write(f"{d:10} {s:7} {n:7d} {l:14.4f} {e:13.4f}\n")
 
 
-def plot_baselines(baselines, id_txt):
+def plot_baselines(baselines, id_txt, local_ties):
     """Plot baseline length for each baseline
 
     Plots the time evolution of the baseline length with formal errors. Each baseline is saved to
@@ -135,6 +135,7 @@ def plot_baselines(baselines, id_txt):
     
     for baseline, data in baselines.items():
         sta_1, _, sta_2 = baseline.partition("/")
+        local_tie = local_ties.get(baseline) or local_ties.get(f"{sta_2}/{sta_1}")
         dates = data["date"]
         baseline_length = data["length"]
         baseline_length_ferr = data["ferr"]
@@ -145,7 +146,9 @@ def plot_baselines(baselines, id_txt):
         fig = plt.figure(figsize=(12, 10), dpi=150)
         plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
         im = plt.scatter(dates, baseline_length, c=color, zorder=100)
-        plt.plot(dates, trend)
+        plt.plot(dates, trend, label="trend")
+        if local_tie:
+            plt.axhline(local_tie, label="local tie")
         plt.gca().get_xaxis().set_major_formatter(mdates.DateFormatter(DATE_FMT))
         plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))
         plt.gca().ticklabel_format(axis="y", style="plain")
@@ -153,6 +156,7 @@ def plot_baselines(baselines, id_txt):
         plt.grid(axis="y", linestyle="--")
         plt.ylabel("Baseline length [m]")
         plt.title(f"{baseline} Baseline Length Repeatability: {repeatability:6.4f} [m]")
+        plt.legend()
         cbar = fig.colorbar(im, use_gridspec=True)
         cbar.set_label("Number of observations on baseline used in solution")
         plt.savefig(f"img/{id_txt}/Baseline_{sta_1}_{sta_2}_{id_txt}.png", bbox_inches="tight")
@@ -270,7 +274,7 @@ def compute_repeatability(baselines):
 
             # update original data based on keep_idx
             if data["repeatability_num_obs"] < num_obs:
-                print(f"Discarded baseline lengths for computation of repeatability for {baseline} for {t.date[~keep_idx]} because ferr is zero")        
+                print(f"Discarded baseline for computation of repeatability for {baseline} for {t.date[~keep_idx]} because ferr is zero or nan") 
 
         
 
@@ -320,11 +324,10 @@ def blr(bl, mjd, ferr):
         trend
         
     """
-    keep_idx = ferr != 0
+    keep_idx = (ferr != 0) & ~np.isnan(ferr)
 
     w = 1 / ferr[keep_idx] ** 2
     w_sum = np.sum(w)
-
     lin_func = np.polynomial.Polynomial.fit(mjd[keep_idx], bl[keep_idx], 1, w=w)
     trend = lin_func(mjd)
 
@@ -398,6 +401,9 @@ def main():
     os.makedirs(f"img/{id_txt}/", exist_ok=True)
     os.makedirs(f"txt/{id_txt}/", exist_ok=True)
 
+    local_ties = np.genfromtxt("local_ties.txt", dtype=None, encoding="utf-8", names="baseline, length")
+    local_ties = dict(zip(local_ties["baseline"], local_ties["length"]))
+
     if args.delete_plots:
         delete_files(".png", id_txt)
 
@@ -416,7 +422,7 @@ def main():
     if args.save_repeatability:
         save_repeatability(baselines, id_txt)
     if args.plot_baselines:
-        plot_baselines(baselines, id_txt)
+        plot_baselines(baselines, id_txt, local_ties)
     if args.save_baselines:
         save_baselines(baselines, id_txt)
 

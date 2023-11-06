@@ -349,12 +349,16 @@ baseline_length = []
 baseline_length_ferr = []
 baseline_dates = []
 
-dof = []
-variance_factor = []
+rms = dset_ts.rms_residual_estimate[idx]
+dof = dset_ts.degrees_of_freedom[idx]
+variance_factor = dset_ts.variance_factor[idx]
 
 idx_sta1 = dset_ts.filter(station=station1)
 idx_sta2 = dset_ts.filter(station=station2)
 
+rms_sta_1 = dset_ts.rms_residual_estimate[idx_sta1]
+rma_sta_2 = dset_ts.rms_residual_estimate[idx_sta2]
+#import IPython; IPython.embed()
 
 # Plot per session
 for rundate, session_code in zip(dates, session_codes):
@@ -363,13 +367,7 @@ for rundate, session_code in zip(dates, session_codes):
     dset_session = dataset.Dataset.read(
         rundate=rundate, pipeline=pipeline, stage="postprocess", label="last", session_code=session_code, id=dset_id
     )
-    n1 = dset_session.num(station=station1)
-    n2 = dset_session.num(station=station2)
-    n = [n1, n2]
 
-    dof.append(dset_session.meta["statistics"]["degrees of freedom"])
-    variance_factor.append(dset_session.meta["statistics"]["variance factor"])
-    
     if args.plot_trop:
         # Zenith wet delay
         trop_wet1 = get_state_values(dset_session, f"trop_wet-{station1}")
@@ -386,6 +384,7 @@ for rundate, session_code in zip(dates, session_codes):
         trop_grad_north2 = get_state_values(dset_session, f"trop_grad-{station2}_north")
         trop_grad_north = np.stack((trop_grad_north1, trop_grad_north2))
 
+        n = [dset_session.num(station=station1), dset_session.num(station=station2)]
         plot_sta_param(dset_session.time.utc.datetime, trop_wet, n, [f"{station1}", f"{station2}"], f"Zenith wet delay {rundate.date()} {session_code}", " Zenith Wet Delay [m]")
         plot_sta_param(dset_session.time.utc.datetime, trop_grad_east, n, [f"{station1}", f"{station2}"], f"Gradient East {rundate.date()} {session_code}", "Gradient East [m]")
         plot_sta_param(dset_session.time.utc.datetime, trop_grad_north, n, [f"{station1}", f"{station2}"], f"Gradient North {rundate.date()} {session_code}", "Gradient North [m]")
@@ -400,10 +399,6 @@ for rundate, session_code in zip(dates, session_codes):
         baseline_length_ferr.append(bl['baseline_length_ferr'])
         num_obs_bs.append(dset_session.num(baseline=baseline1) + dset_session.num(baseline=baseline2))
 
-    # Collect rms information for each session
-    rms.append(dset_session.rms("residual"))
-    rms_sta_1.append(dset_session.rms("residual", station=station1))
-    rms_sta_2.append(dset_session.rms("residual", station=station2))
 
     if args.plot_residuals:
         plot_residuals(dset_session, station1, station2)
