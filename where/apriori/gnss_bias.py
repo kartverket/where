@@ -89,8 +89,8 @@ class BiasCorrection(UserDict):
             Differential Signal Bias for given satellite, DSB code and date as dictionary like:
 
                 {end_time: <date>,
-                 estimate: <dsb_estimate>,
-                 sigma: <dsb_sigma>}
+                 estimate: <dsb_estimate>, in [s]
+                 sigma: <dsb_sigma>} in [s]
 
         """
         used_date = None
