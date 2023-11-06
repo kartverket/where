@@ -378,7 +378,7 @@ class HasOrbit(orbit.AprioriOrbit):
         dset.add_float(
             "has_gnssiod_code_bias", 
             val=self.dset_edit.gnssiod[dset_has_idx], 
-            unit="meters", 
+            unit="", 
             write_level="operational",
         )
         dset.add_float(
