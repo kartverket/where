@@ -80,14 +80,10 @@ class Itrf(TrfFactory):
             if self.solution >= "2014":
                 paths.update(
                     dict(
-                        soln=config.files.path("trf-itrf_snx_soln", file_vars=file_vars, download_missing=True),
                         psd=config.files.path("trf-itrf_snx_psd", file_vars=file_vars, download_missing=True),
                     )
                 )
-            else:
-                paths.update(
-                    dict(soln=config.files.path("trf-itrf_snx_soln", file_vars=file_vars, download_missing=True))
-                )
+
         return paths
 
     def _read_data(self):
