@@ -20,7 +20,6 @@ import pandas as pd
 from midgard.collections import enums 
 from midgard.dev import plugins
 from midgard.plot.matplotext import MatPlotExt
-from midgard.writers._writers import get_existing_fields
 
 # Where imports
 from where import apriori
