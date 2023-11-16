@@ -11,8 +11,9 @@ from where.data import dataset3 as dataset
 from where.data.time import Time
 
 # Setup input argument parser for script 
-parser = argparse.ArgumentParser(epilog="Example: python vlbi_scale.py --year=2013.75 --id=itrf2020test2 --rms_limit=5 --volume_limit=10 --save_fig --show_fig")
-parser.add_argument("--id", help="Dataset id for the dataset timeseries", type=str, default="itrf2020test2")
+parser = argparse.ArgumentParser(epilog="Example: python vlbi_scale.py --year=2013.75 --id=test --rms_limit=5 --volume_limit=10 --save_fig --show_fig",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--id", help="Dataset id for the dataset timeseries", type=str, default="")
 parser.add_argument("--year", help="Decimal year of discontinuity in scale", type=float, default=2013.75)
 parser.add_argument("--rms_limit", help="Outliers larger than rms_limit*RMS are discarded", type=float, default=5)
 parser.add_argument("--volume_limit", help="Networks smaller than the given limit (in Mm^3) are discarded", type=float, default=10)
@@ -23,6 +24,7 @@ parser.add_argument("--make_csv", help="Data is saved as a csv file", action="st
 # Parse input args
 args = parser.parse_args()
 dset_id = args.id
+solution_id = dset_id if dset_id else "default"
 discont_epoch = Time(args.year, scale="utc", fmt="decimalyear")
 rms_limit = args.rms_limit
 volume_limit = args.volume_limit
@@ -95,7 +97,7 @@ cbar.set_label(f"Network volume [Mm^3]")
 plt.title(f"VLBI scale with linear regression before and after {discont_epoch}")
 plt.ylabel(f"Scale [ppb]")
 if save_fig:
-    plt.savefig(f"{imgdir}/VLBI_scale_linear_regression_{discont_epoch}_{rms_limit}_{volume_limit}_{dset_id}.png", bbox_inches="tight")
+    plt.savefig(f"{imgdir}/VLBI_scale_linear_regression_{discont_epoch}_{rms_limit}_{volume_limit}_{solution_id}.png", bbox_inches="tight")
 if show_fig:
     plt.show()
 plt.close()
@@ -113,7 +115,7 @@ for f, u in zip(fields,units):
     plt.title(f"{name}")
     plt.ylabel(f"{name} [{u}]")
     if save_fig:
-        plt.savefig(f"{imgdir}/VLBI_{name}_{rms_limit}_{volume_limit}_{dset_id}.png", bbox_inches="tight")
+        plt.savefig(f"{imgdir}/VLBI_{name}_{rms_limit}_{volume_limit}_{solution_id}.png", bbox_inches="tight")
     if show_fig:
         plt.show()
     plt.close()
@@ -150,16 +152,16 @@ cbar.set_label(f"Network volume [Mm^3]")
 plt.title(f"VLBI Scale with running median ({days} days)")
 plt.ylabel(f"Scale [ppb]")
 if save_fig:
-    plt.savefig(f"{imgdir}/VLBI_scale_running_median_{days}_{rms_limit}_{volume_limit}_{dset_id}.png", bbox_inches="tight")
+    plt.savefig(f"{imgdir}/VLBI_scale_running_median_{days}_{rms_limit}_{volume_limit}_{solution_id}.png", bbox_inches="tight")
 if show_fig:
     plt.show()
 plt.close()    
 
 # Make CSV file
 if make_csv:
-    filename = f"{csvdir}/VLBI_scale_{rms_limit}_{volume_limit}_{dset_id}.csv"
+    filename = f"{csvdir}/VLBI_scale_{rms_limit}_{volume_limit}_{solution_id}.csv"
     with open(filename, "w") as fid:
-        header = f"date, session code, scale [ppb], t_x [m], t_y [m], t_z [m], r_1 [mas], r_2 [mas], r_3 [mas], volume [Mm^3]"
+        header = f"date, session code, scale [ppb], t_x [m], t_y [m], t_z [m], r_1 [mas], r_2 [mas], r_3 [mas], volume [Mm^3], stations "
         fid.write(f"{header}\n")
         rundate = dset_ts.rundate[idx_2][sort_idx_2]
         session_code = dset_ts.session_code[idx_2][sort_idx_2]
@@ -172,4 +174,7 @@ if make_csv:
         r_3 = dset_ts.neq_helmert_gamma[idx_2][sort_idx_2]
         volume = dset_ts.network_volume[idx_2][sort_idx_2]
         for rd, sc, s, tx, ty, tz, r1, r2, r3, v in zip(rundate, session_code, scale, t_x, t_y, t_z, r_1, r_2, r_3, volume):
-            fid.write(f"{rd}, {sc}, {s}, {tx}, {ty}, {tz}, {r1}, {r2}, {r3}, {v} \n")
+            session_idx = dset_ts.filter(rundate=rd)
+            station_idx = dset_ts.num_obs_estimate[session_idx] > 0
+            stations = "/".join(list(dset_ts.station[session_idx][station_idx])[1:]) # First station entry is 'all' for each rundate
+            fid.write(f"{rd}, {sc}, {s}, {tx}, {ty}, {tz}, {r1}, {r2}, {r3}, {v}, {stations}\n")
