@@ -381,7 +381,7 @@ def _plot_scatter_field(
             )
 
         if options["ylim"]:
-            plt.ylim(options["ylim"])
+            plt.ylim([float(options["ylim"][0]), float(options["ylim"][1])])
         ylabel = f"{PLOTCONFIG[field].label} [{UNIT_YLABEL[unit]}]" if UNIT_YLABEL[unit] else f"{PLOTCONFIG[field].label}"
         plt.ylabel(ylabel)
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
