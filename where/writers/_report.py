@@ -40,6 +40,7 @@ class Report:
         self.path = path
         self.description = description
 
+
     def markdown_to_pdf(self) -> None:
         """Convert markdown file to pdf format
         """
@@ -65,6 +66,7 @@ class Report:
         # if process.returncode:
         #    log.error(f"{program} failed with error code {process.returncode} ({' '.join(process.args)})")
 
+
     def write_config(self) -> None:
         """Print the configuration options for a given technique
 
@@ -77,6 +79,7 @@ class Report:
         self.fid.write(str(config.tech.as_str(key_width=25, width=70, only_used=True)))
         self.fid.write("\n```\n")
         self.fid.write("\\newpage\n\n")
+
 
     def write_dataframe_to_markdown(self, df: "Dataframe", format: str = "", statistic: bool = False) -> None:
         """Write Pandas DataFrame to Markdown table
@@ -122,7 +125,7 @@ class Report:
             line_max = "| **max**  |"
             line_min = "| **min**  |"
             line_mean = "| **mean** |"
-            for index, col in df.iteritems():
+            for index, col in df.items():
                 line_max = line_max + " {:{fmt}} |".format(col.max(), fmt=format)
                 line_min = line_min + " {:{fmt}} |".format(col.min(), fmt=format)
                 line_mean = line_mean + " {:{fmt}} |".format(col.mean(), fmt=format)
@@ -132,6 +135,7 @@ class Report:
             self.fid.write(line_mean + "\n")
 
         self.fid.write("\n")
+
 
     def add_figure(
         self, figure_path: Union["pathlib.PosixPath", str], caption: str = "", clearpage: bool = False

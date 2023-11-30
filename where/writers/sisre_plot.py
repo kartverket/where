@@ -78,9 +78,9 @@ def sisre_plot(dset):
     """
 
     # Satellites and systems to plot
-    satellites = config.where.sisre_plot.get("satellites", default=dset.unique("satellite")).list
+    satellites = config.tech.sisre_plot.get("satellites", default=dset.unique("satellite")).list
     satellites = satellites if satellites else dset.unique("satellite")
-    systems = config.where.sisre_plot.get("systems", default="").list
+    systems = config.tech.sisre_plot.get("systems", default="").list
     systems = systems if systems else dset.unique("system")
 
     # Overwrite configuration with command options
@@ -92,7 +92,7 @@ def sisre_plot(dset):
     options = _set_plot_config(title)
 
     # Get fields to plot
-    fields = config.where.sisre_plot.get("fields", default="").list
+    fields = config.tech.sisre_plot.get("fields", default="").list
     if not fields:
         log.fatal(f"No fields to plot.")
 
@@ -114,7 +114,7 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
         title: Title given via option. Overwrites configuration file definition.
     """
     # Change fontsize of labels
-    fontsize = config.where.sisre_plot.get("fontsize", default=10).str
+    fontsize = config.tech.sisre_plot.get("fontsize", default=10).str
     fontsize = 9 if not fontsize else int(fontsize)
     plt.rcParams["axes.titlesize"] = fontsize
     plt.rcParams["axes.labelsize"] = fontsize
@@ -126,19 +126,20 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
 
     # Define additional matplotlib/plot configuration
     options = {
-        "alpha": config.where.sisre_plot.get("alpha", default=1).int,
-        "dpi": config.where.sisre_plot.get("dpi", default=200).int,
-        "color": config.where.sisre_plot.get("color", default="").str,
-        "colormap": config.where.sisre_plot.get("colormap", default="tab10").str,
-        "figsize": tuple([int(v) for v in config.where.sisre_plot.get("figsize", default="6,4").list]),
-        "figsize_subplot": tuple([int(v) for v in config.where.sisre_plot.get("figsize_subplot", default="7,5").list]),
+        "alpha": config.tech.sisre_plot.get("alpha", default=1).int,
+        "dpi": config.tech.sisre_plot.get("dpi", default=200).int,
+        "color": config.tech.sisre_plot.get("color", default="").str,
+        "colormap": config.tech.sisre_plot.get("colormap", default="tab10").str,
+        "figsize": tuple([int(v) for v in config.tech.sisre_plot.get("figsize", default="6,4").list]),
+        "figsize_subplot": tuple([int(v) for v in config.tech.sisre_plot.get("figsize_subplot", default="7,5").list]),
         "fontsize": fontsize,
-        "fsize_subtitle": config.where.sisre_plot.get("fontsize_subtitle", default=7).int,
-        "legend": config.where.sisre_plot.get("legend", default=True).bool,
-        "marker": config.where.sisre_plot.get("marker", default=".").str,
-        "markersize": config.where.sisre_plot.get("markersize", default=9).int,
-        "subplot": config.where.sisre_plot.get("subplot", default=True).bool,
-        "title": title if title else config.where.sisre_plot.get("title", default=" ").str,
+        "fsize_subtitle": config.tech.sisre_plot.get("fontsize_subtitle", default=7).int,
+        "legend": config.tech.sisre_plot.get("legend", default=True).bool,
+        "marker": config.tech.sisre_plot.get("marker", default=".").str,
+        "markersize": config.tech.sisre_plot.get("markersize", default=9).int,
+        "subplot": config.tech.sisre_plot.get("subplot", default=True).bool,
+        "title": title if title else config.tech.sisre_plot.get("title", default=" ").str,
+        "ylim": config.tech.sisre_plot.get("ylim", default=[]).list,
     }
 
     return options
@@ -372,12 +373,15 @@ def _plot_scatter_field(
             plt.legend(
                 loc="upper center", 
                 ncol=6, 
-                bbox_to_anchor=(0.50, -0.20), 
+                bbox_to_anchor=(0.50, -0.30), 
+                borderaxespad=1.0,
                 fontsize=8,
                 fancybox=True, 
                 shadow=True,
             )
 
+        if options["ylim"]:
+            plt.ylim([float(options["ylim"][0]), float(options["ylim"][1])])
         ylabel = f"{PLOTCONFIG[field].label} [{UNIT_YLABEL[unit]}]" if UNIT_YLABEL[unit] else f"{PLOTCONFIG[field].label}"
         plt.ylabel(ylabel)
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
