@@ -28,7 +28,7 @@ TIMEZONE = "Europe/Paris"
 DEFAULT_LANG = "en"
 
 BANNER = "images/banner.jpg"
-BANNER_SUBTITLE = "Version 2.1.2"
+BANNER_SUBTITLE = "Version 2.1.3"
 # BANNER_ALL_PAGES = True
 
 DISPLAY_PAGES_ON_MENU = True
