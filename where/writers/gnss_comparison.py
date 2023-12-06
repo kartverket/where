@@ -11,7 +11,6 @@ Example:
 
 """
 # Standard library imports
-import copy
 from collections import namedtuple
 from typing import Dict
 
@@ -29,6 +28,9 @@ import where
 from where.lib import config
 from where.lib import log
 from where.lib import util
+
+# Name of section in configuration
+_SECTION = "_".join(__name__.split(".")[-1:])
 
 WriterField = namedtuple(
     "WriterField", ["name", "dtype", "format", "width", "header", "unit", "description"]
@@ -242,8 +244,8 @@ def gnss_comparison(dset: "Dataset") -> None:
     output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech.gnss_comparison.solution.str.lower()
-    samples = config.tech.gnss_comparison.samples.list
+    file_vars["solution"] = config.tech[_SECTION].solution.str.lower()
+    samples = config.tech[_SECTION].samples.list
     
      # Get dataframes for writing
     _, dfs_day, dfs_month = _generate_dataframes(dset)
@@ -439,16 +441,12 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         |                      | vpe, ...                                                                             |
     """
     dsets = dset
-    fields = dict()
     dfs = dict()
     dfs_day = dict()
     dfs_month = dict()
 
-    fields_def = ["east", "north", "up", "hpe", "vpe", "pos_3d", "hdop", "pdop", "vdop"]
-    fields_cfg = config.tech.gnss_comparison_report.fields.list
-
     statistics_def = ["mean", "percentile_68", "percentile_90", "percentile_95", "rms", "std"]
-    statistics_cfg = config.tech.gnss_comparison_report.statistic.list
+    statistics_cfg = config.tech[_SECTION].statistic.list
 
     for statistic in statistics_cfg:
         if statistic not in statistics_def:
