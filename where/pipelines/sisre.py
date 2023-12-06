@@ -748,8 +748,14 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     not_common_sat = set(precise.dset.unique("satellite")).difference(set(brdc.dset.unique("satellite")))
     if not_common_sat:
         log.warn(f"The following satellites are not common in brodcast and precise ephemeris: {not_common_sat}")
+
+    # Update dataset vars and analysis variable
+    brdc.dset.vars = dset.vars.copy()
+    brdc.dset.analysis = dset.analysis.copy()
+    precise.dset.vars = dset.vars.copy()
+    precise.dset.analysis = dset.analysis.copy()
         
-    # Write dataset to file        
+    # Write dataset to file   
     brdc.dset.write_as(stage="calculate", label="brdc")
     precise.dset.write_as(stage="calculate", label="precise")
 
