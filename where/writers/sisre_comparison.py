@@ -12,7 +12,7 @@ Example:
 """
 # Standard library imports
 from collections import namedtuple
-from typing import Dict
+from typing import Dict, Tuple
 
 # External library imports
 import numpy as np
@@ -260,26 +260,31 @@ def sisre_comparison(dset: "Dataset") -> None:
     samples = config.tech[_SECTION].samples.list
     
      # Get dataframes for writing
-    _, dfs_day, dfs_month = _generate_dataframes(dset)
+    _, dfs_day, dfs_month, dfs_day_sat, dfs_month_sat = _generate_dataframes(dset)
 
     # Write files for daily and monthly solutions
     for type_ in dfs_day.keys():
 
         # Prepare dataset for writing
         dfs_day[type_] = dfs_day[type_].reset_index()
+        dfs_day_sat[type_] = dfs_day_sat[type_].reset_index()
         dfs_month[type_] = dfs_month[type_].reset_index()
+        dfs_month_sat[type_] = dfs_month_sat[type_].reset_index()
         
         if "daily" in samples:
             output_defs.update({
                   "day": dfs_day[type_],
+                  "day_sat": dfs_day_sat[type_],
                   "day_summary": _generate_dataframe_summary(dfs_day[type_], index="solution"),
             })
         if "monthly" in samples:
             output_defs.update({
                   "month": dfs_month[type_], 
+                  "month_sat": dfs_month_sat[type_],
                   "month_summary": _generate_dataframe_summary(dfs_month[type_], index="solution"), 
             })
-
+       
+        
         for sample, output_array in output_defs.items():
             
             file_vars_tmp = file_vars.copy()
@@ -291,6 +296,9 @@ def sisre_comparison(dset: "Dataset") -> None:
             
             fields = FIELDS_SUM if "summary" in sample else FIELDS
             summary = "Summary of SISRE comparison results (95th percentile)" if "summary" in sample else "SISRE comparison results (95th percentile)"
+            
+            if sample in ["day_sat", "month_sat"]:
+                fields = _get_sat_fields(output_array)       
                 
             # Get header
             header = get_header(
@@ -314,7 +322,7 @@ def sisre_comparison(dset: "Dataset") -> None:
 #
 # AUXILIARY FUNCTIONS
 #
-def _apply(df: pd.core.frame.DataFrame, sample: str, func: str) -> pd.core.frame.DataFrame:
+def _apply(df: pd.core.frame.DataFrame, sample: str, func: str) -> Tuple[pd.core.frame.DataFrame]:
     """Resample dataframe and apply given function 
 
     Args:
@@ -323,24 +331,31 @@ def _apply(df: pd.core.frame.DataFrame, sample: str, func: str) -> pd.core.frame
         func:    Function to be applied ("mean", "percentile_68", "percentile_90", "percentile", "rms", "std")
 
     Returns:
-        Resampled dataframe by applying given function
-    """
-    df_sampled = df.set_index("time_gps").resample(sample)
+        Tuple with resampled dataframes (date based and date+satellite based) by applying given function
+    """    
+    df_sat = df.pivot(index="time_gps", columns="satellite", values=config.tech[_SECTION].field_satellite.str)
+    df_sat_sampled = df_sat.resample(sample)
+    
+    df_reduced = df.drop(["system", "satellite"], axis=1)  # Columns not needed for this analysis.
+    df_sampled = df_reduced.set_index("time_gps").resample(sample)
 
     if func == "mean":
         df_sampled = df_sampled.mean()
+        df_sat_sampled  = df_sat_sampled.mean()
     elif func == "percentile":
         df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=95))
         df_sampled["sisre_epoch_rms"] = _determine_sisre_percentile_of_epochwise_rms(df, sample)
-        
+        df_sat_sampled  = df_sat_sampled.apply(lambda x: np.nanpercentile(x, q=95))   
     elif func == "rms":
         df_sampled = df_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
+        df_sat_sampled  = df_sat_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
     elif func == "std":
         df_sampled = df_sampled.std()
+        df_sat_sampled = df_sat_sampled.std()
     else:
         log.fatal(f"Function '{func}' is not defined.")
-
-    return df_sampled  
+        
+    return df_sampled, df_sat_sampled  
    
 
 def _determine_sisre_percentile_of_epochwise_rms(df: pd.core.frame.DataFrame, sample: str) -> pd.core.frame.DataFrame:
@@ -474,22 +489,33 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         |                      | following dataframe columns: clk_diff, dalong_track, orb_diff_3d, sisre              |
         | dfs_day              | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
         |                      | dataframe as values with daily entries with columns like date, solution, sisre, ...  |
+        | dfs_day_sat          | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
+        |                      | dataframe as values with daily entries with satellite columns, which include e.g.    |
+        |                      | sisre, ... solutions                                                                 |
         | dfs_month            | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
         |                      | dataframe as values with monthly entries with columns like date, solution, sisre, ...|
+        | dfs_month_sat        | Dictionary with function type as keys ('mean', 'percentile_xx', 'rms', 'std') and a  |
+        |                      | dataframe as values with monthly entries  with satellite columns, which include e.g. |
+        |                      | sisre, ... solutions                                                                 |
     """
     dsets = dset
     dfs = dict()
     dfs_day = dict()
+    dfs_day_sat = dict()
     dfs_month = dict()
+    dfs_month_sat = dict()
 
     statistics_def = ["mean", "percentile", "rms", "std"]
     statistics_cfg = config.tech[_SECTION].statistic.list
+    samples = config.tech[_SECTION].samples.list
 
     for statistic in statistics_cfg:
         if statistic not in statistics_def:
             log.fatal(f"Option '{statistic}' is not defined in 'statistic' option.")
         dfs_day.update({ statistic:  pd.DataFrame()})
+        dfs_day_sat.update({ statistic:  pd.DataFrame()})
         dfs_month.update({ statistic:  pd.DataFrame()})
+        dfs_month_sat.update({ statistic:  pd.DataFrame()})
 
     for solution, dset in dsets.items():
 
@@ -500,6 +526,8 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
         # Determine dataframe 
         df = dset.as_dataframe(fields=[
                     "time.gps", 
+                    "system",
+                    "satellite",
                     "age_of_ephemeris",
                     "clk_diff", 
                     "clk_diff_with_dt_mean", 
@@ -524,17 +552,78 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             dfs.update({solution: df})
 
             for type_ in dfs_day.keys():
+                
+                
+                if "daily" in samples:
+                    df_day_tmp, df_day_sat_tmp = _apply(df, "D", type_)
+                    
+                    df_day_tmp.index = df_day_tmp.index.strftime("%Y-%m-%d")
+                    df_day_tmp["solution"] = np.repeat(solution, df_day_tmp.shape[0])
+                    dfs_day[type_] = pd.concat([dfs_day[type_], df_day_tmp], axis=0)
+                    dfs_day[type_].index.name = "date"
+                    
+                    df_day_sat_tmp.index = df_day_sat_tmp.index.strftime("%Y-%m-%d")
+                    df_day_sat_tmp["solution"] = np.repeat(solution, df_day_sat_tmp.shape[0])
+                    dfs_day_sat[type_] = pd.concat([dfs_day_sat[type_], df_day_sat_tmp], axis=0)
+                    dfs_day_sat[type_].index.name = "date"
 
-                df_day_tmp = _apply(df, "D", type_)
-                df_day_tmp.index = df_day_tmp.index.strftime("%Y-%m-%d")
-                df_day_tmp["solution"] = np.repeat(solution, df_day_tmp.shape[0])
-                dfs_day[type_] = pd.concat([dfs_day[type_], df_day_tmp], axis=0)
-                dfs_day[type_].index.name = "date"
-
-                df_month_tmp = _apply(df, "M", type_)
-                df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
-                df_month_tmp["solution"] = np.repeat(solution, df_month_tmp.shape[0])
-                dfs_month[type_] = pd.concat([dfs_month[type_], df_month_tmp], axis=0)
-                dfs_month[type_].index.name = "date"
+                if "monthly" in samples:
+                    df_month_tmp, df_month_sat_tmp = _apply(df, "M", type_)
+                    df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
+                    df_month_tmp["solution"] = np.repeat(solution, df_month_tmp.shape[0])
+                    dfs_month[type_] = pd.concat([dfs_month[type_], df_month_tmp], axis=0)
+                    dfs_month[type_].index.name = "date"
+                    
+                    df_month_sat_tmp.index = df_month_sat_tmp.index.strftime("%b-%Y")
+                    df_month_sat_tmp["solution"] = np.repeat(solution, df_month_sat_tmp.shape[0])
+                    dfs_month_sat[type_] = pd.concat([dfs_month_sat[type_], df_month_sat_tmp], axis=0)
+                    dfs_month_sat[type_].index.name = "date"
   
-    return dfs, dfs_day, dfs_month
+    return dfs, dfs_day, dfs_month, dfs_day_sat, dfs_month_sat
+
+
+def _get_sat_fields(df: pd.core.frame.DataFrame) -> Tuple[WriterField]:
+    """Get satellite WriterField definition
+    
+    Args:
+        df: Dataframe
+        
+    Returns:
+        Tuple with WriterField definition for each satellite column
+    """
+    satellites = set(df.columns) - set(["date", "solution"])
+    field_sat = ([
+        WriterField(
+            "date",
+            object,
+            "%12s",
+            10,
+            "DATE",
+            "",
+            "Date in format yyyy-mm-dd or mmm-yyyy",
+        ),
+        WriterField(
+            "solution",
+            object,
+            "%30s",
+            28,
+            "SOLUTION",
+            "",
+            "Solution name",
+        ),
+    ])
+       
+    for sat in sorted(satellites):
+        field_sat = field_sat + ([
+            WriterField(
+                sat,
+                float,
+                "%11.4f",
+                11,
+                sat,
+                "meter",
+                f"95th percentile SISRE for satellite {sat}",
+            )
+    ])
+        
+    return field_sat
