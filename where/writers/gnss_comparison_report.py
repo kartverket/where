@@ -156,20 +156,20 @@ def _add_to_report(
             rpt.add_text(f"\n# {sample} {text_def[type_]} for given solutions\n\n")
       
             if sample == "Daily":
-                for field in field_def.keys():
+                for field in config.tech[_SECTION].fields.list:
                     dfs_day[type_][field].index = dfs_day[type_][field].index.strftime("%d-%m-%Y")
                     rpt.add_text(f"Daily {text_def[type_]} {field.upper()} results in meter:")
                     rpt.write_dataframe_to_markdown(dfs_day[type_][field], format="6.2f", statistic=True)
 
 
             elif sample == "Monthly":
-                for field in field_def.keys():
+                for field in config.tech[_SECTION].fields.list:
                     rpt.add_text(f"Monthly {text_def[type_]} {field.upper()} results in meter:")
                     rpt.write_dataframe_to_markdown(dfs_month[type_][field], format="6.2f")
 
 
             # Add plots
-            for field in field_def.keys():
+            for field in config.tech[_SECTION].fields.list:
                 rpt.add_figure(
                     f"{figure_dir}/plot_{type_}_{field}_{sample.lower()}_{file_vars['date']}_{file_vars['solution'].lower()}.{FIGURE_FORMAT}",
                     caption=f"{text_def[type_].capitalize()} for {field_def[field]}.",
