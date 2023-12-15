@@ -71,8 +71,8 @@ FIELDS = (
     WriterField(
         "solution",
         object,
-        "%30s",
-        30,
+        "%40s",
+        40,
         "SOLUTION",
         "",
         "Solution name",
@@ -174,8 +174,8 @@ FIELDS_SUM = (
     WriterField(
         "solution",
         object,
-        "%30s",
-        28,
+        "%40s",
+        38,
         "SOLUTION",
         "",
         "Solution name",
