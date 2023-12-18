@@ -428,6 +428,13 @@ def _additional_fields_to_dataset(
     dset.meta["frequencies"] = config.tech.frequencies.dict
     dset.meta["navigation_message_type"] = config.tech.navigation_message_type.dict
     dset.meta["systems"] = config.tech.systems.list
+    
+    # Remove unnecessary type information
+    for type_ in ["frequencies", "navigation_message_type", "systems"]:
+        systems = dset.meta[type_] if type(dset.meta[type_]) == list else dset.meta[type_].keys()
+        remove_systems = set(systems) - set(dset.unique("system"))
+        for sys in remove_systems:
+            del dset.meta[type_][sys]
 
 
 def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
