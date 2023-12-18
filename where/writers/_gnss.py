@@ -1,4 +1,4 @@
-"""Common functions used for plotting GNSS analysis results
+"""Common functions used for writing of GNSS pipeline analysis results
 
 Description:
 ------------
