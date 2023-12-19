@@ -428,6 +428,7 @@ def _additional_fields_to_dataset(
     dset.meta["frequencies"] = config.tech.frequencies.dict
     dset.meta["navigation_message_type"] = config.tech.navigation_message_type.dict
     dset.meta["systems"] = config.tech.systems.list
+    dset.meta["service"] = "HAS" if config.tech.apply_has_correction.bool else "OS"
     
     # Remove unnecessary type information
     for type_ in ["frequencies", "navigation_message_type", "systems"]:
