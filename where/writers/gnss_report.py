@@ -117,7 +117,7 @@ def gnss_report(dset: "Dataset") -> None:
         rpt.markdown_to_pdf()
 
 
-def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath") -> None:
+def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> None:
     """Add figures and tables to report
 
     Args:

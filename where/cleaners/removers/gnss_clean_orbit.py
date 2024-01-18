@@ -427,6 +427,10 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
     for sat in dset.unique("satellite"):
         sat_idx = dset.filter(satellite=sat)
         idx = dset.satellite[keep_idx] == sat
+        if dset.satellite[keep_idx][idx].size == 0:
+            log.warn(f"No observations of satellite {sat} are available after orbit data cleaning.")
+            continue
+
         if dset.satellite[keep_idx][idx].size == 1:
             log.warn(f"All observations of satellite {sat} are removed, because only a single observation epoch is "
                      f"left for satellite {sat} after orbit data cleaning (no interpolation possible).")

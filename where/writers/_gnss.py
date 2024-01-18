@@ -1,4 +1,4 @@
-"""Common functions used for plotting GNSS analysis results
+"""Common functions used for writing of GNSS pipeline analysis results
 
 Description:
 ------------
@@ -112,6 +112,7 @@ def get_grc_csv_row(
     }
 
     slot_def = {
+            "SVN41": "B3",
             "SVN43": "F6",
             "SVN44": "B3",
             "SVN45": "D3",

@@ -108,7 +108,7 @@ FIELDS = (
         8,
         "T-TOE",
         "second",
-        "Age of ephemeris, which is the difference between the observation time and the time of ephemeris " "(ToE)",
+        "Age of ephemeris, which is the difference between the observation time and the time of ephemeris (ToE)",
     ),
     # WriterField("diff_time_trans", "diff_time_trans", (), float, "%8d", 8, "T-TM", "", ""),
     WriterField(

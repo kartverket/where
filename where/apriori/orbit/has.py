@@ -183,7 +183,7 @@ class HasOrbit(orbit.AprioriOrbit):
         dset.add_float(
             "has_gnssiod_orb", 
             val=np.take(self.dset_edit.gnssiod, dset_has_idx), 
-            unit="meters", 
+            unit="", 
             write_level="operational",
         )
         
@@ -299,7 +299,7 @@ class HasOrbit(orbit.AprioriOrbit):
         dset.add_float(
             "has_gnssiod_clk", 
             val=np.take(self.dset_edit.gnssiod, dset_has_idx), 
-            unit="meters", 
+            unit="", 
             write_level="operational",
         )
         

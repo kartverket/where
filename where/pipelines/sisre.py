@@ -273,69 +273,8 @@ def calculate(stage: str, dset: "Dataset"):
             unit="meter",
         )
         orb_diff = orb_diff + dset.has_orbit_correction
-        #clk_diff = brdc.dset.gnss_satellite_clock - brdc.dset.bgd_e1_e5b * constant.c - precise.dset.gnss_satellite_clock + brdc.dset.bgd_e1_e5a * constant.c + dset.has_clock_correction + dcb_e1_e5b 
         clk_diff = clk_diff + dset.has_clock_correction + dset.has_code_bias_correction
-        
-        #+DEBUG        
-        # import matplotlib.pyplot as plt
-        # #clk_diff_com = brdc.satellite_clock_correction_com(ant_brdc, brdc_sys_freq) - precise.satellite_clock_correction_com(ant_precise, precise_sys_freq)
-        # #has_clk_diff_com = clk_diff_com + dset.has_clock_correction
-        
-        # clk_diff_apc = brdc.dset.gnss_satellite_clock - precise.dset.gnss_satellite_clock 
-        # has_clk_diff_apc = clk_diff_apc + dset.has_clock_correction - dcb_e1_e5b - brdc.dset.bgd_e1_e5b * constant.c + brdc.dset.bgd_e1_e5a * constant.c
-        
-        # fig, (ax1, ax2, ax3) = plt.subplots(3)
-        # ax1.scatter(dset.time.datetime, clk_diff_apc)
-        # ax1.set_title("Broadcast APC")
-        # ax2.scatter(dset.time.datetime, has_clk_diff_apc)
-        # ax2.set_title("HAS APC")
-        # ax3.scatter(dset.time.datetime, clk_diff_apc - has_clk_diff_apc)
-        # ax3.set_title("Difference Broadcast-HAS")
-        # plt.show()
-        
-        # has_clk_diff_apc = clk_diff_apc + dset.has_clock_correction + dcb_e1_e5b - brdc.dset.bgd_e1_e5b * constant.c + brdc.dset.bgd_e1_e5a * constant.c
-        # has_clk_diff_apc_dcb = clk_diff_apc + dset.has_clock_correction + dcb_e1_e5b + bias_precise
-        # fig, (ax1, ax2, ax3) = plt.subplots(3)
-        # ax1.scatter(dset.time.datetime, has_clk_diff_apc)
-        # ax1.set_title("HAS APC BGD")
-        # ax2.scatter(dset.time.datetime, has_clk_diff_apc_dcb)
-        # ax2.set_title("HAS APC DCB")
-        # ax3.scatter(dset.time.datetime, has_clk_diff_apc - has_clk_diff_apc_dcb)
-        # ax3.set_title("Difference")
-        # plt.show()
-        
-        
-        # has_clk_diff_apc = clk_diff_apc + dset.has_clock_correction + dcb_e1_e5b - brdc.dset.bgd_e1_e5b * constant.c + brdc.dset.bgd_e1_e5a * constant.c
-                
-        # # Loop over all GNSS
-        # has_clk_diff_mean = np.zeros(dset.num_obs)
-        # for sys in dset.unique("system"):
 
-        #     # Loop over all observation epochs
-        #     for epoch in dset.unique("time"):
-        #         idx = dset.filter(system=sys, time=epoch)
-
-        #         dt_mean = np.sum(has_clk_diff_apc[idx]) / len(has_clk_diff_apc[idx])  # Constellation average clock offset [m]
-        #         has_clk_diff_mean[idx] = clk_diff[idx] + dt_mean  # Satellite clock correction difference [m]
-        
-        # fig, (ax1, ax2, ax3) = plt.subplots(3)
-        # ax1.scatter(dset.time.datetime, has_clk_diff_apc)
-        # ax1.set_title("HAS APC")
-        # ax2.scatter(dset.time.datetime, has_clk_diff_mean)
-        # ax2.set_title("HAS APC with mean")
-        # ax3.scatter(dset.time.datetime, has_clk_diff_apc - has_clk_diff_mean)
-        # ax3.set_title("Difference")
-        
-        
-        # fig, (ax1, ax2, ax3) = plt.subplots(3)
-        # ax1.scatter(dset.time.datetime, has_clk_diff_mean)
-        # ax1.set_title("HAS APC with mean")
-        # ax2.scatter(dset.time.datetime, has_clk_diff_mean)
-        # ax2.set_title("HAS APC with mean + relativistic")
-        # ax3.scatter(dset.time.datetime, has_clk_diff_apc - has_clk_diff_mean + dset.delay.gnss_relativistic_clock)
-        # ax3.set_title("Difference")
-        # plt.show()
-        #-DEBUG
         
     # Calculate SISRE
     dset.add_float("clk_diff", val=clk_diff, unit="meter", write_level="operational")
@@ -489,6 +428,14 @@ def _additional_fields_to_dataset(
     dset.meta["frequencies"] = config.tech.frequencies.dict
     dset.meta["navigation_message_type"] = config.tech.navigation_message_type.dict
     dset.meta["systems"] = config.tech.systems.list
+    dset.meta["service"] = "HAS" if config.tech.apply_has_correction.bool else "OS"
+    
+    # Remove unnecessary type information
+    for type_ in ["frequencies", "navigation_message_type", "systems"]:
+        systems = dset.meta[type_] if type(dset.meta[type_]) == list else dset.meta[type_].keys()
+        remove_systems = set(systems) - set(dset.unique("system"))
+        for sys in remove_systems:
+            del dset.meta[type_][sys]
 
 
 def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
@@ -714,14 +661,28 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
         station=dset.vars["station"],
         apriori_orbit="broadcast",
     )
-    brdc.dset_raw.write()
-    brdc.dset_edit.write()
+    if util.check_write_level("analysis"):
+        brdc.dset_raw.vars = dset.vars.copy()
+        brdc.dset_raw.analysis = dset.analysis.copy()
+        brdc.dset_raw.write()
+
+        brdc.dset_edit.vars = dset.vars.copy()
+        brdc.dset_edit.analysis = dset.analysis.copy()
+        brdc.dset_edit.write()
     brdc.calculate_orbit(dset)
     
     # Read, edit and calculate precise orbit
     precise = apriori.get("orbit", rundate=dset.analysis["rundate"], apriori_orbit="precise")
-    precise.dset_raw.write()
-    precise.dset_edit.write()
+    precise.dset_raw.vars = dset.vars.copy()
+    precise.dset_raw.analysis = dset.analysis.copy()
+    if util.check_write_level("analysis"):
+        precise.dset_raw.vars = dset.vars.copy()
+        precise.dset_raw.analysis = dset.analysis.copy()
+        precise.dset_raw.write()
+
+        precise.dset_edit.vars = dset.vars.copy()
+        precise.dset_edit.analysis = dset.analysis.copy()
+        precise.dset_edit.write()
     precise.calculate_orbit(dset)
 
     # Generate common Dataset for broadcast and precise ephemeris
@@ -748,10 +709,17 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     not_common_sat = set(precise.dset.unique("satellite")).difference(set(brdc.dset.unique("satellite")))
     if not_common_sat:
         log.warn(f"The following satellites are not common in brodcast and precise ephemeris: {not_common_sat}")
+
+    # Update dataset vars and analysis variable
+    brdc.dset.vars = dset.vars.copy()
+    brdc.dset.analysis = dset.analysis.copy()
+    precise.dset.vars = dset.vars.copy()
+    precise.dset.analysis = dset.analysis.copy()
         
-    # Write dataset to file        
-    brdc.dset.write_as(stage="calculate", label="brdc")
-    precise.dset.write_as(stage="calculate", label="precise")
+    # Write dataset to file
+    if util.check_write_level("analysis"):
+        brdc.dset.write_as(stage="calculate", label="brdc")
+        precise.dset.write_as(stage="calculate", label="precise")
 
     return brdc, precise
 
