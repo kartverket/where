@@ -181,20 +181,21 @@ def plot_residuals(dset, sta_1, sta_2):
         plt.close()
 
 
-def plot_residual_rms(dates, rms, rms1, rms2, sta_1, sta_2, colors):
+def plot_residual_rms(dates, dates1, dates2, rms, rms1, rms2, sta_1, sta_2, colors):
     num_plots = 3
     ys = [rms, rms1, rms2]
+    ds = [dates, dates1, dates2]
     labels = ["All stations", sta_1, sta_2]
     norm = mcolors.Normalize(np.min(np.concatenate(colors)), np.max(np.concatenate(colors)))
     im = cm.ScalarMappable(norm=norm)
     fig, axs = plt.subplots(num_plots, figsize=(12, 6), dpi=150, sharex=True)
-    for i, (y, l) in enumerate(zip(ys, labels)):
-        color = np.full(len(y), fill_value=np.nan)
-        color[~np.isnan(y)] = colors[i][colors[i]!=0]
-        axs[i].scatter(dates, y, c=color, norm=norm, zorder=100)
+    for i, (d, y, l) in enumerate(zip(ds, ys, labels)):
+        #color = np.full(len(y), fill_value=np.nan)
+        #color[~np.isnan(y)] = colors[i][colors[i]!=0]
+        axs[i].scatter(d, y, c=colors[i], norm=norm, zorder=100)
         axs[i].set(ylabel=l)
         axs[i].set_ylim((0.0, 0.03))
-        #axs[i].set_xlim((min(dates) - timedelta(days=1), max(dates) + timedelta(days=1)))
+        axs[i].set_xlim((min(dates) - timedelta(days=1), max(dates) + timedelta(days=1)))
         axs[i].grid(axis="y", linestyle="--")
         axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
         axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
@@ -343,8 +344,6 @@ colors = [dset_ts.num_obs_estimate[idx],
 
 num_obs_bs = []
 rms = []
-rms_sta_1 = []
-rms_sta_2 = []
 baseline_length = []
 baseline_length_ferr = []
 baseline_dates = []
@@ -357,8 +356,14 @@ idx_sta1 = dset_ts.filter(station=station1)
 idx_sta2 = dset_ts.filter(station=station2)
 
 rms_sta_1 = dset_ts.rms_residual_estimate[idx_sta1]
-rma_sta_2 = dset_ts.rms_residual_estimate[idx_sta2]
+rms_sta_2 = dset_ts.rms_residual_estimate[idx_sta2]
+
+dates_sta_1 = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx_sta1]])
+dates_sta_2 = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx_sta2]])
 #import IPython; IPython.embed()
+
+# Plots from timeseries
+plot_residual_rms(dates, dates_sta_1, dates_sta_2, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
 
 # Plot per session
 for rundate, session_code in zip(dates, session_codes):
@@ -417,7 +422,7 @@ local_tie = data.get(baseline1) or data.get(baseline2)
 plot_statistics(dates, dof, variance_factor, colors[0])
 plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs, station1, station2, local_tie)
 
-plot_residual_rms(dates, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
+#plot_residual_rms(dates, dates_sta_1, dates_sta_2, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
 
 # Plot timeseries of estimated station coordinate corrections
 plot_station_pos(dset_ts, station1)
