@@ -79,18 +79,18 @@ def get_grc_csv_row(
 
     business_def = {
             "Galileo": {
-                "hpe": "FOM-OS-08 Horizontal Positioning Service Accuracy per Station over Month",
-                "site_vel_3d": "FOM-OS-14 3D Velocity Service Accuracy per Station over Month",
-                "sisre": "SDD-OS-08 SIS Ranging Accuracy over All Satellites over Month",
-                "sisre_sat": "SDD-OS-09 SIS Ranging Accuracy per Satellite over Month",
-                "vpe": "FOM-OS-09 Vertical Positioning Service Accuracy per Station over Month",
+                "hpe": "FOM-OS-07 Horizontal Positioning Service Accuracy per Station over Month",
+                "site_vel_3d": "FOM-OS-11 3D Velocity Service Accuracy per Station over Month",
+                "sisre": "SDD-OS-09 SIS Ranging Accuracy at GA over All Satellites over Month",
+                "sisre_sat": "SDD-OS-10 SIS Ranging Accuracy at GA per Satellite over Month",
+                "vpe": "FOM-OS-08 Vertical Positioning Service Accuracy per Station over Month",
             },
             "GPS": {
-                "hpe": "FOM-OS-08 Horizontal Positioning Service Accuracy per Station over Month",
-                "site_vel_3d": "FOM-OS-14 3D Velocity Service Accuracy per Station over Month",
+                "hpe": "FOM-OS-07 Horizontal Positioning Service Accuracy per Station over Month",
+                "site_vel_3d": "FOM-OS-11 3D Velocity Service Accuracy per Station over Month",
                 "sisre": "SPS-OS-02 SIS Ranging Accuracy over All Satellites over Month",
-                "sisre_sat": "SPS-OS-04 SIS Ranging Accuracy per Satellite over Month",
-                "vpe": "FOM-OS-09 Vertical Positioning Service Accuracy per Station over Month",
+                "sisre_sat": "SPS-OS-03 SIS Ranging Accuracy per Satellite over Month",
+                "vpe": "FOM-OS-08 Vertical Positioning Service Accuracy per Station over Month",
             },
     }
 
