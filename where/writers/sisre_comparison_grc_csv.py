@@ -24,9 +24,7 @@ from midgard.dev import plugins
 
 # Where imports
 import where
-from where.lib import config
-from where.lib import log
-from where.lib import util
+from where.lib import config, log, util
 from where.writers._gnss import get_grc_csv_header, get_grc_csv_row
 
 
