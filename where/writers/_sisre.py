@@ -254,15 +254,15 @@ def _add_columns(solution: str, dset: "Dataset", df: pd.core.frame.DataFrame) ->
     
     # Add fields as column to dataframe
     df["solution"] = np.repeat(solution, num_obs)
-    if frequency:
-        df["frequency"] = np.repeat(frequency, num_obs)
-    if navigation_type:
-        df["navigation_type"] = np.repeat(navigation_type, num_obs)  
-    if service:
-        df["service"] = np.repeat(service, num_obs)
     if system:
         df["system"] = np.repeat(system, num_obs)
-        
+    if service:
+        df["service"] = np.repeat(service, num_obs)
+    if navigation_type:
+        df["navigation_type"] = np.repeat(navigation_type, num_obs) 
+    if frequency:
+        df["frequency"] = np.repeat(frequency, num_obs)
+ 
 
 def _apply(
         df: pd.core.frame.DataFrame, 
