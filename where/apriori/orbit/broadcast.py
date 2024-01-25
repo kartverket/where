@@ -347,6 +347,14 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             cleaners.apply_remover("gnss_clean_orbit", dset_in, orbit_flag="broadcast", orbit=self)
         dset_brdc_idx = dset_in.navigation_idx.astype(int)
 
+        # Add used navigation message type (useful for postprocessing of Where results)
+        navigation_message_type = config.tech.navigation_message_type.dict
+        systems = dset_in.unique("system")
+        for sys in list(navigation_message_type.keys()):
+            if sys not in dset_in.unique("system"):
+                del navigation_message_type[sys]  # Remove unused navigation message types
+        dset_in.meta["navigation_message_type"] = navigation_message_type
+
         # Loop over all observations
         # TODO: Generation of vectorized solution, if possible?
 
@@ -394,7 +402,6 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             dset_out.add_float("has_gnssiod_orb", val=dset_in.has_gnssiod_orb)
 
         # Add time field
-        # MURKS, TODO: How it works to initialize time field with a Time object?
         dset_out.add_time("used_transmission_time", val=self.dset_edit.transmission_time[dset_brdc_idx])
         dset_out.add_time("used_toe", val=self.dset_edit.toe[dset_brdc_idx])
 
