@@ -426,17 +426,13 @@ def _additional_fields_to_dataset(
     dset.meta["pco_sat_brdc"] = brdc.dset.meta["pco_sat"]
     dset.meta["pco_sat_precise"] = precise.dset.meta["pco_sat"]
     dset.meta["frequencies"] = config.tech.frequencies.dict
-    dset.meta["navigation_message_type"] = config.tech.navigation_message_type.dict
-    dset.meta["systems"] = config.tech.systems.list
+    dset.meta["systems"] = list(dset.unique("system"))
     dset.meta["service"] = "HAS" if config.tech.apply_has_correction.bool else "OS"
     
-    # Remove unnecessary type information
-    for type_ in ["frequencies", "navigation_message_type", "systems"]:
-        systems = dset.meta[type_] if type(dset.meta[type_]) == list else dset.meta[type_].keys()
-        remove_systems = set(systems) - set(dset.unique("system"))
-        for sys in remove_systems:
-            del dset.meta[type_][sys]
-
+    # Remove unused frequencies
+    for sys in list(dset.meta["frequencies"].keys()):
+        if sys not in dset.meta["systems"]:
+            del dset.meta["frequencies"][sys]  # Remove unused navigation message types
 
 def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
     """Determine satellite biases for broadcast and precise orbits
