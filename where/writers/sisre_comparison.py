@@ -25,9 +25,7 @@ from midgard.writers.csv_ import csv_
 
 # Where imports
 import where
-from where.lib import config
-from where.lib import log
-from where.lib import util
+from where.lib import config, log, util
 from where.writers._sisre import generate_dataframes, generate_dataframe_summary
 
 # Name of section in configuration
