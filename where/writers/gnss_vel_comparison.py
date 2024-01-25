@@ -19,15 +19,17 @@ import numpy as np
 import pandas as pd
 
 # Midgard imports
+from midgard.collections import enums
 from midgard.data import position
 from midgard.dev import plugins
 from midgard.writers._writers import get_header
 
 # Where imports
 import where
-from where.lib import config
-from where.lib import log
-from where.lib import util
+from where.lib import config, log, util
+
+# Name of section in configuration
+_SECTION = "_".join(__name__.split(".")[-1:])
 
 WriterField = namedtuple(
     "WriterField", ["name", "dtype", "format", "width", "header", "unit", "description"]
@@ -87,6 +89,33 @@ FIELDS = (
         "STAT",
         "",
         "Station name",
+    ),
+    WriterField(
+        "system",
+        object,
+        "%10s",
+        10,
+        "SYS",
+        "",
+        "GNSS system",
+    ),
+    WriterField(
+        "navigation_type",
+        object,
+        "%6s",
+        6,
+        "NAV",
+        "",
+        "Navigation message type used in analysis",
+    ),
+    WriterField(
+        "observation_type",
+        object,
+        "%9s",
+        9,
+        "OBS",
+        "",
+        "Observation type used in analysis",
     ),
     WriterField(
         "site_vel_east",
@@ -236,8 +265,8 @@ FIELDS_SUM = (
 
 
 @plugins.register
-def gnss_comparison(dset: "Dataset") -> None:
-    """Compare GNSS datasets
+def gnss_vel_comparison(dset: "Dataset") -> None:
+    """Compare GNSS site velocity datasets
 
     Args:
         dset:  Dictionary with station name as keys and the belonging Dataset as value
@@ -245,7 +274,11 @@ def gnss_comparison(dset: "Dataset") -> None:
     output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech.gnss_vel_comparison_report.solution.str.lower()
+    file_vars["solution"] = config.tech[_SECTION].solution.str.lower()
+
+    # CSV file options
+    mode_csv = config.tech[_SECTION].mode_csv.str
+    write_csv = config.tech[_SECTION].write_csv.bool
     
      # Get dataframes for writing
     _, df_day, df_month, _, _ = _generate_dataframes(dset)
@@ -257,7 +290,7 @@ def gnss_comparison(dset: "Dataset") -> None:
     df_month = df_month.reset_index()
  
     # Write files for daily and monthly solutions
-    samples = config.tech.gnss_vel_comparison.samples.list
+    samples = config.tech[_SECTION].samples.list
     if "daily" in samples:
         output_defs.update({
               "day": df_day,
@@ -300,7 +333,54 @@ def gnss_comparison(dset: "Dataset") -> None:
             delimiter="",
             encoding="utf8",
         )
-      
+
+        # Write daily and monthly CSV files
+        if write_csv:
+            file_vars_tmp = file_vars.copy()
+            file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}")
+            file_path = config.files.path("output_gnss_vel_comparison_csv", file_vars=file_vars_tmp)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            log.info(f"Write '{type_}' comparison file {file_path} in CSV format.")
+            output_array.to_csv(file_path, float_format="%.3f", index=False, na_rep="nan", mode=mode_csv)
+
+
+#
+# AUXILIARY FUNCTIONS
+#      
+def _add_columns(station: str, dset: "Dataset", df: pd.core.frame.DataFrame) -> None:
+    """Add additional columns to dataframe
+    
+    Args:
+        solution: Station name
+        dset:     A dataset containing the data.
+        df:       Dataframe. 
+    """
+    num_obs = df.shape[0]
+    
+    # Get fields to add (Note: Check if more than one GNSS is defined, which should normally not be the case.)
+    system = None if len(dset.unique("system")) > 1 else dset.unique("system")[0] 
+    if system is None:
+        log.fatal(f"More than one GNSS is defined ({dset.unique('system')}). The writer does not handle this.")
+
+    observation_type = "/".join(dset.meta["obstypes"][system])
+
+    if "navigation_message_type" in dset.meta.keys():
+    	navigation_type = "" if len(dset.meta["navigation_message_type"].keys()) > 1 else list(dset.meta["navigation_message_type"].values())[0]
+    else:
+        #TODO/MURKS: This is only a workaround until all datasets have included the 'navigation_message_type' meta variable.
+        if system == "G":
+            navigation_type = "LNAV"
+        elif system == "E":
+            navigation_type = "FNAV" if "5" in observation_type else "INAV"
+        else:
+            log.fatal("The analysis for the GNSS '{system}' is not implemented.")
+           
+    # Add fields as column to dataframe
+    df["station"] = np.repeat(station, num_obs)
+    df["system"] = np.repeat(enums.gnss_id_to_name[system].value, num_obs)
+    df["navigation_type"] = np.repeat(navigation_type, num_obs) 
+    df["observation_type"] = np.repeat(observation_type, num_obs)
+
              
 def _generate_dataframe_summary(df: pd.core.frame.DataFrame, index: str) -> pd.core.frame.DataFrame:
     """Determine dataframe summary with mean, minimal and maximal values for each numeric column
@@ -462,6 +542,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
             dfs.update({station: df})
 
             df_day_tmp = df.set_index("date").resample("D").apply(lambda x: np.nanpercentile(x, q=95))
+            _add_columns(station, dset, df_day_tmp) 
             for field in dfs_day_field.keys():
                 if dfs_day_field[field].empty:
                     dfs_day_field[field][station] = df_day_tmp[field]
@@ -474,6 +555,7 @@ def _generate_dataframes(dset: Dict[str, "Dataset"]) -> Dict[str, pd.core.frame.
 
             df_month_tmp = df.set_index("date").resample("M").apply(lambda x: np.nanpercentile(x, q=95))
             df_month_tmp.index = df_month_tmp.index.strftime("%b-%Y")
+            _add_columns(station, dset, df_month_tmp)
             for field in dfs_month_field.keys():
                 dfs_month_field[field][station] = df_month_tmp[field]
 
