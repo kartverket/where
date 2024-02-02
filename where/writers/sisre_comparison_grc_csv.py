@@ -27,6 +27,9 @@ import where
 from where.lib import config, log, util
 from where.writers._gnss import get_grc_csv_header, get_grc_csv_row
 
+# Name of section in configuration
+_SECTION = "_".join(__name__.split(".")[-1:])
+
 
 @plugins.register
 def sisre_comparison_grc_csv(dset: "Dataset") -> None:
@@ -37,11 +40,19 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
     """
     output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
-    _,nav_msg,mode = dset_first.vars["profile"].split("_")[0:3]
-
-    # Get file path
+    
+    # Get file variables
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
+    for sol in dset.keys(): # Add service information (OS and/or HAS) to file variables
+        if "HAS" in dset[sol].meta["service"]:
+            file_vars["service"] = "has"
+            file_vars["SERVICE"] = "HAS"
+            break
+        else:
+            file_vars["service"] = "os"
+            file_vars["SERVICE"] = "OS"
+
+    # Open file path
     file_path = config.files.path("output_sisre_comparison_grc_csv", file_vars=file_vars)
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
