@@ -308,10 +308,19 @@ def sisre_comparison(dset: "Dataset") -> None:
     """
     output_defs = dict()
     dset_first = dset[list(dset.keys())[0]]
-    file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech[_SECTION].solution.str.lower()
     samples = config.tech[_SECTION].samples.list
-    
+
+    # Get file variables
+    file_vars = {**dset_first.vars, **dset_first.analysis}
+    for sol in dset.keys(): # Add service information (OS and/or HAS) to file variables
+        if "HAS" in dset[sol].meta["service"]:
+            file_vars["service"] = "has"
+            file_vars["SERVICE"] = "HAS"
+            break
+        else:
+            file_vars["service"] = "os"
+            file_vars["SERVICE"] = "OS"
+
     # CSV file options
     mode_csv = config.tech[_SECTION].mode_csv.str
     write_csv = config.tech[_SECTION].write_csv.bool
@@ -357,7 +366,7 @@ def sisre_comparison(dset: "Dataset") -> None:
         for sample, output_array in output_defs.items():
             
             file_vars_tmp = file_vars.copy()
-            file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}_{sample}")
+            file_vars_tmp.update(solution=f"{type_}_{sample}")
             file_path = config.files.path("output_sisre_comparison", file_vars=file_vars_tmp)
             file_path.parent.mkdir(parents=True, exist_ok=True)
             
@@ -390,7 +399,7 @@ def sisre_comparison(dset: "Dataset") -> None:
             # Write daily and monthly CSV files
             if write_csv:
                 file_vars_tmp = file_vars.copy()
-                file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}_{sample}")
+                file_vars_tmp.update(solution=f"{type_}_{sample}")
                 file_path = config.files.path("output_sisre_comparison_csv", file_vars=file_vars_tmp)
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 log.info(f"Write '{sample}' comparison file {file_path} in CSV format.")
