@@ -54,6 +54,17 @@ def sisre_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
 
+    # Get file variables
+    file_vars = {**dset_first.vars, **dset_first.analysis}
+    for sol in dset.keys(): # Add service information (OS and/or HAS) to file variables
+        if "HAS" in dset[sol].meta["service"]:
+            file_vars["service"] = "has"
+            file_vars["SERVICE"] = "HAS"
+            break
+        else:
+            file_vars["service"] = "os"
+            file_vars["SERVICE"] = "OS"
+
     # Generate figure directory to save figures generated for SISRE report
     figure_dir = config.files.path("output_sisre_comparison_report_figure", file_vars=file_vars)
     figure_dir.mkdir(parents=True, exist_ok=True)
