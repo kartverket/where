@@ -29,13 +29,14 @@ from where.lib import log
 from where.lib import util
 
 
-PlotConfig = namedtuple("PlotConfig", ["label", "statistic", "format"])
+PlotConfig = namedtuple("PlotConfig", ["label", "statistic", "format", "ylim"])
 PlotConfig.__doc__ = """A convenience class for defining a field for subplot configuration
 
     Args:
-        label (str):      Label
-        statistic(bool):  Flag for plotting statistical information in title or not
-        format (str):     Format of statistical values (e.g. mean or rms) in title
+        label (str):        Label
+        statistic(bool):    Flag for plotting statistical information in title or not
+        format (str):       Format of statistical values (e.g. mean or rms) in title
+        ylim (List[float]): Define y-axis range (Default: None)
     """
 
 SubplotConfig = namedtuple("SubplotConfig", ["ylabel", "color", "ydata"])
@@ -54,15 +55,18 @@ GNSS_NAME = {"C": "BeiDou", "E": "Galileo", "G": "GPS", "I": "IRNSS", "J": "QZSS
 
 # TODO: How to get statistical format specification to work?
 PLOTCONFIG = {
-    "age_of_ephemeris": PlotConfig("Age of ephemeris", True, ".0f"),
-    "sisre": PlotConfig("SISE", True, ".2f"),
-    "sisre_orb": PlotConfig("orbit-only SISE", True, ".2f"),
-    "orb_diff_3d": PlotConfig("3D orbit error", True, ".2f"),
-    "clk_diff": PlotConfig("Clock difference \n without mean", True, ".2f"),
-    "clk_diff_with_dt_mean": PlotConfig("Clock difference", True, ".2f"),
-    "bias_brdc": PlotConfig("Satellite bias of broadcast clocks", True, ".0f"),
-    "bias_precise": PlotConfig("Satellite bias of precise clocks", True, ".0f"),
-    "used_iode": PlotConfig("IODE", False, ".0f"),
+    "age_of_ephemeris": PlotConfig("Age of ephemeris", True, ".0f", None),
+    #"sisre": PlotConfig("SISE", True, ".2f", [0.0, 1.75]),
+    "sisre": PlotConfig("SISE", True, ".2f", [0.0, 5.0]),
+    "sisre_orb": PlotConfig("orbit-only SISE", True, ".2f", None),
+    #"orb_diff_3d": PlotConfig("Orbit accuracy", True, ".2f", [0.0, 2.0]),
+    "orb_diff_3d": PlotConfig("Orbit accuracy", True, ".2f", [0.0, 6.0]),
+    "clk_diff": PlotConfig("Clock accuracy \n without mean", True, ".2f", None),
+    #"clk_diff_with_dt_mean": PlotConfig("Clock accuracy", True, ".2f", [-1.6, 2.0]),
+    "clk_diff_with_dt_mean": PlotConfig("Clock accuracy", True, ".2f", [-5.0, 5.0]),
+    "bias_brdc": PlotConfig("Satellite bias of broadcast clocks", True, ".0f", None),
+    "bias_precise": PlotConfig("Satellite bias of precise clocks", True, ".0f", None),
+    "used_iode": PlotConfig("IODE", False, ".0f", None),
 }
 
 UNIT_TITLE = {"": "", "meter": "m", "minute": "min", "second": "s"}
@@ -201,13 +205,19 @@ def _insert_kartverket_logo(fig):
 # SCATTER SUPPLOTS
 #
 def _plot_scatter_subplots(
-    dset: "Dataset", fields: List[str], systems: List[str], satellites: List[str], options: Dict[str, Any]
+            dset: "Dataset", 
+            fields: List[str], 
+            systems: List[str], 
+            satellites: List[str], 
+            options: Dict[str, Any],
 ) -> None:
     """Generate scatter subplot
     Args:
-       dset:       A dataset containing the data.
-       field:      Dataset field.
-       options:    Dictionary with options, which overwrite default plot configuration.
+       dset:        A dataset containing the data.
+       field:       Dataset field.
+       systems:     Defined GNSSs for plotting.
+       satellites:  Defined GNSS satellites for plotting.
+       options:     Dictionary with options, which overwrite default plot configuration.
     """
     # Generate plot for each GNSS
     for sys in systems:
@@ -313,14 +323,20 @@ def _plot_scatter_subplots(
 
 
 def _plot_scatter_field(
-    dset: "Dataset", field: List[str], systems: List[str], satellites: List[str], options: Dict[str, Any]
+                dset: "Dataset", 
+                field: List[str], 
+                systems: List[str], 
+                satellites: List[str], 
+                options: Dict[str, Any],
 ) -> None:
     """Scatter plot of given field
 
     Args:
-       dset (Dataset):           A dataset containing the data.
-       field (str):              Dataset field.
-       legend(bool):             Plot legend or not.
+       dset:        A dataset containing the data.
+       field:       Dataset field.
+       systems:     Defined GNSSs for plotting.
+       satellites:  Defined GNSS satellites for plotting.
+       options:     Dictionary with options, which overwrite default plot configuration.
 
     Returns:
         None
@@ -382,6 +398,9 @@ def _plot_scatter_field(
 
         if options["ylim"]:
             plt.ylim([float(options["ylim"][0]), float(options["ylim"][1])])
+        else:
+            if PLOTCONFIG[field].ylim:
+                plt.ylim(PLOTCONFIG[field].ylim) 
         ylabel = f"{PLOTCONFIG[field].label} [{UNIT_YLABEL[unit]}]" if UNIT_YLABEL[unit] else f"{PLOTCONFIG[field].label}"
         plt.ylabel(ylabel)
         plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
