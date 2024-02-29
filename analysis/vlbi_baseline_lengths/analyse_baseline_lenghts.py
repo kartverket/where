@@ -140,7 +140,7 @@ def plot_baselines(baselines, id_txt, local_ties):
         baseline_length = data["length"]
         baseline_length_ferr = data["ferr"]
         color = data["num_obs"]
-        repeatability = data.get("repeatability", np.nan)
+        repeatability = data.get("repeatability", np.nan) * Unit.m2mm
         trend = data.get("trend")
         trend_rate = data.get("trend_rate", np.nan) * Unit.m2mm
         
@@ -166,7 +166,7 @@ def plot_baselines(baselines, id_txt, local_ties):
         ax1.set_ylabel("Baseline length [m]")
         if trend is not None or local_tie:
             ax1.legend()
-        ax1.set_title(f"{baseline} Baseline Length Repeatability: {repeatability:6.4f} [m]")
+        ax1.set_title(f"{baseline} Baseline Length Repeatability: {repeatability:6.2f} [mm]")
 
         # Colorbar
         cbar = fig.colorbar(im, cax=ax2, pad=0.05)
@@ -344,6 +344,8 @@ def blr(bl, decimalyear, ferr):
         baseline length repeatability
         mean baseline length (after detrending)
         trend
+        trend_rate
+        keep_idx (index of used dates)
         
     """
     keep_idx = (ferr != 0) & ~np.isnan(ferr)
