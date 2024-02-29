@@ -144,23 +144,41 @@ def plot_baselines(baselines, id_txt, local_ties):
         trend = data.get("trend", [np.nan]*len(dates))
         
         fig = plt.figure(figsize=(12, 10), dpi=150)
-        plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
-        im = plt.scatter(dates, baseline_length, c=color, zorder=100)
-        plt.plot(dates, trend, label="trend")
+
+        # Bounding boxes: left, bottom, width, height
+        ax1 = fig.add_axes([0.1, 0.1, 0.8, 0.8]) # Baselines
+        ax2 = fig.add_axes([0.93, 0.2, 0.02, 0.68]) # Colorbar
+        ax3 = fig.add_axes([0.91, 0.11, 0.08, 0.08], projection=ccrs.Mollweide()) # World map
+
+        # Baselines
+        ax1.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
+        im = ax1.scatter(dates, baseline_length, c=color, zorder=100)
+        ax1.plot(dates, trend, label="trend")
         if local_tie:
-            plt.axhline(local_tie, label="local tie")
-        plt.gca().get_xaxis().set_major_formatter(mdates.DateFormatter(DATE_FMT))
-        plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))
-        plt.gca().ticklabel_format(axis="y", style="plain")
-        plt.gca().yaxis.get_major_formatter().set_useOffset(False)
-        plt.grid(axis="y", linestyle="--")
-        plt.ylabel("Baseline length [m]")
-        plt.title(f"{baseline} Baseline Length Repeatability: {repeatability:6.4f} [m]")
-        plt.legend()
-        cbar = fig.colorbar(im, use_gridspec=True)
+            ax1.axhline(local_tie, label="local tie")
+        ax1.get_xaxis().set_major_formatter(mdates.DateFormatter(DATE_FMT))
+        ax1.xaxis.set_major_locator(mt.LinearLocator(numticks=7))
+        ax1.ticklabel_format(axis="y", style="plain")
+        ax1.yaxis.get_major_formatter().set_useOffset(False)
+        ax1.grid(axis="y", linestyle="--")
+        ax1.set_ylabel("Baseline length [m]")
+        ax1.legend()
+        ax1.set_title(f"{baseline} Baseline Length Repeatability: {repeatability:6.4f} [m]")
+
+        # Colorbar
+        cbar = fig.colorbar(im, cax=ax2, pad=0.05)
         cbar.set_label("Number of observations on baseline used in solution")
+
+        # World map
+        lat = np.concatenate((data["lat_1"], data["lat_2"]))
+        lon = np.concatenate((data["lon_1"], data["lon_2"]))
+        ax3.set_global()
+        ax3.coastlines()
+        ax3.plot(lon, lat, c="red", transform=ccrs.Geodetic())
+        ax3.scatter(lon, lat, color="red", transform=ccrs.PlateCarree())
         plt.savefig(f"img/{id_txt}/Baseline_{sta_1}_{sta_2}_{id_txt}.png", bbox_inches="tight")
         plt.close()
+
 
 
 def save_repeatability(baselines, id_txt="default"):
