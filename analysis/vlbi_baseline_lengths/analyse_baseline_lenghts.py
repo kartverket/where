@@ -354,7 +354,7 @@ def blr(bl, decimalyear, ferr):
     w_sum = np.sum(w)
     lin_func = np.polynomial.Polynomial.fit(decimalyear[keep_idx], bl[keep_idx], 1, w=w)
     trend = lin_func(decimalyear)
-    trend_rate = lin_func.coef[1]
+    trend_rate = lin_func.convert().coef[1]
 
     bl_mean = np.mean(trend)
     blr = np.sqrt(np.sum(w * (bl[keep_idx] - trend[keep_idx]) ** 2) / (w_sum - np.sum(w ** 2) / w_sum))
