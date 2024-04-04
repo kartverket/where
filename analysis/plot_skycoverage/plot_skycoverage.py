@@ -74,13 +74,10 @@ def plot_skycoverage(residuals, elevation, azimuth, station, label):
         '315' + degree_sign,
     ]
     ax.set_thetagrids(range(0, 360, 45), theta_labels)
-    #ax.set_yticks(range(0, 100, 10))
     cbar = plt.colorbar(im, use_gridspec=True, pad=0.1)
     cbar.set_label("Absolute value of residual after estimation [m]")
-    #plt.tight_layout()
-    sub_dir = "Skyplot"
-    os.makedirs(f"img/{dset_id}/{sub_dir}", exist_ok=True)
-    fig.savefig(f"img/{dset_id}/{sub_dir}/{sub_dir}_{station}_{label}_{dset_id}.png", bbox_inches="tight")
+    os.makedirs(f"img/{dset_id}/", exist_ok=True)
+    fig.savefig(f"img/{dset_id}/Skyplot_{station}_{label}_{dset_id}.png", bbox_inches="tight")
     plt.close()
 
 
@@ -88,7 +85,7 @@ def plot_skycoverage(residuals, elevation, azimuth, station, label):
 # Program starts execution here
     
 
-parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id nyale13s0 --station NYALE13S",
+parser = argparse.ArgumentParser(epilog="Example: python plot_skycoverage.py --id nyales --station NYALE13S",
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="")
 parser.add_argument("--start", help="Start date to look for sessions in master files. Format: YYYY-mm-dd", type=date.fromisoformat, default=date.min)
