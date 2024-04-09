@@ -39,17 +39,19 @@ def get_residuals(dset_session, station):
     return list(np.abs(residuals)), list(elevation), list(azimuth)
 
 def plot_skycoverage(residuals, elevation, azimuth, station, label):
-    title = f"{station} {label.replace('_', ' ')}"
+    title = f"{station}"
 
     fig = plt.figure(figsize=(8, 8), dpi=150)
     plt.set_cmap("cool")
+
+    norm = mpl.colors.Normalize(vmin=0, vmax=0.1)
     ax = fig.add_subplot(111, projection="polar")
     ax.set_theta_zero_location('N')
     ax.set_theta_direction(-1)
     elevation = np.degrees(elevation)
     # Invert data because inverting axis is hard
     elevation = 90 - elevation
-    im = ax.scatter(azimuth, elevation, c=residuals, marker=".", alpha=0.75)
+    im = ax.scatter(azimuth, elevation, c=residuals, marker=".", alpha=0.75, norm=norm)
     ax.set_title(title)
     # Change labels because elevation is "inverted"
     degree_sign = u'\N{DEGREE SIGN}'
@@ -116,7 +118,8 @@ idx = dset_ts.filter(station="all")
 dates = np.array([datetime.strptime(dt, "%Y-%m-%d").date() for dt in dset_ts.rundate[idx]])
 idx2 = np.logical_and(dates >= start, dates <= end)
 session_codes = dset_ts.session_code[idx][idx2]
-
+num_obs_total = np.sum(dset_ts.num_obs_estimate[idx])
+print(f"{dset_id}: Number of observations total: {num_obs_total}")
 # Accumulated residuals, elevation and azimuth angles
 acc_r = {}
 acc_e = {}
@@ -143,3 +146,5 @@ for i, (rundate, session_code) in enumerate(zip(dates[idx2], session_codes)):
 
 for s in stations:
     plot_skycoverage(acc_r[s], acc_e[s], acc_a[s], s, label=f"{start}_{end}")
+    print(f"{dset_id}: Number of observations total for {s}: {len(acc_r[s])}")
+
