@@ -36,6 +36,11 @@ def get_residuals(dset_session, station):
     elevation = np.concatenate((elevation1, elevation2))
     azimuth = np.concatenate((azimuth1, azimuth2))
 
+    #el1 = np.degrees(elevation1) < 15
+    #el2 = np.degrees(elevation2) < 15
+    #if station == "NYALE13S" and (any(el1) or any(el2)):
+    #    num_el = np.sum(el1) + np.sum(el2)
+    #    print(f"Elevation below 15 degrees for {num_el} obs for {station} in session {dset_session.vars['rundate']} {dset_session.vars['session_code']}")
     return list(np.abs(residuals)), list(elevation), list(azimuth)
 
 def plot_skycoverage(residuals, elevation, azimuth, station, label):

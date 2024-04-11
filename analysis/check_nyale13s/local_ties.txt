@@ -1,4 +1,6 @@
 WETTZ13N/WETTZELL  123.3070 # https://ivscc.gsfc.nasa.gov/publications/gm2018/33_schueler_etal.pdf
+WETTZ13N/WETTZ13S   69.5441 # see above
+WETTZ13S/WETTZELL  187.1944 # see above
 NYALE13S/NYALES20 1539.1931 # Oddvar
 NYALE13N/NYALES20 1624.4546 # Oddvar
 NYALE13S/NYALE13N   85.3312 # Oddvar
