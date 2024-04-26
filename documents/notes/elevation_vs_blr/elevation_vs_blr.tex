@@ -25,8 +25,10 @@ NYALE13S started observing in February 2020 with a triband receiver and NYALES20
 
 The baseline length repeatability of the NYALE13S/NYALES20 baseline have been higher than the similar baseline in Germany between WETTZELL and WETTZ13N \cite{kirkvik2021}. NYALES20 and WETTZELL are both old 20-meter antennas that have participated in many global sessions and are regularly contributing to the determination of earth orientation parameters and the international terrestrial reference frame. Like NYALE13S, WETTZ13N is a 13-meter antenna with a legacy receiver (S/X) that has observed many session together with the local 20-meter antenna. There is also a third station, WETTZ13S, in Germany with a VGOS receiver.
 
+\sloppy
 The NYALES20/NYALE13S baseline is approximately 1540 meters and the WETTZELL/WETTZ13N baseline is approximately 120 meters. The German baseline is shorter than the Norwegian one, but in a VLBI context where baselines usually are intercontinental, both these baselines are short. This study investigates one potential candidate for the different performance of the two baselines.
 
+\fussy
 In GNSS, there is the concept of Position Dilution Of Precision (PDOP). This parameter says something about the expected precision of a position based on the satellite geometry. A good spread of satellites in the sky yields a better PDOP value. It is therefore desirable to have many satellites at different elevation and azimuth angles. Similarly, in VLBI it is desirable to have many observations to radio sources at different positions in the sky. In addition, the data from satellites and radio sources at low elevation angles have a longer travel path through the troposphere and therefore provide useful information about the troposphere. In both GNSS and VLBI analysis, the troposphere needs to be estimated to be able to remove the effect of the troposphere on the signal path. The theory is then that the observations at low elevation angles are especially valuable to the data analysis. This has been studied and verified already. See for instance \cite{teke2008}. % https://ivscc.gsfc.nasa.gov/publications/gm2008/teke.pdf == https://yunus.hacettepe.edu.tr/~kteke/index_files/proceedings/Teke_etal_2008_5th_IVS_paper.pdf
 
 The new observatory in Ny-Ålesund is build lower in the terrain than the old observatory and it is closer to the sea. The radar from the boats that enter the harbor in Ny-Ålesund is a threat to the sensitive equipment in the antennas. In the NYALE13S antenna the X-band low noise amplifier (LNA) have been destroyed on multiple occasions due to the boat radars \cite{perez2019}. To mitigate this effect the antennas at the new observatory should never point towards the sea with an elevation angle lower than 15$^\circ$. As a consequence, the elevation masks have been set to 15$^\circ$ regardless of azimuth angle. Can this be one of the reasons for the higher baseline repeatability results in Ny-Ålesund and should the elevation mask be refined?
@@ -255,12 +257,12 @@ Comparing the weighted baseline length with the local tie shows the same behavio
 	\begin{tabularx}{\linewidth}{X|r|r|r|r}
 	Baseline & Scenario & WBL & WBLR & dL \\
 	\hline
-	NYALE13S/NYALES20 & {0$^\circ$} & 1539.1940 m & 5.22 mm & 0.88 mm \\
-	NYALE13S/NYALES20 & {15$^\circ$} & 1539.1944 m & 6.42 mm & 1.26 mm \\
-	NYALE13S/NYALES20 & random & 1539.1941 m & 5.44 mm & 1.02 mm \\
-	WETTZELL/WETTZ13N & {0$^\circ$} & 123.3069 m & 2.81 mm & -0.14 mm \\
-	WETTZELL/WETTZ13N & {15$^\circ$} & 123.3064 m & 3.66 mm & -0.58 mm \\
-	WETTZELL/WETTZ13N & random & 123.3069 m & 2.73 mm & -0.10 mm \\
+	NYALE13S/NYALES20 & {0$^\circ$}  & 1539.1940 m & 5.22 mm &  0.88 mm \\
+	NYALE13S/NYALES20 & {15$^\circ$} & 1539.1944 m & 6.42 mm &  1.26 mm \\
+	NYALE13S/NYALES20 & random       & 1539.1941 m & 5.44 mm &  1.02 mm \\
+	WETTZELL/WETTZ13N & {0$^\circ$}  &  123.3069 m & 2.81 mm & -0.14 mm \\
+	WETTZELL/WETTZ13N & {15$^\circ$} &  123.3064 m & 3.66 mm & -0.58 mm \\
+	WETTZELL/WETTZ13N & random       &  123.3069 m & 2.73 mm & -0.10 mm \\
 	\hline
 	\end{tabularx}
 \caption{{Weighted baseline length (WBL), weighted baseline length repeatability (WBLR) and difference 
