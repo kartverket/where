@@ -86,7 +86,7 @@ def get_args(rundate, input_args=None):
     if session_list_file:
         from_session_list = _read_session_list_file(session_list_file)
     else:
-        session_list_file = set()
+        from_session_list = set()
 
     if get_session_from_master:
 
@@ -96,8 +96,15 @@ def get_args(rundate, input_args=None):
             value=util.read_option_value("--session_types", default=None),
             default="",
         ).list
+
+        skip_intensives = config.where.get(
+            "skip_intensives",
+            section="runner",
+            value=util.read_option_value("--skip_intensives", default=None),
+            default=True,
+        ).bool
         master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
-        sessions = set(master_schedule.list_sessions(rundate, session_types=session_types))
+        sessions = set(master_schedule.list_sessions(rundate, session_types=session_types, skip_intensives=skip_intensives))
 
         check_master_status = config.where.get(
             "check_master_status",
