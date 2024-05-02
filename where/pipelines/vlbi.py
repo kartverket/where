@@ -5,6 +5,7 @@ Description:
 
 
 """
+import functools
 import itertools
 from datetime import datetime, date
 
@@ -52,6 +53,7 @@ def get_args(rundate, input_args=None):
         List:   Strings with names of available sessions.
     """
     keyword = "--session_code"
+
     session_list = set()
     input_args = list(input_args) if input_args is not None else list()
     for idx in range(len(input_args)):
@@ -68,6 +70,23 @@ def get_args(rundate, input_args=None):
         value=util.read_option_value("--get_session_from_master", default=None),  # TODO: add this to mg_config
         default=False,
     ).bool
+
+    session_list_file = config.where.get(
+        "session_list",
+        section="runner",
+        value=util.read_option_value("--session_list", default=None),
+        default="",
+        ).str
+
+    @functools.lru_cache
+    def _read_session_list_file(filename):
+        with open(filename) as fid:
+            return set(fid.read().splitlines())
+
+    if session_list_file:
+        from_session_list = _read_session_list_file(session_list_file)
+    else:
+        session_list_file = set()
 
     if get_session_from_master:
 
@@ -99,6 +118,7 @@ def get_args(rundate, input_args=None):
 
         sessions = set(sessions) - not_ready_sessions
         sessions = sessions & session_list if session_list else sessions
+        sessions = sessions & from_session_list if from_session_list else sessions
         return [keyword + "=" + s + " " + args for s in sessions]
     else:
         obs_format = config.tech.get(
@@ -110,6 +130,7 @@ def get_args(rundate, input_args=None):
             f"vlbi_obs_{obs_format}", variable="session_code", pattern=r"\w{6}", file_vars=file_vars
         )
         sessions = sessions & session_list
+        sessions = sessions & from_session_list if from_session_list else sessions
         return [keyword + "=" + s + " " + args for s in sessions]
 
 
