@@ -12,7 +12,7 @@ Example:
 """
 # Standard library imports
 from collections import namedtuple, OrderedDict
-from typing import Tuple
+from typing import List, Tuple
 
 # External library imports
 import numpy as np
@@ -96,6 +96,15 @@ FIELDS = (
         "GNSS service",
     ),
     WriterField(
+        "satellite",
+        object,
+        "%5s",
+        5,
+        "SAT",
+        "",
+        "Satellite identifier",
+    ),
+    WriterField(
         "navigation_type",
         object,
         "%6s",
@@ -148,7 +157,18 @@ FIELDS = (
         "ΔCLOCK_MEAN_RMS",
         "meter",
         "Satellite clock correction difference corrected for satellite biases and averaged clock offset in each epoch. "
-        "In addition RMS of all daily samples is subtracted and afterwards epochwise RMS is determined.",
+        "Afterwards the epochwise RMS is determined.",
+    ),
+    WriterField(
+        "clk_diff_with_dt_mean_day_rms",
+        float,
+        "%16.4f",
+        16,
+        "ΔCLOCK_MDAY_RMS",
+        "meter",
+        "Satellite clock correction difference corrected for satellite biases and averaged clock offset in each epoch. "
+        "In addition RMS for each satellite and daily samples is subtracted and afterwards the epochwise RMS is "
+        "determined.",
     ),
     WriterField(
         "dalong_track",
@@ -310,9 +330,17 @@ def sisre_comparison(dset: "Dataset") -> None:
     dset_first = dset[list(dset.keys())[0]]
     samples = config.tech[_SECTION].samples.list
 
-    # Get file variables
+    #+WORKAROUND_MURKS: service meta information is not available in earlier datasets.
+    for sol in dset.keys():
+        if "service" not in dset[sol].meta.keys():
+            service = "has" if "has" in sol else "os"
+            dset[sol].meta["service"] = service.upper()
+    #-WORKAROUND_MURKS:
+
+    # Add service information (OS and/or HAS) to file variables
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    for sol in dset.keys(): # Add service information (OS and/or HAS) to file variables
+    for sol in dset.keys(): 
+
         if "HAS" in dset[sol].meta["service"]:
             file_vars["service"] = "has"
             file_vars["SERVICE"] = "HAS"
@@ -373,11 +401,9 @@ def sisre_comparison(dset: "Dataset") -> None:
             log.info(f"Write '{sample}' comparison file {file_path}.")
             
             fields = FIELDS_SUM if "summary" in sample else FIELDS
+            fields = _get_existing_fields(output_array.columns, fields) 
             summary = "Summary of SISRE comparison results (95th percentile)" if "summary" in sample else "SISRE comparison results (95th percentile)"
-            
-            if sample in ["day_sat", "month_sat"]:
-                fields = _get_sat_fields(output_array)       
-                
+                            
             # Get header
             header = get_header(
                 fields,
@@ -409,6 +435,23 @@ def sisre_comparison(dset: "Dataset") -> None:
 #
 # AUXILIARY FUNCTIONS
 #
+def _get_existing_fields(data_fields: List[str], writer_fields: Tuple["WriterField", ...]) -> List["WriterField"]:
+    """Get existing writer fields, which are given in Dataset.
+
+    Args:
+        data_fields:      List with data fields
+        writers_fields:   Writer fields
+
+    Returns:
+        Existing writer fields
+    """
+    common_fields = []
+    for writer in writer_fields:
+        if writer.name in data_fields:
+            common_fields.append(writer)
+    return common_fields
+
+
 def _get_sat_fields(df: pd.core.frame.DataFrame) -> Tuple[WriterField]:
     """Get satellite WriterField definition
     
