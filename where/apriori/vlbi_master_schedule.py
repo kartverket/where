@@ -57,7 +57,7 @@ class VlbiMasterSchedule(UserDict):
 
         return defaultdict(default_factory="")
 
-    def list_sessions(self, date, session_types=None):
+    def list_sessions(self, date, session_types=None, skip_intensives=True):
         """List sessions available at a given date
 
         Args:
@@ -68,16 +68,20 @@ class VlbiMasterSchedule(UserDict):
             List of strings:  Names of sessions available at a given date.
         """
         doy = date.timetuple().tm_yday
-        if session_types:
-            # Filter on session types in addition to date
-            # Convert all given session types to upper case to make a case insensitive comparison
-            session_types = [st.upper() for st in session_types]
-            return [
-                sc
-                for (sc, v) in self.data.items()
-                if v["doy"] == doy and self.where_session_type(sc).upper() in session_types
-            ]
-        return [sc for sc, v in self.data.items() if v["doy"] == doy]
+        sessions = list()
+        for sc, v in self.data.items():
+            if v["doy"] == doy:
+                # Filter on session types in addition to date
+                # Convert all given session types to upper case to make a case insensitive comparison
+                if session_types:
+                    session_types = [st.upper() for st in session_types]
+                    if self.where_session_type(sc).upper() not in session_types:
+                        continue
+                # Before 1992 intensive sessions and 24 hour sessions are listed in the same master file
+                if skip_intensives and v["session_type"] == "INTENSIVE":
+                    continue
+                sessions.append(sc)
+        return sessions
 
     def ready(self, session_code):
         """Returns True if a session is marked as submitted in the master file

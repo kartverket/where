@@ -57,6 +57,7 @@ htmlcov/
 # Eclipse project settings
 .pydevproject
 .project
+.settings
 
 # mypy
 .mypy_cache/

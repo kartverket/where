@@ -66,34 +66,6 @@ def plot_sta_param(x, ys, num, labels, title, ylabel):
     plt.close()
 
 
-def plot_skycoverage(dset_session, station):
-    idx0 = dset_session.filter(station=station)
-    idx1 = dset_session.filter(station_1=station)
-    idx2 = dset_session.filter(station_2=station)
-    elevation1 = dset_session.site_pos_1.elevation[idx1]
-    elevation2 = dset_session.site_pos_2.elevation[idx2]
-    azimuth1 = dset_session.site_pos_1.azimuth[idx1]
-    azimuth2 = dset_session.site_pos_2.azimuth[idx2]
-    residuals = dset_session.residual[idx0]
-    elevation = np.concatenate((elevation1, elevation2))
-    azimuth = np.concatenate((azimuth1, azimuth2))
-
-    title = f"{station} {dset_session.vars['rundate']} {dset_session.vars['session_code']}"
-
-    fig = plt.figure(figsize=(8, 8), dpi=150)
-    ax = fig.add_subplot(111, projection="polar")
-    im = ax.scatter(azimuth, elevation, c=residuals)
-    ax.set_title(title)
-    cbar = plt.colorbar(im, use_gridspec=True)
-    cbar.set_label("Residual after estimation [m]")
-    plt.tight_layout()
-    title = title.replace(" ", "_")
-    sub_dir = "Skyplot"
-    os.makedirs(f"img/{dset_id}/{sub_dir}", exist_ok=True)
-    fig.savefig(f"img/{dset_id}/{sub_dir}/{sub_dir}_{title}_{dset_id}.png")
-    plt.close()
-
-
 def plot_station_pos(dset_ts, station):
 
     # Select data from dataset
@@ -304,11 +276,10 @@ def get_state_values(dset, fieldname, fill_value=np.nan):
 # Program starts execution here
     
 
-parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id nyale13s0 --stations NYALE13S NYALES20 --plot_skycoverage --plot_num_obs --plot_trop --plot_residuals",
+parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id nyale13s0 --stations NYALE13S NYALES20 --plot_trop --plot_residuals",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the two stations in the baseline", nargs=2, type=str, default=["NYALE13S", "NYALES20"])
-parser.add_argument("--plot_skycoverage", help="Enable this flag to plot sky coverage.", action="store_true")
 parser.add_argument("--plot_trop", help="Enable this flag to plot troposphere parameters for each session for specified stations", action="store_true")
 parser.add_argument("--plot_residuals", help="Enable this flag to plot residuals for each session for specified stations", action="store_true")
 args = parser.parse_args()
@@ -408,9 +379,6 @@ for rundate, session_code in zip(dates, session_codes):
     if args.plot_residuals:
         plot_residuals(dset_session, station1, station2)
 
-    if args.plot_skycoverage:
-        plot_skycoverage(dset_session, station1)
-        plot_skycoverage(dset_session, station2)
     
 # Global plots
 
