@@ -5,16 +5,6 @@ Description:
 Information to calculate the difference between total/broadcast group delay (TGD/BGD) and DCBs taken from: 
 Wang, N. et al (2019): "Quality assessment of GPS, Galileo and BeiDou-2/3 satellite broadcast group delays"
 
-Depending on the given GNSS navigation data following fields can be added to Dataset:
-
-| Field          | Type          | Unit | Description                                              |
-|----------------|---------------|------|----------------------------------------------------------|
-| bgd_e1_e5a_diff | numpy.ndarray | s    | Galileo E1-E5a BGD compared to given DCBs                | 
-| bgd_e1_e5b_diff | numpy.ndarray | s    | Galileo E1-E5a BGD compared to given DCBs                | 
-| tgd_diff        | numpy.ndarray | s    | Total group delay (e.g. from GPS) compared to given DCBs | 
-| tgd_b1_b3_diff  | numpy.ndarray | s    | BeiDou B1-B3 TGD compared to given DCBs                  |
-| tgd_b2_b3_diff  | numpy.ndarray | s    | BeiDou B2-B3 TGD compared to given DCBs                  |
-
 """
 # Standard library imports
 from collections import namedtuple
@@ -49,6 +39,37 @@ BiasField.__doc__ = """A convenience class for defining a necessary parameters t
 
 @plugins.register
 def gnss_compare_tgd(dset: "Dataset") -> None:
+    """Compare total/broadcast group delay (TGD/BGD) given from navigation messages against other differential code 
+    bias (DCB) sources
+
+    Depending on the given GNSS navigation data following fields can be added to Dataset:
+
+      | Field                | Type          | Unit | Description                                                     |
+      | :------------------- | :------------ | :--- | :-------------------------------------------------------------- |
+      | {solution}_dcb       | numpy.ndarray | s    | BGD/TGD calculated based on postprocessed DCBs                  |
+      | {solution}_dcb_mean  | numpy.ndarray | s    | BGD/TGD calculated based on postprocessed DCBs. In addition the |
+      |                      |               |      | mean over the data period is subtracted from the solution (zero |
+      |                      |               |      | mean difference) for each GNSS seperately.                      |
+      | {solution}_mean      | numpy.ndarray | s    | The mean over the data period is subtracted from the BGD/TDG    |
+      |                      |               |      | solution (zero mean difference) for each GNSS seperately.       |
+      | {solution}_diff      | numpy.ndarray | s    | BGD/TGD compared to given DCBs                                  |
+      | {solution}_diff_mean | numpy.ndarray | s    | BGD/TGD compared to given DCBs. In addition the mean over the   |
+      |                      |               |      | data period is subtracted from the solution (zero mean          |
+      |                      |               |      | difference) for each GNSS seperately.                           |
+
+    whereby following {solution} are possible:
+
+      | Solution   | Description                         |
+      | :----------| :---------------------------------- |
+      | bgd_e1_e5a | Galileo E1-E5a BGD                  | 
+      | bgd_e1_e5b | Galileo E1-E5a BGD                  | 
+      | tgd        | Total group delay (e.g. from GPS)   | 
+      | tgd_b1_b3  | BeiDou B1-B3 TGD                    |
+      | tgd_b2_b3  | BeiDou B2-B3 TGD                    |
+        
+    Args:
+        dset:     A Dataset containing model data.
+    """
     
     tgd_def = {
         "C": {
