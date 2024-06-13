@@ -273,12 +273,12 @@ def run(rundate, pipeline, *args, **kwargs):
                 dset = None
         kwargs[var_name] = "combined"
 
-    if dset_list:
-        dset_list[0].merge_with(*dset_list[1:], sort_by="time")
-        dset = dset_list[0]
-        if len(dset_list) > 1:
-            log.info(f"Combining dataset for {len(dset_list)} {iterate_over}")
-            dset.write_as(stage=stage_iterate[-1], label=2, **kwargs)
+    #if dset_list:
+    #    dset_list[0].merge_with(*dset_list[1:], sort_by="time")
+    #    dset = dset_list[0]
+    #    if len(dset_list) > 1:
+    #        log.info(f"Combining dataset for {len(dset_list)} {iterate_over}")
+    #        dset.write_as(stage=stage_iterate[-1], label=2, **kwargs)
 
     # Read which stages that should be executed once
     stage_once = config.tech.stage_once.list
