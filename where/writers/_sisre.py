@@ -144,8 +144,6 @@ def generate_dataframes(
             log.warn(f"Dataset '{solution}' is empty.")
             continue
         
-
-
         # Determine dataframe 
         df = dset.as_dataframe(fields=fields_def)
         df = df.rename(columns={
@@ -280,41 +278,54 @@ def _apply(
 
     Returns:
         Tuple with resampled dataframes (date based and date+satellite based) by applying given function
-    """    
-    df_sat = df.pivot(index="time_gps", columns="satellite", values=field_satellite)
-    df_sat_sampled = df_sat.resample(sample)
+    """  
+    # Sampling for time and satellite entries together
+    df_sat_group = df.set_index(["time_gps", "satellite"]) # Define multi index
+    df_sat_group = df_sat_group.drop(["system"], axis=1) # Only numeric columns can be used in the following
+    df_sat_group_sampled = df_sat_group.groupby([pd.Grouper(level="time_gps",freq=sample), pd.Grouper(level="satellite")])
+    
+    # Only numeric columns can be used in the following
     df_reduced = df.drop([
             "system", 
             "satellite"], 
             axis=1,
-    )  # Columns not needed for this analysis.
+    )  
     df_sampled = df_reduced.set_index("time_gps").resample(sample)
 
     if func == "mean":
         df_sampled = df_sampled.mean()
-        df_sat_sampled  = df_sat_sampled.mean()
+        df_sat_group_sampled  = df_sat_group_sampled.mean()
     elif func == "percentile":
-        df_sampled = df_sampled.apply(lambda x: np.nanpercentile(x, q=95))
-        df_sat_sampled  = df_sat_sampled.apply(lambda x: np.nanpercentile(x, q=95)) 
+        df_sampled = df_sampled.quantile(q=0.95)
+        df_sat_group_sampled  = df_sat_group_sampled.quantile(q=0.95)
         
         # Determine defined HAS performance metrics based on Galileo HAS SDD v1.0
-        df["clk_diff_with_dt_mean_day"] = df.clk_diff_with_dt_mean - _get_daily_mean(df, "clk_diff_with_dt_mean")
         df_sampled["clk_diff_with_dt_mean_rms"] = _determine_percentile_of_epochwise_rms(
+                        df, 
+                        "clk_diff_with_dt_mean", 
+                        sample,
+        )
+
+        df["clk_diff_with_dt_mean_day"] = df.clk_diff_with_dt_mean - _get_daily_mean_for_satellites(df, "clk_diff_with_dt_mean")
+        df_sampled["clk_diff_with_dt_mean_day_rms"] = _determine_percentile_of_epochwise_rms(
                         df, 
                         "clk_diff_with_dt_mean_day", 
                         sample,
         )
+
         df_sampled["orb_diff_3d_rms"] = _determine_percentile_of_epochwise_rms(df, "orb_diff_3d", sample)
         df_sampled["sisre_epoch_rms"] = _determine_percentile_of_epochwise_rms(df, "sisre", sample)
           
     elif func == "rms":
         df_sampled = df_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
-        df_sat_sampled  = df_sat_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
+        df_sat_group_sampled  = df_sat_group_sampled.apply(lambda x: np.sqrt(np.nanmean(np.square(x))))
     elif func == "std":
         df_sampled = df_sampled.std()
-        df_sat_sampled = df_sat_sampled.std()
+        df_sat_group_sampled = df_sat_group_sampled.std(numeric_only=True)
     else:
         log.fatal(f"Function '{func}' is not defined.")
+
+    df_sat_sampled = df_sat_group_sampled.reset_index(level="satellite") # Convert satellite index into a column
         
     return df_sampled, df_sat_sampled  
    
@@ -349,26 +360,32 @@ def _determine_percentile_of_epochwise_rms(
     return df_tmp.resample(sample).apply(lambda x: np.nanpercentile(list(x), q=95))
    
              
-def _get_daily_mean(
+def _get_daily_mean_for_satellites(
         df: pd.core.frame.DataFrame, 
         field: str,
 ) -> np.ndarray:
-    """Get daily mean for given field
+    """Get daily mean for each satellite and given field
 
     Args:
         df:      Dataframe.
         field:   Field name.
 
     Returns:
-        Array with daily mean of given field
+        Array with daily mean for each satellite and given field
     """
     dates = np.array([v.date() for v in df["time_gps"]])
     array_mean = np.zeros(df.shape[0])
 
-    # Loop over observation epochs
+    # Loop over days
     for date in sorted(set(dates)):
         idx = dates == date
-        array_mean[idx] = df[field][idx].mean()
+        array_sat = np.zeros(len(dates[idx]))
+
+        # Loop over satellites for given day
+        for sat in set(df.satellite[idx]):
+            idx_sat = df.satellite[idx] == sat
+            array_sat[idx_sat] = df[field][idx][idx_sat].mean()
+        array_mean[idx] = array_sat
 
     return array_mean
 
