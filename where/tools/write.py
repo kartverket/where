@@ -42,7 +42,7 @@ Example:
 --------
   {exe:tools} write 2021 7 1 --sisre --stage=calculate --label=raw --id='_cnes_inav_e1' --writers=sisre_plot
   {exe:tools} write 2019 2 1 --gnss --station=stas --stage=write --writers=gnss_report
-  {exe:tools} write 2019 2 1 --rinex_nav --stage=read --writers=rinex_nav_report
+  {exe:tools} write 2019 2 1 --rinex_nav --stage=edit --writers=rinex_nav_report --id='_cnes_inav_concatenated'
 """
 # Standard library imports
 from typing import List
