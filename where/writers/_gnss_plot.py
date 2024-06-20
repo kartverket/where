@@ -1337,12 +1337,12 @@ class GnssPlot:
             if field in self.dset.fields:
                 figure_paths = figure_paths + self.plot_field(field)
             
-            #if f"{field}_diff" in self.dset.fields:
-            #    figure_paths = figure_paths + self.plot_field(f"{field}_diff")
-
             if f"{field}_dcb" in self.dset.fields:
                 figure_paths = figure_paths + self.plot_field(f"{field}_dcb")
-                
+            
+            if f"{field}_diff" in self.dset.fields:
+                figure_paths = figure_paths + self.plot_field(f"{field}_diff")
+    
             if f"{field}_diff_mean" in self.dset.fields:
                 figure_paths = figure_paths + self.plot_field(f"{field}_diff_mean")
         
