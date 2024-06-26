@@ -1,2 +1,5 @@
-version: 1.0
-organisasjon: Geodesi
+version: 3.0
+organization: Geodesi
+product: 
+repo_types: [InternalClient]
+platforms: [OS_VM]
