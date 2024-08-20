@@ -80,13 +80,13 @@ def get_args(rundate, input_args=None):
 
     @functools.lru_cache
     def _read_session_list_file(filename):
+        if not filename:
+            return set()
+
         with open(filename) as fid:
             return set(fid.read().splitlines())
 
-    if session_list_file:
-        from_session_list = _read_session_list_file(session_list_file)
-    else:
-        from_session_list = set()
+    from_session_list = _read_session_list_file(session_list_file)
 
     if get_session_from_master:
 
