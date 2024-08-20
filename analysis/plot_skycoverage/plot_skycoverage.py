@@ -1,26 +1,14 @@
 import argparse
-from datetime import date, datetime, timedelta
-import sys
+from datetime import date, datetime
 import os
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import cm
 import matplotlib as mpl
-import matplotlib.ticker as mt
-import matplotlib.dates as mdates
-import matplotlib.colors as mcolors
-
-from midgard.math.unit import Unit
-from midgard.math.constant import constant
 
 from where.data import dataset3 as dataset
-from where.data.position import PositionDelta
-from where.data.time import Time
 from where.lib import config
-from where.lib import rotation
 from where import apriori
-
 
 
 def get_residuals(dset_session, station):
