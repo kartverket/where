@@ -280,6 +280,8 @@ parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id n
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the two stations in the baseline", nargs=2, type=str, default=["NYALE13S", "NYALES20"])
+parser.add_argument("--start", help="Only use sessions after this date (inclusive). Format: YYYY-mm-dd", type=date.fromisoformat, default=date.min)
+parser.add_argument("--end", help="Only use sessions before this date (inclusive). Format:YYYY-mm-dd", type=date.fromisoformat, default=date.max)
 parser.add_argument("--plot_trop", help="Enable this flag to plot troposphere parameters for each session for specified stations", action="store_true")
 parser.add_argument("--plot_residuals", help="Enable this flag to plot residuals for each session for specified stations", action="store_true")
 args = parser.parse_args()
@@ -303,13 +305,17 @@ dset_ts = dataset.Dataset.read(
     rundate=date(1970, 1, 1), pipeline=pipeline, stage="timeseries", label="0", session_code="", id=dset_id
 )
 
-idx = dset_ts.filter(station="all")
-dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx]])
+idx_all = dset_ts.filter(station="all") 
+dates = np.array([datetime.strptime(dt, "%Y-%m-%d").date() for dt in dset_ts.rundate])
+idx_date = np.logical_and(dates >= args.start, dates <= args.end)
+idx = idx_all & idx_date
+
+dates = dates[idx]
 session_codes = dset_ts.session_code[idx]
 
 colors = [dset_ts.num_obs_estimate[idx], 
-          dset_ts.num_obs_estimate[dset_ts.filter(station=station1)],
-          dset_ts.num_obs_estimate[dset_ts.filter(station=station2)]]
+          dset_ts.num_obs_estimate[dset_ts.filter(station=station1, idx=idx_date)],
+          dset_ts.num_obs_estimate[dset_ts.filter(station=station2, idx=idx_date)]]
 
 
 
@@ -323,8 +329,8 @@ rms = dset_ts.rms_residual_estimate[idx]
 dof = dset_ts.degrees_of_freedom[idx]
 variance_factor = dset_ts.variance_factor[idx]
 
-idx_sta1 = dset_ts.filter(station=station1)
-idx_sta2 = dset_ts.filter(station=station2)
+idx_sta1 = dset_ts.filter(station=station1, idx=idx_date)
+idx_sta2 = dset_ts.filter(station=station2, idx=idx_date)
 
 rms_sta_1 = dset_ts.rms_residual_estimate[idx_sta1]
 rms_sta_2 = dset_ts.rms_residual_estimate[idx_sta2]
