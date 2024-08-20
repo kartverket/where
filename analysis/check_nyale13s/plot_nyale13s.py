@@ -39,7 +39,7 @@ def plot(x, ys, errors, colors, labels, name, station):
     fig.autofmt_xdate()
     #fig.suptitle(station)
     #plt.tight_layout()
-    plt.savefig(f"img/{dset_id}/Position_{station}_{name}_{dset_id}.png", bbox_inches='tight')
+    plt.savefig(f"img/{dset_id}/Position_{station}_{name}_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
     plt.close()
 
 
@@ -66,20 +66,23 @@ def plot_sta_param(x, ys, num, labels, title, ylabel):
     plt.close()
 
 
-def plot_station_pos(dset_ts, station):
+def plot_station_pos(dset_ts, station, idx_date, idx_all):
 
     # Select data from dataset
-    idx = dset_ts.filter(station=station)
-    dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx]])
-    num_obs = np.zeros(np.sum(dset_ts.filter(station="all")))
-    colors = dset_ts.num_obs_estimate[idx]
-    all_idx = dset_ts.filter(station="all")
-    all_dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[all_idx]])
+    idx = idx_date & idx_all
+    idx_sta = dset_ts.filter(station=station, idx=idx_date)
+    #dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx]])
+    dates = dset_ts.rundate[idx_sta & idx_date]
+    num_obs = np.zeros(np.sum(idx)) #np.sum(dset_ts.filter(station="all")))
+    colors = dset_ts.num_obs_estimate[idx_sta]
+    #all_idx = dset_ts.filter(station="all")
+    #all_dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[all_idx]])
+    all_dates = dset_ts.rundate[idx]
     _, idx2, _ = np.intersect1d(all_dates, dates, return_indices=True)
     num_obs[idx2] = colors
-    session_code = dset_ts.session_code[idx]
-
-    t = Time(val=dates, scale="utc", fmt="datetime")
+    session_code = dset_ts.session_code[idx_sta]
+    
+    t = Time(val=dates, scale="utc", fmt="date")
     trf = apriori.get("trf", time=t, reference_frames="itrf:2020, vtrf, custom")
     names = apriori.get("vlbi_station_codes")
 
@@ -88,15 +91,15 @@ def plot_station_pos(dset_ts, station):
     trs2enu = rotation.enu2trs(lat, lon)
     enu2trs = rotation.trs2enu(lat, lon)
 
-    dpos = PositionDelta(val=np.squeeze(dset_ts.neq_vlbi_site_pos[idx]), system="trs", ref_pos=pos)
-    dpos_cov_xyz = dset_ts.neq_vlbi_site_pos_cov_[idx]
+    dpos = PositionDelta(val=np.squeeze(dset_ts.neq_vlbi_site_pos[idx_sta]), system="trs", ref_pos=pos)
+    dpos_cov_xyz = dset_ts.neq_vlbi_site_pos_cov_[idx_sta]
     dpos_ferr_xyz = np.sqrt(dpos_cov_xyz.diagonal(axis1=1, axis2=2))
     dpos_cov_enu = trs2enu @ dpos_cov_xyz @ enu2trs
     dpos_ferr_enu = np.sqrt(dpos_cov_enu.diagonal(axis1=1, axis2=2))
 
     # Plot timeseries of estimated station coordinate corrections
-    plot(dates, dpos.val.T, dpos_ferr_xyz.T, colors, ["X [m]", " Y [m]", "Z [m]"], "xyz", station)
-    plot(dates, dpos.enu.val.T, dpos_ferr_enu.T, colors, ["E [m]", " N [m]", "U [m]"], "enu", station)
+    plot(t.datetime, dpos.val.T, dpos_ferr_xyz.T, colors, ["X [m]", " Y [m]", "Z [m]"], "xyz", station)
+    plot(t.datetime, dpos.enu.val.T, dpos_ferr_enu.T, colors, ["E [m]", " N [m]", "U [m]"], "enu", station)
     return num_obs, session_code
 
 
@@ -178,7 +181,7 @@ def plot_residual_rms(dates, dates1, dates2, rms, rms1, rms2, sta_1, sta_2, colo
     plt.suptitle("Root Mean Square of Postfit Residuals  [m]")
     #plt.tight_layout()
     fig.autofmt_xdate()
-    plt.savefig(f"img/{dset_id}/RMS_Postfit_Residuals_{sta_1}_{sta_2}_{dset_id}.png", bbox_inches='tight')
+    plt.savefig(f"img/{dset_id}/RMS_Postfit_Residuals_{sta_1}_{sta_2}_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
     plt.close()
 
 
@@ -205,7 +208,7 @@ def plot_statistics(dates, dof, variance_factor, colors):
     cbar.set_label("Number of observations used in solution")
     fig.autofmt_xdate()
     #fig.tight_layout()
-    plt.savefig(f"img/{dset_id}/Statistics_{dset_id}.png", bbox_inches='tight')
+    plt.savefig(f"img/{dset_id}/Statistics_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
 
 def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, sta_1, sta_2, local_tie):
     t = Time(dates, fmt="datetime", scale="utc")
@@ -240,7 +243,7 @@ def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, sta_
     cbar.set_label("Number of observations on baseline used in solution")
     #plt.tight_layout()
     fig.autofmt_xdate()
-    plt.savefig(f"img/{dset_id}/Baseline_{sta_2}_{sta_1}_{dset_id}.png", bbox_inches='tight')
+    plt.savefig(f"img/{dset_id}/Baseline_{sta_2}_{sta_1}_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
     plt.close()
 
 
@@ -280,14 +283,16 @@ parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id n
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the two stations in the baseline", nargs=2, type=str, default=["NYALE13S", "NYALES20"])
-parser.add_argument("--start", help="Only use sessions after this date (inclusive). Format: YYYY-mm-dd", type=date.fromisoformat, default=date.min)
-parser.add_argument("--end", help="Only use sessions before this date (inclusive). Format:YYYY-mm-dd", type=date.fromisoformat, default=date.max)
+parser.add_argument("--start", help="Only use sessions after this date (inclusive). Format: YYYY-mm-dd", type=str, default="1-1-1")
+parser.add_argument("--end", help="Only use sessions before this date (inclusive). Format:YYYY-mm-dd", type=str, default="9999-12-31")
 parser.add_argument("--plot_trop", help="Enable this flag to plot troposphere parameters for each session for specified stations", action="store_true")
 parser.add_argument("--plot_residuals", help="Enable this flag to plot residuals for each session for specified stations", action="store_true")
 args = parser.parse_args()
 
 dset_id = args.id
 station1, station2 = sorted(args.stations)
+start = datetime.strptime(args.start, "%Y-%m-%d")
+end = datetime.strptime(args.end, "%Y-%m-%d")
 
 baseline1 = f"{station1}/{station2}"
 baseline2 = f"{station2}/{station1}"
@@ -306,8 +311,8 @@ dset_ts = dataset.Dataset.read(
 )
 
 idx_all = dset_ts.filter(station="all") 
-dates = np.array([datetime.strptime(dt, "%Y-%m-%d").date() for dt in dset_ts.rundate])
-idx_date = np.logical_and(dates >= args.start, dates <= args.end)
+dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate])
+idx_date = np.logical_and(dates >= start, dates <= end)
 idx = idx_all & idx_date
 
 dates = dates[idx]
@@ -399,5 +404,5 @@ plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs,
 #plot_residual_rms(dates, dates_sta_1, dates_sta_2, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
 
 # Plot timeseries of estimated station coordinate corrections
-plot_station_pos(dset_ts, station1)
-plot_station_pos(dset_ts, station2)
+plot_station_pos(dset_ts, station1, idx_date, idx_all)
+plot_station_pos(dset_ts, station2, idx_date, idx_all)
