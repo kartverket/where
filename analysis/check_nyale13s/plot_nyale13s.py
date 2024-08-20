@@ -283,7 +283,7 @@ parser = argparse.ArgumentParser(epilog="Example: python plot_nyale13s.py --id n
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--id", help="Dataset id of result files.", type=str, default="nyale13s0")
 parser.add_argument("--stations", help="Name of the two stations in the baseline", nargs=2, type=str, default=["NYALE13S", "NYALES20"])
-parser.add_argument("--start", help="Only use sessions after this date (inclusive). Format: YYYY-mm-dd", type=str, default="1-1-1")
+parser.add_argument("--start", help="Only use sessions after this date (inclusive). Format: YYYY-mm-dd", type=str, default="0001-1-1")
 parser.add_argument("--end", help="Only use sessions before this date (inclusive). Format:YYYY-mm-dd", type=str, default="9999-12-31")
 parser.add_argument("--plot_trop", help="Enable this flag to plot troposphere parameters for each session for specified stations", action="store_true")
 parser.add_argument("--plot_residuals", help="Enable this flag to plot residuals for each session for specified stations", action="store_true")
