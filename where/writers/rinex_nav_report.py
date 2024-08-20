@@ -20,8 +20,8 @@ from midgard.dev import plugins
 from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
-from where.lib import config
-from where.lib import log
+from where import cleaners
+from where.lib import config, log
 from where.postprocessors.gnss_compare_tgd import gnss_compare_tgd
 from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
@@ -41,11 +41,15 @@ def rinex_nav_report(dset: "Dataset") -> None:
         dset:        A dataset containing the data.
     """
     file_vars = {**dset.vars, **dset.analysis}
+    ignore_satellites = config.tech[_SECTION].ignore_satellites.list
  
     # TODO: Better solution?
     if "station" not in file_vars:  # necessary if called for example by ./where/tools/concatenate.py
         file_vars["station"] = ""
         file_vars["STATION"] = ""
+
+    if ignore_satellites:
+        cleaners.apply_remover("ignore_satellite", dset, satellites=ignore_satellites)
 
     # Generate figure directory to save figures generated for RINEX navigation file report
     figure_dir = config.files.path("output_rinex_nav_report_figure", file_vars=file_vars)
@@ -59,6 +63,7 @@ def rinex_nav_report(dset: "Dataset") -> None:
         rpt.write_config()
         _add_to_report(dset, rpt, figure_dir)
         rpt.markdown_to_pdf()
+
 
 def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPath") -> None:
     """Add figures and tables to report
