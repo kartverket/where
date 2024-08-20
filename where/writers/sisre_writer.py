@@ -319,18 +319,24 @@ def sisre_writer(dset: "Dataset") -> None:
         val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.time],
         write_level="detail",
     )
-    dset.add_text(
-        "trans_time_gpsweek",
-        val=[
-            f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_transmission_time
-        ],
-        write_level="detail",
-    )
-    dset.add_text(
-        "toe_gpsweek",
-        val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_toe],
-        write_level="detail",
-    )
+    if "used_transmission_time" not in dset.fields:
+        log.warn("Dataset has not field 'used_transmission_time'. Therefore 'time of ephemeris' can not be written in file.")
+    else:
+        dset.add_text(
+            "trans_time_gpsweek",
+            val=[
+                f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_transmission_time
+            ],
+            write_level="detail",
+        )
+    if "used_toe" not in dset.fields:
+        log.warn("Dataset has not field 'used_toe'. Therefore 'transmission time' can not be written in file.")
+    else:
+        dset.add_text(
+            "toe_gpsweek",
+            val=[f"{t.gps_ws.week:04.0f}{t.gps_ws.day:1.0f}:{t.gps_ws.seconds:06.0f}" for t in dset.used_toe],
+            write_level="detail",
+        )
     # dset.add_float("diff_time_trans", val=(dset.time.mjd - dset.used_transmission_time.mjd) * Unit.day2second, Unit="second")
     dset.add_float(
         "dalong_track", 

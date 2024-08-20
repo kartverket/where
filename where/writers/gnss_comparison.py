@@ -98,6 +98,15 @@ FIELDS = (
         "Navigation message type used in analysis",
     ),
     WriterField(
+        "frequency",
+        object,
+        "%9s",
+        9,
+        "FREQ",
+        "",
+        "Frequency used in analysis",
+    ),
+    WriterField(
         "observation_type",
         object,
         "%9s",
@@ -331,13 +340,10 @@ def gnss_comparison(dset: "Dataset") -> None:
 
             # Write daily and monthly CSV files
             if write_csv:
-                file_vars_tmp = file_vars.copy()
-                file_vars_tmp.update(solution=f"{file_vars_tmp['solution']}_{type_}_{sample}")
                 file_path = config.files.path("output_gnss_comparison_csv", file_vars=file_vars_tmp)
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 log.info(f"Write '{sample}' comparison file {file_path} in CSV format.")
                 output_array.to_csv(file_path, float_format="%.3f", index=False, na_rep="nan", mode=mode_csv)
-
 
 
 #
@@ -370,11 +376,27 @@ def _add_columns(station: str, dset: "Dataset", df: pd.core.frame.DataFrame) -> 
             navigation_type = "FNAV" if "5" in observation_type else "INAV"
         else:
             log.fatal("The analysis for the GNSS '{system}' is not implemented.")
+
+    # Get frequency information
+    freq_tmp = list()
+    if system == "E":
+        for type_ in dset.meta["obstypes"][system]:
+            freq_tmp.append(enums.gnss_num2freq_E[f"f{type_[1]}"].value)
+
+    elif system == "G":
+        for type_ in dset.meta["obstypes"][system]:
+            freq_tmp.append(enums.gnss_num2freq_G[f"f{type_[1]}"].value)
+
+    else:
+        log.fatal("The analysis for the GNSS '{system}' is not implemented.")
+
+    frequency = "/".join(freq_tmp)
            
     # Add fields as column to dataframe
     df["station"] = np.repeat(station, num_obs)
     df["system"] = np.repeat(enums.gnss_id_to_name[system].value, num_obs)
     df["navigation_type"] = np.repeat(navigation_type, num_obs) 
+    df["frequency"] = np.repeat(frequency, num_obs)
     df["observation_type"] = np.repeat(observation_type, num_obs)
  
 

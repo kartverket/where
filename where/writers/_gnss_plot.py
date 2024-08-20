@@ -194,9 +194,11 @@ class GnssPlot:
         plot_def = {
                 "age_of_ephemeris": PlotField("Age of ephemeris", "s", (7, 6)),
                 "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns", (7, 6)),
+                "bgd_e1_e5a_dcb": PlotField("DCB(C1C,C5Q)", "ns", (7, 6)),
                 "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns", (7, 6)),
                 "bgd_e1_e5a_diff_mean": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns", (7, 6)),
                 "bgd_e1_e5b": PlotField("BGD(E1,E5b)", "ns", (7, 6)),
+                "bgd_e1_e5b_dcb": PlotField("DCB(C1C,C7Q)", "ns", (7, 6)),
                 "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
                 "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
                 "clk_diff_with_dt_mean": PlotField("Clock correction difference $\Delta t$ (mean)", "m", (7, 6)),
@@ -214,12 +216,15 @@ class GnssPlot:
                 "sisre": PlotField("SISE", "m", (7, 6)),
                 "sisre_orb": PlotField("orbit-only SISE", "m", (7, 6)),
                 "tgd": PlotField("TGD(L1,L2)", "ns", (7, 6)),
+                "tgd_dcb": PlotField("DCB(C1W,C2W)", "ns", (7, 6)),
                 "tgd_diff": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns", (7, 6)),
                 "tgd_diff_mean": PlotField("TGD(L1,L2) - DCB(C1W,C2W)", "ns", (7, 6)),
                 "tgd_b1_b3": PlotField("TGD(B1,B3)", "ns", (7, 6)),
+                "tgd_b1_b3_dcb": PlotField("DCB(C2I,C6I)", "ns", (7, 6)),
                 "tgd_b1_b3_diff": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns", (7, 6)),
                 "tgd_b1_b3_diff_mean": PlotField("TGD(B1,B3) - DCB(C2I,C6I)", "ns", (7, 6)),
                 "tgd_b2_b3": PlotField("TGD(B2,B3)", "ns", (7, 6)),
+                "tgd_b2_b3": PlotField("DCB(C7I,C6I)", "ns", (7, 6)),
                 "tgd_b2_b3_diff": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns", (7, 6)),
                 "tgd_b2_b3_diff_mean": PlotField("TGD(B2,B3) - DCB(C7I,C6I)", "ns", (7, 6)),
 
@@ -1332,9 +1337,12 @@ class GnssPlot:
             if field in self.dset.fields:
                 figure_paths = figure_paths + self.plot_field(field)
             
-            #if f"{field}_diff" in self.dset.fields:
-            #    figure_paths = figure_paths + self.plot_field(f"{field}_diff")
-                
+            if f"{field}_dcb" in self.dset.fields:
+                figure_paths = figure_paths + self.plot_field(f"{field}_dcb")
+            
+            if f"{field}_diff" in self.dset.fields:
+                figure_paths = figure_paths + self.plot_field(f"{field}_diff")
+    
             if f"{field}_diff_mean" in self.dset.fields:
                 figure_paths = figure_paths + self.plot_field(f"{field}_diff_mean")
         

@@ -57,6 +57,16 @@ def sisre_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     # Get file variables
     file_vars = {**dset_first.vars, **dset_first.analysis}
     for sol in dset.keys(): # Add service information (OS and/or HAS) to file variables
+
+        #+WORKAROUND_MURKS: service meta information is not available in earlier datasets.
+        if "service" not in dset[sol].meta.keys():
+            service = "has" if "has" in sol else "os"
+            file_vars["service"] = service
+            file_vars["SERVICE"] = service.upper()
+            dset[sol].meta["service"] = service.upper()
+            continue
+        #-WORKAROUND_MURKS:
+
         if "HAS" in dset[sol].meta["service"]:
             file_vars["service"] = "has"
             file_vars["SERVICE"] = "HAS"
