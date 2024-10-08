@@ -1,5 +1,5 @@
 version: 3.0
 organization: Geodesi
 product: 
-repo_types: [InternalClient]
+repo_types: [Tool]
 platforms: [OS_VM]
