@@ -4,9 +4,9 @@ kind: "Component"
 metadata:
   name: "where"
   tags:
-  - "internal"
+  - "private"
 spec:
-  type: "website"
+  type: "service"
   lifecycle: "production"
   owner: "global_geodesi"
 ---
