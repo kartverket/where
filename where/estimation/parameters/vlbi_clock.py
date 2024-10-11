@@ -44,7 +44,11 @@ def clock(dset):
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
     stations = list(dset.unique("station"))
-    stations.remove(dset.meta["ref_clock"])
+    try:
+        stations.remove(dset.meta["ref_clock"])
+    except ValueError:
+        # Station is no longer in the data
+        pass
     stations = np.asarray(stations)
 
     skip_stations = config.tech.get("skip_stations", section=PARAMETER, default="").list

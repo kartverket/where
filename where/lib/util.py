@@ -84,11 +84,21 @@ def check_options(*options):
   
 def check_write_level(write_level: enums.WriteLevel) -> bool:
     """Check if given configuration write level is larger than given write level
+
+    Write levels define, which fields of a dataset and other information should be written to disk. Following levels 
+    exists:
+
+         operational (=3): Write dataset fields, which are used afterwards the analysis. 'operational' processing
+                           uses minimal disk memory.
+         analysis (=2):    Write dataset fields, which are useful in the analysis either to 
+                           interpret results or make analyses under processing (e.g. data which can help to identify 
+                           a clock break in VLBI).
+         detail (=1):      Other fields, which are useful (e.g. for debugging).
     
     Args:
         write_level: Write level to check
     """
-    cfg_write_level = config.where.write_level.str
+    cfg_write_level = config.tech.write_level.str
     return True if enums.get_value("write_level", write_level) >= enums.get_value("write_level", cfg_write_level) else False
 
 

@@ -84,9 +84,9 @@ for year in years:
         for i, station in enumerate(stations):
             idx = np.logical_and(data[station]["date"] <= datetime(year, 12, 31), data[station]["date"] >= datetime(year, 1, 1))
             plot_data = data[station]
-            axs[i].bar(plot_data["date"][idx], plot_data["scheduled"][idx], label="Scheduled", width=3)
-            axs[i].bar(plot_data["date"][idx], plot_data["correlated"][idx], label="Correlated", width=3)
-            axs[i].bar(plot_data["date"][idx], plot_data["used"][idx], label="Used", width=3)
+            axs[i].bar(plot_data["date"][idx], plot_data["scheduled"][idx], label="Scheduled", width=2)
+            axs[i].bar(plot_data["date"][idx], plot_data["correlated"][idx], label="Correlated", width=2)
+            axs[i].bar(plot_data["date"][idx], plot_data["used"][idx], label="Used", width=2)
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             axs[i].set_xlim(xlim)
             if args.same_scale:
@@ -110,13 +110,13 @@ for year in years:
             idx = np.logical_and(data[station]["date"] <= datetime(year, 12, 31), data[station]["date"] >= datetime(year, 1, 1))
             plot_data = data[station]
             norm_factor = 100/plot_data["scheduled"][idx]
-            axs[i].bar(plot_data["date"][idx], plot_data["scheduled"][idx]*norm_factor, label="Scheduled", width=3)
-            axs[i].bar(plot_data["date"][idx], plot_data["correlated"][idx]*norm_factor, label="Correlated", width=3)
-            axs[i].bar(plot_data["date"][idx], plot_data["used"][idx]*norm_factor, label="Used", width=3)
+            axs[i].bar(plot_data["date"][idx], plot_data["scheduled"][idx]*norm_factor, label="Scheduled", width=2)
+            axs[i].bar(plot_data["date"][idx], plot_data["correlated"][idx]*norm_factor, label="Correlated", width=2)
+            axs[i].bar(plot_data["date"][idx], plot_data["used"][idx]*norm_factor, label="Used", width=2)
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             axs[i].set_xlim(xlim)
-            if args.same_scale:
-                axs[i].set_ylim(ylim)
+            #if args.same_scale:
+            #    axs[i].set_ylim(ylim)
 
             axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
             axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
@@ -132,12 +132,14 @@ for year in years:
     # Default. Always plot at least these plots
     # One plot per year and one plot per station, values are absolute
     for i, station in enumerate(stations):
-        fig = plt.figure(figsize=(12,8), dpi=150)
         idx = np.logical_and(data[station]["date"] <= datetime(year, 12, 31), data[station]["date"] >= datetime(year, 1, 1))
+        if not any(idx):
+            continue
+        fig = plt.figure(figsize=(12,8), dpi=150)
         plot_data = data[station]
-        plt.bar(plot_data["date"][idx], plot_data["scheduled"][idx], label="Scheduled", width=3)
-        plt.bar(plot_data["date"][idx], plot_data["correlated"][idx], label="Correlated", width=3)
-        plt.bar(plot_data["date"][idx], plot_data["used"][idx], label="Used", width=3)
+        plt.bar(plot_data["date"][idx], plot_data["scheduled"][idx], label="Scheduled", width=2)
+        plt.bar(plot_data["date"][idx], plot_data["correlated"][idx], label="Correlated", width=2)
+        plt.bar(plot_data["date"][idx], plot_data["used"][idx], label="Used", width=2)
         xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
         plt.xlim(xlim)
         if args.same_scale:
@@ -157,17 +159,19 @@ for year in years:
     if args.normalized:
         # One plot per year and one plot per station, values are normalized
         for i, station in enumerate(stations):
-            fig = plt.figure(figsize=(12,8), dpi=150)
             idx = np.logical_and(data[station]["date"] <= datetime(year, 12, 31), data[station]["date"] >= datetime(year, 1, 1))
+            if not any(idx):
+                continue
+            fig = plt.figure(figsize=(12,8), dpi=150)
             plot_data = data[station]
             norm_factor = 100/plot_data["scheduled"][idx]
-            plt.bar(plot_data["date"][idx], plot_data["scheduled"][idx]*norm_factor, label="Scheduled", width=3)
-            plt.bar(plot_data["date"][idx], plot_data["correlated"][idx]*norm_factor, label="Correlated", width=3)
-            plt.bar(plot_data["date"][idx], plot_data["used"][idx]*norm_factor, label="Used", width=3)
+            plt.bar(plot_data["date"][idx], plot_data["scheduled"][idx]*norm_factor, label="Scheduled", width=2)
+            plt.bar(plot_data["date"][idx], plot_data["correlated"][idx]*norm_factor, label="Correlated", width=2)
+            plt.bar(plot_data["date"][idx], plot_data["used"][idx]*norm_factor, label="Used", width=2)
             xlim = (datetime(year, 1, 1), datetime(year, 12, 31))
             plt.xlim(xlim)
-            if args.same_scale:
-                plt.ylim(ylim)
+            #if args.same_scale:
+            #    plt.ylim(ylim)
 
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
             plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))

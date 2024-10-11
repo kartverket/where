@@ -5,6 +5,7 @@ Description:
 
 
 """
+import functools
 import itertools
 from datetime import datetime, date
 
@@ -52,6 +53,7 @@ def get_args(rundate, input_args=None):
         List:   Strings with names of available sessions.
     """
     keyword = "--session_code"
+
     session_list = set()
     input_args = list(input_args) if input_args is not None else list()
     for idx in range(len(input_args)):
@@ -69,6 +71,23 @@ def get_args(rundate, input_args=None):
         default=False,
     ).bool
 
+    session_list_file = config.where.get(
+        "session_list",
+        section="runner",
+        value=util.read_option_value("--session_list", default=None),
+        default="",
+        ).str
+
+    @functools.lru_cache
+    def _read_session_list_file(filename):
+        if not filename:
+            return set()
+
+        with open(filename) as fid:
+            return set(fid.read().splitlines())
+
+    from_session_list = _read_session_list_file(session_list_file)
+
     if get_session_from_master:
 
         session_types = config.where.get(
@@ -77,8 +96,15 @@ def get_args(rundate, input_args=None):
             value=util.read_option_value("--session_types", default=None),
             default="",
         ).list
+
+        skip_intensives = config.where.get(
+            "skip_intensives",
+            section="runner",
+            value=util.read_option_value("--skip_intensives", default=None),
+            default=True,
+        ).bool
         master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
-        sessions = set(master_schedule.list_sessions(rundate, session_types=session_types))
+        sessions = set(master_schedule.list_sessions(rundate, session_types=session_types, skip_intensives=skip_intensives))
 
         check_master_status = config.where.get(
             "check_master_status",
@@ -99,6 +125,7 @@ def get_args(rundate, input_args=None):
 
         sessions = set(sessions) - not_ready_sessions
         sessions = sessions & session_list if session_list else sessions
+        sessions = sessions & from_session_list if from_session_list else sessions
         return [keyword + "=" + s + " " + args for s in sessions]
     else:
         obs_format = config.tech.get(
@@ -110,6 +137,7 @@ def get_args(rundate, input_args=None):
             f"vlbi_obs_{obs_format}", variable="session_code", pattern=r"\w{6}", file_vars=file_vars
         )
         sessions = sessions & session_list
+        sessions = sessions & from_session_list if from_session_list else sessions
         return [keyword + "=" + s + " " + args for s in sessions]
 
 

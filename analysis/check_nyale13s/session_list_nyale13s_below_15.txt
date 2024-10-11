@@ -1,0 +1,20 @@
+# List of session with observations below 15 degrees elevation for NYALE13S
+# Observed in the time between (inclusive) 2020-02-17 and 2020-12-29
+r1934
+r1935
+r1936
+r1937
+r1939
+r1940
+r1944
+r1945
+r1946
+r1947
+r1948
+r1949
+r1951
+r1952
+r1971
+r1975
+r4978
+r4979

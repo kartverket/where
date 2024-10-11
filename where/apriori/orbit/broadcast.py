@@ -561,6 +561,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             + self.dset_edit.sat_clock_drift_rate[dset_brdc_idx] * tk ** 2
         ) * constant.c
         
+
     def satellite_clock_rate_correction(self, dset: "Dataset", time: str = "time") -> np.ndarray:
         """Determine satellite clock rate correction
 

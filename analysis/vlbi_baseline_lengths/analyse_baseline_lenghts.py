@@ -140,27 +140,48 @@ def plot_baselines(baselines, id_txt, local_ties):
         baseline_length = data["length"]
         baseline_length_ferr = data["ferr"]
         color = data["num_obs"]
-        repeatability = data.get("repeatability", np.nan)
-        trend = data.get("trend", [np.nan]*len(dates))
+        repeatability = data.get("repeatability", np.nan) * Unit.m2mm
+        trend = data.get("trend")
+        trend_rate = data.get("trend_rate", np.nan) * Unit.m2mm
         
         fig = plt.figure(figsize=(12, 10), dpi=150)
-        plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
-        im = plt.scatter(dates, baseline_length, c=color, zorder=100)
-        plt.plot(dates, trend, label="trend")
+
+        # Bounding boxes: left, bottom, width, height
+        ax1 = fig.add_axes([0.1, 0.1, 0.8, 0.8]) # Baselines
+        ax2 = fig.add_axes([0.93, 0.2, 0.02, 0.68]) # Colorbar
+        ax3 = fig.add_axes([0.91, 0.11, 0.08, 0.08], projection=ccrs.Mollweide()) # World map
+
+        # Baselines
+        ax1.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
+        im = ax1.scatter(dates, baseline_length, c=color, zorder=100)
+        if trend is not None:
+            ax1.plot(dates, trend, label=f"{trend_rate: 6.2f} [mm/year]")
         if local_tie:
-            plt.axhline(local_tie, label="local tie")
-        plt.gca().get_xaxis().set_major_formatter(mdates.DateFormatter(DATE_FMT))
-        plt.gca().xaxis.set_major_locator(mt.LinearLocator(numticks=7))
-        plt.gca().ticklabel_format(axis="y", style="plain")
-        plt.gca().yaxis.get_major_formatter().set_useOffset(False)
-        plt.grid(axis="y", linestyle="--")
-        plt.ylabel("Baseline length [m]")
-        plt.title(f"{baseline} Baseline Length Repeatability: {repeatability:6.4f} [m]")
-        plt.legend()
-        cbar = fig.colorbar(im, use_gridspec=True)
+            ax1.axhline(local_tie, label="local tie")
+        ax1.get_xaxis().set_major_formatter(mdates.DateFormatter(DATE_FMT))
+        ax1.xaxis.set_major_locator(mt.LinearLocator(numticks=7))
+        ax1.ticklabel_format(axis="y", style="plain")
+        ax1.yaxis.get_major_formatter().set_useOffset(False)
+        ax1.grid(axis="y", linestyle="--")
+        ax1.set_ylabel("Baseline length [m]")
+        if trend is not None or local_tie:
+            ax1.legend()
+        ax1.set_title(f"{baseline} Baseline Length Repeatability: {repeatability:6.2f} [mm]")
+
+        # Colorbar
+        cbar = fig.colorbar(im, cax=ax2, pad=0.05)
         cbar.set_label("Number of observations on baseline used in solution")
+
+        # World map
+        lat = np.concatenate((data["lat_1"], data["lat_2"]))
+        lon = np.concatenate((data["lon_1"], data["lon_2"]))
+        ax3.set_global()
+        ax3.coastlines()
+        ax3.plot(lon, lat, c="red", transform=ccrs.Geodetic())
+        ax3.scatter(lon, lat, color="red", transform=ccrs.PlateCarree())
         plt.savefig(f"img/{id_txt}/Baseline_{sta_1}_{sta_2}_{id_txt}.png", bbox_inches="tight")
         plt.close()
+
 
 
 def save_repeatability(baselines, id_txt="default"):
@@ -266,11 +287,12 @@ def compute_repeatability(baselines):
             l = data["length"]
             e = data["ferr"]
             #repeatability, length = wblr(l, t.mjd, e)
-            repeatability, length, trend, keep_idx  = blr(l, t.mjd, e)
+            repeatability, length, trend, trend_rate, keep_idx  = blr(l, t.decimalyear, e)
             data["repeatability"] = repeatability
             data["mean_length"] = length
             data["repeatability_num_obs"] = np.sum(keep_idx)
             data["trend"] = trend
+            data["trend_rate"] = trend_rate
 
             # update original data based on keep_idx
             if data["repeatability_num_obs"] < num_obs:
@@ -305,7 +327,7 @@ def wblr(bl, mjd, ferr):
     wblr = np.sqrt(np.sum(w * (bl - bl_wmean) ** 2) / (w_sum - np.sum(w ** 2) / w_sum))
     return wblr, bl_wmean
 
-def blr(bl, mjd, ferr):
+def blr(bl, decimalyear, ferr):
     """Computes baseline length repeatability for long baselines
 
     The mean baseline length after removing a linear trend is used in the computation. 
@@ -314,27 +336,31 @@ def blr(bl, mjd, ferr):
     Based on equation (6.3) in {hofmeister2016}
 
     Args:
-        bl:     estimated baseline lengths for one baseline [m]
-        mjd:    modified julian date for estimated baseline length
-        w:      formal error of estimated baseline lengths [m]
+        bl:             estimated baseline lengths for one baseline [m]
+        decimalyear:    decimal year for estimated baseline length
+        w:              formal error of estimated baseline lengths [m]
 
     Returns: 
         baseline length repeatability
         mean baseline length (after detrending)
         trend
+        trend_rate
+        keep_idx (index of used dates)
         
     """
     keep_idx = (ferr != 0) & ~np.isnan(ferr)
 
     w = 1 / ferr[keep_idx] ** 2
     w_sum = np.sum(w)
-    lin_func = np.polynomial.Polynomial.fit(mjd[keep_idx], bl[keep_idx], 1, w=w)
-    trend = lin_func(mjd)
+    lin_func = np.polynomial.Polynomial.fit(decimalyear[keep_idx], bl[keep_idx], 1, w=w)
+    trend = lin_func(decimalyear)
+    trend_rate = lin_func.convert().coef[1]
 
     bl_mean = np.mean(trend)
     blr = np.sqrt(np.sum(w * (bl[keep_idx] - trend[keep_idx]) ** 2) / (w_sum - np.sum(w ** 2) / w_sum))
     
-    return blr, bl_mean, trend, keep_idx
+    # trend_rate: [meter/year]
+    return blr, bl_mean, trend, trend_rate, keep_idx
 
 def parse_args():
     """Define and parse input arguments to the script"""

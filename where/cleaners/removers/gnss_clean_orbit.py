@@ -302,6 +302,9 @@ def _get_navigation_records_and_ignore_epochs(dset: "Dataset", orbit: "AprioriOr
 
         unhealthy_satellites = sorted(set(dset.satellite[remove_idx]))
         log.info(f"Discarding observations for unhealthy satellites: {', '.join(unhealthy_satellites)}")
+        
+        for time, sat in zip(dset.time.gps.datetime[remove_idx], dset.satellite[remove_idx]):
+            log.debug(f"REJECT UNHEALTHY SATELLITE OBSERVATIONS: {time} {sat}")
     else:
         remove_idx = np.zeros(dset.num_obs, dtype=bool)
 
@@ -500,7 +503,7 @@ def _ignore_epochs_exceeding_interpolation_boundaries(dset: "Dataset", orbit: "A
    
 
 def _ignore_satellites(dset: "Dataset", orbit: "AprioriOrbit", orbit_flag: str) -> None:
-    """Remove GNSS observations with unavailable apriori satellite orbits from Dataset
+    """Remove GNSS observations with unavailable apriori satellite orbits from Dataset for given rundate
 
     The remover can be used for precise and broadcast ephemeris and also for the GNSS and SISRE technique/analysis.
 
@@ -510,12 +513,17 @@ def _ignore_satellites(dset: "Dataset", orbit: "AprioriOrbit", orbit_flag: str) 
     - SISRE: Both apriori orbits, broadcast and precise, has to be checked against a set of satellites defined in
              the configuration file.
 
+    Note, broadcast and precise ephemeris are often used over several consecutive days. Especially for precise
+    ephemeris it is important, that the satellites are ignored if the satellites are not available on the given 
+    rundate. This is done to avoid interpolation challenges on day boundaries.
+
     Args:
         dset:        A Dataset containing model data, which is decimated by unavailable satellite observations.
         orbit:       Apriori orbit object containing orbit data (either broadcast or precise)
         orbit_flag:  Specification of which apriori orbit is used ("broadcast" or "precise")
     """
-    not_available_sat = set(dset.satellite) - set(orbit.dset_edit.satellite)
+    idx = orbit.dset_edit.time.gps.date == dset.analysis["rundate"].strftime("%Y-%m-%d")        
+    not_available_sat = set(dset.satellite) - set(orbit.dset_edit.satellite[idx])
     file_paths = orbit.dset_edit.meta["parser"]["file_path"]
 
     if not_available_sat:

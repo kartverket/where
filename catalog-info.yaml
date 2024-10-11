@@ -1,0 +1,37 @@
+# nonk8s
+apiVersion: "backstage.io/v1alpha1"
+kind: "Component"
+metadata:
+  name: "where"
+  tags:
+  - "private"
+spec:
+  type: "service"
+  lifecycle: "production"
+  owner: "global_geodesi"
+---
+apiVersion: "backstage.io/v1alpha1"
+kind: "Group"
+metadata:
+  name: "security_champion_where"
+  title: "Security Champion where"
+spec:
+  type: "security_champion"
+  parent: "geodesi_security_champions"
+  members:
+  - "annsilje"
+  children:
+  - "resource:where"
+---
+apiVersion: "backstage.io/v1alpha1"
+kind: "Resource"
+metadata:
+  name: "where"
+  links:
+  - url: "https://github.com/kartverket/where"
+    title: "where på GitHub"
+spec:
+  type: "repo"
+  owner: "security_champion_where"
+  dependencyOf:
+  - "component:where"
