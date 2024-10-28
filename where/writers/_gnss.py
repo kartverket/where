@@ -173,6 +173,10 @@ def get_grc_csv_row(
             "GSAT0222": "B07",
             "GSAT0223": "B03",
             "GSAT0224": "B15",
+            "GSAT0225": "C05",
+            "GSAT0226": "A02",
+            "GSAT0227": "C12",
+            "GSAT0232": "A17",
     }
 
     station_def = {
