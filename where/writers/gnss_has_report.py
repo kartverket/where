@@ -393,7 +393,7 @@ def _plot_has_clock_availability(
             options={
                 "figsize": (7, 8),
                 "marker": "s",
-                "marksersize": 10,
+                "markersize": 1,
                 "legend_ncol": 4,
                 "legend_location": "bottom",
                 "plot_to": "file",
@@ -467,7 +467,7 @@ def _plot_has_orbit_availability(
             options={
                 "figsize": (7, 8),
                 "marker": "s",
-                "marksersize": 10,
+                "markersize": 1,
                 "legend_ncol": 4,
                 "legend_location": "bottom",
                 "plot_to": "file",
