@@ -79,18 +79,18 @@ def get_grc_csv_row(
 
     business_def = {
             "Galileo": {
-                "hpe": "FOM-OS-07 Horizontal Positioning Service Accuracy per Station over Month",
-                "site_vel_3d": "FOM-OS-11 3D Velocity Service Accuracy per Station over Month",
-                "sisre": "SDD-OS-09 SIS Ranging Accuracy at GA over All Satellites over Month",
-                "sisre_sat": "SDD-OS-10 SIS Ranging Accuracy at GA per Satellite over Month",
-                "vpe": "FOM-OS-08 Vertical Positioning Service Accuracy per Station over Month",
+                "hpe": "FOM-OS-07: Horizontal Positioning Service Accuracy per Station over Month",
+                "site_vel_3d": "FOM-OS-11: 3D Velocity Service Accuracy per Station over Month",
+                "sisre": "SDD-OS-09: SIS Ranging Accuracy at GA over All Satellites over Month",
+                "sisre_sat": "SDD-OS-10: SIS Ranging Accuracy at GA per Satellite over Month",
+                "vpe": "FOM-OS-08: Vertical Positioning Service Accuracy per Station over Month",
             },
             "GPS": {
-                "hpe": "FOM-OS-07 Horizontal Positioning Service Accuracy per Station over Month",
-                "site_vel_3d": "FOM-OS-11 3D Velocity Service Accuracy per Station over Month",
-                "sisre": "SPS-OS-02 SIS Ranging Accuracy over All Satellites over Month",
-                "sisre_sat": "SPS-OS-03 SIS Ranging Accuracy per Satellite over Month",
-                "vpe": "FOM-OS-08 Vertical Positioning Service Accuracy per Station over Month",
+                "hpe": "FOM-OS-07; Horizontal Positioning Service Accuracy per Station over Month",
+                "site_vel_3d": "FOM-OS-11: 3D Velocity Service Accuracy per Station over Month",
+                "sisre": "SPS-OS-02: SIS Ranging Accuracy over All Satellites over Month",
+                "sisre_sat": "SPS-OS-03: SIS Ranging Accuracy per Satellite over Month",
+                "vpe": "FOM-OS-08: Vertical Positioning Service Accuracy per Station over Month",
             },
     }
 
@@ -112,39 +112,39 @@ def get_grc_csv_row(
     }
 
     slot_def = {
-            "SVN41": "B3",
-            "SVN43": "F6",
-            "SVN44": "B3",
-            "SVN45": "D3",
-            "SVN48": "A4",
-            "SVN50": "E3",
-            "SVN51": "E4",
-            "SVN52": "A2",
-            "SVN53": "C4",
-            "SVN55": "F2",
-            "SVN56": "B1",
-            "SVN57": "C1",
-            "SVN58": "B4",
-            "SVN59": "C5",
-            "SVN61": "D1",
-            "SVN62": "B2",
-            "SVN63": "D2",
-            "SVN64": "A3",
-            "SVN65": "A1",
-            "SVN66": "C2",
-            "SVN67": "D4",
-            "SVN68": "F3",
-            "SVN69": "E1",
-            "SVN70": "F1",
-            "SVN71": "B5",
-            "SVN72": "C3",
-            "SVN73": "E2",
-            "SVN74": "F4",
-            "SVN75": "D6",
-            "SVN76": "E5",
-            "SVN77": "B6",
-            "SVN78": "D5",
-            "SVN79": "A6",
+            "SVN41": "B03",
+            "SVN43": "F06",
+            "SVN44": "B03",
+            "SVN45": "D03",
+            "SVN48": "A04",
+            "SVN50": "E03",
+            "SVN51": "E04",
+            "SVN52": "A02",
+            "SVN53": "C04",
+            "SVN55": "F02",
+            "SVN56": "B01",
+            "SVN57": "C01",
+            "SVN58": "B04",
+            "SVN59": "C05",
+            "SVN61": "D01",
+            "SVN62": "B02",
+            "SVN63": "D02",
+            "SVN64": "A03",
+            "SVN65": "A01",
+            "SVN66": "C02",
+            "SVN67": "D04",
+            "SVN68": "F03",
+            "SVN69": "E01",
+            "SVN70": "F01",
+            "SVN71": "B05",
+            "SVN72": "C03",
+            "SVN73": "E02",
+            "SVN74": "F04",
+            "SVN75": "D06",
+            "SVN76": "E05",
+            "SVN77": "B06",
+            "SVN78": "D05",
+            "SVN79": "A06",
             "GSAT0101": "B05",
             "GSAT0102": "B06",
             "GSAT0103": "C04",
@@ -173,6 +173,10 @@ def get_grc_csv_row(
             "GSAT0222": "B07",
             "GSAT0223": "B03",
             "GSAT0224": "B15",
+            "GSAT0225": "C05",
+            "GSAT0226": "A02",
+            "GSAT0227": "C12",
+            "GSAT0232": "A17",
     }
 
     station_def = {
@@ -243,7 +247,7 @@ def get_grc_csv_row(
         target_def[kpi], # Target
         unit_def[kpi], # Unit
         date, # Month/Year
-        f"{result:.5f}", # Result
+        f"{result:.3f}", # Result
     ]
 
 
