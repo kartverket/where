@@ -174,7 +174,9 @@ if make_csv:
         r_3 = dset_ts.neq_helmert_gamma[idx_2][sort_idx_2]
         volume = dset_ts.network_volume[idx_2][sort_idx_2]
         for rd, sc, s, tx, ty, tz, r1, r2, r3, v in zip(rundate, session_code, scale, t_x, t_y, t_z, r_1, r_2, r_3, volume):
-            session_idx = dset_ts.filter(rundate=rd)
+            session_idx = dset_ts.filter(rundate=rd, session_code=sc)
             station_idx = dset_ts.num_obs_estimate[session_idx] > 0
-            stations = "/".join(list(dset_ts.station[session_idx][station_idx])[1:]) # First station entry is 'all' for each rundate
+            stations = list(dset_ts.station[session_idx][station_idx])
+            stations.remove("all") 
+            stations = "/".join(stations)
             fid.write(f"{rd}, {sc}, {s}, {tx}, {ty}, {tz}, {r1}, {r2}, {r3}, {v}, {stations}\n")
