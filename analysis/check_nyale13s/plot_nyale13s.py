@@ -210,14 +210,26 @@ def plot_statistics(dates, dof, variance_factor, colors):
     #fig.tight_layout()
     plt.savefig(f"img/{dset_id}/Statistics_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
 
-def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, sta_1, sta_2, local_tie):
+def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos, sta_1, sta_2, local_tie):
     t = Time(dates, fmt="datetime", scale="utc")
     _wblr, wmean = wblr(baseline_length,t.mjd, baseline_length_ferr)
+
+    vgos = np.array(vgos)
+    dates = np.array(dates)
+    baseline_length = np.array(baseline_length)
+    baseline_length_ferr = np.array(baseline_length_ferr)
+    num_obs_bs = np.array(num_obs_bs)
+
+    num_vgos = np.sum(vgos)
+    num_sx = np.sum(~vgos)
+
     if local_tie:
         print(f"{dset_id}: Weighted mean: {wmean: 6.4f} [m], Local tie offset: {(wmean - local_tie)*Unit.m2mm: 6.2f} [mm]")
     else:
         print(f"{dset_id}: Weighted mean: {wmean: 16.4f} [m]")
     print(f"{dset_id}: Weighted blr (using weighted mean): {_wblr*Unit.m2mm: 6.2f} [mm]")
+    print(f"Number of S/X sessions: {num_sx}")
+    print(f"Number of VGOS sessions: {num_vgos}")
 
     x_padding = 1.5 # days
     y_padding = 0.01 # meter
@@ -225,8 +237,11 @@ def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, sta_
     fig = plt.figure(figsize=(12, 8), dpi=150)
     xlim = (min(dates) - timedelta(days=x_padding), max(dates) + timedelta(days=x_padding))
     ylim = (wmean - y_padding, wmean + y_padding)
-    plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
-    im = plt.scatter(dates, baseline_length, c=num_obs_bs, zorder=100)
+    plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt=",", marker=None, zorder=0, mew=0, ecolor="tab:gray")
+    if num_sx > 0:
+        im = plt.scatter(dates[~vgos], baseline_length[~vgos], c=num_obs_bs[~vgos], marker="o", zorder=100, label="S/X")
+    if num_vgos > 0:
+        im = plt.scatter(dates[vgos], baseline_length[vgos], c=num_obs_bs[vgos], marker="d", zorder=100, label="VGOS")
     plt.axhline(wmean, c="red",label="Weighted mean")
     if local_tie:
        plt.axhline(local_tie, c="blue", label="Local tie vector")
@@ -329,6 +344,7 @@ rms = []
 baseline_length = []
 baseline_length_ferr = []
 baseline_dates = []
+vgos = []
 
 rms = dset_ts.rms_residual_estimate[idx]
 dof = dset_ts.degrees_of_freedom[idx]
@@ -385,6 +401,10 @@ for rundate, session_code in zip(dates, session_codes):
         baseline_length.append(bl['baseline_length'])
         baseline_length_ferr.append(bl['baseline_length_ferr'])
         num_obs_bs.append(dset_session.num(baseline=baseline1) + dset_session.num(baseline=baseline2))
+        if session_code.startswith("v"):
+            vgos.append(True)
+        else:
+            vgos.append(False)
 
 
     if args.plot_residuals:
@@ -399,7 +419,7 @@ data = dict(zip(data["baseline"], data["length"]))
 local_tie = data.get(baseline1) or data.get(baseline2)
 
 plot_statistics(dates, dof, variance_factor, colors[0])
-plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs, station1, station2, local_tie)
+plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos, station1, station2, local_tie)
 
 #plot_residual_rms(dates, dates_sta_1, dates_sta_2, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
 
