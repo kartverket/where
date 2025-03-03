@@ -97,10 +97,10 @@ class Slr(orbit.AprioriOrbit):
         log.debug(f"Parse precise orbit file {file_path}")
 
         # Generate dataset with external orbit file data
-        dset_orbit = dataset.Dataset(
-            tech=dset_raw.meta["tech"], stage="orbit", dataset_name="", dataset_id=0, empty=True
-        )
-        parser = parsers.parse(parser_name="orbit_sp3", file_path=file_path, rundate=date_to_read)
-        parser.write_to_dataset(dset_orbit)
+        #dset_orbit = dataset.Dataset(
+        #    tech=dset_raw.meta["tech"], stage="orbit", dataset_name="", dataset_id=0, empty=True
+        #)
+        parser = parsers.parse(parser_name="sp3", file_path=file_path, rundate=date_to_read)
+        dset_orbit = parser.as_dataset()
 
         return dset_orbit

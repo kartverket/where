@@ -110,9 +110,8 @@ class PreciseOrbit(orbit.AprioriOrbit):
             log.debug(f"Parse precise orbit file {file_path}")
 
             # Generate temporary Dataset with orbit file data
-            dset_temp = dataset.Dataset(rundate=date_to_read, pipeline=dset_raw.vars["pipeline"], stage="temporary")
-            parser = parsers.parse(parser_name="orbit_sp3", file_path=file_path, rundate=date_to_read)
-            parser.write_to_dataset(dset_temp)
+            parser = parsers.parse_file(parser_name="sp3", file_path=file_path)
+            dset_temp = parser.as_dataset()
             file_paths.append(str(parser.file_path))
             dependencies.add(str(parser.file_path), label=self.file_key)  # Used for output writing
 
