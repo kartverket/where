@@ -114,8 +114,9 @@ def read(stage, dset):
             log.fatal(f"Unknown RINEX format {version} is used in file {file_path}")
 
     dset.update_from(parser.as_dataset())
-                    
-    dset.write_as(stage=stage)
+
+    if util.check_write_level("analysis"):                    
+        dset.write_as(stage=stage)
 
 
 #
@@ -154,7 +155,8 @@ def orbit(stage: str, dset: "Dataset") -> None:
         # Connect site position with satellite orbits needed for determination of elevation and azimuth
         dset.site_pos.other = dset.sat_posvel
         
-        #dset.write_as(stage=stage)
+        #if util.check_write_level("analysis"):
+        #    dset.write_as(stage=stage)
 
 
 #
@@ -170,7 +172,9 @@ def edit(stage, dset):
     """
     # cleaners.apply_editors("editors", dset)
     cleaners.apply_removers("removers", dset)
-    #dset.write_as(stage=stage)
+
+    if util.check_write_level("analysis"):
+        dset.write_as(stage=stage)
     
     
 #
@@ -185,7 +189,9 @@ def postprocess(stage, dset):
         dset (Dataset):       A dataset containing the data.
     """
     postprocessors.apply_postprocessors("postprocessors", dset)
-    #dset.write_as(stage=stage)
+
+    if util.check_write_level("analysis"):
+        dset.write_as(stage=stage)
 
 
 #
@@ -203,4 +209,6 @@ def write(stage, dset):
         dset (Dataset):       A dataset containing the data.
     """
     writers.write(default_dset=dset)
-    dset.write_as(stage="write", dataset_id=0)
+
+    if util.check_write_level("operational"):
+        dset.write_as(stage="write", dataset_id=0)
