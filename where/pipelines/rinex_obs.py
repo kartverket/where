@@ -98,7 +98,7 @@ def read(stage, dset):
 
     # Read GNSS observation data either from Android raw file or RINEX file
     if config.tech.format.str == "android":
-        parser = parsers.parse_key("gnss_android_raw_data", file_vars={**dset.vars, **dset.analysis})
+        parser = parsers.parse_key_existing("gnss_android_raw_data", file_vars={**dset.vars, **dset.analysis})
     else:
         version, file_path = gnss.get_rinex_file_version("gnss_rinex_obs")
         log.info(f"Read RINEX file {file_path} with format version {version}.")
