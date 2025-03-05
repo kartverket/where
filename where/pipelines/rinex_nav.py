@@ -99,7 +99,8 @@ def read(stage: str, dset: "Dataset") -> None:
     else:
         dset.update_from(brdc.dset_raw)
 
-    dset.write_as(stage=stage)
+    if util.check_write_level("analysis"):
+        dset.write_as(stage=stage)
 
 
 #
@@ -114,7 +115,9 @@ def edit(stage: str, dset: "Dataset") -> None:
         dset:       A dataset containing the data.
     """
     cleaners.apply_removers("removers", dset)
-    dset.write_as(stage=stage)
+
+    if util.check_write_level("operational"):
+        dset.write_as(stage=stage)
 
 
 #
@@ -132,4 +135,6 @@ def write(stage: str, dset: "Dataset") -> None:
         dset (Dataset):       A dataset containing the data.
     """
     writers.write(default_dset=dset)
-    dset.write_as(stage=stage)
+
+    if util.check_write_level("operational"):
+        dset.write_as(stage=stage)

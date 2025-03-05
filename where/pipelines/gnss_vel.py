@@ -18,17 +18,10 @@ from midgard.dev import plugins
 from midgard.gnss import gnss as mg_gnss
 
 # Where imports
-from where.lib import config
+from where.lib import config, gnss, log, util
 from where import estimation
-from where.lib import gnss
-from where.lib import log
-from where.lib import util
 from where.models import site, delay
-from where import apriori
-from where import cleaners
-from where import parsers
-from where import writers
-
+from where import apriori, cleaners, parsers, writers
 
 # The name of this technique
 TECH = __name__.split(".")[-1]
