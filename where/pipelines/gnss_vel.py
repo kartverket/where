@@ -138,6 +138,13 @@ def read(stage, dset):
                 sampling_rate=sampling_rate,
                 convert_unit=True,
             )
+        elif version.startswith("4"):  #TODO: Own RINEX 4 parser should be implemented. But RINEX 3 parser works also.
+            parser = parsers.parse_file(
+                "rinex3_obs",
+                file_path=file_path,
+                sampling_rate=sampling_rate,
+                convert_unit=True,
+            )
         else:
             log.fatal(f"Unknown RINEX format {version} is used in file {file_path}")
 
