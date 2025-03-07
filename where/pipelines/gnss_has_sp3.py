@@ -250,16 +250,26 @@ def orbit(stage: str, dset: "Dataset") -> None:
     
     # Apply HAS orbit and clock correction
     if satellite_origin == "com":
-        ant_brdc = apriori.get("gnss_antenna_correction", file_key="antex_brdc") #TODO: Should we IGS ANTEX file? apriori.get("gnss_antenna_correction") 
+        ant = apriori.get("gnss_antenna_correction")
         
+
         # Definition of GNSS frequencies for accessing correct PCOs for conversion from APC to CoM:
-        #   for broadcast orbits: PCOs of broadcast orbits are based for Galileo on the average of E1/E5/E6 PCOs defined
-        #                         by the European GNSS Service Centre and for GPS it is defined by the National Geospatial
-        #                         Intelligence Agency (NGA). An ANTEX file is created with these PCOs values, whereby the
-        #                         Galileo E1 and respectively GPS L1 is used.
-        brdc_sys_freq = {"E": "E1", "G": "L1"} #TODO: Do we need something like that? {"E": "E1_E5b", "G": "L1_L2"} 
-        
-        pco_sat = ant_brdc.satellite_phase_center_offset(dset, brdc_sys_freq)
+        #   for broadcast orbits: Assumption that the PCOs of broadcast orbits are based on following ionosphere-free
+        #                         linear combination:
+        #                            - E1/E5a for Galileo FNAV messages
+        #                            - E1/E5b for Galileo INAV messages
+        #                            - L1/L2 for GPS LNAV messages
+        #
+        brdc_sys_freq = {"G": "L1_L2"}
+        if "E" in dset.meta["navigation_message_type"].keys():
+            if dset.meta["navigation_message_type"]["E"].startswith("FNAV"):
+                brdc_sys_freq.update({"E": "E1_E5a"})
+            elif dset.meta["navigation_message_type"]["E"].startswith("INAV"):
+                brdc_sys_freq.update({"E": "E1_E5b"})
+            else:
+                log.fatal(f"Unknown Galileo navigation message type: {dset.meta['navigation_message_type']['E']}")
+  
+        pco_sat = ant.satellite_phase_center_offset(dset, brdc_sys_freq)
         dset.sat_posvel[:] = dset.sat_posvel - pco_sat + dset.has_orbit_correction 
         
     elif satellite_origin == "apc":
