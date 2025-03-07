@@ -195,7 +195,7 @@ def calculate(stage: str, dset: "Dataset"):
     Following Dataset fields are generated:
 
     | Field                  | Type              |  Description
-    |------------------------|-------------------|---------------------------------------------------------------------|
+    | :--------------------- | :---------------  | :------------------------------------------------------------------ |
     | bias_brdc              | numpy.ndarray     | Satellite bias of broadcast ephemeris in [m]                        |
     | bias_precise           | numpy.ndarray     | Satellite bias of precise orbits in [m]                             |
     | clk_diff               | numpy.ndarray     | Satellite clock correction difference without correction in [m]     |
@@ -526,13 +526,13 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
             f_L2 = enums.gnss_freq_G.L2
 
             for sat in dset.unique("satellite"):
-                if sat.startswith("G"):
+                if sat.startswith("G"): # related to L1 P(Y) signal
                     idx = dset.filter(satellite=sat)
                     dcb_l1_l2 = (
                         -f_L2 ** 2
                         / (f_L1 ** 2 - f_L2 ** 2)
                         * dcb.get_dsb(sat, "C1W-C2W", dset.analysis["rundate"])["estimate"]
-                        + dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"]
+                        #+ dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"] # related to L1 C/A signal
                     )
                     bias = dcb_l1_l2 * constant.c
                     bias_precise[idx] = bias
