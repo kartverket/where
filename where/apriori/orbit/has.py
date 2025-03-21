@@ -93,6 +93,7 @@ class HasOrbit(orbit.AprioriOrbit):
             meta = dict()
             
             file_path = config.files.path(self.file_key, file_vars={**dset_raw.vars, **dset_raw.analysis})
+            log.info(f"Read file {file_path}") 
             if not file_path.exists():                       
                 log.fatal(f"File does not exists: {file_path}")
             
@@ -102,7 +103,7 @@ class HasOrbit(orbit.AprioriOrbit):
             p = parsers.parse("gnss_has_decoder", file_path=file_path)
             if not p.data_available:
                 log.fatal(f"No observations in file {file_path}.")
-                
+               
             file_paths.append(str(file_path))
             dset_temp = p.as_dataset()          
 
