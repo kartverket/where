@@ -62,19 +62,13 @@ file_vars = config.date_vars(rundate)
 
 # Define 15 min dataset
 file_path = config.files.path(file_key="test_gnss_orbit_interpolation_15min", file_vars=file_vars)
-orb_15min = data.Dataset(
-    rundate, tech=None, stage=None, dataset_name="gnss_precise_orbit_15min", dataset_id=0, empty=True
-)
-parser = parsers.parse(parser_name="orbit_sp3c", file_path=file_path, rundate=rundate)
-parser.write_to_dataset(orb_15min)
+parser = parsers.parse(parser_name="sp3", file_path=file_path, rundate=rundate)
+orb_15min = parser.as_dataset()
 
 # Define 5 min control dataset
 file_path = config.files.path(file_key="test_gnss_orbit_interpolation_5min", file_vars=file_vars)
-orb_5min = data.Dataset(
-    rundate, tech=None, stage=None, dataset_name="gnss_precise_orbit_15min", dataset_id=0, empty=True
-)
-parser = parsers.parse(parser_name="orbit_sp3c", file_path=file_path, rundate=rundate)
-parser.write_to_dataset(orb_5min)
+parser = parsers.parse(parser_name="sp3", file_path=file_path, rundate=rundate)
+orb_5min = parser.as_dataset()
 
 # Interpolation timestamps
 obs_time = orb_5min.time.gps.gpssec

@@ -93,6 +93,7 @@ class HasOrbit(orbit.AprioriOrbit):
             meta = dict()
             
             file_path = config.files.path(self.file_key, file_vars={**dset_raw.vars, **dset_raw.analysis})
+            log.info(f"Read file {file_path}") 
             if not file_path.exists():                       
                 log.fatal(f"File does not exists: {file_path}")
             
@@ -102,7 +103,7 @@ class HasOrbit(orbit.AprioriOrbit):
             p = parsers.parse("gnss_has_decoder", file_path=file_path)
             if not p.data_available:
                 log.fatal(f"No observations in file {file_path}.")
-                
+               
             file_paths.append(str(file_path))
             dset_temp = p.as_dataset()          
 
@@ -132,6 +133,8 @@ class HasOrbit(orbit.AprioriOrbit):
             HAS orbit data    - Fields `delta_cross_track`, `delta_in_track`, delta_radial` are set to Not a number (NaN)
             HAS clock data    - `status` field are set to 1 or 2
             HAS bias data     - `av_flag` field is set to 0
+
+        In addition remove HAS messages, which exceeds defined limits.
         
         TODO: Is that necessary? First the navigation messages are sorted after the satellite and time of transmission.
               Removing of duplicated HAS message records.
@@ -139,22 +142,76 @@ class HasOrbit(orbit.AprioriOrbit):
         Args:
             dset_edit (Dataset):     Dataset representing edited data from RINEX navigation file
         """
+        remove_idx = np.zeros(self.dset_raw.num_obs, dtype=bool)
+        
+        idx = np.logical_or(self.dset_raw.validity < 5, self.dset_raw.validity > 3600) # unit [s] (Table 23, Galileo HAS ICD)
+        log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS message data exceeding validity limits [5 s, 3600 s].")
+        remove_idx[idx] = True
         
         # Edit HAS orbit message data
         if "delta_cross_track" in self.dset_raw.fields:
-            remove_idx = np.isnan(self.dset_raw.delta_cross_track)            
-            log.info(f"Removing {sum(np.logical_not(~remove_idx)):5d} not available HAS orbit message data (declared as NaN).")
+            idx = np.isnan(self.dset_raw.delta_cross_track)            
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} not available HAS orbit message data (declared as NaN).")
+            remove_idx[idx] = True
+
+            idx = np.logical_or(self.dset_raw.delta_cross_track < -16.376, self.dset_raw.delta_cross_track > 16.376) # unit [m] (Table 25, Galileo HAS ICD)
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS orbit message data exceeding delta cross-track correction limits [-16.376 m, 16.376 m].")
+            remove_idx[idx] = True
+
+            idx = np.logical_or(self.dset_raw.delta_in_track < -16.376, self.dset_raw.delta_in_track > 16.376) # unit [m] (Table 25, Galileo HAS ICD)
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS orbit message data exceeding delta in-track correction limits [-16.376 m, 16.376 m].")
+            remove_idx[idx] = True
+
+            idx = np.logical_or(self.dset_raw.delta_radial < -10.2375, self.dset_raw.delta_radial > 10.2375) # unit [m] (Table 25, Galileo HAS ICD)
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS orbit message data exceeding delta radial correction limits [-10.2375 m, 10.2375 m].")
+            remove_idx[idx] = True
+
+            for sys in self.dset_raw.unique("system"):
+                idx_sys = self.dset_raw.filter(system=sys)
+                remove_idx_sys = np.zeros(len(self.dset_raw.system[idx_sys]), dtype=bool)
+                if sys == "E":
+                    idx = np.logical_or(self.dset_raw.gnssiod[idx_sys] < 0, self.dset_raw.gnssiod[idx_sys] > 1023) # (Table 26, Galileo HAS ICD)
+                    log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS orbit message data exceeding IODref limits for Galileo [0, 1023].")
+                    remove_idx_sys[idx] = True  #TODO: Does this work?
+                elif sys == "G":
+                    idx = np.logical_or(self.dset_raw.gnssiod[idx_sys] < 0, self.dset_raw.gnssiod[idx_sys] > 255) # (Table 26, Galileo HAS ICD)
+                    log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS orbit message data exceeding IODref limits for GPS [0, 255].")
+                    remove_idx_sys[idx] = True  #TODO: Does this work?
+
+                remove_idx[idx_sys] = remove_idx_sys
 
         # Edit HAS clock message data        
         if "status" in self.dset_raw.fields:
-            remove_idx = self.dset_raw.status > 0
-            log.info(f"Removing {sum(np.logical_not(~remove_idx)):5d} not available HAS clock message data (status=1) " 
+            idx = self.dset_raw.status > 0
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} not available HAS clock message data (status=1) " 
                      f"and data which shall not be used (status=2).")
+            remove_idx[idx] = True
+
+            idx = np.logical_or(self.dset_raw.multiplier < 1, self.dset_raw.multiplier > 4) # (Table 29, Galileo HAS ICD)
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS clock message data exceeding multiplier limits [1, 4].")
+
+            idx = np.logical_or(self.dset_raw.delta_clock_c0 < -10.2375, self.dset_raw.delta_clock_c0 > 10.2350) # unit [m] (Table 31, Galileo HAS ICD) 
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS clock message data exceeding delta clock correction limits [-10.2375 m, 10.2350 m].")
             
         # Edit HAS code and phase bias message data        
         if "av_flag" in self.dset_raw.fields:
-            remove_idx = self.dset_raw.av_flag == 0
-            log.info(f"Removing {sum(np.logical_not(~remove_idx)):5d} not available HAS code/phase bias message data (av_flag=0)." )
+            idx = self.dset_raw.av_flag == 0
+            log.info(f"Removing {sum(np.logical_not(~idx)):5d} not available HAS code/phase bias message data (av_flag=0).")
+            remove_idx[idx] = True
+
+            if "code_bias" in self.dset_raw.fields:
+                idx = np.logical_or(self.dset_raw.code_bias < -20.46, self.dset_raw.code_bias > 20.46) # unit [m] (Table 37, Galileo HAS ICD)
+                log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS code bias message data exceeding code bias limits [-20.46 m, 20.46 m].")
+                remove_idx[idx] = True
+
+            elif "phase_bias" in self.dset_raw.fields:
+                idx = np.logical_or(self.dset_raw.phase_bias < -10.23, self.dset_raw.phase_bias > 10.23) # unit [m] (Table 40, Galileo HAS ICD)
+                log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS phase bias message data exceeding phase bias limits [-10.23 m, 10.23 m].")
+                remove_idx[idx] = True
+
+                idx = np.logical_or(self.dset_raw.phase_discontinuity_ind < 0, self.dset_raw.phase_discontinuity_ind > 3) # (Table 40, Galileo HAS ICD)
+                log.info(f"Removing {sum(np.logical_not(~idx)):5d} HAS phase bias message data exceeding phase dicontinuity indicator limits [0, 3].")
+                remove_idx[idx] = True
             
         # Copy raw dataset
         dset_edit.update_from(self.dset_raw)

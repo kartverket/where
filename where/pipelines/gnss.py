@@ -117,7 +117,7 @@ def read(stage: str, dset: "Dataset") -> None:
     # Read GNSS observation data either from Android raw file or RINEX file
     # TODO: Maybe a gnss.py 'obs' modul should be added to ./where/obs?
     if config.tech.format.str == "android":
-        parser = parsers.parse_key("gnss_android_raw_data", file_vars={**dset.vars, **dset.analysis})
+        parser = parsers.parse_key_existing("gnss_android_raw_data", file_vars={**dset.vars, **dset.analysis})
     else:
         version, file_path = gnss.get_rinex_file_version("gnss_rinex_obs")
         log.info(f"Read RINEX file {file_path} with format version {version}.")
@@ -129,6 +129,13 @@ def read(stage: str, dset: "Dataset") -> None:
                 # convert_unit=True,
             )
         elif version.startswith("3"):
+            parser = parsers.parse_file(
+                "rinex3_obs",
+                file_path=file_path,
+                sampling_rate=sampling_rate,
+                # convert_unit=True,
+            )
+        elif version.startswith("4"):  #TODO: Own RINEX 4 parser should be implemented. But RINEX 3 parser works also.
             parser = parsers.parse_file(
                 "rinex3_obs",
                 file_path=file_path,
@@ -155,7 +162,7 @@ def read(stage: str, dset: "Dataset") -> None:
 
     # Overwrite station coordinates given in RINEX header
     # TODO: Should be a apriori function with, where a station coordinate can be select for a given station.
-    p = parsers.parse_key(parser_name="bernese_crd", file_key="gnss_station_crd")
+    p = parsers.parse_key_existing(parser_name="bernese_crd", file_key="gnss_station_crd")
     sta_crd = p.as_dict()
 
     if station in sta_crd:

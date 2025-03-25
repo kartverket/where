@@ -75,6 +75,15 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels
 
 
 def add(config_key, dset):
+    """Sum all site model corrections based on caculated site model field results in GCRS
+
+    Args:
+        config_key (String):  Key in config with list of models.
+        dset (Dataset):       A dataset containing the data.
+
+    Returns:
+        List with PositionDelta object array with total sum of site corrections given for each station entry
+    """
     delta_pos = list()
 
     for _ in dset.for_each_suffix("station"):
@@ -91,6 +100,7 @@ def add(config_key, dset):
         for field in pos_fields:
             sta_delta += dset[config_key][field]
         delta_pos.append(sta_delta)
+
     return delta_pos
 
 
