@@ -115,6 +115,7 @@ def _get_iono_para(dset: "Dataset") -> Dict[str, Any]:
     file_path = config.files.path(
             config.tech.gnss_ionosphere.filekey_para.str, file_vars={**dset.vars, **dset.analysis}
     )
+    log.debug(f"Read {file_path}")
     parser = rinex_nav.get_rinex2_or_rinex3(file_path)
     return parser.meta["iono_para"]
 

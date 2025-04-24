@@ -195,7 +195,7 @@ def calculate(stage: str, dset: "Dataset"):
     Following Dataset fields are generated:
 
     | Field                  | Type              |  Description
-    |------------------------|-------------------|---------------------------------------------------------------------|
+    | :--------------------- | :---------------  | :------------------------------------------------------------------ |
     | bias_brdc              | numpy.ndarray     | Satellite bias of broadcast ephemeris in [m]                        |
     | bias_precise           | numpy.ndarray     | Satellite bias of precise orbits in [m]                             |
     | clk_diff               | numpy.ndarray     | Satellite clock correction difference without correction in [m]     |
@@ -227,34 +227,39 @@ def calculate(stage: str, dset: "Dataset"):
     apply_has_correction = config.tech.apply_has_correction.bool
     sat_clock_related_to = config.tech.sat_clock_related_to.str
     
-    ant_precise = apriori.get("gnss_antenna_correction")
-    ant_brdc = apriori.get("gnss_antenna_correction", file_key="antex_brdc") #TODO: Do we need something like that? apriori.get("gnss_antenna_correction") if apply_has_correction else apriori.get("gnss_antenna_correction", file_key="antex_brdc")
+    ant = apriori.get("gnss_antenna_correction")
     brdc, precise = _get_common_brdc_precise_ephemeris(dset)
 
     # Definition of GNSS frequencies for accessing correct PCOs for SISRE analysis:
-    #   for broadcast orbits: PCOs of broadcast orbits are based for Galileo on the average of E1/E5/E6 PCOs defined
-    #                         by the European GNSS Service Centre before 29th May 2018. Since 29th May 2018
-    #                         (around 4 p.m.) the generation of PCOs for the INAV/FNAV messages was changed. The
-    #                         average of the ionosphere-free linear combination of E1/E5a and E1/E5b PCOs is used
-    #                         based on PCOs of GSC webpage. The PCOs for GPS are defined by the National Geospatial
-    #                         Intelligence Agency (NGA). An ANTEX file is created with these PCOs values, whereby the
-    #                         Galileo E1 and respectively GPS L1 is used.
+    #   for broadcast orbits: Assumption that the PCOs of broadcast orbits are based on following ionosphere-free
+    #                         linear combination:
+    #                            - E1/E5a for Galileo FNAV messages
+    #                            - E1/E5b for Galileo INAV messages
+    #                            - L1/L2 for GPS LNAV messages
     #   for precise orbits_:  Normally precise Galileo orbits are based on ionosphere-free linear combination E1/E5a
     #                         and for GPS on L1/L2, so that also the PCOs has to be based on that.
     #
-    brdc_sys_freq = {"E": "E1", "G": "L1"} #TODO: Do we need something like that? {"E": "E1_E5b", "G": "L1_L2"} if apply_has_correction else {"E": "E1", "G": "L1"} 
+    brdc_sys_freq = {"G": "L1_L2"}
+    if "E" in dset.meta["navigation_message_type"].keys():
+        if dset.meta["navigation_message_type"]["E"].startswith("FNAV"):
+            brdc_sys_freq.update({"E": "E1_E5a"})
+        elif dset.meta["navigation_message_type"]["E"].startswith("INAV"):
+            brdc_sys_freq.update({"E": "E1_E5b"})
+        else:
+            log.fatal(f"Unknown Galileo navigation message type: {dset.meta['navigation_message_type']['E']}")
+
     precise_sys_freq = {"E": "E1_E5a", "G": "L1_L2"}
 
     # Determine satellite position difference (orbit difference in ITRS) related to CoM
     # TODO: If sat_clock_related_to = "apc", then pco_sat.trs should also applied related to APC?
-    pco_sat = ant_brdc.satellite_phase_center_offset(brdc.dset, brdc_sys_freq)
+    pco_sat = ant.satellite_phase_center_offset(brdc.dset, brdc_sys_freq)
     orb_diff = (brdc.dset.sat_posvel.trs - pco_sat.trs) - precise.dset.sat_posvel.trs
 
     # Determine satellite clock correction difference related to CoM
     bias_brdc, bias_precise = _get_bias(dset, brdc.dset)
     if sat_clock_related_to == "com":
-        clk_diff = (brdc.satellite_clock_correction_com(ant_brdc, brdc_sys_freq) - bias_brdc) - (
-            precise.satellite_clock_correction_com(ant_precise, precise_sys_freq) - bias_precise
+        clk_diff = (brdc.satellite_clock_correction_com(ant, brdc_sys_freq) - bias_brdc) - (
+            precise.satellite_clock_correction_com(ant, precise_sys_freq) - bias_precise
         )
     elif sat_clock_related_to == "apc":
         clk_diff = (brdc.dset.gnss_satellite_clock - bias_brdc) - (precise.dset.gnss_satellite_clock - bias_precise)
@@ -287,7 +292,7 @@ def calculate(stage: str, dset: "Dataset"):
 
     _get_sisre(dset)
     _additional_fields_to_dataset(
-        dset, ant_brdc, ant_precise, brdc, precise, bias_brdc, bias_precise, orb_diff, brdc_sys_freq, precise_sys_freq
+        dset, ant, brdc, precise, bias_brdc, bias_precise, orb_diff, brdc_sys_freq, precise_sys_freq
     )
 
     # Write raw Dataset to file
@@ -322,8 +327,7 @@ def write(stage: str, dset: "Dataset"):
 
 def _additional_fields_to_dataset(
     dset: "Dataset",
-    ant_brdc: "AntennaCorrection",
-    ant_precise: "AntennaCorrection",
+    ant: "AntennaCorrection",
     brdc: "BroadcastOrbit",
     precise: "PreciseOrbit",
     bias_brdc: np.ndarray,
@@ -336,8 +340,7 @@ def _additional_fields_to_dataset(
 
     Args:
         dset:             Dataset, a dataset containing the data.
-        ant_brdc:         Antenna correction object for broadcast orbits
-        ant_precise:      Antenna correction object for precise orbits
+        ant:              Antenna correction object
         brdc:             Broadcast orbit object
         precise:          Precise orbit object
         bias_brdc:        Satellite bias for broadcast orbits
@@ -367,10 +370,10 @@ def _additional_fields_to_dataset(
             "age_of_ephemeris": (((brdc.dset.time.mjd - brdc.dset.used_toe.mjd) * Unit.day2second), "second"),
         },
         "posvel_delta": {
-            "pco_precise": (ant_precise.satellite_phase_center_offset(precise.dset, precise_sys_freq), "meter"), # Set precise.dset.meta["pco_sat"]
-            "pco_brdc": (ant_brdc.satellite_phase_center_offset(brdc.dset, brdc_sys_freq), "meter"), # Set brdc.dset.meta["pco_sat"]
+            "pco_precise": (ant.satellite_phase_center_offset(precise.dset, precise_sys_freq), "meter"), # Set precise.dset.meta["pco_sat"]
+            "pco_brdc": (ant.satellite_phase_center_offset(brdc.dset, brdc_sys_freq), "meter"), # Set brdc.dset.meta["pco_sat"]
         },
-        "text": {"satellite_type": ant_precise.satellite_type(dset)},
+        "text": {"satellite_type": ant.satellite_type(dset)},
         "time": {"used_transmission_time": brdc.dset.used_transmission_time, "used_toe": brdc.dset.used_toe},
     }
     
@@ -381,8 +384,8 @@ def _additional_fields_to_dataset(
         add_float_fields = {
             "bias_brdc": (bias_brdc, "meter"),
             "bias_precise": (bias_precise, "meter"),
-            "clk_brdc_com": (brdc.satellite_clock_correction_com(ant_brdc, brdc_sys_freq), "meter"),
-            "clk_precise_com": (precise.satellite_clock_correction_com(ant_precise, precise_sys_freq), "meter"),
+            "clk_brdc_com": (brdc.satellite_clock_correction_com(ant, brdc_sys_freq), "meter"),
+            "clk_precise_com": (precise.satellite_clock_correction_com(ant, precise_sys_freq), "meter"),
         }
         fields["float"].update(add_float_fields)
 
@@ -433,6 +436,7 @@ def _additional_fields_to_dataset(
     for sys in list(dset.meta["frequencies"].keys()):
         if sys not in dset.meta["systems"]:
             del dset.meta["frequencies"][sys]  # Remove unused navigation message types
+
 
 def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.ndarray]:
     """Determine satellite biases for broadcast and precise orbits
@@ -522,13 +526,13 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
             f_L2 = enums.gnss_freq_G.L2
 
             for sat in dset.unique("satellite"):
-                if sat.startswith("G"):
+                if sat.startswith("G"): # related to L1 P(Y) signal
                     idx = dset.filter(satellite=sat)
                     dcb_l1_l2 = (
                         -f_L2 ** 2
                         / (f_L1 ** 2 - f_L2 ** 2)
                         * dcb.get_dsb(sat, "C1W-C2W", dset.analysis["rundate"])["estimate"]
-                        + dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"]
+                        #+ dcb.get_dsb(sat, "C1C-C1W", dset.analysis["rundate"])["estimate"] # related to L1 C/A signal
                     )
                     bias = dcb_l1_l2 * constant.c
                     bias_precise[idx] = bias

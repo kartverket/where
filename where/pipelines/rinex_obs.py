@@ -98,7 +98,7 @@ def read(stage, dset):
 
     # Read GNSS observation data either from Android raw file or RINEX file
     if config.tech.format.str == "android":
-        parser = parsers.parse_key("gnss_android_raw_data", file_vars={**dset.vars, **dset.analysis})
+        parser = parsers.parse_key_existing("gnss_android_raw_data", file_vars={**dset.vars, **dset.analysis})
     else:
         version, file_path = gnss.get_rinex_file_version("gnss_rinex_obs")
         log.info(f"Read RINEX file {file_path} with format version {version}.")
@@ -110,12 +110,20 @@ def read(stage, dset):
             parser = parsers.parse_file(
                 "rinex3_obs", file_path=file_path, sampling_rate=sampling_rate, convert_unit=convert_unit
             )
+        elif version.startswith("4"):  #TODO: Own RINEX 4 parser should be implemented. But RINEX 3 parser works also.
+            parser = parsers.parse_file(
+                "rinex3_obs",
+                file_path=file_path,
+                sampling_rate=sampling_rate,
+                convert_unit=convert_unit,
+            )
         else:
             log.fatal(f"Unknown RINEX format {version} is used in file {file_path}")
 
     dset.update_from(parser.as_dataset())
-                    
-    dset.write_as(stage=stage)
+
+    if util.check_write_level("analysis"):                    
+        dset.write_as(stage=stage)
 
 
 #
@@ -154,7 +162,8 @@ def orbit(stage: str, dset: "Dataset") -> None:
         # Connect site position with satellite orbits needed for determination of elevation and azimuth
         dset.site_pos.other = dset.sat_posvel
         
-        #dset.write_as(stage=stage)
+        #if util.check_write_level("analysis"):
+        #    dset.write_as(stage=stage)
 
 
 #
@@ -170,7 +179,9 @@ def edit(stage, dset):
     """
     # cleaners.apply_editors("editors", dset)
     cleaners.apply_removers("removers", dset)
-    #dset.write_as(stage=stage)
+
+    if util.check_write_level("analysis"):
+        dset.write_as(stage=stage)
     
     
 #
@@ -185,7 +196,9 @@ def postprocess(stage, dset):
         dset (Dataset):       A dataset containing the data.
     """
     postprocessors.apply_postprocessors("postprocessors", dset)
-    #dset.write_as(stage=stage)
+
+    if util.check_write_level("analysis"):
+        dset.write_as(stage=stage)
 
 
 #
@@ -203,4 +216,6 @@ def write(stage, dset):
         dset (Dataset):       A dataset containing the data.
     """
     writers.write(default_dset=dset)
-    dset.write_as(stage="write", dataset_id=0)
+
+    if util.check_write_level("operational"):
+        dset.write_as(stage="write", dataset_id=0)

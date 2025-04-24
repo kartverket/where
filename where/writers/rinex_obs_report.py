@@ -299,7 +299,7 @@ def _generate_dataframes(dset: "Dataset") -> Tuple[pd.core.frame.DataFrame, pd.c
                 num_sat,  # Number of satellites
                 len(dset.obs[obstype][idx][idx_num]),  # Number of observations
             ]
-            df_obstype = df_obstype.append(pd.DataFrame([row], columns=columns, index=[index]))
+            df_obstype = pd.concat([df_obstype, pd.DataFrame([row], columns=columns, index=[index])])
 
         # Generate observation overview related to GNSS
         idx_sys = df_obstype["sys"] == gnss_name
@@ -308,7 +308,7 @@ def _generate_dataframes(dset: "Dataset") -> Tuple[pd.core.frame.DataFrame, pd.c
             len(set(dset.satellite[idx])),  # Number of satellites
             df_obstype["num_obs"][idx_sys].sum(),  # Number of observations
         ]
-        df_system = df_system.append(pd.DataFrame([row], columns=columns, index=[gnss_name]))
+        df_system = pd.concat([df_system, pd.DataFrame([row], columns=columns, index=[gnss_name])])
 
     return df_system, df_obstype
 

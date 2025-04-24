@@ -51,7 +51,7 @@ class AntennaCorrection(UserDict):
     with following entries:
 
     | Value              | Type              | Description                                                             |
-    |--------------------|---------------------------------------------------------------------------------------------|
+    | :----------------- | :---------------- | :---------------------------------------------------------------------- |
     | azi                | numpy.ndarray     | Array with azimuth-elevation dependent antenna correction in [mm] with  |
     |                    |                   | the shape: number of azimuth values x number of elevation values.       |
     | azimuth            | numpy.ndarray     | List with azimuth values in [rad] corresponding to antenna corrections  |
@@ -92,10 +92,11 @@ class AntennaCorrection(UserDict):
 
         The parsing is done by :mod:`where.parsers.antex`.
         """
-        parser = parsers.parse_key(file_key)
+        parser = parsers.parse_key_existing(file_key)
         self.data = parser.as_dict()
         self.file_path = parser.file_path
         log.debug(f"Read ANTEX file: {self.file_path}")
+
 
     def satellite_phase_center_offset(
         self, dset: "Dataset", sys_freq: Union[None, Dict[str, Dict[str, str]]] = None
@@ -191,6 +192,7 @@ class AntennaCorrection(UserDict):
         # Transform PCO given in satellite body-fixed reference frame (for GPS and Galileo assumed to be aligned
         # to yaw-steering reference frame) to ITRS
         return correction.trs
+
 
     def get_pco_sat(self, sat: str, sys_freq: Dict[str, Dict[str, str]], used_date: datetime.datetime) -> np.ndarray:
         """Get satellite PCO in satellite reference system

@@ -145,6 +145,7 @@ def get_grc_csv_row(
             "SVN77": "B06",
             "SVN78": "D05",
             "SVN79": "A06",
+            "SVN80": "D02",
             "GSAT0101": "B05",
             "GSAT0102": "B06",
             "GSAT0103": "C04",

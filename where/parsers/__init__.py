@@ -30,8 +30,7 @@ from midgard.dev import plugins
 from midgard.files import dependencies
 
 # Where imports
-from where.lib import config
-from where.lib import log
+from where.lib import config, log
 
 # Add Where parsers to Midgard parsers
 plugins.add_alias(mg_parsers.__name__, __name__)
@@ -127,3 +126,36 @@ def parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, **pars
 
     # Use the Midgard parser function to create parser and parse data
     return parse_file(parser_name, file_path, use_cache=use_cache, timer_logger=log.time, **parser_args)
+
+
+def parse_key_existing(file_key, file_vars=None, parser_name=None, use_cache=True, **parser_args):
+    """Parse a file given in the Where file-list, check if file exists and return parsed data
+
+    By specifying a `file_key`. The file_key is looked up in the file list to figure out which file that should be
+    parsed. The name of the parser will also be looked up in the file configuration. The dictionary `file_vars` may be
+    specified if variables are needed to figure out the correct file path from the configuration. The following file
+    keys are available:
+
+    {doc_file_keys}
+
+    Data can be retrieved either as Dictionaries, Pandas DataFrames or Where Datasets by using one of the methods
+    `as_dict`, `as_dataframe` or `as_dataset`.
+
+    Example:
+        > df = parsers.parse_key_existing('center_of_mass', file_vars=dict(satellite='Lageos')).as_dataset()
+
+    Args:
+        file_key (String):     Used to look up parser_name and file_path in the Where file configuration.
+        file_vars (Dict):      Additional file variables used when looking up file path in configuration.
+        parser_name (String):  Name of parser to use. Default is to use parser named in the file list.
+        use_cache (Boolean):   Whether to use a cache to avoid parsing the same file several times.
+        parser_args:           Input arguments to the parser.
+
+    Returns:
+        Parser:  Parser with the parsed data
+    """
+    parser = parse_key(file_key, file_vars=None, parser_name=None, use_cache=True, **parser_args)
+    if parser.data_available == False:
+        log.fatal(f"File does not exist: {parser.file_path}")
+
+    return parser

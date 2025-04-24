@@ -67,22 +67,20 @@ def plot_sta_param(x, ys, num, labels, title, ylabel):
 
 
 def plot_station_pos(dset_ts, station, idx_date, idx_all):
-
     # Select data from dataset
     idx = idx_date & idx_all
     idx_sta = dset_ts.filter(station=station, idx=idx_date)
-    #dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[idx]])
-    dates = dset_ts.rundate[idx_sta & idx_date]
-    num_obs = np.zeros(np.sum(idx)) #np.sum(dset_ts.filter(station="all")))
+    station_dates = dset_ts.rundate[idx_sta]
+    station_sc = dset_ts.session_code[idx_sta]
+    num_obs = np.zeros(np.sum(idx))
     colors = dset_ts.num_obs_estimate[idx_sta]
-    #all_idx = dset_ts.filter(station="all")
-    #all_dates = np.array([datetime.strptime(dt, "%Y-%m-%d") for dt in dset_ts.rundate[all_idx]])
     all_dates = dset_ts.rundate[idx]
-    _, idx2, _ = np.intersect1d(all_dates, dates, return_indices=True)
+    all_sc = dset_ts.session_code[idx]
+    _, idx2, _ = np.intersect1d(all_sc, station_sc, return_indices=True)
     num_obs[idx2] = colors
     session_code = dset_ts.session_code[idx_sta]
     
-    t = Time(val=dates, scale="utc", fmt="date")
+    t = Time(val=station_dates, scale="utc", fmt="date")
     trf = apriori.get("trf", time=t, reference_frames="itrf:2020, vtrf, custom")
     names = apriori.get("vlbi_station_codes")
 
@@ -100,7 +98,17 @@ def plot_station_pos(dset_ts, station, idx_date, idx_all):
     # Plot timeseries of estimated station coordinate corrections
     plot(t.datetime, dpos.val.T, dpos_ferr_xyz.T, colors, ["X [m]", " Y [m]", "Z [m]"], "xyz", station)
     plot(t.datetime, dpos.enu.val.T, dpos_ferr_enu.T, colors, ["E [m]", " N [m]", "U [m]"], "enu", station)
-    return num_obs, session_code
+
+    print(f"High formal errors for {station}")
+    for i, enu in enumerate(["East", "North", "Up"]):
+        print(f"{enu}:")
+        idx_ferr_high = dpos_ferr_enu[:,i] > 0.05 # meter
+        ferr = dpos_ferr_enu[:,i][idx_ferr_high]
+        ferr_dates = station_dates[idx_ferr_high]
+        ferr_sc = station_sc[idx_ferr_high]
+
+        for ferr_, ferr_dates_, ferr_sc_ in zip(ferr, ferr_dates, ferr_sc):
+            print(f"{ferr_dates_} {ferr_sc_:8}: {ferr_:8.4f} [m]")
 
 
 def plot_residuals(dset, sta_1, sta_2):
@@ -210,14 +218,26 @@ def plot_statistics(dates, dof, variance_factor, colors):
     #fig.tight_layout()
     plt.savefig(f"img/{dset_id}/Statistics_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
 
-def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, sta_1, sta_2, local_tie):
+def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos, sta_1, sta_2, local_tie):
     t = Time(dates, fmt="datetime", scale="utc")
     _wblr, wmean = wblr(baseline_length,t.mjd, baseline_length_ferr)
+
+    vgos = np.array(vgos)
+    dates = np.array(dates)
+    baseline_length = np.array(baseline_length)
+    baseline_length_ferr = np.array(baseline_length_ferr)
+    num_obs_bs = np.array(num_obs_bs)
+
+    num_vgos = np.sum(vgos)
+    num_sx = np.sum(~vgos)
+
     if local_tie:
         print(f"{dset_id}: Weighted mean: {wmean: 6.4f} [m], Local tie offset: {(wmean - local_tie)*Unit.m2mm: 6.2f} [mm]")
     else:
         print(f"{dset_id}: Weighted mean: {wmean: 16.4f} [m]")
     print(f"{dset_id}: Weighted blr (using weighted mean): {_wblr*Unit.m2mm: 6.2f} [mm]")
+    print(f"Number of S/X sessions: {num_sx}")
+    print(f"Number of VGOS sessions: {num_vgos}")
 
     x_padding = 1.5 # days
     y_padding = 0.01 # meter
@@ -225,8 +245,11 @@ def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, sta_
     fig = plt.figure(figsize=(12, 8), dpi=150)
     xlim = (min(dates) - timedelta(days=x_padding), max(dates) + timedelta(days=x_padding))
     ylim = (wmean - y_padding, wmean + y_padding)
-    plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
-    im = plt.scatter(dates, baseline_length, c=num_obs_bs, zorder=100)
+    plt.errorbar(dates, baseline_length, yerr=baseline_length_ferr, fmt=",", marker=None, zorder=0, mew=0, ecolor="tab:gray")
+    if num_sx > 0:
+        im = plt.scatter(dates[~vgos], baseline_length[~vgos], c=num_obs_bs[~vgos], marker="o", zorder=100, label="S/X")
+    if num_vgos > 0:
+        im = plt.scatter(dates[vgos], baseline_length[vgos], c=num_obs_bs[vgos], marker="d", zorder=100, label="VGOS")
     plt.axhline(wmean, c="red",label="Weighted mean")
     if local_tie:
        plt.axhline(local_tie, c="blue", label="Local tie vector")
@@ -329,6 +352,7 @@ rms = []
 baseline_length = []
 baseline_length_ferr = []
 baseline_dates = []
+vgos = []
 
 rms = dset_ts.rms_residual_estimate[idx]
 dof = dset_ts.degrees_of_freedom[idx]
@@ -385,6 +409,10 @@ for rundate, session_code in zip(dates, session_codes):
         baseline_length.append(bl['baseline_length'])
         baseline_length_ferr.append(bl['baseline_length_ferr'])
         num_obs_bs.append(dset_session.num(baseline=baseline1) + dset_session.num(baseline=baseline2))
+        if session_code.startswith("v"):
+            vgos.append(True)
+        else:
+            vgos.append(False)
 
 
     if args.plot_residuals:
@@ -399,7 +427,7 @@ data = dict(zip(data["baseline"], data["length"]))
 local_tie = data.get(baseline1) or data.get(baseline2)
 
 plot_statistics(dates, dof, variance_factor, colors[0])
-plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs, station1, station2, local_tie)
+plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos, station1, station2, local_tie)
 
 #plot_residual_rms(dates, dates_sta_1, dates_sta_2, rms, rms_sta_1, rms_sta_2, station1, station2, colors)
 
