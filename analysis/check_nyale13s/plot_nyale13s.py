@@ -222,7 +222,7 @@ def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos
     t = Time(dates, fmt="datetime", scale="utc")
     _wblr, wmean = wblr(baseline_length,t.mjd, baseline_length_ferr)
 
-    vgos = np.array(vgos)
+    vgos = np.array(vgos, dtype=bool)
     dates = np.array(dates)
     baseline_length = np.array(baseline_length)
     baseline_length_ferr = np.array(baseline_length_ferr)
