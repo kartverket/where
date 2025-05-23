@@ -18,6 +18,9 @@ writers.write(dset)
 from math import floor
 from typing import List, Set, Union
 
+# Third party imports
+import numpy as np
+
 # Midgard imports
 from midgard.data.time import Time
 from midgard.dev import plugins
@@ -37,7 +40,6 @@ def orbit_sp3(dset: "Dataset"):
     Args:
         dset:  Dataset, a dataset containing the data.
     """
-
     time = Time(
             val=dset.time.gps.datetime[0],
             scale="gps", 
@@ -235,6 +237,23 @@ def orbit_sp3(dset: "Dataset"):
             for sat in sorted(dset.unique("satellite")):
                 
                 if sat not in set(dset.satellite[idx]):
+                    # Note: The total number of satellites at each epoch must always be the same. This serves as an
+                    #       integrity check on the file -- i.e., satellites must be designated as "bad" or "absent"
+                    #       by intentionally setting their position (and velocity) values equal to zero.
+                    #
+                    # Position and clock record
+                    # ----+----1----+----2----+----3----+----4----+----5----+----6
+                    # PG01      0.000000      0.000000      0.000000 999999.999999 
+                    fid.write(
+                        "P{:3s}{:14.6f}{:14.6f}{:14.6f}{:14.6f}\n"
+                        "".format(
+                            sat, # Vehicle identifier
+                            0.0, # X-coordinate (km)
+                            0.0, # Y-coordinate (km)
+                            0.0, # Z-coordinate (km)
+                            999999.999999, # Clock (microsec)
+                        )
+                    )
                     continue
 
                 idx_sat = dset.satellite[idx] == sat
@@ -247,13 +266,12 @@ def orbit_sp3(dset: "Dataset"):
                     "P{:3s}{:14.6f}{:14.6f}{:14.6f}{:14.6f}\n"
                     "".format(
                         dset.satellite[idx][idx_sat][0], # Vehicle identifier
-                        dset.sat_posvel.pos.trs.x[idx][idx_sat][0] * Unit.meter2kilometer, # X-coordinate (km)
-                        dset.sat_posvel.pos.trs.y[idx][idx_sat][0] * Unit.meter2kilometer, # Y-coordinate (km)
-                        dset.sat_posvel.pos.trs.z[idx][idx_sat][0] * Unit.meter2kilometer, # Z-coordinate (km)
-                        (-dset.delay.gnss_satellite_clock[idx][idx_sat][0] / constant.c) * Unit.second2microsecond, # Clock (microsec)
+                        0.0 if np.isnan(dset.sat_posvel.pos.trs.x[idx][idx_sat][0]) else dset.sat_posvel.pos.trs.x[idx][idx_sat][0] * Unit.meter2kilometer, # X-coordinate (km)
+                        0.0 if np.isnan(dset.sat_posvel.pos.trs.y[idx][idx_sat][0]) else dset.sat_posvel.pos.trs.y[idx][idx_sat][0] * Unit.meter2kilometer, # Y-coordinate (km)
+                        0.0 if np.isnan(dset.sat_posvel.pos.trs.z[idx][idx_sat][0]) else dset.sat_posvel.pos.trs.z[idx][idx_sat][0] * Unit.meter2kilometer, # Z-coordinate (km)
+                        999999.999999 if np.isnan(dset.delay.gnss_satellite_clock[idx][idx_sat][0]) else (-dset.delay.gnss_satellite_clock[idx][idx_sat][0] / constant.c) * Unit.second2microsecond, # Clock (microsec)
                     )
                 )
-
 
         # End of file
         # ----+----1----+----2----+----3----+----4----+----5----+----6
