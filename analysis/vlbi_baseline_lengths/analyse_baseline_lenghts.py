@@ -350,6 +350,8 @@ def blr(bl, decimalyear, ferr):
     """
     keep_idx = (ferr != 0) & ~np.isnan(ferr)
 
+    if not any(keep_idx):
+        return np.nan, np.nan, np.nan, np.nan, keep_idx
     w = 1 / ferr[keep_idx] ** 2
     w_sum = np.sum(w)
     lin_func = np.polynomial.Polynomial.fit(decimalyear[keep_idx], bl[keep_idx], 1, w=w)

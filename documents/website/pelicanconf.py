@@ -10,7 +10,9 @@ SITEURL = "https://kartverket.github.io/where"
 THEME = 'pelican-bootstrap3'
 JINJA_ENVIRONMENT = {'extensions': ['jinja2.ext.i18n']}
 PLUGIN_PATHS = ['pelican-plugins']
-PLUGINS = ['i18n_subsites', "pin_to_top"]
+#PLUGINS = ['i18n_subsites', "pin_to_top"]
+# pin_to_top does not seem to be maintained any more and has not migrated to new plugins structure
+PLUGINS = ["i18n_subsites"] 
 BOOTSTRAP_THEME = 'cerulean'  # https://bootswatch.com/  cosmo, sandstone, lumen
 
 MARKDOWN = {
