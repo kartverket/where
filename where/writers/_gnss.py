@@ -86,7 +86,7 @@ def get_grc_csv_row(
                 "vpe": "FOM-OS-08: Vertical Positioning Service Accuracy per Station over Month",
             },
             "GPS": {
-                "hpe": "FOM-OS-07; Horizontal Positioning Service Accuracy per Station over Month",
+                "hpe": "FOM-OS-07: Horizontal Positioning Service Accuracy per Station over Month",
                 "site_vel_3d": "FOM-OS-11: 3D Velocity Service Accuracy per Station over Month",
                 "sisre": "SPS-OS-02: SIS Ranging Accuracy over All Satellites over Month",
                 "sisre_sat": "SPS-OS-03: SIS Ranging Accuracy per Satellite over Month",
