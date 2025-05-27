@@ -291,6 +291,7 @@ def calculate(stage: str, dset: "Dataset"):
     dset.add_posvel_delta("orb_diff", val=orb_diff, write_level="operational")
 
     _get_sisre(dset)
+
     _additional_fields_to_dataset(
         dset, ant, brdc, precise, bias_brdc, bias_precise, orb_diff, brdc_sys_freq, precise_sys_freq
     )
@@ -424,7 +425,6 @@ def _additional_fields_to_dataset(
 
         #TODO: This does not work: dset._fields[field].write_level = enums.get_value("write_level", "operational")
     
-
     # Add PCOs for broadcast and precise orbits and seleted configuration settings to Dataset meta
     dset.meta["pco_sat_brdc"] = brdc.dset.meta["pco_sat"]
     dset.meta["pco_sat_precise"] = precise.dset.meta["pco_sat"]
@@ -607,9 +607,7 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     adapted.
 
     Args:
-        dset:  A dataset containing the data.        # Apply HAS orbit and clock correction
-                #dset.sat_posvel[:] = dset.sat_posvel + dset.has_orbit_correction
-                #dset.delay.gnss_satellite_clock[:] = dset.delay.gnss_satellite_clock - dset.has_clock_correction
+        dset:  A dataset containing the data. 
 
     Returns:
         Tuple with broadcast and precise apriori data
