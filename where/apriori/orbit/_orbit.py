@@ -200,4 +200,11 @@ class AprioriOrbit:
             orbit eccentricity correction)
         """
         correction = antex.satellite_phase_center_offset(self.dset, sys_freq)
-        return self.satellite_clock_correction(self.dset) + correction.yaw.z
+
+        # TODO: Is that correct in all cases to use "gnss_satellite_clock" values, if they existing?
+        if "gnss_satellite_clock" in self.dset.fields:
+            satellite_clock_correction = self.dset.gnss_satellite_clock
+        else:
+            satellite_clock_correction = self.satellite_clock_correction(self.dset)
+
+        return satellite_clock_correction + correction.yaw.z
