@@ -36,6 +36,7 @@ GAMMA = 1 # PPN parameter. Equal to 1 in general relativity
 @plugins.register
 def vlbi_near_field_delay(dset):
     r"""Calculate the theoretical delay dependent on the baseline
+
     -------------------------------------------------------
 
     Args:
