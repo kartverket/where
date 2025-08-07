@@ -30,6 +30,7 @@ GAMMA = 1 # PPN parameter. Equal to 1 in general relativity
 @plugins.register
 def vlbi_near_field_delay(dset):
     r"""Calculate the theoretical delay dependent on the baseline
+
     -------------------------------------------------------
 
     Args:
@@ -176,7 +177,7 @@ def vlbi_near_field_delay(dset):
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
     # Convert from TT to TCG since the Jaron, et. al (2017) equations work with this
     t_g01 = t_g01_TDB / (1 - constant.L_G)
-    
+
 
     # Save TT(=TDB) value to dset
     _save_detail_to_dataset(dset, "vlbi_nf_grav_1", t_g01_TDB * constant.c, dset.add_float, unit="meter")
