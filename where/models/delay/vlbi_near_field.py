@@ -43,14 +43,6 @@ def vlbi_near_field_delay(dset):
         dset:     A Dataset containing model data.
 
     Returns:
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-=======
->>>>>>> 91712e0 (debugging code)
-=======
-
->>>>>>> 9f30693 (Start of near field model)
         Numpy array: Near field delay for each observation
 
     """
@@ -117,6 +109,8 @@ def vlbi_near_field_delay(dset):
     # idx_sat = True when observation is to a satellite
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
+    # TODO
+    # idx_sat = True when observation is to a satellite
 
     t1 = dset.time.tcg
     x1_t1 = dset.site_pos_1.gcrs.pos # station_1 at epoch t1
@@ -133,7 +127,6 @@ def vlbi_near_field_delay(dset):
     delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
     delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
     
-
     t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
@@ -153,6 +146,7 @@ def vlbi_near_field_delay(dset):
     
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
+
 
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
