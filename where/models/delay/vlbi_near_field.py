@@ -36,7 +36,6 @@ GAMMA = 1 # PPN parameter. Equal to 1 in general relativity
 @plugins.register
 def vlbi_near_field_delay(dset):
     r"""Calculate the theoretical delay dependent on the baseline
-
     -------------------------------------------------------
 
     Args:
@@ -104,6 +103,8 @@ def vlbi_near_field_delay(dset):
 
     orbit = apriori.get("simple_orbit", rundate=dset.analysis["rundate"], days_before=0, days_after=1)
 
+    orbit = apriori.get("simple_orbit", rundate=dset.analysis["rundate"], days_before=0, days_after=1)
+
     # TODO
     # idx_sat = True when observation is to a satellite
 
@@ -124,7 +125,6 @@ def vlbi_near_field_delay(dset):
     delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
     delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
     
-
     t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
