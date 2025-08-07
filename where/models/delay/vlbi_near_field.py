@@ -30,7 +30,6 @@ GAMMA = 1 # PPN parameter. Equal to 1 in general relativity
 @plugins.register
 def vlbi_near_field_delay(dset):
     r"""Calculate the theoretical delay dependent on the baseline
-
     -------------------------------------------------------
 
     Args:
@@ -75,10 +74,11 @@ def vlbi_near_field_delay(dset):
     # At the picosecond level, only the solar potential is needed (IERS Conventions chapter 11)
     U = constant.GM_sun / np.linalg.norm(eph.pos_gcrs("sun"), axis=1)
 
+    orbit = apriori.get("simple_orbit", rundate=dset.analysis["rundate"], days_before=0, days_after=1)
+
     # TODO
     # idx_sat = True when observation is to a satellite
 
-    delay = np.zeros(dset.num_obs)
     
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
 
@@ -97,7 +97,6 @@ def vlbi_near_field_delay(dset):
     delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
     delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
     
-
     t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
@@ -117,7 +116,6 @@ def vlbi_near_field_delay(dset):
     
     gamma0_2 = np.sqrt(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / constant.c**2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
-
 
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
@@ -281,7 +279,7 @@ def vlbi_near_field_delay(dset):
     
     _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
 
-    import IPython; IPython.embed()
+    #import IPython; IPython.embed()
 
     return delay * constant.c # Convert to meter
 
@@ -290,3 +288,7 @@ def _save_detail_to_dataset(dset, field, value, func, **kwargs):
         dset[field][:] = value
     else:
         func(field, value, write_level="detail", **kwargs)
+
+    return delay * constant.c
+
+
