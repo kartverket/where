@@ -37,6 +37,7 @@ def vlbi_near_field_delay(dset):
         dset:     A Dataset containing model data.
 
     Returns:
+
         Numpy array: Near field delay for each observation
 
     """
@@ -73,13 +74,14 @@ def vlbi_near_field_delay(dset):
     # The gravitational potential at the geocenter, neglecting the effects of the Earth’s mass.
     # At the picosecond level, only the solar potential is needed (IERS Conventions chapter 11)
     U = constant.GM_sun / np.linalg.norm(eph.pos_gcrs("sun"), axis=1)
-    
+
     # TODO
     # idx_sat = True when observation is to a satellite
 
     delay = np.zeros(dset.num_obs)
     
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
+
     t1 = dset.time.tcg
     x1_t1 = dset.site_pos_1.gcrs.pos # station_1 at epoch t1
     x2_t1 = dset.site_pos_2.gcrs.pos # station_2 at epoch t1
@@ -95,6 +97,7 @@ def vlbi_near_field_delay(dset):
     delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
     delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
     
+
     t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
@@ -267,7 +270,6 @@ def vlbi_near_field_delay(dset):
     
     # Convert from TCG to TT
     delay = (delta_t2 + delta_t0) * (1 - constant.L_G) # eq. 10 
-
 
     
     ## For debugging. See if satellite is above horizon for both stations
