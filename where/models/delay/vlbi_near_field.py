@@ -66,14 +66,6 @@ def vlbi_near_field(dset):
         dset:     A Dataset containing model data.
 
     Returns:
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-=======
->>>>>>> 91712e0 (debugging code)
-=======
-
->>>>>>> 9f30693 (Start of near field model)
         Numpy array: Near field delay for each observation
 
     """
@@ -134,6 +126,7 @@ def jaron2019(dset):
 
     sat_posvel = _sat_posvel(dset, t0_tilde) 
 
+
     # Satellite position and velocity at t0
     x0_t0_tilde = sat_posvel.gcrs.pos.val #/ ((1 - L_G))
     v0_t0_tilde = sat_posvel.gcrs.vel.val #/ ((1 - L_G))
@@ -144,6 +137,7 @@ def jaron2019(dset):
 
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
+
 
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
