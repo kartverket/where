@@ -197,15 +197,6 @@ def jaron2019(dset):
     # Convert from TCG to TT
     delay = (delta_t2 + delta_t0) #* (1 - L_G) # eq. 10 
 
-    
-    ## For debugging. See if satellite is above horizon for both stations
-    s1 = dset.site_pos_1.copy()
-    s1.other = dset.sat_pos
-    s2 = dset.site_pos_2.copy()
-    s2.other = dset.sat_pos
-    sat_visible = (s1.elevation > 0) & (s2.elevation > 0)
-    
-    _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
 
     # Save intermediate variables to dataset for reuse in computation of partials
     # All variables are TT compatible
