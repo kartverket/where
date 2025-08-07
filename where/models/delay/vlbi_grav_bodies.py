@@ -5,6 +5,7 @@ Description:
 
 Calculate the gravitational delay using the Consensus model as described in the IERS Conventions [1]_, section 11.1.
 
+This model accounts for the gravitational effect of the celestial bodies in the solar system on the delay
 
 References:
 -----------

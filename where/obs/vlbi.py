@@ -210,3 +210,40 @@ def _write_to_dataset(parser, dset, rundate, session_code):
     for s in np.unique(bad_sources):
         log.warn(f"Unknown source {s}. Observations with this source is discarded")
     dset.subset(np.logical_not(bad_source_idx))
+    
+    # ## Test orbit with satellite G10 
+    # TODO: use dset.time to set days_before and days_after?
+    orbit = apriori.get("simple_orbit", rundate=rundate, days_before=0, days_after=1)
+    sat = "G10"
+    pos = orbit[sat]["pos"](dset.time)
+    vel = orbit[sat]["vel"](dset.time)
+    dset.add_posvel("sat_pos", np.concatenate((pos,vel), axis=1), system="trs", time=dset.time)
+    #
+    # ## Test
+    # import matplotlib.pyplot as plt
+    # from where.data.time import Time
+    # from where.data.position import Position
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection="3d")
+    # u = np.linspace(0, 2 * np.pi, 100)
+    # v = np.linspace(0, np.pi, 100)
+    # x = constant.a  * np.outer(np.cos(u), np.sin(v))
+    # y = constant.a * np.outer(np.sin(u), np.sin(v))
+    # z = constant.a * np.outer(np.ones(np.size(u)), np.cos(v))
+    #
+    # # Plot Earth
+    # ax.plot_surface(x, y, z)
+    #
+    # x = Time(np.linspace(60614.9, 60615.2, 40), fmt="mjd", scale="utc")
+    #
+    # for sat in orb.keys():
+    #     try:
+    #         pos = Position(orb[sat]["pos"](dset.time), system="trs", time=dset.time)
+    #         #ax.scatter(pos[:,0], pos[:,1], pos[:,2], label=sat)
+    #         ax.scatter(pos.gcrs.x, pos.gcrs.y, pos.gcrs.z, marker='.', label=sat)
+    #     except exceptions.MissingDataError as err:
+    #         log.warn(f"Not enough orbit data for {sat}: {err}")
+    # plt.legend(ncol=5, loc='center left', bbox_to_anchor=(1, 0.5))
+    # plt.show()
+    #
+    # import IPython; IPython.embed()
