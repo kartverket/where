@@ -213,17 +213,13 @@ def _write_to_dataset(parser, dset, rundate, session_code):
         log.warn(f"Unknown source {s}. Observations with this source is discarded")
     dset.subset(np.logical_not(bad_source_idx))
     
-    # ## Test orbit with satellite G10
-    # TODO: what about site_pos.other when the session is a mix of quasars and satellites?
+    # ## Test orbit with satellite G10 
     # TODO: use dset.time to set days_before and days_after?
     orbit = apriori.get("simple_orbit", rundate=rundate, days_before=0, days_after=1)
-
     sat = "G10"
     pos = orbit[sat]["pos"](dset.time)
     vel = orbit[sat]["vel"](dset.time)
     dset.add_posvel("sat_pos", np.concatenate((pos,vel), axis=1), system="trs", time=dset.time)
-    dset.site_pos_1.other_2 = dset.sat_pos
-    dset.site_pos_2.other_2 = dset.sat_pos
     #
     # ## Test
     # import matplotlib.pyplot as plt
