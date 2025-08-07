@@ -67,9 +67,13 @@ def vlbi_near_field(dset):
 
     Returns:
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 91712e0 (debugging code)
+=======
+
+>>>>>>> 9f30693 (Start of near field model)
         Numpy array: Near field delay for each observation
 
     """
