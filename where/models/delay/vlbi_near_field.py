@@ -59,7 +59,6 @@ def register_model(model: Callable) -> Callable:
 @plugins.register
 def vlbi_near_field(dset):
     r"""Calculate the theoretical delay dependent on the baseline
-
     -------------------------------------------------------
 
     Args:
@@ -137,7 +136,6 @@ def jaron2019(dset):
 
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
-
 
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
