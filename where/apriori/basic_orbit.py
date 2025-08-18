@@ -142,7 +142,6 @@ def _get_velocity_func(pos_func):
     def velocity(time):
         """time: where.data.time.Time"""
         # Estimate velocity based on position right before and after given epoch
-        dt = 1.0 # 1 second
-        dt = TimeDelta(np.array([dt]*len(time)), scale="gps", fmt="seconds")
+        dt = TimeDelta(np.array([1/86400]*len(time)), scale="gps", fmt="days") # 1 second
         return (pos_func(time.gps - dt) - pos_func(time.gps + dt))/(2 * dt.val[:, None])
     return velocity
