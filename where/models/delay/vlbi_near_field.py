@@ -102,6 +102,7 @@ def jaron2019(dset):
     idx = dset.near_field_obs
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
+<<<<<<< HEAD
     time = dset.time[idx]
     #t1 = time.tcg
     t1 = time.tt
@@ -112,6 +113,15 @@ def jaron2019(dset):
     v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] #/ ((1 - L_G)) # station_2 velocity at epoch t1
 
 
+=======
+    t1 = dset.time.tcg
+    x1_t1 = dset.site_pos_1.gcrs.pos # station_1 at epoch t1
+    x2_t1 = dset.site_pos_2.gcrs.pos # station_2 at epoch t1
+    x0_t1 = dset.sat_pos.gcrs.pos # satellite position at epoch t1
+    v0_t1 = dset.sat_pos.gcrs.vel.val # satellite velocity at at epoch t1
+    v2_t1 = dset.site_pos_2.gcrs.vel.val # station_2 velocity at epoch t1
+    
+>>>>>>> 60d7fe6 (Near field update)
     # First approximation to light travel time
     delta1 = (x1_t1 - x0_t1).length / C #/ ((1 - L_G)) # eq. 4 # seconds
     delta2 = (x2_t1 - x0_t1).length / C #/ ((1 - L_G)) # eq. 6 # seconds
