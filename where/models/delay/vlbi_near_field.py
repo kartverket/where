@@ -54,10 +54,10 @@ def register_model(model: Callable) -> Callable:
     MODELS[model.__name__] = model
     return model
 
+
 @plugins.register
 def vlbi_near_field(dset):
     r"""Calculate the theoretical delay dependent on the baseline
-
     -------------------------------------------------------
 
     Args:
@@ -108,6 +108,7 @@ def jaron2019(dset):
     v0_t1 = dset.sat_pos.gcrs.vel.val[idx] #/ ((1 - L_G)) # satellite velocity at at epoch t1
     v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] #/ ((1 - L_G)) # station_2 velocity at epoch t1
 
+
     # First approximation to light travel time
     delta1 = (x1_t1 - x0_t1).length / C #/ ((1 - L_G)) # eq. 4 # seconds
     delta2 = (x2_t1 - x0_t1).length / C #/ ((1 - L_G)) # eq. 6 # seconds
@@ -135,6 +136,7 @@ def jaron2019(dset):
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
 
+
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
     # Equations are in BCRS. Ephemerides use TDB.
@@ -151,6 +153,7 @@ def jaron2019(dset):
     # eq. 14 in jaron2019
     x01_dot_v0 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
     x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0]  / C ** 2 # Intermediate variable
+
     # Time of emmison of the signal relative to t1
     delta_t0 = gamma0_2 * (x01_dot_v0 - t_g01) - \
         np.sqrt(gamma0_2 ** 2 * (x01_dot_v0 - t_g01) ** 2 + gamma0_2 * (x01_dot_x01 - t_g01 ** 2))
@@ -180,6 +183,7 @@ def jaron2019(dset):
     # Save TT(=TDB) value to dset  
     _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
     
+
     # eq. 17 in jaron2019
     x02_dot_v2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
     x02_dot_x02 = (x02[:, None, :] @ x02[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -191,6 +195,15 @@ def jaron2019(dset):
     # Convert from TCG to TT
     delay = (delta_t2 + delta_t0) #* (1 - L_G) # eq. 10 
 
+    
+    ## For debugging. See if satellite is above horizon for both stations
+    s1 = dset.site_pos_1.copy()
+    s1.other = dset.sat_pos
+    s2 = dset.site_pos_2.copy()
+    s2.other = dset.sat_pos
+    sat_visible = (s1.elevation > 0) & (s2.elevation > 0)
+    
+    _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
 
     # Save intermediate variables to dataset for reuse in computation of partials
     # All variables are TT compatible
@@ -522,3 +535,4 @@ def _save_time_to_dset(dset, idx, field, value, **kwargs):
     jd2[idx] = value.jd2
     jd1[idx] = value.jd1
     dset.add_time(field, val=jd1, val2=jd2, scale=value.scale, fmt="jd", **kwargs)
+

@@ -20,12 +20,17 @@ Example:
 
 To use the orbits, simply get them from the apriori-package specifying the days you need::
 
+<<<<<<< HEAD
     orbit = apriori.get('basic_orbit', rundate=rundate, bounds_error=True, days_after=1, days_before=1)
+=======
+    orbit = apriori.get('basic_orbit', rundate=rundate, days_after=1, days_before=1)
+>>>>>>> 6aa6131 (Near field update)
 
 After the orbit dictionary is created, you can get the different functions::
 
     orbit["G10"]["pos"](dset.time)
     orbit["G10"]["vel"](dset.time)
+<<<<<<< HEAD
 
 The input time argument must be a array-like.
 
@@ -33,17 +38,30 @@ The positions and velocities are computed in a terrestrial reference system (trs
 
 Unless bounds_error is set to False, the time input argument to the functions must be covered by the time period
 in the apriori.get call. Otherwise the functions will raise a MissingDataError exception.
+=======
+    
+The positions and velocities are computed in a terrestrial reference system (trs).
+
+The time input argument to the functions must be covered by the time period in the apriori.get call.
+Otherwise the functions will raise a MissingDataError exception.
+>>>>>>> 6aa6131 (Near field update)
 
 If a satellite is completely missing in the sp3 orbits for the given time period the call will result in a
 normal KeyError.
 
 """
+<<<<<<< HEAD
 # Standard library imports
 from datetime import timedelta
 from functools import lru_cache
 
 # Third party imports
 import numpy as np
+=======
+
+import numpy as np
+from datetime import timedelta
+>>>>>>> 6aa6131 (Near field update)
 
 # Midgard imports
 from midgard.dev import plugins
@@ -59,13 +77,18 @@ from where import parsers
 
 
 @plugins.register
+<<<<<<< HEAD
 def get_orbit(rundate, file_key=None, bounds_error=False, days_before=1, days_after=1):
+=======
+def get_orbit(rundate, file_key=None, days_before=1, days_after=1):
+>>>>>>> 6aa6131 (Near field update)
     """
     Returns a dictionary with interpolation functions for position and velocity for each
     GNSS satellite. Reads sp3 files as defined in the file_key gnss_orbit_sp3. The files
     for the dates [rundate - days_before, rundate + days_after] are read and used to create
     the interpolation functions.
     
+<<<<<<< HEAD
     bounds_error is set to False by default. This is to avoid error message for boundary
     conditions when the orbit time scale is different from used time scale. This might
     happen because time.utc is not guaranteed to be identical to time.gps.utc due to the
@@ -75,6 +98,10 @@ def get_orbit(rundate, file_key=None, bounds_error=False, days_before=1, days_af
         rundate (date):     Date of model run.
         file_key:           Which file_key to read
         bounds_error: (bool)Flag to enable error message instead of extrapolation
+=======
+    Args:
+        rundate (date):     Date of model run.
+>>>>>>> 6aa6131 (Near field update)
         days_before (int):  Number of days of sp3 files to read before the rundate
         days_after (int):   Number of days of sp3 files to read after the rundate
     
@@ -84,6 +111,7 @@ def get_orbit(rundate, file_key=None, bounds_error=False, days_before=1, days_af
                             pos_func and vel_func requires a Time object as input
     """
     file_key = "gnss_orbit_sp3" if file_key is None else file_key
+<<<<<<< HEAD
     # TODO: Multiple file keys?
     return _orbit_from_sp3(rundate, file_key, bounds_error, days_before, days_after)
 
@@ -94,10 +122,17 @@ def _orbit_from_sp3(rundate, file_key, bounds_error, days_before, days_after):
     
     sat_vel = None
     parsed_files = []
+=======
+    
+    date_to_read = rundate - timedelta(days=days_before)
+    orb_data = {}
+    
+>>>>>>> 6aa6131 (Near field update)
     # Read the files for all the days and collect it in orb_data
     while date_to_read <= rundate + timedelta(days=days_after):
         file_vars=config.date_vars(date_to_read)
 
+<<<<<<< HEAD
         parser = parsers.parse_key(file_key, file_vars=file_vars)
         if parser.data is None:
             log.warn(f"Missing data from {parser.file_path}")
@@ -197,3 +232,70 @@ def _get_derived_velocity_func(pos_func):
         return (pos_func(time - dt) - pos_func(time + dt))/(2 * dt.val[:, None])
     return velocity
 
+=======
+        parser = parsers.parse_key("gnss_orbit_sp3", file_vars=file_vars)
+        if parser.data is None:
+            log.warn(f"Missing data from {parser.file_path}")
+        else:
+            log.info(f"Parsed precise orbit file {parser.file_path}")
+        
+        satellite = np.array(parser.data["satellite"])
+        satellites = np.unique(satellite)
+        time = np.array(parser.data["time"]) # GPS time in isot format
+        sat_pos = np.array(parser.data["sat_pos"])
+        
+        for sat in satellites:
+            sat_dict = orb_data.setdefault(sat, {})
+            sat_dict.setdefault("time", [])
+            sat_dict.setdefault("xyz", [])
+            sat_dict["system"] = sat[0]
+            idx = satellite == sat
+            # Remove last epoch of the day because it is also included in the start of the next day
+            sat_dict["time"] += time[idx][:-1].tolist()
+            sat_dict["xyz"] += sat_pos[idx][:-1].tolist()
+    
+        date_to_read += timedelta(days=1)
+    
+    
+    # Create interpolation functions for position and velocity for each satellite    
+    orb = {}
+    satellites = list(orb_data.keys())
+    for sat in satellites:
+        sat_dict = orb.setdefault(sat, {})
+        sat_time = Time(orb_data[sat]["time"], fmt="isot", scale="gps")
+        test = _time_to_jd2(sat_time)
+        sat_dict["pos"] = _get_position_func(sat_time, orb_data[sat]["xyz"])
+        sat_dict["vel"] = _get_velocity_func(sat_dict["pos"]) 
+    
+    return orb  
+
+def _time_to_jd2(time):
+    """Convert time object to fraction of day relative to first epoch.
+    
+    Orbits are given in GPS-time.
+    """
+    ref_time = time.gps[0].jd1
+    ref_jd1 = time.gps.jd1 - ref_time
+    jd2 = time.gps.jd2
+    return ref_jd1 + jd2
+
+def _get_position_func(sat_time, sat_pos):
+    def position(time):
+        """time: where.data.time.Time"""
+        # Lagrange interpolation with 10 points: https://gssc.esa.int/navipedia/index.php/Precise_GNSS_Satellite_Coordinates_Computation
+        func = lagrange(_time_to_jd2(sat_time), np.array(sat_pos), window=10)
+        try:
+            result = func(_time_to_jd2(time))
+        except ValueError:
+            raise exceptions.MissingDataError(f"Some orbit data missing for {sat_time[0]}-{sat_time[-1]}")
+        return result
+    return position
+
+def _get_velocity_func(pos_func):
+    def velocity(time):
+        """time: where.data.time.Time"""
+        # Estimate velocity based on position right before and after given epoch
+        dt = TimeDelta(np.array([1/86400]*len(time)), scale="gps", fmt="days") # 1 second
+        return (pos_func(time.gps - dt) - pos_func(time.gps + dt))/(2 * dt.val[:, None])
+    return velocity
+>>>>>>> 6aa6131 (Near field update)
