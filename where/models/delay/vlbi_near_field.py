@@ -30,7 +30,7 @@ C = C
 L_G = constant.L_G
 L_C = constant.L_C
 
-
+GAMMA = 1 # PPN parameter. Equal to 1 in general relativity
 
 @plugins.register
 def vlbi_near_field_delay(dset):
