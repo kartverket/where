@@ -20,7 +20,7 @@ Example:
 
 To use the orbits, simply get them from the apriori-package specifying the days you need::
 
-    orbit = apriori.get('simple_orbit', rundate=rundate, days_after=1, days_before=1)
+    orbit = apriori.get('basic_orbit', rundate=rundate, days_after=1, days_before=1)
 
 After the orbit dictionary is created, you can get the different functions::
 
