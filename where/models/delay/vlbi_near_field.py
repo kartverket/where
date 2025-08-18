@@ -182,7 +182,6 @@ def jaron2019(dset):
 
     # Save TT(=TDB) value to dset  
     _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
-    
 
     # eq. 17 in jaron2019
     x02_dot_v2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -351,7 +350,6 @@ def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
 
     delay_bodies = 0
     for body in bodies:
-        
         R_body_T_sat = eph_T_sat.pos_bcrs(body)
         R_body_T_site = eph_T_site.pos_bcrs(body)
         
