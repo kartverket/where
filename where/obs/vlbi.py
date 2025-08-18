@@ -212,8 +212,10 @@ def _write_to_dataset(parser, dset, rundate, session_code):
     dset.subset(np.logical_not(bad_source_idx))
     
     # ## Test orbit with satellite G10 
+    # TODO: what about site_pos.other when the session is a mix of quasars and satellites?
+    
     # TODO: use dset.time to set days_before and days_after?
-    orbit = apriori.get("simple_orbit", rundate=rundate, days_before=0, days_after=1)
+    orbit = apriori.get("basic_orbit", rundate=rundate, days_before=0, days_after=1)
     sat = "G10"
     pos = orbit[sat]["pos"](dset.time)
     vel = orbit[sat]["vel"](dset.time)
