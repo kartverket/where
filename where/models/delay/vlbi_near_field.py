@@ -109,7 +109,6 @@ def vlbi_near_field_delay(dset):
     # idx_sat = True when observation is to a satellite
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
-
     t1 = dset.time.tcg
     x1_t1 = dset.site_pos_1.gcrs.pos # station_1 at epoch t1
     x2_t1 = dset.site_pos_2.gcrs.pos # station_2 at epoch t1
