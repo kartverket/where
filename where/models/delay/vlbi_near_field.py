@@ -22,13 +22,56 @@ from midgard.math.constant import constant
 from where import apriori
 from where.data.position import PosVel
 from where.data.time import TimeDelta
+<<<<<<< HEAD
 from where.lib import log
 
 GAMMA = 1 # PPN parameter. Equal to 1 in general relativity
+=======
+
+
+>>>>>>> 636a984aee8604ec0a8613cc480a4158fc774034
 
 @plugins.register
 def vlbi_near_field_delay(dset):
     r"""Calculate the theoretical delay dependent on the baseline
+<<<<<<< HEAD
+=======
+
+    TODOTODOTODOTODO :
+    --------------------------------------
+    The implementation is described in IERS Conventions :cite:`iers2010`, section 11.1, in particular equation
+    (11.9). We do not take the gravitational delay into account here (see
+    :mod:`where.models.delay.vlbi_gravitational_delay`), and multiply by :math:`c` to get the correction in
+    meters. Thus, we implement the following equation:
+
+    .. math::
+       \mathrm{correction} = \frac{- \hat K \cdot \vec b \bigl[ 1 - \frac{(1 + \gamma) U}{c^2}
+                             - \frac{| \vec V_\oplus |^2}{2 c^2} - \frac{\vec V_\oplus \cdot \vec w_2}{c^2} \bigr]
+                             - \frac{\vec V_\oplus \cdot \vec b}{c} \bigl[ 1
+                             + \frac{\hat K \cdot \vec V_\oplus}{2 c} \bigr]}{1
+                             + \frac{\hat K \cdot (\vec V_\oplus + \vec w_2)}{c}}
+
+    with
+
+    * :math:`\hat K` -- the unit vector from the barycenter to the source in the absence of gravitational or
+      aberrational bending,
+
+    * :math:`\vec b` -- the GCRS baseline vector at the time :math:`t_1` of arrival, :math:`\vec x_2(t_1) - \vec
+      x_1(t_1)`,
+
+    * :math:`\gamma` -- the parameterized post-Newtonian (PPN) gamma, equal to 1 in general relativity theory,
+
+    * :math:`U` -- the gravitational potential at the geocenter, neglecting the effects of the Earth's mass. At the
+      picosecond level, only the solar potential need be in included in :math:`U` so that :math:`U = G M_\odot / | \vec
+      R_{\oplus_\odot} |` where :math:`\vec R_{\oplus_\odot}` is the vector from the Sun to the geocenter,
+
+    * :math:`\vec V_\oplus` -- the barycentric velocity of the geocenter,
+
+    * :math:`\vec w_2` -- the geocentric velocity of station 2.
+
+    Each term in the correction is calculated in separate functions. and stored in the Dataset in a table called
+    ``vlbi_vacuum_delay``.
+>>>>>>> 636a984aee8604ec0a8613cc480a4158fc774034
     -------------------------------------------------------
 
     Args:
@@ -107,7 +150,7 @@ def vlbi_near_field_delay(dset):
     
     gamma0_2 = np.sqrt(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / constant.c**2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
-    
+
 
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
@@ -165,7 +208,6 @@ def vlbi_near_field_delay(dset):
 
     #import IPython; IPython.embed()
     
-    # eq. 14 in jaron2017
     x_dot_v_1 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / constant.c ** 2 # Intermediate variable
     x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0] # Intermediate variable
     # Time of emmison of the signal relative to t1
@@ -245,8 +287,7 @@ def vlbi_near_field_delay(dset):
         np.sqrt(gamma2_2 ** 2 * (x_dot_v_2 - t_g02) ** 2 + gamma2_2 * (x02_dot_x02 / constant.c ** 2 - t_g02 ** 2))
     
     # Convert from TCG to TT
-    delay = (delta_t2 + delta_t0) * (1 - constant.L_G) # eq. 10 
-
+    delay = (delta_t2 + delta_t0) * (1 - constant.L_G) # eq. 10
 
     
     ## For debugging. See if satellite is above horizon for both stations
@@ -267,3 +308,5 @@ def _save_detail_to_dataset(dset, field, value, func, **kwargs):
         dset[field][:] = value
     else:
         func(field, value, write_level="detail", **kwargs)
+    return delay * constant.c
+

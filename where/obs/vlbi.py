@@ -211,7 +211,7 @@ def _write_to_dataset(parser, dset, rundate, session_code):
         log.warn(f"Unknown source {s}. Observations with this source is discarded")
     dset.subset(np.logical_not(bad_source_idx))
     
-    # ## Test orbit with satellite G10 
+    # ## Test orbit with satellite G10
     # TODO: what about site_pos.other when the session is a mix of quasars and satellites?
     
     # TODO: use dset.time to set days_before and days_after?
