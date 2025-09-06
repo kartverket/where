@@ -35,9 +35,7 @@ from midgard.parsers import rinex_nav
 from where.data import dataset3 as dataset
 from where import cleaners
 from where.apriori import orbit
-from where.lib import config
-from where.lib import log
-from where.lib import rotation
+from where.lib import config, log, rotation
 
 # Earth's gravitational constant
 GM = {
