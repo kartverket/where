@@ -25,10 +25,8 @@ from typing import Dict, List, Tuple, Union
 from midgard.dev import plugins
 
 # Where imports
-from where import apriori
-from where import cleaners
-from where import writers
-from where.lib import config
+from where import apriori, cleaners, writers
+from where.lib import config, util
 
 # The name of this technique
 TECH = __name__.split(".")[-1]
