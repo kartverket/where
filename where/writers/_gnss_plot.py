@@ -1004,7 +1004,7 @@ class GnssPlot:
                     "plot_to": "file",
                     "plot_type": "scatter",
                     "projection": "polar",
-                    "title": f"Skyplot for {enums.gnss_id_to_name[sys]}\n Azimuth [deg] / Elevation[deg]",
+                    "title": f"Skyplot for {enums.gnss_id_to_name[sys].value}\n Azimuth [deg] / Elevation[deg]",
                     "xlim": [0, 2 * np.pi],
                     "ylim": [0, 90],
                     "yticks": (range(0, 90, 30)),  # sets 3 concentric circles
@@ -1070,13 +1070,13 @@ class GnssPlot:
                 figure_path=figure_path,
                 options={
                     "colormap": "tab20",
-                    "figsize": (7, 8),
+                    "figsize": (7, 6),
                     "legend": True,
                     "legend_ncol": 6,
                     "legend_location": "bottom",
                     "plot_to": "file",
                     "plot_type": "scatter",
-                    "title": f"Satellite elevation for {enums.gnss_id_to_name[sys]}",
+                    "title": f"Satellite elevation for {enums.gnss_id_to_name[sys].value}",
                     "xlim": [day_start, day_end],
                 },
             )

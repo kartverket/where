@@ -222,14 +222,14 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
     for figure_path in plt.plot_skyplot():
         rpt.add_figure(
                 figure_path=figure_path, 
-                caption=f"Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                caption=f"Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                 clearpage=False,
         )
 
     for figure_path in plt.plot_satellite_elevation():
         rpt.add_figure(
                 figure_path=figure_path,
-                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                 clearpage=True,
         )
         
@@ -244,7 +244,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
             for figure_path in plt.plot_field(field.name, field.collection):
                 system, _ = figure_path.stem.split("_")[2:4] 
                 rpt.add_figure(
-                    figure_path=figure_path, 
+                    figure_path=figure_path,      
                     caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
                     clearpage=True,
                 )
@@ -260,7 +260,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
             if figure_path.exists():
                 rpt.add_figure(
                     figure_path,
-                    caption=f"HAS correction for {enums.gnss_id_to_name[figure_path.stem[-1]]}",
+                    caption=f"HAS correction for {enums.gnss_id_to_name[figure_path.stem[-1]].value}",
                     clearpage=True,
                 )
 
@@ -505,6 +505,7 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
             "histogram_size": 0.8,
             "plot_to": "file",
             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+            "xlabelrotation": 30,
         },
     )
     
