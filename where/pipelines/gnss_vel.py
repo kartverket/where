@@ -215,8 +215,8 @@ def orbit(stage, dset):
         "orbit", rundate=dset.analysis["rundate"], system=tuple(dset.unique("system")), station=station
     )
     if util.check_write_level("analysis"):
-        orbit.dset_raw.write_as(stage=stage, station=station, label="raw")
-        orbit.dset_edit.write_as(stage=stage, station=station, label="edit")
+        orbit.dset_raw.write_as(stage=stage, station=station, pipeline=dset.vars["pipeline"], label="raw")
+        orbit.dset_edit.write_as(stage=stage, station=station, pipeline=dset.vars["pipeline"], label="edit")
 
     #TODO: Check if it would change anything, if using orbit.calculate_orbit(dset, time="sat_time") instead
     ## First estimate of satellite transmission time
