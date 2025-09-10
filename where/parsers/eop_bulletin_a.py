@@ -56,7 +56,7 @@ class EopBulletinAParser(LineParser):
                 10,
                 10,
             ),
-            dtype="i2, i2, i2, u1, f8, u1, u1, u1, f8, f8, u1, f8, f8, u2, u1, f8,f8, u1, f8,f8, u2,u1,u1,f8,f8,u1,f8,f8,f8,f8,f8,f8,f8",
+            dtype="i2, i2, i2, U1, f8, U1, U1, U1, f8, f8, U1, f8, f8, U2, U1, f8,f8, U1, f8,f8, U2,U1,U1,f8,f8,U1,f8,f8,f8,f8,f8,f8,f8",
             names=[
                 "year",
                 "month",
