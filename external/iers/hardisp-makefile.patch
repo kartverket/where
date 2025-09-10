@@ -1,6 +1,6 @@
---- external/iers/src_2010/libiers-hardisp/makefile.orig	2018-06-13 11:21:25.454807753 +0200
-+++ external/iers/src_2010/libiers-hardisp/makefile	2018-06-13 11:22:58.776569848 +0200
-@@ -22,7 +22,7 @@
+--- external/iers/src_2010/libiers-hardisp/makefile.orig	2025-09-10 13:40:27.028757770 +0200
++++ external/iers/src_2010/libiers-hardisp/makefile	2025-09-10 13:40:44.361618083 +0200
+@@ -22,13 +22,13 @@
  # here.
  
  FC = gfortran 
@@ -9,3 +9,10 @@
  
  #----YOU SHOULDN'T HAVE TO MODIFY ANYTHING BELOW THIS LINE---------
  
+ # Name the IERS library in its source location.
+
+-IERS_LIB = libiers-hardisp.a
++IERS_LIB = libiers_hardisp.a
+
+ # The list of IERS library object files.
+
