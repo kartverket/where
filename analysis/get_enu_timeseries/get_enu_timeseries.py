@@ -26,6 +26,7 @@ stations = args.station
 show_fig = args.show_fig
 dset_id = args.id
 
+reference_frame = "itrf:2020-u2023"
 
 # Setup config to make apriori modules work
 config.set_analysis(rundate=None, pipeline=pipeline)
@@ -47,7 +48,7 @@ for station in stations:
     # Sort data based on time
     sort_idx = np.argsort(t.mjd)
     t = t[sort_idx]
-    trf = apriori.get("trf", time=t, reference_frames="itrf:2020")
+    trf = apriori.get("trf", time=t, reference_frames=reference_frame)
     names = apriori.get("vlbi_station_codes")
 
     if names[station]["cdp"] not in trf:
@@ -83,9 +84,9 @@ for station in stations:
 # formal error of east estimate: [m]
 # formal error of north estimate: [m]
 # formal error of up estimate: [m]
-# a priori position in x coordinate: [m] (ITRF2020)
-# a priori position in y coordinate: [m] (ITRF2020)
-# a priori position in z coordinate: [m] (ITRF2020)
+# a priori position in x coordinate: [m] ({reference_frame.replace(":", "").upper()})
+# a priori position in y coordinate: [m] ({reference_frame.replace(":", "").upper()})
+# a priori position in z coordinate: [m] ({reference_frame.replace(":", "").upper()})
 """
 
     outfile=f"{station}_enu_estimates_{dset_id}.txt"
