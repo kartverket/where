@@ -150,7 +150,7 @@ def _add_solved_neq_fields(dset, dset_session, idx_values):
     names = dset.meta["normal equation"]["names"]
     x = np.array(dset.meta["normal equation"]["solution"])
     Q = np.array(dset.meta["normal equation"]["covariance"])
-    units = np.array(dset.meta["normal equation"]["unit"])
+    units = dset.meta["normal equation"]["unit"]
 
     # This code is terrible. TODO: Rewrite
     idx_names = idx_values[list(idx_values.keys()).pop()]

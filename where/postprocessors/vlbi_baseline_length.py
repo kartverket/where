@@ -144,8 +144,8 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
             log_and_write("No station position or baseline lengths are estimated")
             return
 
-        dset.meta.add("baseline_length", bl_length, section=bl_sorted)
-        dset.meta.add("baseline_length_ferr", bl_length_ferr, section=bl_sorted)
+        dset.meta.add("baseline_length", float(bl_length), section=bl_sorted)
+        dset.meta.add("baseline_length_ferr", float(bl_length_ferr), section=bl_sorted)
         dset.meta.add("__unit__", "meter", section=bl_sorted)
         
         num_obs = dset.num(baseline=bl_rsorted) or dset.num(baseline=bl_sorted)

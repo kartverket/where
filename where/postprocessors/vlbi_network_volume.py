@@ -62,7 +62,7 @@ def vlbi_network_volume(dset: "Dataset") -> None:
 
     volume = volume * Unit.meter2Megameter**3
     
-    dset.meta.add("value", volume, section="network_volume")
+    dset.meta.add("value", float(volume), section="network_volume")
     dset.meta.add("__unit__", "Megameter**3", section="network_volume")
     log.info(f"Network volume: {volume:.4f} Mm**3")
     
