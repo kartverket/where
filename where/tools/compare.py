@@ -44,7 +44,7 @@ Description:
 ------------
 
 The script compares different Where datasets based on given writers. The 
-different datasets are identified by the given items. The optione 'specifier'
+different datasets are identified by the given items. The option 'specifier'
 defines, which kind of items are given.
 
 Defined 'writers' uses configuration given in general Where configuration. If
@@ -56,16 +56,16 @@ like:
 
 Examples:
 ---------
-Concatenate datasets from SISRE analysis by using 'id' items:
+Compare datasets from SISRE analysis by using 'id' items:
 {exe:tools} compare 2019 1 1 2019 1 1 --sisre --stage=calculate --label=1 --writers=sisre_comparison_report --items='grc_inav_e1_std_sat_concatenated,grc_inav_e1e5b_std_sat_concatenated,grc_fnav_e1e5a_std_sat_concatenated' --specifier=id
 
-Concatenate datasets from GNSS and GNSS VEL analysis by using 'station' items:
+Compare datasets from SISRE analysis by using 'stage' items:
+{exe:tools} compare 2019 1 1 2019 1 1 --gnss --dset_name=krss --label=1 --writers=sisre_comparison_report --items='calculate, estimate' --specifier=stage
+
+Compare datasets from GNSS and GNSS VEL analysis by using 'station' items:
 {exe:tools} compare 2019 7 1 2019 7 1 --gnss --stage=estimate --writers=gnss_comparison_report --id=cnes_inav_e1_concatenated --items='nabf, hons, vegs, krss' --specifier=station
 
 {exe:tools} compare 2019 7 1 2019 7 1 --gnss_vel --stage=write --writers=gnss_vel_comparison_report --id=_concatenated --items='vegs, krss' --specifier=station
-
-Concatenate datasets from SISRE analysis by using 'stage' items:
-{exe:tools} compare 2019 1 1 2019 1 1 --gnss --dset_name=krss --label=1 --writers=sisre_comparison_report --items='calculate, estimate' --specifier=stage
 
 """
 
