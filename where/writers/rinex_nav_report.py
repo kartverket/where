@@ -57,6 +57,7 @@ def rinex_nav_report(dset: "Dataset") -> None:
 
     # Generate RINEX navigation file report
     path = config.files.path("output_rinex_nav_report", file_vars=file_vars)
+    log.info(f"Write file {path}.")
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="RINEX navigation file analysis")
         rpt.title_page()
@@ -102,7 +103,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
             if gnss == "galileo":
                 caption=f"Galileo signal-in-space (SIS) status for signal {figure_path.stem.split('_')[-1].upper()}"
             else:
-                caption=f"{gnss.upper()} signal-in-space (SIS) status"
+                caption=f"{gnss.upper()} signal-in-space (SIS) status for each navigation messages"
                 
             rpt.add_figure(
                     figure_path=figure_path, 

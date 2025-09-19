@@ -21,8 +21,7 @@ from midgard.dev import plugins
 # Where imports
 import where
 from where import apriori
-from where.lib import config
-from where.lib import util
+from where.lib import config, log, util
 
 # TODO: SYSTEM_TIME_OFFSET_TO_GPS_SECOND & SYSTEM_TIME_OFFSET_TO_GPS_WEEK should be placed in constans.conf
 
@@ -67,7 +66,10 @@ def rinex3_nav(dset: "Dataset"):
     )
     rinex_version = "3.03"
 
-    with config.files.open("output_rinex3_nav", file_vars={**dset.vars, **dset.analysis}, mode="wt") as fid:
+    file_path = config.files.path("output_rinex3_nav", file_vars={**dset.vars, **dset.analysis})
+    log.info(f"Write file {file_path}.")
+
+    with config.files.open_path(file_path, create_dirs=True, mode="wt") as fid:
 
         #
         # Write RINEX navigation header
@@ -242,9 +244,9 @@ def _time_system_correction(data, idx):
     Following relationship are given between GNSS time scale (either BeiDou, Galileo, IRNSS or QZSS)
     :math:`t_{GNSS}` and GPS time scale :math:`t_{GPS}` (see Section 2.1.4 in :cite:`teunissen2017`):
     .. math::
-          t_{GPS}  = t_{GNSS} + \Delta t
+          t_{GPS}  = t_{GNSS} + \\Delta t
 
-    The time offset :math:`\Delta t` is 0 s for Galileo, IRNSS and QZSS and for BeiDou 14 s. All these time scales
+    The time offset :math:`\\Delta t` is 0 s for Galileo, IRNSS and QZSS and for BeiDou 14 s. All these time scales
     are related to the International Atomic Time (TAI) by a certain time offset. In addition the GNSS week number
     is different depending on the GNSS. Galileo, IRNSS and QZSS are referring to the same GPS week, whereas BeiDou
     week starts at GPS week 1356.
