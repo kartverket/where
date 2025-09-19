@@ -2,7 +2,7 @@
 
 Usage:
 
-    {exe:tools} <tool> [arguments]
+    {exe:tools} <tool> [options]
 
 The program requires the name of a tool. Each tool has its own set of
 arguments. Run "{exe:tools} <tool> -h" to get more information and help about a
