@@ -181,7 +181,7 @@ def parse_reference_clock(stations):
             log.warn(f"Reference clock {ref_clock_str!r} unknown. Available options are {', '.join(stations)}")
 
         # Pick last station as default
-        ref_clock_str = stations[-1]
+        ref_clock_str = str(stations[-1])
     log.info(f"Reference clock is {ref_clock_str!r}")
     return ref_clock_str
 

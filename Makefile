@@ -91,15 +91,15 @@ iers_2010:	$(EXTDIR)/iers_2010$(F2PYEXTENSION)
 $(IERSDIR)_2010/iers_2010.pyf:
 	python download.py iers_2010
 
-$(EXTDIR)/iers_2010$(F2PYEXTENSION):	$(IERSDIR)_2010/iers_2010.pyf $(IERSDIR)_2010/libiers-dehant/libiers-dehant.a $(IERSDIR)_2010/libiers-hardisp/libiers-hardisp.a $(shell find $(IERSDIR)_2010 -type f)
+$(EXTDIR)/iers_2010$(F2PYEXTENSION):	$(IERSDIR)_2010/iers_2010.pyf $(IERSDIR)_2010/libiers-dehant/libiers_dehant.a $(IERSDIR)_2010/libiers-hardisp/libiers_hardisp.a $(shell find $(IERSDIR)_2010 -type f)
 	( cd $(EXTDIR) && \
           $(F2PY) -c $(IERSDIR)_2010/iers_2010.pyf $(IERSDIR)_2010/*.F \
-                  -liers-dehant -L$(IERSDIR)_2010/libiers-dehant -liers-hardisp -L$(IERSDIR)_2010/libiers-hardisp )
+                  -liers_dehant -L$(IERSDIR)_2010/libiers-dehant -liers_hardisp -L$(IERSDIR)_2010/libiers-hardisp )
 
-$(IERSDIR)_2010/libiers-dehant/libiers-dehant.a:	$(shell find $(IERSDIR)_2010/libiers-dehant -type f -name *.F)
+$(IERSDIR)_2010/libiers-dehant/libiers_dehant.a:	$(shell find $(IERSDIR)_2010/libiers-dehant -type f -name *.F)
 	( cd $(IERSDIR)_2010/libiers-dehant && make && make clean )
 
-$(IERSDIR)_2010/libiers-hardisp/libiers-hardisp.a:	$(shell find $(IERSDIR)_2010/libiers-hardisp -type f -name *.F)
+$(IERSDIR)_2010/libiers-hardisp/libiers_hardisp.a:	$(shell find $(IERSDIR)_2010/libiers-hardisp -type f -name *.F)
 	( cd $(IERSDIR)_2010/libiers-hardisp && make && make clean )
 
 
