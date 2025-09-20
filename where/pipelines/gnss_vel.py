@@ -189,7 +189,7 @@ def read(stage, dset):
 
     # Write dataset to file
     if util.check_write_level("analysis"):
-        dset.write_as(stage=stage)
+        dset.write_as(stage=stage, write_level="analysis")
 
 
 #
@@ -215,8 +215,11 @@ def orbit(stage, dset):
         "orbit", rundate=dset.analysis["rundate"], system=tuple(dset.unique("system")), station=station
     )
     if util.check_write_level("analysis"):
-        orbit.dset_raw.write_as(stage=stage, station=station, pipeline=dset.vars["pipeline"], label="raw")
-        orbit.dset_edit.write_as(stage=stage, station=station, pipeline=dset.vars["pipeline"], label="edit")
+        dset_vars = {**dset.vars, **dset.analysis}
+        for key in ["label", "stage"]:
+            del dset_vars[key]
+        orbit.dset_raw.write_as(stage="orbit", label="raw", **dset_vars)
+        orbit.dset_edit.write_as(stage="orbit", label="edit", **dset_vars)
 
     #TODO: Check if it would change anything, if using orbit.calculate_orbit(dset, time="sat_time") instead
     ## First estimate of satellite transmission time
@@ -354,7 +357,7 @@ def calculate_estimate(stage: str, dset: "Dataset") -> None:
         # Store calculate results
         log.info(f"{dset.num_obs} observations, residual = {dset.rms('residual'):.4f}")
         if util.check_write_level("analysis"):
-            dset.write_as(stage="calculate", dataset_id=iter_num)
+            dset.write_as(stage="calculate", label=iter_num)
 
         # ESTIMATE
         # ----------
