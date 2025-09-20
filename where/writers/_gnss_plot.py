@@ -201,7 +201,7 @@ class GnssPlot:
                 "bgd_e1_e5b_dcb": PlotField("DCB(C1C,C7Q)", "ns", (7, 6)),
                 "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
                 "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
-                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\Delta t$ (mean)", "m", (7, 6)),
+                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\\Delta t$ (mean)", "m", (7, 6)),
                 "delay.gnss_earth_rotation_drift": PlotField("Earth rotation drift", "m/s", (7, 6)),
                 "delay.gnss_ionosphere": PlotField("Ionospheric delay", "m", (7, 6)),
                 "delay.gnss_range": PlotField("Range", "m", (7, 6)),
@@ -1109,17 +1109,18 @@ class GnssPlot:
         # Get time and satellite data from read and orbit stage
         file_vars = {**self.dset.vars, **self.dset.analysis}
         file_vars["stage"] = "read"
+        file_vars["label"] = "None"
         file_path = config.files.path("dataset", file_vars=file_vars)
         if file_path.exists():
             systems = list(self.dset.unique("system")) # self.dset.meta["obstypes"].keys()
             time_read, satellite_read, _ = self._sort_by_satellite(
-                self._get_dataset(stage="read", systems=systems)
+                self._get_dataset(stage="read", label="None", systems=systems)
             )
             time_orbit, satellite_orbit, _ = self._sort_by_satellite(
-                self._get_dataset(stage="orbit", systems=systems)
+                self._get_dataset(stage="orbit", label="None", systems=systems)
             )
-            time_edit, satellite_edit, _ = self._sort_by_satellite(
-                self._get_dataset(stage="edit", systems=systems)
+            time_calculate, satellite_calculate, _ = self._sort_by_satellite(
+                self._get_dataset(stage="estimate", label="None", systems=systems)
             )
             
         else:
@@ -1130,12 +1131,12 @@ class GnssPlot:
         # Generate plot
         plt = MatPlotExt()
         plt.plot(
-            x_arrays=[time_read.tolist(), time_orbit.tolist(), time_edit.tolist()],
-            y_arrays=[satellite_read.tolist(), satellite_orbit.tolist(), satellite_edit.tolist()],
+            x_arrays=[time_read.tolist(), time_orbit.tolist(), time_calculate.tolist()],
+            y_arrays=[satellite_read.tolist(), satellite_orbit.tolist(), satellite_calculate.tolist()],
             xlabel="Time [GPS]",
             ylabel="Satellite",
             y_unit="",
-            # labels = ["Rejected in orbit stage", "Rejected in edit stage", "Kept observations"],
+            #labels = ["Rejected in orbit stage", "Rejected in edit stage", "Kept observations"],
             colors=["red", "orange", "green"],
             figure_path=figure_path,
             options={
@@ -1391,11 +1392,14 @@ class GnssPlot:
     def _get_dataset(
             self, 
             stage: str, 
+            label: str,
             systems: Union[List[str], None] = None,
     ) -> "Dataset":
         """Get dataset for given stage
     
         Args:
+           stage:       Stage name
+           label:       Label name
            systems:     List with GNSS identifiers (e.g. E, G, ...)
     
         Returns:
@@ -1403,13 +1407,13 @@ class GnssPlot:
         """
     
         # Get Dataset
-        # TODO: "label" should have a default value.
         file_vars = {**self.dset.vars, **self.dset.analysis}
         file_vars["stage"] = stage
+        file_vars["label"] = label
         try:
             dset_out = dataset.Dataset.read(**file_vars)
         except OSError:
-            log.warn("Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
+            log.warn(f"Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
             return enums.ExitStatus.error
     
         # Reject not defined GNSS observations
@@ -1424,9 +1428,6 @@ class GnssPlot:
         return dset_out
     
     
-
-    
-        
     def _get_gnss_signal_in_space_status_data(
                 self,
                 status: int, 
@@ -1543,11 +1544,11 @@ class GnssPlot:
         time = []
         satellite = []
         system = []
-        for sat in sorted(self.dset.unique("satellite"), reverse=True):
-            idx = self.dset.filter(satellite=sat)
-            time.extend(self.dset.time.gps.datetime[idx])
-            satellite.extend(self.dset.satellite[idx])
-            system.extend(self.dset.system[idx])
+        for sat in sorted(dset.unique("satellite"), reverse=True):
+            idx = dset.filter(satellite=sat)
+            time.extend(dset.time.gps.datetime[idx])
+            satellite.extend(dset.satellite[idx])
+            system.extend(dset.system[idx])
     
         return np.array(time), np.array(satellite), np.array(system)
     

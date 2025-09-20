@@ -223,7 +223,7 @@ def _table_navigation_message_overview(dset: "Dataset"):
         Dataframe with satellites as indices and following columns:
 
         | Name        | Description                                                                                  |
-        |-------------|----------------------------------------------------------------------------------------------|
+        | :---------- | :------------------------------------------------------------------------------------------- |
         | num_msg     | Number of navigation messages for each satellite                                             |
         | fnav        | Number of Galileo F/NAV navigation messages for each satellite                               |
         | inav        | Number of Galileo F/NAV navigation messages for each satellite                               |
@@ -235,7 +235,7 @@ def _table_navigation_message_overview(dset: "Dataset"):
         Example:
 
             |    |num_msg| fnav| inav| inav_e1| inav_e5b| inav_e1e5b|
-            |----|-------|-----|-----|--------|---------|-----------|
+            | :--| :---- | :-- | :-- | :----- | :------ | :-------- |
             | C01|     72|    0|    0|       0|        0|          0|
             | C02|     72|    0|    0|       0|        0|          0|
             | .. |    ...|  ...|  ...|     ...|      ...|        ...|
