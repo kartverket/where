@@ -193,6 +193,8 @@ class GnssPlot:
         
         plot_def = {
                 "age_of_ephemeris": PlotField("Age of ephemeris", "s", (7, 6)),
+                "bias_brdc": PlotField("Satellite bias for broadcast clocks", "m", (7, 6)),
+                "bias_precise": PlotField("Satellite bias for precise clocks", "m", (7, 6)),
                 "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns", (7, 6)),
                 "bgd_e1_e5a_dcb": PlotField("DCB(C1C,C5Q)", "ns", (7, 6)),
                 "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns", (7, 6)),
