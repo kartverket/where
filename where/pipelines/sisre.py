@@ -196,8 +196,8 @@ def calculate(stage: str, dset: "Dataset"):
 
     | Field                  | Type              |  Description
     | :--------------------- | :---------------  | :------------------------------------------------------------------ |
-    | bias_brdc              | numpy.ndarray     | Satellite bias of broadcast ephemeris in [m]                        |
-    | bias_precise           | numpy.ndarray     | Satellite bias of precise orbits in [m]                             |
+    | bias_brdc              | numpy.ndarray     | Satellite bias for correting broadcast clocks in [m]                |
+    | bias_precise           | numpy.ndarray     | Satellite bias for correcting precise clocks in [m]                 |
     | clk_diff               | numpy.ndarray     | Satellite clock correction difference without correction in [m]     |
     | clk_diff_with_dt_mean  | numpy.ndarray     | Satellite clock correction difference corrected for average         |
     |                        |                   | satellite clock offset difference for given GNSS and epoch in [m]   |
@@ -344,8 +344,8 @@ def _additional_fields_to_dataset(
         ant:              Antenna correction object
         brdc:             Broadcast orbit object
         precise:          Precise orbit object
-        bias_brdc:        Satellite bias for broadcast orbits
-        bias_precise:     Satellite bias for precise orbits
+        bias_brdc:        Satellite bias for correcting broadcast clocks
+        bias_precise:     Satellite bias for correcting precise clocks
         orb_diff:         Orbit difference
         brdc_sys_freq:    Dictionary with frequency given for GNSS identifier. This is used for selection of correct
                           broadcast orbit ANTEX PCOs.
@@ -460,9 +460,9 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
         Tuple with following `numpy.ndarray` arrays:
 
     |Elements       | Description                                                                                      |
-    |---------------|--------------------------------------------------------------------------------------------------|
-    | bias_brdc     | Satellite bias for broadcast orbits in [m]                                                       |
-    | bias_precise  | Satellite bias for precise orbits in [m]                                                         |
+    | :------------ | :----------------------------------------------------------------------------------------------- |
+    | bias_brdc     | Satellite bias for correcting broadcast clocks in [m]                                            |
+    | bias_precise  | Satellite bias for correcting precise orbits in [m]                                              |
     """
     bias_brdc = np.zeros(dset.num_obs)
     bias_precise = np.zeros(dset.num_obs)
