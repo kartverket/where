@@ -127,16 +127,15 @@ def sisre_report(dset: "Dataset") -> None:
         rpt.title_page()
         _write_information(fid)
         rpt.write_config()
-        # rpt.add_text("\n# Satellite status\n\n")
-        # _unhealthy_satellites(fid, dset)
-        # _eclipse_satellites(fid, dset)
+        #rpt.add_text("\n# Satellite status\n\n")
+        #_unhealthy_satellites(fid, dset)
+        #_eclipse_satellites(fid, dset)
         
         # Generate figure directory to save figures generated for SISRE report
         rpt.add_text("\n# SISRE analysis results\n\n")
         figure_dir = config.files.path("output_sisre_report_figure", file_vars=file_vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
         
-        _plot_histogram_sisre(fid, figure_dir, dset) #TODO: move to _add_to_report
         _add_to_report(dset, rpt, figure_dir)
         
         _satellite_statistics_and_plot(fid, figure_dir, dset, rpt) #TODO: move to _add_to_report
@@ -156,7 +155,6 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     """
 
     plt = GnssPlot(dset, figure_dir)
-
 
     #
     # Scatter plots
@@ -178,7 +176,16 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
                     f"{enums.gnss_id_to_name[system].value} satellites. ",
             clearpage=True,
         ) 
-  
+
+    #
+    # Histogram plot
+    #
+    rpt.add_figure(
+        figure_path=_plot_histogram_sisre(dset, figure_dir), 
+        caption="Histrogram of SISRE results",
+        clearpage=True,
+    )
+     
     #
     # Field plots
     #     
@@ -206,6 +213,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
                             f"correction)", 
                     clearpage=True,
             )
+
 
 def _eclipse_satellites(fid, dset):
     """Write overview over satellites in eclipse
@@ -469,28 +477,39 @@ def _plot_histogram_subplot(data, axis, system):
     )
 
 
-def _plot_histogram_sisre(fid, figure_dir, dset):
+def _plot_histogram_sisre(dset: "Dataset", figure_dir: PosixPath) -> PosixPath:
     """Plot histogram based on SISRE dataset field
 
     Args:
-       fid (_io.TextIOWrapper):  File object.
-       figure_dir (PosixPath):   Figure directory
-       dset (Dataset):           A dataset containing the data.
-    """
-    import math
+       dset:         A dataset containing the data.
+       figure_dir:   Figure directory
 
-    # TODO: How to handle for example 3 subplots?
-    nrows = math.ceil(len(dset.unique("system")) / 2)
-    ncols = 2 if len(dset.unique("system")) > 1 else 1
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True, squeeze=False)
+    Returns:
+        Figure path of plot
+    """
+    from math import ceil
+    nrows = ceil(len(dset.unique("system")) / 2)
+    ncols = len(dset.unique("system"))
+    figure_path = figure_dir / f"plot_histogram_sisre.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
+
+    fig, axes = plt.subplots(
+                    #figsize= (6, 10) if ncols > 2 else (5,5),
+                    nrows=nrows, 
+                    ncols=ncols, 
+                    sharex=True, 
+                    sharey=True, 
+                    squeeze=False,
+    )
+
     for sys, ax in zip(dset.unique("system"), axes.flatten()):
         idx = dset.filter(system=sys)
         _plot_histogram_subplot(dset.sisre[idx], ax, sys)
-    plt.savefig(figure_dir / f"plot_histogram_sisre.{FIGURE_FORMAT}", dpi=FIGURE_DPI)
+    plt.tight_layout()
+    plt.savefig(figure_path, dpi=FIGURE_DPI)
     plt.clf()  # clear the current figure
 
-    fid.write(f"![Histrogram of SISRE results]({figure_dir}/plot_histogram_sisre.{FIGURE_FORMAT})\n")
-    fid.write("\n\\clearpage\n\n")
+    return figure_path
 
 
 #
