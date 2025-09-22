@@ -64,7 +64,7 @@ def axis_offset_station(dset):
     for ivsname in dset.unique("ivsname"):
         site_id = dset.meta["station"][ivsname]["site_id"] if ivsname in dset.meta else ""
         if ivsname not in antenna_info:
-            log.warn(f"Missing antenna specifications for ivsname {ivsname!r} ({site_id}). Axis offset correction set to zero.")
+            log.warn(f"Missing antenna specifications for ivsname {str(ivsname)!r} ({str(site_id)}). Axis offset correction set to zero.")
             continue
 
         idx = dset.filter(ivsname=ivsname)
