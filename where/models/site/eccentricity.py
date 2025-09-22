@@ -76,7 +76,7 @@ def eccentricity_vector_station(ecc, dset):
         log.fatal(f"dset.site_pos{dset.default_field_suffix} is not a PositionArray or PosVelArray.")
 
     fieldnames = config.tech.eccentricity.identifier.list
-    fielddata = [dset[field] for field in fieldnames]
+    fielddata = [dset[field].tolist() for field in fieldnames]
     if len(fieldnames) > 1:
         keys = set(tuple(zip(*fielddata)))
     else:
