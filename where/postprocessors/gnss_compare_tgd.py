@@ -18,7 +18,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where import apriori
-from where.lib import log
+from where.lib import exceptions, log
 
 # Name of section in configuration
 _SECTION = "_".join(__name__.split(".")[-1:])
@@ -113,15 +113,13 @@ def gnss_compare_tgd(dset: "Dataset") -> None:
                 continue
                        
             # Initialize dataset fields
+            fields_to_add = [f"{field}_mean", f"{field}_dcb", f"{field}_dcb_mean", f"{field}_diff", f"{field}_diff_mean"]
             if f"{field}_dcb" not in dset.fields:
                 tmp_nan = np.empty(dset.num_obs)
                 tmp_nan[:] = np.nan
-                log.info(f"Add TGD/BGD comparison and DCB fields to dataset: {field}_dcb, {field}_diff, {field}_diff_mean")
-                dset.add_float(f"{field}_mean", val=tmp_nan.copy(), unit="second")
-                dset.add_float(f"{field}_dcb", val=tmp_nan.copy(), unit="second")
-                dset.add_float(f"{field}_dcb_mean", val=tmp_nan.copy(), unit="second")
-                dset.add_float(f"{field}_diff", val=tmp_nan.copy(), unit="second")
-                dset.add_float(f"{field}_diff_mean", val=tmp_nan.copy(), unit="second")
+                log.info(f"Add TGD/BGD comparison and DCB fields to dataset: {field}_dcb, {field}_diff, {field}_diff_mean")    
+                for field_to_add in fields_to_add:
+                    dset.add_float(field_to_add, val=tmp_nan.copy(), unit="second")
 
             if tgd_def[sys][field].field  not in dset.fields:
                 dset.add_float(tgd_def[sys][field].field, val=tmp_nan.copy(), unit="second")
@@ -130,7 +128,13 @@ def gnss_compare_tgd(dset: "Dataset") -> None:
             for sat in dset.unique("satellite", idx=idx_sys):
                 idx = dset.filter(satellite=sat)
        
-                dcb_val = dcb.get_dsb(sat, tgd_def[sys][field].dcb, dset.analysis["rundate"])["estimate"]
+                try:
+                    dcb_val = dcb.get_dsb(sat, tgd_def[sys][field].dcb, dset.analysis["rundate"])["estimate"]
+                except exceptions.MissingDataError as error:
+                    # Note: DCBs are not availbale in bias file.
+                    log.debug(error)
+                    continue
+                    
                 dset[tgd_def[sys][field].field][idx] = dcb_val
                 
                 if sys in ["E", "G", "I", "J"]:
@@ -142,6 +146,14 @@ def gnss_compare_tgd(dset: "Dataset") -> None:
                 elif sys == "C":
                     dset[f"{field}_diff"][idx] = dset[field][idx] - dcb_val
 
+            # Check if DCBs for given field has been available
+            if np.all(np.isnan(dset[f"{field}_dcb"])):
+                log.warn(f"No DCBs available for {enums.gnss_id_to_name[sys].value}. Related dataset '{field}' "
+                         f"fields will be deleted.")
+                for field_to_add in fields_to_add:
+                    del dset[field_to_add]
+                continue
+
             # Determine zero mean difference between TGD and post-processed DCBs
             dcb_sys_mean = np.mean(dset[f"{field}_dcb"][idx_sys])
             tgd_sys_mean = np.mean(dset[field][idx_sys])
@@ -149,4 +161,3 @@ def gnss_compare_tgd(dset: "Dataset") -> None:
             dset[f"{field}_mean"][idx_sys] = dset[field][idx_sys] - tgd_sys_mean
             dset[f"{field}_diff_mean"][idx_sys] = dset[f"{field}_diff"][idx_sys] - tgd_sys_mean + dcb_sys_mean
     
-

@@ -22,7 +22,7 @@ from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.data import dataset3 as dataset
-from where.lib import config
+from where.lib import config, log
 from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
 
@@ -62,6 +62,7 @@ def rinex_obs_report(dset: "Dataset") -> None:
     
     # Generate RINEX observation file report
     path = config.files.path("output_rinex_obs_report", file_vars=file_vars)
+    log.info(f"Write file {path}.")
     with config.files.open_path(path, create_dirs=True, mode="wt") as fid:
         rpt = Report(fid, rundate=dset.analysis["rundate"], path=path, description="RINEX observation file analysis")
         rpt.title_page()

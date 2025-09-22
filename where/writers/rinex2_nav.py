@@ -4,7 +4,7 @@ Description:
 ------------
 Write data in the Rinex navigation file format 2.11 (see :cite:`rinex2`).
 
-TODO: BUG: All orbit information of three days are written in each daily navigation file.
+TODO: DOES NOT WORK
 
 
 """
@@ -15,7 +15,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where import apriori
-from where.lib import config
+from where.lib import config, log
 
 
 @plugins.register
@@ -25,33 +25,33 @@ def rinex2_nav(dset):
     Args:
         dset:       Dataset, a dataset containing the data.
     """
-    for date_offset in range(-1, 2):
-        write_one_day(dset, dset.analysis["rundate"] + timedelta(days=date_offset))
 
+    log.fatal("'rinex2_nav' writer does not work at the moment. Update your configuration and start process without "
+              "using this writer.")
+    
 
-def write_one_day(dset, date):
-    """Write RINEX navigation file for given date
+    # Overwrite Dataset. This is necessary if the writer is called from a analysis (e.g. SISRE) with does not include
+    # broadcast ephemeris information.
+    # TODO: Is that the best solution?
+    if dset.vars["pipeline"] != "rinex_nav":
+        brdc = apriori.get(
+            "orbit",
+            rundate=dset.analysis["rundate"],
+            system=tuple(dset.unique("system")),
+            station=dset.vars["station"],
+            apriori_orbit="broadcast",
+        )
+        meta = brdc.dset_edit.meta[dset.analysis["rundate"].strftime("%Y-%m-%d")]
+        data = brdc.dset_edit  # TODO: Another possibility: brdc.dset_raw
 
-    Args:
-        dset:       Dataset, a dataset containing the data.
-        date:       Current date
-    """
-    brdc = apriori.get(
-        "orbit",
-        rundate=dset.analysis["rundate"],
-        system=tuple(dset.unique("system")),
-        station=dset.vars["station"],
-        apriori_orbit="broadcast",
-    )
+    else:
+        meta = dset.meta[dset.analysis["rundate"].strftime("%Y-%m-%d")]
+        data = dset  # TODO: Another possibility: brdc.dset_raw
 
-    meta = brdc.dset_edit.meta[date.strftime("%Y-%m-%d")]
-    data = brdc.dset_edit  # TODO: Another possibility: brdc.dset_raw
-    file_vars = {**dset.vars, **dset.analysis}
-    file_vars["doy"] = config.date_vars(date)[
-        "doy"
-    ]  # TODO: workaround, so that all files are written in the same working directory -> does not work if year is changed.
+    file_path = config.files.path("output_rinex2_nav", file_vars={**dset.vars, **dset.analysis})
+    log.info(f"Write file {file_path}.")
 
-    with config.files.open("output_rinex2_nav", file_vars=file_vars, mode="wt") as fid:
+    with config.files.open_path(file_path, create_dirs=True, mode="wt") as fid:
 
         #
         # Write RINEX navigation header
@@ -64,8 +64,9 @@ def write_one_day(dset, date):
             "{:20s}{:20s}{:20s}PGM / RUN BY / DATE\n".format(meta["program"], meta["run_by"], meta["file_created"])
         )
 
-        for line in meta["comment"]:
-            fid.write("{:60s}COMMENT\n".format(line))
+        if "comment" in meta:
+            for line in meta["comment"]:
+                fid.write("{:60s}COMMENT\n".format(line))
         fid.write(
             "{:>14.4e}{:>12.4e}{:>12.4e}{:>12.4e}{:10s}ION ALPHA\n"
             "".format(

@@ -18,8 +18,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where import parsers
-from where.lib import config
-from where.lib import log
+from where.lib import config, exceptions, log
 
 
 @plugins.register
@@ -53,7 +52,7 @@ class BiasCorrection(UserDict):
     with following entries:
 
     | Value            | Type              | Description                                                               |
-    |------------------|-------------------|---------------------------------------------------------------------------|
+    | :--------------- | :---------------- | :------------------------------------------------------------------------ |
     | <code1>-<code2>  | str               | GNSS code bias combination (e.g. 'C1C-C1W')                               |
     | estimate         | float             | Differential Signal Bias (DSB) estimate in [s]                            |
     | <prn>            | str               | Satellite code e.g. GPS PRN, GLONASS slot or Galileo SVID number          |
@@ -98,17 +97,21 @@ class BiasCorrection(UserDict):
         given_date = datetime.datetime.combine(given_date, datetime.time())  # conversion from date to datetime
 
         if satellite not in self.data.keys():
-            log.fatal(f"Satellite {satellite} does not exists in file {self.file_path}.")
+            raise exceptions.MissingDataError(
+                f"Satellite {satellite} does not exists in file {self.file_path}."
+            )
 
         if dsb not in self.data[satellite]:
-            log.fatal(f"No satellite GNSS bias {dsb} is given for satellite {satellite} in file {self.file_path}.")
+            raise exceptions.MissingDataError(
+                f"No satellite GNSS bias {dsb} is given for satellite {satellite} in file {self.file_path}."
+            )
 
         for date in sorted(self.data[satellite][dsb]):
             if date <= given_date:
                 used_date = date
 
         if (used_date is None) or (given_date > self.data[satellite][dsb][used_date]["end_time"]):
-            log.fatal(
+            raise exceptions.MissingDataError(
                 f"No satellite GNSS bias is given for satellite {satellite}, Differential Signal Bias (DSB) "
                 f"{dsb} and time {given_date} in file {self.file_path}."
             )

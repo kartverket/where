@@ -18,8 +18,7 @@ from midgard.math.unit import Unit
 
 # Where imports
 import where
-from where.lib import config
-from where.lib import util
+from where.lib import config, log, util
 
 WriterField = namedtuple(
     "WriterField", ["name", "field", "attrs", "dtype", "format", "width", "header", "unit", "description"]
@@ -116,6 +115,7 @@ def rinex_nav_writer(dset: "Dataset") -> None:
         dset:   A dataset containing the data.
     """
     file_path = config.files.path(f"output_rinex_nav", file_vars={**dset.vars, **dset.analysis})
+    log.info(f"Write file {file_path}.")
 
     # Add additional fields used by the writer
     dset.add_text("date", val=[d.strftime("%Y/%m/%d %H:%M:%S") for d in dset.time.datetime])
