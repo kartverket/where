@@ -197,27 +197,25 @@ class PreciseOrbit(orbit.AprioriOrbit):
         boundaries. The input Dataset contains observation epochs for which the broadcast ephemeris and satellite
         clock correction should be determined. The satellite position is determined for each observation epoch by
         interpolating within the given SP3 orbit time entries. The satellite velocities are calculated based on
-        satellite positions 0.5 second before and after the observation epoch.
+        satellite positions 0.5 seconds before and after the observation epoch.
 
         Args:
-            dset_out (Dataset): Dataset representing calculated precise orbits with following fields:
-
-        ========================  ===============  =======  ========================================================
-         Field                     Type             Unit     Description
-        ========================  ===============  =======  ========================================================
-         gnss_satellite_clock     numpy.ndarray     m       Satellite clock correction
-         gnss_relativistic_clock  numpy.ndarray     m       Relativistic clock correction due to orbit eccentricity
-         sat_posvel               PosVelTable       m       Satellite position and velocity
-         satellite                numpy.ndarray             Satellite numbers
-         system                   numpy.ndarray             GNSS identifiers
-         time                     TimeTable                 Observation epochs
-        =======================  ===============  =======  ========================================================
+            dset_out: Dataset representing calculated precise orbits with following fields:
+   
+        | Field                   | Type           | Unit   | Description |
+        | :---------------------- | :------------- | :----- | :---------- | 
+        | gnss_satellite_clock    | numpy.ndarray  | m      | Satellite clock correction |
+        | gnss_relativistic_clock | numpy.ndarray  | m      | Relativistic clock correction due to orbit eccentricity |
+        | sat_posvel              | PosVelTable    | m      | Satellite position and velocity |
+        | satellite               | numpy.ndarray  |        | Satellite numbers |
+        | system                  | numpy.ndarray  |        | GNSS identifiers |
+        | time                    | TimeTable      |        | Observation epochs |
 
             dset_in:  Input Dataset containing model data for which broadcast ephemeris should be determined.
             time: Define time fields to be used. It can be for example 'time' or 'sat_time'. 'time' is related to 
                   observation time and 'sat_time' to satellite transmission time.
         """
-        # Clean orbits by removing unavailable satellites, unhealthy satellites and checking interpolation boundaries
+        # Clean orbits by removing unavailable satellites and checking interpolation boundaries
         cleaners.apply_remover("gnss_clean_orbit", dset_in, orbit_flag="precise")
 
         # TODO: Another solution has to be found for satellites not given in SP3 file, e.g. use of broadcast
