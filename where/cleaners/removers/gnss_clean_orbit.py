@@ -1,5 +1,5 @@
 """Clean broadcast/precise orbit. Remove GNSS observations with unavailable satellite orbits, unhealthy satellites and
-observation exceeding the validity length of a navigation record.
+observation exceeding the validity length of a navigation record or interpolation period.
 
 Description:
 ------------
