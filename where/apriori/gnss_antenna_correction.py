@@ -95,7 +95,7 @@ class AntennaCorrection(UserDict):
         parser = parsers.parse_key_existing(file_key)
         self.data = parser.as_dict()
         self.file_path = parser.file_path
-        log.debug(f"Read ANTEX file: {self.file_path}")
+        log.info(f"Read ANTEX file: {self.file_path}")
 
 
     def satellite_phase_center_offset(
