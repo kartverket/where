@@ -21,13 +21,8 @@ from midgard.math.constant import constant
 from midgard.math.unit import Unit
 
 # Where imports
-from where import apriori
-from where import cleaners
-from where import writers
-from where.lib import config
-from where.lib import gnss
-from where.lib import log
-from where.lib import util
+from where import apriori, cleaners, writers
+from where.lib import config, gnss, log, util
 
 # The name of this technique
 TECH = __name__.split(".")[-1]
@@ -154,16 +149,6 @@ def setup(stage: str, dset: "Dataset") -> None:
     dset.add_text("satellite", val=dset_satellites, write_level="operational")
     dset.add_text("system", val=dset_systems, write_level="operational")
 
-    # Get station positions
-    # trf = apriori.get('trf', time=dset.time)  # reference_frame='itrf_ssc:2014'
-    # stations = trf.sites  ## [k[1] for k, _ in trf.items()]  # TODO: Better solution? trf.stations???
-    # if session.upper() in stations:
-    #    pass
-    # try:
-    #   dset.add_position('site_pos', time='time', itrs=trf.pos(('gnss', session.upper())))
-    # except KeyError:
-    #    pass
-
     # Write Dataset to file
     if util.check_write_level("analysis"):
         dset.write_as(stage="setup")
@@ -279,7 +264,6 @@ def calculate(stage: str, dset: "Dataset"):
         )
         orb_diff = orb_diff + dset.has_orbit_correction
         clk_diff = clk_diff + dset.has_clock_correction + dset.has_code_bias_correction
-
         
     # Calculate SISRE
     dset.add_float("clk_diff", val=clk_diff, unit="meter", write_level="operational")
@@ -670,7 +654,11 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     brdc.calculate_orbit(dset)
     
     # Read, edit and calculate precise orbit
-    precise = apriori.get("orbit", rundate=dset.analysis["rundate"], apriori_orbit="precise")
+    precise = apriori.get(
+        "orbit",
+        rundate=dset.analysis["rundate"],
+        apriori_orbit="precise",
+    )
     precise.dset_raw.vars = dset.vars.copy()
     precise.dset_raw.analysis = dset.analysis.copy()
     if util.check_write_level("analysis"):
