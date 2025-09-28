@@ -310,13 +310,13 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         | :-----------------------| :------------ | :------ | :------------------------------------------------------ |
         | gnss_satellite_clock    | numpy.ndarray | m       | Satellite clock correction                              |
         | gnss_relativistic_clock | numpy.ndarray | m       | Relativistic clock correction due to orbit eccentricity |
-        | sat_posvel              | PosVelTable   | m       | Satellite position and velocity                         |
+        | sat_posvel              | PosVel        | m       | Satellite position and velocity                         |
         | satellite               | numpy.ndarray |         | Satellite numbers                                       |
         | system                  | numpy.ndarray |         | GNSS identifiers                                        |
-        | time                    | TimeTable     |         | Observation epochs                                      |
+        | time                    | Time          |         | Observation epochs                                      |
         | used_iode               | numpy.ndarray |         | IODE of selected broadcast ephemeris block              |
-        | used_transmission_time  | TimeTable     |         | Transmission time of selected broadcast ephemeris block |
-        | used_toe                | TimeTable     |         | Time of ephemeris (TOE) of selected broadcast ephemeris |
+        | used_transmission_time  | Time          |         | Transmission time of selected broadcast ephemeris block |
+        | used_toe                | Time          |         | Time of ephemeris (TOE) of selected broadcast ephemeris |
         |                         |               |         | block                                                   |
         
             dset_in:  Input Dataset containing model data for which broadcast ephemeris should be determined.
@@ -447,8 +447,16 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         dset_brdc_idx = dset.navigation_idx.astype(int)
 
         # Add satellite clock parameters to dataset
-        dset.add_float("sat_clock_bias", val=self.dset_edit.sat_clock_bias[dset_brdc_idx], write_level="analysis")
-        dset.add_float("sat_clock_drift", val=self.dset_edit.sat_clock_drift[dset_brdc_idx], write_level="analysis")
+        dset.add_float(
+            "sat_clock_bias", 
+            val=self.dset_edit.sat_clock_bias[dset_brdc_idx], 
+            write_level="analysis",
+        )
+        dset.add_float(
+            "sat_clock_drift",
+            val=self.dset_edit.sat_clock_drift[dset_brdc_idx],
+            write_level="analysis",
+        )
         dset.add_float(
             "sat_clock_drift_rate", 
             val=self.dset_edit.sat_clock_drift_rate[dset_brdc_idx], 
