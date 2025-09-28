@@ -107,6 +107,25 @@ def file_vars(file_vars=None) -> Dict[str, str]:
 def read(stage: str, dset: "Dataset") -> None:
     """Read the GNSS RINEX data.
 
+    Following Dataset fields are generated:
+
+   |  Field               | Type              | Description                                                           |
+   | :------------------- | :---------------- | :-------------------------------------------------------------------- |
+   | <observation type>   | numpy.ndarray     | GNSS observation type data (e.g. C1C, C2W, L1C, L2W, ...) given for   |
+   |                      |                   | loss of lock indicator (lli), pseudo-range and carrier phase          |
+   |                      |                   | observation (obs) and signal-to-noise-ratio (snr)                     |
+   | epoch_flag           | numpy.ndarray     | Epoch flag                                                            |
+   | num_satellite_available |  numpy.ndarray | Number of available satellite in each observation epoch               |
+   | rcv_clk_offset       | numpy.ndarray     | Receiver clock offset in seconds given for each epoch                 |
+   | satellite            | numpy.ndarray     | Satellite PRN number together with GNSS identifier (e.g. G07)         |
+   | satnum               | numpy.ndarray     | Satellite PRN number (e.g. 07)                                        |
+   | site_pos             | Position          | PositionTable object with given station coordinates either from       |
+   |                      |                   | RINEX header or overwritten by 'gnss_station_crd' station coordinate  | 
+   |                      |                   | RINEX header)                                                         |
+   | station              | numpy.ndarray     | Station name list                                                     |
+   | system               | numpy.ndarray     | GNSS identifier                                                       |
+   | time                 | Time              | Observation time given as Time object                                 |
+
     Args:
         stage:  Name of current stage.
         dset:   A dataset containing the data.
@@ -200,6 +219,21 @@ def orbit(stage: str, dset: "Dataset") -> None:
     TODO: Is the workflow for determining the satellite transmission time correct? gLAB determines satellite clock
           correction based on receiver time and not an satellite transmission time. Additionally gLAB does not apply
           relativistic corrections.
+
+    Following Dataset fields are generated:
+
+    | Field                         | Type          | Description                                                    |
+    | :---------------------------- | :------------ | :------------------------------------------------------------- |
+    | delay.gnss_satellite_clock    | numpy.ndarray | Satellite clock correction in [m]                              |
+    | delay.gnss_relativistic_clock | numpy.ndarray | Relativistic clock correction due to orbit eccentricity in [m] |
+    | gnss_earth_rotation           | PosVel        | Earth's rotation effect during signal flight time              |
+    | navigation_idx                | numpy.ndarray | Indices related to the correct set of broadcast ephemeris for  |
+    |                               |               | given observation epochs                                       |
+    | sat_posvel                    | PosVel        | Satellite position and velocity                                |
+    | sat_time                      | Time          | Satellite transmission time given as Time object               |
+    | used_iode                     | numpy.ndarray | IODE of selected broadcast ephemeris block                     |
+    | used_transmission_time        | Time          | Transmission time of selected broadcast ephemeris block        |
+    | used_toe                      | Time          | Time of ephemeris (TOE) of selected broadcast ephemeris block  |
 
     Args:
         stage:  Name of current stage.
