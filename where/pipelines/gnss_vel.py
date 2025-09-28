@@ -110,6 +110,25 @@ def file_vars(file_vars=None):
 def read(stage, dset):
     """Read the GNSS RINEX data.
 
+    Following Dataset fields are generated:
+
+   |  Field               | Type              | Description                                                           |
+   | :------------------- | :---------------- | :-------------------------------------------------------------------- |
+   | <observation type>   | numpy.ndarray     | GNSS observation type data (e.g. C1C, C2W, L1C, L2W, ...) given for   |
+   |                      |                   | loss of lock indicator (lli), pseudo-range and carrier phase          |
+   |                      |                   | observation (obs) and signal-to-noise-ratio (snr)                     |
+   | epoch_flag           | numpy.ndarray     | Epoch flag                                                            |
+   | num_satellite_available |  numpy.ndarray | Number of available satellite in each observation epoch               |
+   | rcv_clk_offset       | numpy.ndarray     | Receiver clock offset in seconds given for each epoch                 |
+   | satellite            | numpy.ndarray     | Satellite PRN number together with GNSS identifier (e.g. G07)         |
+   | satnum               | numpy.ndarray     | Satellite PRN number (e.g. 07)                                        |
+   | site_pos             | Position          | PositionTable object with given station coordinates either from       |
+   |                      |                   | RINEX header or overwritten by 'gnss_station_crd' station coordinate  | 
+   |                      |                   | RINEX header)                                                         |
+   | station              | numpy.ndarray     | Station name list                                                     |
+   | system               | numpy.ndarray     | GNSS identifier                                                       |
+   | time                 | Time              | Observation time given as TimeTable object                            |
+
     Args:
         stage (str):          Name of current stage.
         dset (Dataset):       A dataset containing the data.
@@ -159,6 +178,7 @@ def read(stage, dset):
     )
 
     # Select GNSS observation to process
+    cleaners.apply_remover("ignore_epochs", dset)
     cleaners.apply_remover("gnss_select_obs", dset)
     cleaners.apply_remover("gnss_clean_obs", dset)
 
@@ -203,6 +223,22 @@ def orbit(stage, dset):
           correction based on receiver time and not an satellite transmission time. Additionally gLAB does not apply
           relativistic corrections.
 
+    Following Dataset fields are generated:
+
+    | Field                         | Type          | Description                                                    |
+    | :---------------------------- | :------------ | :------------------------------------------------------------- |
+    | gnss_earth_rotation           | PosVel        | Earth's rotation effect during signal flight time              |
+    | navigation_idx                | numpy.ndarray | Indices related to the correct set of broadcast ephemeris for  |
+    |                               |               | given observation epochs                                       |
+    | sat_clock_bias                | numpy.ndarray | Satellite clock bias in [s]                                    |
+    | sat_clock_drift               | numpy.ndarray | Satellite clock drift in [s/s]                                 |
+    | sat_clock_drift_rate          | numpy.ndarray | Satellite clock drift rate in [s/s^2]                          |
+    | sat_posvel                    | PosVel        | Satellite position and velocity                                |
+    | sat_time                      | Time          | Satellite transmission time given as Time object               |
+    | used_iode                     | numpy.ndarray | IODE of selected broadcast ephemeris block                     |
+    | used_transmission_time        | Time          | Transmission time of selected broadcast ephemeris block        |
+    | used_toe                      | Time          | Time of ephemeris (TOE) of selected broadcast ephemeris block  |
+
     Args:
         stage (str):          Name of current stage.
         dset (Dataset):       A dataset containing the data.
@@ -237,7 +273,9 @@ def orbit(stage, dset):
         "sat_time",
         val=dset.time
         - gnss.get_initial_flight_time(
-            dset, sat_clock_corr=orbit.dset.gnss_satellite_clock, rel_clock_corr=orbit.dset.gnss_relativistic_clock
+            dset, 
+            sat_clock_corr=orbit.dset.gnss_satellite_clock,
+            rel_clock_corr=orbit.dset.gnss_relativistic_clock,
         ),
         write_level="operational",
     )
