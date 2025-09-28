@@ -97,6 +97,15 @@ def setup(stage: str, dset: "Dataset") -> None:
 
     The GNSS satellites are defined in the configuration file, which should be used in the SISRE analysis.
 
+    Following Dataset fields are generated:
+
+    | Field                  | Type              |  Description
+    | :--------------------- | :---------------  | :----------------------------------------------------------------- |
+    | satellite              | numpy.ndarray     | Satellite PRN number together with GNSS identifier (e.g. G07)      |
+    |                        |                   | based on defined satellites in configuration file                  |
+    | system                 | numpy.ndarray     | GNSS identifier (e.g. E-Galileo, G-GPS)                            |
+    | time                   | Time              | Observation time based on given sampling rate configuration        |
+
     Args:
         stage:  Name of current stage.
         dset:   A dataset containing the data.
@@ -180,18 +189,28 @@ def calculate(stage: str, dset: "Dataset"):
     Following Dataset fields are generated:
 
     | Field                  | Type              |  Description
-    | :--------------------- | :---------------  | :------------------------------------------------------------------ |
+    | :--------------------- | :---------------- | :------------------------------------------------------------------ |
+    | age_of_ephemeris       | numpy.ndarray     | Age of ephemeris in [s], which is the difference between            |
+    |                        |                   | observation epochs and time of ephemeris                            |
     | bias_brdc              | numpy.ndarray     | Satellite bias for correting broadcast clocks in [m]                |
     | bias_precise           | numpy.ndarray     | Satellite bias for correcting precise clocks in [m]                 |
+    | clk_brdc_com           | numpy.ndarray     | Broadcast satellite clock correction related to center of mass      |
+    |                        |                   | in [s]                                                              |
     | clk_diff               | numpy.ndarray     | Satellite clock correction difference without correction in [m]     |
     | clk_diff_with_dt_mean  | numpy.ndarray     | Satellite clock correction difference corrected for average         |
     |                        |                   | satellite clock offset difference for given GNSS and epoch in [m]   |
+    | clk_precise_com        | numpy.ndarray     | Precise satellite clock correction related to center of mass in [s] |
+    | diff_trans_toe         | numpy.ndarray     | Difference between transmission time and time of ephemeris in [s]   |
+    | navigation_idx         | numpy.ndarray     | Indices related to the correct set of broadcast ephemeris for given |
+    |                        |                   | observation epochs                                                  |
+    | orb_diff               | PositionTable     | Orbit difference in given ITRS [m]                                  |
+    | orb_diff_acr           | PositionTable     | Orbit difference given local orbital reference system, that means   |
+    |                        |                   | in along-track, cross-track and radial (ACR)                        |
+    | orb_diff_3d            | numpy.ndarray     | 3D orbit difference based on ACR orbit differences                  |
     | pco_brdc               | PositionTable     | Phase center offset (PCO) of broadcast ephemeris in [m]             |
     | pco_precise            | PositionTable     | Phase center offset (PCO) of precise orbits in [m]                  |
-    | orb_diff               | PositionTable     | Orbit difference in given ITRS [m]                                  |
-    | orb_diff_acr           | PositionTable     | Orbit difference given local orbital reference system, that means in|
-    |                        |                   | along-track, cross-track and radial (ACR)                           |
-    | orb_diff_3d            | numpy.ndarray     | 3D orbit difference based on ACR orbit differences                  |
+    | satellite_type         | numpy.ndarray     | Satellite type based on ANTEX file (e.g. BLOCK IIF, GALILEO-1,      |
+    |                        |                   | GALILEO-2, GLONASS-M, BEIDOU-2G, ...)                               |
     | sisre                  | numpy.ndarray     | Signal-in-space range error in [m]                                  |
     | sisre_with_dr_mean     | numpy.ndarray     | Signal-in-space range error with corrected average constellation-   |
     |                        |                   | mean radial orbit error [m]                                         |
