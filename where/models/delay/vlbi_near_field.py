@@ -43,7 +43,10 @@ def vlbi_near_field_delay(dset):
         dset:     A Dataset containing model data.
 
     Returns:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 91712e0 (debugging code)
         Numpy array: Near field delay for each observation
 
     """
@@ -227,6 +230,7 @@ def vlbi_near_field_delay(dset):
     R2_T2 = bcrs_pos(x2_t2_tilde, time=t2_tilde) # station_2 pos at t2 in BCRS
     RS_T2 = eph.pos_bcrs("sun", time=t2_tilde) # sun pos at t2 in BCRS
 
+    RS_T2 = eph.pos_gcrs("sun", time=t2_tilde) # sun pos at t2 in GCRS
     R2_S = R2_T2 - RS_T2 # eq. 16, i=2, alpha = S
     R02_S = R2_S - R0_S # eq. 17, alpha = S
 
