@@ -170,6 +170,7 @@ def vlbi_near_field_delay(dset):
     delay_bodies = 0
     for body in bodies:
         RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
+        RB_T0 = eph.pos_gcrs(body, time=t0_tilde) # body pos at t0 in GCRS
         RB_T1 = eph.pos_bcrs(body) # body pos at t1 in BCRS
 
         R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
