@@ -181,7 +181,6 @@ def vlbi_near_field_delay(dset):
 
     #import IPython; IPython.embed()
     
-    # eq. 14 in jaron2017
     x_dot_v_1 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / constant.c ** 2 # Intermediate variable
     x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0] # Intermediate variable
     # Time of emmison of the signal relative to t1
@@ -266,8 +265,7 @@ def vlbi_near_field_delay(dset):
         np.sqrt(gamma2_2 ** 2 * (x_dot_v_2 - t_g02) ** 2 + gamma2_2 * (x02_dot_x02 / constant.c ** 2 - t_g02 ** 2))
     
     # Convert from TCG to TT
-    delay = (delta_t2 + delta_t0) * (1 - constant.L_G) # eq. 10 
-
+    delay = (delta_t2 + delta_t0) * (1 - constant.L_G) # eq. 10
 
     
     ## For debugging. See if satellite is above horizon for both stations
@@ -288,3 +286,5 @@ def _save_detail_to_dataset(dset, field, value, func, **kwargs):
         dset[field][:] = value
     else:
         func(field, value, write_level="detail", **kwargs)
+    return delay * constant.c
+
