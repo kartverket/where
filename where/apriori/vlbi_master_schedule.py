@@ -125,6 +125,6 @@ class VlbiMasterSchedule(UserDict):
             The custom defined session type
         """
         session_code = session_code.upper()
-        reg_hits = re.search("\d", session_code)
+        reg_hits = re.search(r"\d", session_code)
         num_idx = reg_hits.start() if reg_hits else len(session_code)
         return session_code[:num_idx]
