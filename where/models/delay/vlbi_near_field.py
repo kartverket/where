@@ -68,7 +68,10 @@ def vlbi_near_field(dset):
         dset:     A Dataset containing model data.
 
     Returns:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 91712e0 (debugging code)
         Numpy array: Near field delay for each observation
 
     """
@@ -180,6 +183,7 @@ def jaron2019(dset):
     t_g02_TDB = _deuv_relativistic_term(R0_T0, R2_T2, t2_tilde, time, bodies)
     # TODO: how to convert from TDB to TT? And is it needed at this precision level?
     t_g02 = t_g02_TDB #/ (1 - L_G)
+
 
     # Save TT(=TDB) value to dset  
     _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
@@ -353,8 +357,7 @@ def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
     for body in bodies:
         
         R_body_T_sat = eph_T_sat.pos_bcrs(body)
-        R_body_T_site = eph_T_site.pos_bcrs(body)
-        
+        R_body_T_site = eph_T_site.pos_bcrs(body)        
         R_sat_body = R_sat - R_body_T_sat # eq. 16, i = 0, alpha = body
         R_site_body = R_site  - R_body_T_site # eq. 16, i = 1 or 2, alpha = body
         R_sat_site_body = R_site_body - R_sat_body # eq. 17, alpha = body
