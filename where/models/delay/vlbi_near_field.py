@@ -183,7 +183,7 @@ def vlbi_near_field_delay(dset):
     _save_detail_to_dataset(dset, "vlbi_nf_grav_1", t_g01_TDB * constant.c, dset.add_float, unit="meter")
 
     #import IPython; IPython.embed()
-    
+
     # eq. 14 in jaron2017
     x_dot_v_1 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / constant.c ** 2 # Intermediate variable
     x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0] # Intermediate variable
