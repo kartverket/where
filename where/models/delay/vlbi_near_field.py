@@ -37,7 +37,10 @@ def vlbi_near_field_delay(dset):
         dset:     A Dataset containing model data.
 
     Returns:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 91712e0 (debugging code)
         Numpy array: Near field delay for each observation
 
     """
@@ -189,10 +192,17 @@ def vlbi_near_field_delay(dset):
     # Equations are in BCRS. Ephemerides use TDB.
     # Ref. IERS 2010 conventions eq. 11.6 used for grav delay in consensus model
     # Transformation between BCRS and GRCS is approximated by X_bcrs = X_earth + X_gcrs
-    R0_T0 = eph.pos_bcrs("earth", time=t0_tilde) + x0_t0_tilde # satellite position at t0 in BCRS
+    R0_T0_orig = eph.pos_bcrs("earth", time=t0_tilde) + x0_t0_tilde # satellite position at t0 in BCRS
+    # Eq. 11.18 IERS2010 conventions
+    V_earth = eph.vel_bcrs("earth", time=t0_tilde)
+    R0_T0 = eph.pos_bcrs("earth") + x0_t0_tilde * (1 - U[:, None]/constant.c ** 2) - 0.5 * ((V_earth[:, None, :] @ x0_t0_tilde[:, :, None])/constant.c **2  @ V_earth[:, None, :])[:,0, :]
+    R0_T0 = x0_t0_tilde * (1 - U[:, None]/constant.c ** 2) - 0.5 * ((V_earth[:, None, :] @ x0_t0_tilde[:, :, None])/constant.c **2  @ V_earth[:, None, :])[:,0, :]
     RS_T0 = eph.pos_bcrs("sun", time=t0_tilde) # sun pos at t0 in BCRS
+    RS_T0 = eph.pos_gcrs("sun", time=t0_tilde) # sun pos at t0 in GCRS
     R1_T1 = eph.pos_bcrs("earth") + dset.site_pos_1.gcrs.pos.val # station_1 pos at t1 in BCRS
+    R1_T1 = dset.site_pos_1.gcrs.pos.val # station_1 pos at t1 in GCRS
     RS_T1 = eph.pos_bcrs("sun") # sun pos at t1 in BCRS
+    RS_T1 = eph.pos_gcrs("sun") # sun pos at t1 in GCRS
     R0_S = R0_T0 - RS_T0 # eq. 16, i=0, alpha = S
     R1_S = R1_T1 - RS_T1 # eq. 16, i=1, alpha = S
     R01_S = R1_S - R0_S # eq. 17, alpha = S
@@ -211,7 +221,9 @@ def vlbi_near_field_delay(dset):
     delay_bodies = 0
     for body in bodies:
         RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
+        RB_T0 = eph.pos_gcrs(body, time=t0_tilde) # body pos at t0 in GCRS
         RB_T1 = eph.pos_bcrs(body) # body pos at t1 in BCRS
+        RB_T1 = eph.pos_gcrs(body) # body pos at t1 in GCRS
         R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
         R1_B = R1_T1 - RB_T1 # eq. 16, i=1, alpha = B
         R01_B = R1_B - R0_B # eq. 17, aplha = B
@@ -227,7 +239,7 @@ def vlbi_near_field_delay(dset):
         delay_bodies += delay_body
         
         _save_detail_to_dataset(dset, f"vlbi_nf_grav_{body}_1", delay_body * constant.c, dset.add_float, unit="meter")
-
+        import IPython; IPython.embed()
     #t_g01_TDB = np.zeros(dset.num_obs) 
     t_g01_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
@@ -272,12 +284,13 @@ def vlbi_near_field_delay(dset):
     R2_T2 = x2_t2_tilde # station_2 pos at t2 in GCRS
     RS_T2 = eph.pos_bcrs("sun", time=t2_tilde) # sun pos at t2 in BCRS
     RS_T2 = eph.pos_gcrs("sun", time=t2_tilde) # sun pos at t2 in GCRS
-
     # Ref. IERS 2010 conventions eq. 11.6 used for grav delay in consensus model
     # Transformation between BCRS and GRCS is approximated by X_bcrs = X_earth + X_gcrs
     R2_T2 = eph.pos_bcrs("earth", time=t2_tilde) + x2_t2_tilde # station_2 pos at t2 in BCRS
+    R2_T2 = x2_t2_tilde # station_2 pos at t2 in GCRS
     RS_T2 = eph.pos_bcrs("sun", time=t2_tilde) # sun pos at t2 in BCRS
 
+    RS_T2 = eph.pos_gcrs("sun", time=t2_tilde) # sun pos at t2 in GCRS
     R2_S = R2_T2 - RS_T2 # eq. 16, i=2, alpha = S
     R02_S = R2_S - R0_S # eq. 17, alpha = S
 
@@ -300,6 +313,7 @@ def vlbi_near_field_delay(dset):
 
         RB_T0 = eph.pos_bcrs(body) # body pos at t0 in BCRS
         RB_T2 = eph.pos_bcrs(body, time=t2_tilde) # body pos at t2 in BCRS
+        RB_T2 = eph.pos_gcrs(body, time=t2_tilde) # body pos at t2 in GCRS
         R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
         R2_B = R2_T2 - RB_T2 # eq. 16, i=2, alpha = B
         R02_B = R2_B - R0_B # eq. 17, aplha = B
