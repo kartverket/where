@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Midgard imports
+import midgard
 from midgard.data._time import GpsTime, UtcTime
 from midgard.data import collection
 from midgard.dev import plugins
@@ -107,14 +108,6 @@ def gnss_compare_datasets(dset: Dict[str, "Dataset"]) -> None:
     # Decimate datasets
     difference_by = _get_difference_by(dset1.fields, dset2.fields)
     _decimate_datasets(dset1, dset2, difference_by)
-    # +MURKS
-    vars_ = dset2.vars.copy()
-    vars_["stage"] = vars_["stage"] + "x"
-    dset2_path = config.files.path("dataset", file_vars=vars_)
-    if dset2_path.exists():
-        dset2_path.unlink()
-    dset2.write_as(stage=vars_["stage"])
-    # -MURKS
     if dset1.num_obs == 0 or dset2.num_obs == 0:
         log.fatal(
             f"Nothing to compare. Number of observations are zero at least for one dataset "
@@ -155,6 +148,7 @@ def _add_to_report(rpt: "Report", common_fields: Set[str], figure_dir: "pathlib.
     dset2_name = config.where.gnss_compare_datasets.get("dset2_name", default="dset2").str
 
     for field in sorted(common_fields):
+
         rpt.add_figure(
             f"{figure_dir}/plot_{field}.{FIGURE_FORMAT}",
             caption=f"Difference between {dset1_name} and {dset2_name} dataset field **{field}**.",
@@ -178,6 +172,7 @@ def _plot(
     dset2_name = config.where.gnss_compare_datasets.get("dset2_name", default="dset2").str + ":"
 
     for field in common_fields:
+
         ylabel = FIELDS[field].label if field in FIELDS.keys() else field.lower()
         title = FIELDS[field].title if field in FIELDS.keys() else ""
         if field in FIELDS.keys():
@@ -288,11 +283,43 @@ def _get_common_fields(dset1: "Dataset", dset2: "Dataset") -> Set[str]:
         if isinstance(dset1[field], (GpsTime, UtcTime, collection.Collection)):  # TODO: Check if more time datatypes should be defined.
             remove_fields.add(field)
             continue
-        elif field in ["satellite", "system"]:
-            remove_fields.add(field)
-            continue
+
+        # Skip text fields
+        if field in dset1._fields.keys():
+            if type(dset1._fields[field]) == midgard.data.fieldtypes.text.TextField:
+                remove_fields.add(field)
+                continue
         
-    # Add site position coordinate fields to dataset
+    # Add Position fields to dataset
+    if "orb_diff" in common_fields:
+        
+        dset1.add_float("orb_diff_x", val=dset1.orb_diff.pos.trs.x)
+        dset1.add_float("orb_diff_y", val=dset1.orb_diff.pos.trs.y)
+        dset1.add_float("orb_diff_z", val=dset1.orb_diff.pos.trs.z)
+        del dset1.orb_diff
+
+        dset2.add_float("orb_diff_x", val=dset2.orb_diff.pos.trs.x)
+        dset2.add_float("orb_diff_y", val=dset2.orb_diff.pos.trs.y)
+        dset2.add_float("orb_diff_z", val=dset2.orb_diff.pos.trs.z)
+        del dset2.orb_diff
+
+        remove_fields.add("orb_diff")
+        common_fields.update(("orb_diff_x", "orb_diff_y", "orb_diff_z"))
+
+    if "sat_pos" in common_fields:
+        dset1.add_float("sat_pos_x", val=dset1.sat_pos.trs.x)
+        dset1.add_float("sat_pos_y", val=dset1.sat_pos.trs.y)
+        dset1.add_float("sat_pos_z", val=dset1.sat_pos.trs.z)
+        del dset1.sat_pos
+
+        dset2.add_float("sat_pos_x", val=dset2.sat_pos.trs.x)
+        dset2.add_float("sat_pos_y", val=dset2.sat_pos.trs.y)
+        dset2.add_float("sat_pos_z", val=dset2.sat_pos.trs.z)
+        del dset2.sat_pos
+
+        remove_fields.add("sat_pos")
+        common_fields.update(("sat_pos_x", "sat_pos_y", "sat_pos_z"))
+
     if "site_pos" in common_fields:
         dset1.add_float("site_pos_x", val=dset1.site_pos.trs.x, unit="meter")
         dset1.add_float("site_pos_y", val=dset1.site_pos.trs.y, unit="meter")
@@ -307,21 +334,28 @@ def _get_common_fields(dset1: "Dataset", dset2: "Dataset") -> Set[str]:
         remove_fields.add("site_pos")
         common_fields.update(("site_pos_x", "site_pos_y", "site_pos_z"))
 
-    # Add satellite position coordinate fields to dataset
-    if "sat_pos" in common_fields:
-        dset1.add_float("sat_pos_x", val=dset1.sat_pos.trs.x)
-        dset1.add_float("sat_pos_y", val=dset1.sat_pos.trs.y)
-        dset1.add_float("sat_pos_z", val=dset1.sat_pos.trs.z)
-        del dset1.sat_pos
+    # Add PosVel fields to dataset
+    if "gnss_earth_rotation" in common_fields:
+        
+        dset1.add_float("gnss_earth_rotation_x", val=dset1.gnss_earth_rotation.pos.trs.x)
+        dset1.add_float("gnss_earth_rotation_y", val=dset1.gnss_earth_rotation.pos.trs.y)
+        dset1.add_float("gnss_earth_rotation_z", val=dset1.gnss_earth_rotation.pos.trs.z)
+        dset1.add_float("gnss_earth_rotation_vx", val=dset1.gnss_earth_rotation.vel.trs.x)
+        dset1.add_float("gnss_earth_rotation_vy", val=dset1.gnss_earth_rotation.vel.trs.y)
+        dset1.add_float("gnss_earth_rotation_vz", val=dset1.gnss_earth_rotation.vel.trs.z)
+        del dset1.gnss_earth_rotation
 
-        dset2.add_float("sat_pos_x", val=dset2.sat_pos.trs.x)
-        dset2.add_float("sat_pos_y", val=dset2.sat_pos.trs.y)
-        dset2.add_float("sat_pos_z", val=dset2.sat_pos.trs.z)
-        del dset2.sat_pos
+        dset2.add_float("gnss_earth_rotation_x", val=dset2.gnss_earth_rotation.pos.trs.x)
+        dset2.add_float("gnss_earth_rotation_y", val=dset2.gnss_earth_rotation.pos.trs.y)
+        dset2.add_float("gnss_earth_rotation_z", val=dset2.gnss_earth_rotation.pos.trs.z)
+        dset2.add_float("gnss_earth_rotation_vx", val=dset2.gnss_earth_rotation.vel.trs.x)
+        dset2.add_float("gnss_earth_rotation_vy", val=dset2.gnss_earth_rotation.vel.trs.y)
+        dset2.add_float("gnss_earth_rotation_vz", val=dset2.gnss_earth_rotation.vel.trs.z)
+        del dset2.gnss_earth_rotation
 
-        remove_fields.add("sat_pos")
-        common_fields.update(("sat_pos_x", "sat_pos_y", "sat_pos_z"))
-     
+        remove_fields.add("gnss_earth_rotation")
+        common_fields.update(("gnss_earth_rotation_x", "gnss_earth_rotation_y", "gnss_earth_rotation_z", "gnss_earth_rotation_vx", "gnss_earth_rotation_vy", "gnss_earth_rotation_vz"))
+
     if "sat_posvel" in common_fields:
         
         dset1.add_float("sat_pos_x", val=dset1.sat_posvel.pos.trs.x)
@@ -343,20 +377,6 @@ def _get_common_fields(dset1: "Dataset", dset2: "Dataset") -> Set[str]:
         remove_fields.add("sat_posvel")
         common_fields.update(("sat_pos_x", "sat_pos_y", "sat_pos_z", "sat_vel_x", "sat_vel_y", "sat_vel_z"))
         
-    if "orb_diff" in common_fields:
-        
-        dset1.add_float("orb_diff_x", val=dset1.orb_diff.pos.trs.x)
-        dset1.add_float("orb_diff_y", val=dset1.orb_diff.pos.trs.y)
-        dset1.add_float("orb_diff_z", val=dset1.orb_diff.pos.trs.z)
-        del dset1.orb_diff
-
-        dset2.add_float("orb_diff_x", val=dset2.orb_diff.pos.trs.x)
-        dset2.add_float("orb_diff_y", val=dset2.orb_diff.pos.trs.y)
-        dset2.add_float("orb_diff_z", val=dset2.orb_diff.pos.trs.z)
-        del dset2.orb_diff
-
-        remove_fields.add("orb_diff")
-        common_fields.update(("orb_diff_x", "orb_diff_y", "orb_diff_z"))
 
     # Remove unnecessary fields
     common_fields -= remove_fields
@@ -413,7 +433,7 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
         "dpi": config.where.gnss_plot.get("dpi", default=200).int,
         "color": config.where.gnss_plot.get("color", default="").str,
         "colormap": config.where.gnss_plot.get("colormap", default="tab10").str,
-        "figsize": tuple([int(v) for v in config.where.gnss_plot.get("figsize", default="6,4").list]),
+        "figsize": tuple([int(v) for v in config.where.gnss_plot.get("figsize", default="8,6").list]),
         "fontsize": fontsize,
         "legend": config.where.gnss_plot.get("legend", default=True).bool,
         "marker": config.where.gnss_plot.get("marker", default=".").str,
