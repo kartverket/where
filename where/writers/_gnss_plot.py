@@ -172,6 +172,7 @@ class GnssPlot:
                     collection: Union[str, None] = None, 
                     figure_name: str="plot_field_{solution}.{FIGURE_FORMAT}",
                     use_labels: bool=True,
+                    colormap: str="tab20",
                     suffix: str="",
 
     ) -> List[pathlib.PosixPath]:
@@ -182,6 +183,7 @@ class GnssPlot:
             field:       Field name.
             figure_name: File name of figure.
             use_labels:  Use labels together with legend.
+            colormap:    Color map type for plotting labels (e.g. viridis, jet, tab10, rainbow, hsv, plasma) 
             suffix:      File name suffix
         
         Returns:
@@ -312,6 +314,7 @@ class GnssPlot:
                 labels=labels if use_labels else None,
                 figure_path=figure_path,
                 options={
+                    "colormap": colormap,
                     "figsize": plot_def[fieldname].figsize if fieldname in plot_def.keys() else (7,6),
                     "legend": True,
                     "legend_ncol": 6,
