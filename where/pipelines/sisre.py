@@ -449,10 +449,13 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
 
     |System | Type      | Signal   | Broadcast bias | Precise bias                                                      |
     |:------|:----------|:---------|:---------------|:------------------------------------------------------------------|
-    |GPS    | LNAV      | G:L1     | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W} + DCB^s_{C1C-C1W}`|
+    |GPS    | LNAV      | G:L1 C/A | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W} + DCB^s_{C1C-C1W}`|
+    |       | LNAV      | G:L1 P   | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W}`|
     |       |           | G:L1_L2  | 0              |0                                                                  |
     |Galileo| INAV_E1   | E:E1     | bgd_e1_e5b     |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q}`      |
+    |       | INAV      | E:E5b    | :math:`\frac{f^2_{E1}}{f^2_{E15b} bgd_e1_e5b`|  :math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} - DCB^s_{C1C-C7Q}` | 
     |       | INAV      | E:E1_E5b | 0              |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} + \frac{f^2_{E5b}}{f^2_{E1}-f^2_{E5b}} DCB^s_{C1C-C7Q}`|
+    |       | FNAV_E5a  | E:E5a    | :math:`\frac{f^2_{E1}}{f^2_{E15a} bgd_e1_e5a`|  :math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} - DCB^s_{C1C-C5Q}` |                                                                |
     |       | FNAV_E5a  | E:E1_E5a | 0              | 0                                                                 |
 
     Args:
@@ -477,7 +480,81 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
 
     for sys in dset.unique("system"):
 
-        if (sys == "E") and ("E:E1_E5b" in config.tech.frequencies.list):
+        if (sys == "E") and ("E:E1" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E1.")
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            f_E1 = enums.gnss_freq_E.E1
+            f_E5a = enums.gnss_freq_E.E5a
+
+            for sat in dset.unique("satellite"):
+                if sat.startswith("E"):
+                    idx = dset.filter(satellite=sat)
+                    dcb_c1c_c5q = (
+                        -f_E5a ** 2
+                        / (f_E1 ** 2 - f_E5a ** 2)
+                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                    )
+                    bias = dcb_c1c_c5q * constant.c
+                    bias_precise[idx] = bias
+                    meta_bias_precise[sat] = bias
+
+                    bias = dset_brdc.bgd_e1_e5b[idx] * constant.c
+                    bias_brdc[idx] = bias
+                    meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "E") and ("E:E5a" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E5a.")
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            f_E1 = enums.gnss_freq_E.E1
+            f_E5a = enums.gnss_freq_E.E5a
+
+            for sat in dset.unique("satellite"):
+                if sat.startswith("E"):
+                    idx = dset.filter(satellite=sat)
+                    dcb_c1c_c5q = (
+                        -f_E5a ** 2
+                        / (f_E1 ** 2 - f_E5a ** 2)
+                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                        - dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                    )
+                    bias = dcb_c1c_c5q * constant.c
+                    bias_precise[idx] = bias
+                    meta_bias_precise[sat] = bias
+
+                    bias = f_E1 ** 2 / f_E5a ** 2 * dset_brdc.bgd_e1_e5a[idx] * constant.c
+                    bias_brdc[idx] = bias
+                    meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "E") and ("E:E5b" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E5b.")
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            f_E1 = enums.gnss_freq_E.E1
+            f_E5b = enums.gnss_freq_E.E5b
+            f_E5a = enums.gnss_freq_E.E5a
+
+            for sat in dset.unique("satellite"):
+                if sat.startswith("E"):
+                    idx = dset.filter(satellite=sat)
+                    dcb_c1c_c5q = (
+                        -f_E5a ** 2
+                        / (f_E1 ** 2 - f_E5a ** 2)
+                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                        - dcb.get_dsb(sat, "C1C-C7Q", dset.analysis["rundate"])["estimate"]
+                    )
+                    bias = dcb_c1c_c5q * constant.c
+                    bias_precise[idx] = bias
+                    meta_bias_precise[sat] = bias
+
+                    bias = f_E1 ** 2 / f_E5b ** 2 * dset_brdc.bgd_e1_e5b[idx] * constant.c
+                    bias_brdc[idx] = bias
+                    meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "E") and ("E:E1_E5b" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E1/E5b.")
             dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
             f_E1 = enums.gnss_freq_E.E1
             f_E5a = enums.gnss_freq_E.E5a
@@ -499,31 +576,14 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
                     bias = (dcb_c1c_c5q + dcb_c1c_c7q) * constant.c
                     bias_precise[idx] = bias
                     meta_bias_precise[sat] = bias
+                    
+        elif (sys == "E") and ("E:E1_E5a" in config.tech.frequencies.list):
 
-        elif (sys == "E") and ("E:E1" in config.tech.frequencies.list):
-
-            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
-            f_E1 = enums.gnss_freq_E.E1
-            f_E5a = enums.gnss_freq_E.E5a
-
-            for sat in dset.unique("satellite"):
-                if sat.startswith("E"):
-                    idx = dset.filter(satellite=sat)
-                    dcb_c1c_c5q = (
-                        -f_E5a ** 2
-                        / (f_E1 ** 2 - f_E5a ** 2)
-                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
-                    )
-                    bias = dcb_c1c_c5q * constant.c
-                    bias_precise[idx] = bias
-                    meta_bias_precise[sat] = bias
-
-                    bias = dset_brdc.bgd_e1_e5b[idx] * constant.c
-                    bias_brdc[idx] = bias
-                    meta_bias_brdc[sat] = np.mean(bias)
-
+            log.info(f"No bias correction needed for GNSS '{sys}' and frequency E1/E5a.")
+                    
         elif (sys == "G") and ("G:L1" in config.tech.frequencies.list):
-
+        
+            log.info(f"Get bias for GNSS '{sys}' and frequency L1.")
             dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
             f_L1 = enums.gnss_freq_G.L1
             f_L2 = enums.gnss_freq_G.L2
@@ -544,6 +604,10 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
                     bias = dset_brdc.tgd[idx] * constant.c
                     bias_brdc[idx] = bias
                     meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "G") and ("G:L1_L2" in config.tech.frequencies.list):
+
+            log.info(f"No bias correction needed for GNSS '{sys}' and frequency L1/L2.")
 
     # Add bias information to Dataset 'meta'
     dset.meta["bias_brdc"] = meta_bias_brdc
@@ -575,7 +639,8 @@ def _get_bias_has(dset: "Dataset") -> np.ndarray:
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
 
-        if (sys == "E") and ("E:E1_E5b" in frequencies):    
+        if (sys == "E") and ("E:E1_E5b" in frequencies): 
+            log.info(f"Get bias for GNSS '{sys}' and frequency E1/E5b.")   
             correction[idx] = gnss.ionosphere_free_linear_combination(
                 dset.has_code_bias_c1c[idx], 
                 dset.has_code_bias_c7q[idx], 
@@ -584,6 +649,7 @@ def _get_bias_has(dset: "Dataset") -> np.ndarray:
             )
             
         elif (sys == "G") and ("G:L1_L2" in frequencies):
+            log.info(f"Get bias for GNSS '{sys}' and frequency L1/L2.")
             dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
             for sat in dset.unique("satellite"):
                 if not sys == sat[0:1]:
