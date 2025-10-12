@@ -192,7 +192,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     for field in FIELDS:
         
         if f"{field.collection}.{field.name}" in dset.fields or f"{field.name}" in dset.fields:                
-            for figure_path in plt.plot_field(field.name, field.collection):
+            for figure_path in plt.plot_field(field.name, field.collection, colormap="jet"):
                 system, _ = figure_path.stem.split("_")[2:4] 
                 rpt.add_figure(
                     figure_path=figure_path, 
