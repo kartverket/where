@@ -172,6 +172,7 @@ class GnssPlot:
                     collection: Union[str, None] = None, 
                     figure_name: str="plot_field_{solution}.{FIGURE_FORMAT}",
                     use_labels: bool=True,
+                    colormap: str="tab20",
                     suffix: str="",
 
     ) -> List[pathlib.PosixPath]:
@@ -182,6 +183,7 @@ class GnssPlot:
             field:       Field name.
             figure_name: File name of figure.
             use_labels:  Use labels together with legend.
+            colormap:    Color map type for plotting labels (e.g. viridis, jet, tab10, rainbow, hsv, plasma) 
             suffix:      File name suffix
         
         Returns:
@@ -193,6 +195,8 @@ class GnssPlot:
         
         plot_def = {
                 "age_of_ephemeris": PlotField("Age of ephemeris", "s", (7, 6)),
+                "bias_brdc": PlotField("Satellite bias for broadcast clocks", "m", (7, 6)),
+                "bias_precise": PlotField("Satellite bias for precise clocks", "m", (7, 6)),
                 "bgd_e1_e5a": PlotField("BGD(E1,E5a)", "ns", (7, 6)),
                 "bgd_e1_e5a_dcb": PlotField("DCB(C1C,C5Q)", "ns", (7, 6)),
                 "bgd_e1_e5a_diff": PlotField("BGD(E1,E5a) - DCB(C1C,C5Q)", "ns", (7, 6)),
@@ -201,7 +205,7 @@ class GnssPlot:
                 "bgd_e1_e5b_dcb": PlotField("DCB(C1C,C7Q)", "ns", (7, 6)),
                 "bgd_e1_e5b_diff": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
                 "bgd_e1_e5b_diff_mean": PlotField("BGD(E1,E5b) - DCB(C1C,C7Q)", "ns", (7, 6)),
-                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\Delta t$ (mean)", "m", (7, 6)),
+                "clk_diff_with_dt_mean": PlotField("Clock correction difference $\\Delta t$ (mean)", "m", (7, 6)),
                 "delay.gnss_earth_rotation_drift": PlotField("Earth rotation drift", "m/s", (7, 6)),
                 "delay.gnss_ionosphere": PlotField("Ionospheric delay", "m", (7, 6)),
                 "delay.gnss_range": PlotField("Range", "m", (7, 6)),
@@ -310,6 +314,7 @@ class GnssPlot:
                 labels=labels if use_labels else None,
                 figure_path=figure_path,
                 options={
+                    "colormap": colormap,
                     "figsize": plot_def[fieldname].figsize if fieldname in plot_def.keys() else (7,6),
                     "legend": True,
                     "legend_ncol": 6,
@@ -416,6 +421,7 @@ class GnssPlot:
                         "figsize": (7, 8),
                         "marker": "s",
                         "marksersize": 10,
+                        "legend_bbox_bottom": (0.5, -0.15),
                         "legend_ncol": 4,
                         "legend_location": "bottom",
                         "plot_to": "file",
@@ -484,6 +490,7 @@ class GnssPlot:
                 "figsize": (7, 12),
                 "marker": "s",
                 "marksersize": 10,
+                "legend_bbox_bottom": (0.5, -0.1),
                 "legend_ncol": 4,
                 "legend_location": "bottom",
                 "plot_to": "file",
@@ -1004,7 +1011,7 @@ class GnssPlot:
                     "plot_to": "file",
                     "plot_type": "scatter",
                     "projection": "polar",
-                    "title": f"Skyplot for {enums.gnss_id_to_name[sys]}\n Azimuth [deg] / Elevation[deg]",
+                    "title": f"Skyplot for {enums.gnss_id_to_name[sys].value}\n Azimuth [deg] / Elevation[deg]",
                     "xlim": [0, 2 * np.pi],
                     "ylim": [0, 90],
                     "yticks": (range(0, 90, 30)),  # sets 3 concentric circles
@@ -1070,13 +1077,13 @@ class GnssPlot:
                 figure_path=figure_path,
                 options={
                     "colormap": "tab20",
-                    "figsize": (7, 8),
+                    "figsize": (7, 6),
                     "legend": True,
                     "legend_ncol": 6,
                     "legend_location": "bottom",
                     "plot_to": "file",
                     "plot_type": "scatter",
-                    "title": f"Satellite elevation for {enums.gnss_id_to_name[sys]}",
+                    "title": f"Satellite elevation for {enums.gnss_id_to_name[sys].value}",
                     "xlim": [day_start, day_end],
                 },
             )
@@ -1107,17 +1114,18 @@ class GnssPlot:
         # Get time and satellite data from read and orbit stage
         file_vars = {**self.dset.vars, **self.dset.analysis}
         file_vars["stage"] = "read"
+        file_vars["label"] = "None"
         file_path = config.files.path("dataset", file_vars=file_vars)
         if file_path.exists():
             systems = list(self.dset.unique("system")) # self.dset.meta["obstypes"].keys()
             time_read, satellite_read, _ = self._sort_by_satellite(
-                self._get_dataset(stage="read", systems=systems)
+                self._get_dataset(stage="read", label="None", systems=systems)
             )
             time_orbit, satellite_orbit, _ = self._sort_by_satellite(
-                self._get_dataset(stage="orbit", systems=systems)
+                self._get_dataset(stage="orbit", label="None", systems=systems)
             )
-            time_edit, satellite_edit, _ = self._sort_by_satellite(
-                self._get_dataset(stage="edit", systems=systems)
+            time_calculate, satellite_calculate, _ = self._sort_by_satellite(
+                self._get_dataset(stage="estimate", label="None", systems=systems)
             )
             
         else:
@@ -1128,12 +1136,12 @@ class GnssPlot:
         # Generate plot
         plt = MatPlotExt()
         plt.plot(
-            x_arrays=[time_read.tolist(), time_orbit.tolist(), time_edit.tolist()],
-            y_arrays=[satellite_read.tolist(), satellite_orbit.tolist(), satellite_edit.tolist()],
+            x_arrays=[time_read.tolist(), time_orbit.tolist(), time_calculate.tolist()],
+            y_arrays=[satellite_read.tolist(), satellite_orbit.tolist(), satellite_calculate.tolist()],
             xlabel="Time [GPS]",
             ylabel="Satellite",
             y_unit="",
-            # labels = ["Rejected in orbit stage", "Rejected in edit stage", "Kept observations"],
+            #labels = ["Rejected in orbit stage", "Rejected in edit stage", "Kept observations"],
             colors=["red", "orange", "green"],
             figure_path=figure_path,
             options={
@@ -1235,7 +1243,7 @@ class GnssPlot:
                     x_arrays= [satellites, satellites],
                     y_arrays=[tgd_sat_mean, dcb_sat_mean],
                     xlabel="Satellite",
-                    ylabel=f"Mean {plot_def[sys][field].ylabel}",
+                    ylabel=f"Mean\n{plot_def[sys][field].ylabel}",
                     y_unit="ns",
                     labels=plot_def[sys][field].ylabel.split(", "),
                     colors=["blue", "red"],
@@ -1263,7 +1271,7 @@ class GnssPlot:
                     y_arrays=[tgd_dcb_sat_mean],
                     yerr_arrays=[tgd_dcb_sat_std],
                     xlabel="Satellite",
-                    ylabel=f"Mean {plot_def[sys][field].ylabel.replace(', ', ' - ')}",
+                    ylabel=f"Mean\n{plot_def[sys][field].ylabel.replace(', ', ' - ')}",
                     y_unit="ns",
                     colors=["black"],
                     figure_path=figure_path,
@@ -1289,7 +1297,7 @@ class GnssPlot:
                     x_arrays= [satellites],
                     y_arrays=[tgd_dcb_sat_rms],
                     xlabel="Satellite",
-                    ylabel=f"RMS {plot_def[sys][field].ylabel.replace(', ', ' - ')}",
+                    ylabel=f"RMS\n{plot_def[sys][field].ylabel.replace(', ', ' - ')}",
                     y_unit="ns",
                     colors=["dodgerblue"],
                     figure_path=figure_path,
@@ -1313,7 +1321,7 @@ class GnssPlot:
                     x_arrays= [satellites],
                     y_arrays=[tgd_dcb_sat_percentile],
                     xlabel="Satellite",
-                    ylabel=f"Percentile {plot_def[sys][field].ylabel.replace(', ', ' - ')}",
+                    ylabel=f"95th percentile\n{plot_def[sys][field].ylabel.replace(', ', ' - ')}",
                     y_unit="ns",
                     colors=["dodgerblue"],
                     figure_path=figure_path,
@@ -1389,11 +1397,14 @@ class GnssPlot:
     def _get_dataset(
             self, 
             stage: str, 
+            label: str,
             systems: Union[List[str], None] = None,
     ) -> "Dataset":
         """Get dataset for given stage
     
         Args:
+           stage:       Stage name
+           label:       Label name
            systems:     List with GNSS identifiers (e.g. E, G, ...)
     
         Returns:
@@ -1401,13 +1412,13 @@ class GnssPlot:
         """
     
         # Get Dataset
-        # TODO: "label" should have a default value.
         file_vars = {**self.dset.vars, **self.dset.analysis}
         file_vars["stage"] = stage
+        file_vars["label"] = label
         try:
             dset_out = dataset.Dataset.read(**file_vars)
         except OSError:
-            log.warn("Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
+            log.warn(f"Could not read dataset {config.files.path('dataset', file_vars=file_vars)}.")
             return enums.ExitStatus.error
     
         # Reject not defined GNSS observations
@@ -1422,9 +1433,6 @@ class GnssPlot:
         return dset_out
     
     
-
-    
-        
     def _get_gnss_signal_in_space_status_data(
                 self,
                 status: int, 
@@ -1541,11 +1549,11 @@ class GnssPlot:
         time = []
         satellite = []
         system = []
-        for sat in sorted(self.dset.unique("satellite"), reverse=True):
-            idx = self.dset.filter(satellite=sat)
-            time.extend(self.dset.time.gps.datetime[idx])
-            satellite.extend(self.dset.satellite[idx])
-            system.extend(self.dset.system[idx])
+        for sat in sorted(dset.unique("satellite"), reverse=True):
+            idx = dset.filter(satellite=sat)
+            time.extend(dset.time.gps.datetime[idx])
+            satellite.extend(dset.satellite[idx])
+            system.extend(dset.system[idx])
     
         return np.array(time), np.array(satellite), np.array(system)
     

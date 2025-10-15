@@ -92,7 +92,10 @@ def read(stage: str, dset: "Dataset") -> None:
 
     # Write either raw or filtered (edit) broadcast ephemeris as Dataset
     if config.tech.get("filter_navigation_message", default=True).bool:
-        brdc.dset_raw.write()
+        if util.check_write_level("analysis"):
+            dset_vars = {**dset.vars, **dset.analysis}
+            del dset_vars["label"]
+            brdc.dset_raw.write_as(label="raw", **dset_vars) # dset_vars elements needed as placeholders
         dset.update_from(brdc.dset_edit)
     else:
         dset.update_from(brdc.dset_raw)

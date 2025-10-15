@@ -191,14 +191,14 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     for figure_path in plt.plot_skyplot():
         rpt.add_figure(
             figure_path=figure_path,
-            caption="Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]]}",
+            caption=f"Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]].value}",
             clearpage=False,
         )
 
     for figure_path in plt.plot_satellite_elevation():
         rpt.add_figure(
                 figure_path=figure_path,
-                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                 clearpage=True,
         )
 
@@ -339,6 +339,7 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
             "histogram_binwidth": 0.002,
             "plot_to": "file",
             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+            "xlabelrotation": 30,
         },
     )
 

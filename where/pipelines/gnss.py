@@ -107,6 +107,25 @@ def file_vars(file_vars=None) -> Dict[str, str]:
 def read(stage: str, dset: "Dataset") -> None:
     """Read the GNSS RINEX data.
 
+    Following Dataset fields are generated:
+
+   |  Field               | Type              | Description                                                           |
+   | :------------------- | :---------------- | :-------------------------------------------------------------------- |
+   | <observation type>   | numpy.ndarray     | GNSS observation type data (e.g. C1C, C2W, L1C, L2W, ...) given for   |
+   |                      |                   | loss of lock indicator (lli), pseudo-range and carrier phase          |
+   |                      |                   | observation (obs) and signal-to-noise-ratio (snr)                     |
+   | epoch_flag           | numpy.ndarray     | Epoch flag                                                            |
+   | num_satellite_available |  numpy.ndarray | Number of available satellite in each observation epoch               |
+   | rcv_clk_offset       | numpy.ndarray     | Receiver clock offset in seconds given for each epoch                 |
+   | satellite            | numpy.ndarray     | Satellite PRN number together with GNSS identifier (e.g. G07)         |
+   | satnum               | numpy.ndarray     | Satellite PRN number (e.g. 07)                                        |
+   | site_pos             | Position          | PositionTable object with given station coordinates either from       |
+   |                      |                   | RINEX header or overwritten by 'gnss_station_crd' station coordinate  | 
+   |                      |                   | RINEX header)                                                         |
+   | station              | numpy.ndarray     | Station name list                                                     |
+   | system               | numpy.ndarray     | GNSS identifier                                                       |
+   | time                 | Time              | Observation time given as Time object                                 |
+
     Args:
         stage:  Name of current stage.
         dset:   A dataset containing the data.
@@ -201,6 +220,21 @@ def orbit(stage: str, dset: "Dataset") -> None:
           correction based on receiver time and not an satellite transmission time. Additionally gLAB does not apply
           relativistic corrections.
 
+    Following Dataset fields are generated:
+
+    | Field                         | Type          | Description                                                    |
+    | :---------------------------- | :------------ | :------------------------------------------------------------- |
+    | delay.gnss_satellite_clock    | numpy.ndarray | Satellite clock correction in [m]                              |
+    | delay.gnss_relativistic_clock | numpy.ndarray | Relativistic clock correction due to orbit eccentricity in [m] |
+    | gnss_earth_rotation           | PosVel        | Earth's rotation effect during signal flight time              |
+    | navigation_idx                | numpy.ndarray | Indices related to the correct set of broadcast ephemeris for  |
+    |                               |               | given observation epochs                                       |
+    | sat_posvel                    | PosVel        | Satellite position and velocity                                |
+    | sat_time                      | Time          | Satellite transmission time given as Time object               |
+    | used_iode                     | numpy.ndarray | IODE of selected broadcast ephemeris block                     |
+    | used_transmission_time        | Time          | Transmission time of selected broadcast ephemeris block        |
+    | used_toe                      | Time          | Time of ephemeris (TOE) of selected broadcast ephemeris block  |
+
     Args:
         stage:  Name of current stage.
         dset:   A dataset containing the data.
@@ -213,8 +247,11 @@ def orbit(stage: str, dset: "Dataset") -> None:
         "orbit", rundate=dset.analysis["rundate"], system=tuple(dset.unique("system")), station=station
     )
     if util.check_write_level("analysis"):
-        orbit.dset_raw.write_as(stage=stage, station=station, label="raw")
-        orbit.dset_edit.write_as(stage=stage, station=station, label="edit")
+        dset_vars = {**dset.vars, **dset.analysis}
+        for key in ["label", "stage"]:
+            del dset_vars[key]
+        orbit.dset_raw.write_as(stage="orbit", label="raw", **dset_vars)
+        orbit.dset_edit.write_as(stage="orbit", label="edit", **dset_vars)
 
     #TODO: Check if it would change anything, if using orbit.calculate_orbit(dset, time="sat_time") instead
     ## First estimate of satellite transmission time
@@ -418,7 +455,7 @@ def calculate_estimate(stage: str, dset: "Dataset") -> None:
         ## MURKS: Writing of dataset leads to failure in the ongoing processing
         # Store estimate results
         # if util.check_write_level("analysis"):
-        #     dset.write_as(stage="estimate", dataset_id=iter_num)
+        #     dset.write_as(stage="estimate", label=iter_num)
         # dset.read()  # TODO: workaround because caching does not work correctly
 
         # Detect and remove outliers

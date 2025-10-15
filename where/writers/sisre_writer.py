@@ -21,7 +21,6 @@ from midgard.writers._writers import get_existing_fields, get_field, get_header
 import where
 from where.lib import config, log, util
 from where import pipelines
-from where.writers import sisre_output_buffer
 
 WriterField = namedtuple(
     "WriterField", ["name", "field", "attrs", "dtype", "format", "width", "header", "unit", "description"]
@@ -418,10 +417,6 @@ def sisre_writer(dset: "Dataset") -> None:
         encoding="utf8",
     )
 
-    # Append SISRE output path to SISRE output buffer file
-    if config.tech.sisre_writer.write_buffer_file.bool:
-        sisre_output_buffer.sisre_output_buffer(dset)
-
 
 def _get_header(dset: "Dataset") -> str:
     """Get header
@@ -482,8 +477,12 @@ def _get_paths() -> str:
 
     for name, file_key in sorted(path_def.items()):
         if file_key == "gnss_rinex_clk":
-            if config.tech.clock_product.str != "clk":
-                continue
+            if "clock_product" in dir(config.tech):
+                if config.tech.clock_product.str != "clk":  #TODO: config.tech.clock_product does not work if called
+                                                            #      by where_tools. At the moment always RINEX clock
+                                                            #      files are used.
+                    continue
+
         path = ", ".join(str(p) for p in sorted(pipelines.paths(file_key)))
         lines += console.fill(f"{name:<{key_width}} = {path}", **fill_args)
         lines += "\n"

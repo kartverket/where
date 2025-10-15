@@ -23,8 +23,7 @@ from midgard.plot.matplotext import MatPlotExt
 
 # Where imports
 from where.data import dataset3 as dataset
-from where.lib import config
-from where.lib import log
+from where.lib import config, log
 from where.data import position
 from where.writers._gnss_plot import GnssPlot
 from where.writers._report import Report
@@ -215,21 +214,21 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
     if figure_path is not None:  # Note: Does not exists for concatenated Datasets.
         rpt.add_figure(
             figure_path=figure_path,
-            caption="Overview over satellite observations. Red coloured: Observation rejected in orbit stage (e.g. unhealthy satellites, exceeding validity length, no orbit data available); Orange coloured: Observation rejected in edit stage; Green coloured: Kept observations after edit stage.",
+            caption="Overview over satellite observations. Red coloured: Observation rejected in orbit stage (e.g. unhealthy satellites, exceeding validity length, no orbit data available); Orange coloured: Observation rejected in edit stage (elevation cut-off); Green coloured: Kept observations after edit stage.",
             clearpage=False,
         )
     
     for figure_path in plt.plot_skyplot():
         rpt.add_figure(
                 figure_path=figure_path, 
-                caption=f"Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                caption=f"Skyplot for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                 clearpage=False,
         )
 
     for figure_path in plt.plot_satellite_elevation():
         rpt.add_figure(
                 figure_path=figure_path,
-                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]]}", 
+                caption=f"Satellite elevation for {enums.gnss_id_to_name[figure_path.stem[-1]].value}", 
                 clearpage=True,
         )
         
@@ -244,7 +243,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
             for figure_path in plt.plot_field(field.name, field.collection):
                 system, _ = figure_path.stem.split("_")[2:4] 
                 rpt.add_figure(
-                    figure_path=figure_path, 
+                    figure_path=figure_path,      
                     caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
                     clearpage=True,
                 )
@@ -260,7 +259,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
             if figure_path.exists():
                 rpt.add_figure(
                     figure_path,
-                    caption=f"HAS correction for {enums.gnss_id_to_name[figure_path.stem[-1]]}",
+                    caption=f"HAS correction for {enums.gnss_id_to_name[figure_path.stem[-1]].value}",
                     clearpage=True,
                 )
 
@@ -502,13 +501,14 @@ def _plot_residual(dset: "Dataset", figure_dir: "pathlib.PosixPath") -> None:
         options={
             "figsize": (7, 4),
             "histogram": "y",
-            "histogram_size": 0.8,
+            "histogram_binwidth": 0.1,
+            "histogram_size": 0.5,
             "plot_to": "file",
             "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+            "xlabelrotation": 30,
         },
     )
     
-
 
 #
 # TABLE GENERATION FUNCTIONS
@@ -578,7 +578,8 @@ def _get_outliers_dataset(dset: "Dataset") -> Union["Dataset", Enum]:
 
     # Get Dataset where no outliers are rejected
     file_vars = {**dset.vars, **dset.analysis}
-    file_vars["stage"] = "calculate"
+    file_vars["stage"] = "edit"
+    file_vars["label"] = "None"
 
     try:
         dset_complete = dataset.Dataset.read(**file_vars)

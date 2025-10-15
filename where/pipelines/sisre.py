@@ -21,13 +21,8 @@ from midgard.math.constant import constant
 from midgard.math.unit import Unit
 
 # Where imports
-from where import apriori
-from where import cleaners
-from where import writers
-from where.lib import config
-from where.lib import gnss
-from where.lib import log
-from where.lib import util
+from where import apriori, cleaners, writers
+from where.lib import config, gnss, log, util
 
 # The name of this technique
 TECH = __name__.split(".")[-1]
@@ -102,6 +97,15 @@ def setup(stage: str, dset: "Dataset") -> None:
 
     The GNSS satellites are defined in the configuration file, which should be used in the SISRE analysis.
 
+    Following Dataset fields are generated:
+
+    | Field                  | Type              |  Description
+    | :--------------------- | :---------------  | :----------------------------------------------------------------- |
+    | satellite              | numpy.ndarray     | Satellite PRN number together with GNSS identifier (e.g. G07)      |
+    |                        |                   | based on defined satellites in configuration file                  |
+    | system                 | numpy.ndarray     | GNSS identifier (e.g. E-Galileo, G-GPS)                            |
+    | time                   | Time              | Observation time based on given sampling rate configuration        |
+
     Args:
         stage:  Name of current stage.
         dset:   A dataset containing the data.
@@ -154,16 +158,6 @@ def setup(stage: str, dset: "Dataset") -> None:
     dset.add_text("satellite", val=dset_satellites, write_level="operational")
     dset.add_text("system", val=dset_systems, write_level="operational")
 
-    # Get station positions
-    # trf = apriori.get('trf', time=dset.time)  # reference_frame='itrf_ssc:2014'
-    # stations = trf.sites  ## [k[1] for k, _ in trf.items()]  # TODO: Better solution? trf.stations???
-    # if session.upper() in stations:
-    #    pass
-    # try:
-    #   dset.add_position('site_pos', time='time', itrs=trf.pos(('gnss', session.upper())))
-    # except KeyError:
-    #    pass
-
     # Write Dataset to file
     if util.check_write_level("analysis"):
         dset.write_as(stage="setup")
@@ -195,18 +189,28 @@ def calculate(stage: str, dset: "Dataset"):
     Following Dataset fields are generated:
 
     | Field                  | Type              |  Description
-    | :--------------------- | :---------------  | :------------------------------------------------------------------ |
-    | bias_brdc              | numpy.ndarray     | Satellite bias of broadcast ephemeris in [m]                        |
-    | bias_precise           | numpy.ndarray     | Satellite bias of precise orbits in [m]                             |
+    | :--------------------- | :---------------- | :------------------------------------------------------------------ |
+    | age_of_ephemeris       | numpy.ndarray     | Age of ephemeris in [s], which is the difference between            |
+    |                        |                   | observation epochs and time of ephemeris                            |
+    | bias_brdc              | numpy.ndarray     | Satellite bias for correting broadcast clocks in [m]                |
+    | bias_precise           | numpy.ndarray     | Satellite bias for correcting precise clocks in [m]                 |
+    | clk_brdc_com           | numpy.ndarray     | Broadcast satellite clock correction related to center of mass      |
+    |                        |                   | in [s]                                                              |
     | clk_diff               | numpy.ndarray     | Satellite clock correction difference without correction in [m]     |
     | clk_diff_with_dt_mean  | numpy.ndarray     | Satellite clock correction difference corrected for average         |
     |                        |                   | satellite clock offset difference for given GNSS and epoch in [m]   |
+    | clk_precise_com        | numpy.ndarray     | Precise satellite clock correction related to center of mass in [s] |
+    | diff_trans_toe         | numpy.ndarray     | Difference between transmission time and time of ephemeris in [s]   |
+    | navigation_idx         | numpy.ndarray     | Indices related to the correct set of broadcast ephemeris for given |
+    |                        |                   | observation epochs                                                  |
+    | orb_diff               | PositionTable     | Orbit difference in given ITRS [m]                                  |
+    | orb_diff_acr           | PositionTable     | Orbit difference given local orbital reference system, that means   |
+    |                        |                   | in along-track, cross-track and radial (ACR)                        |
+    | orb_diff_3d            | numpy.ndarray     | 3D orbit difference based on ACR orbit differences                  |
     | pco_brdc               | PositionTable     | Phase center offset (PCO) of broadcast ephemeris in [m]             |
     | pco_precise            | PositionTable     | Phase center offset (PCO) of precise orbits in [m]                  |
-    | orb_diff               | PositionTable     | Orbit difference in given ITRS [m]                                  |
-    | orb_diff_acr           | PositionTable     | Orbit difference given local orbital reference system, that means in|
-    |                        |                   | along-track, cross-track and radial (ACR)                           |
-    | orb_diff_3d            | numpy.ndarray     | 3D orbit difference based on ACR orbit differences                  |
+    | satellite_type         | numpy.ndarray     | Satellite type based on ANTEX file (e.g. BLOCK IIF, GALILEO-1,      |
+    |                        |                   | GALILEO-2, GLONASS-M, BEIDOU-2G, ...)                               |
     | sisre                  | numpy.ndarray     | Signal-in-space range error in [m]                                  |
     | sisre_with_dr_mean     | numpy.ndarray     | Signal-in-space range error with corrected average constellation-   |
     |                        |                   | mean radial orbit error [m]                                         |
@@ -279,7 +283,6 @@ def calculate(stage: str, dset: "Dataset"):
         )
         orb_diff = orb_diff + dset.has_orbit_correction
         clk_diff = clk_diff + dset.has_clock_correction + dset.has_code_bias_correction
-
         
     # Calculate SISRE
     dset.add_float("clk_diff", val=clk_diff, unit="meter", write_level="operational")
@@ -344,8 +347,8 @@ def _additional_fields_to_dataset(
         ant:              Antenna correction object
         brdc:             Broadcast orbit object
         precise:          Precise orbit object
-        bias_brdc:        Satellite bias for broadcast orbits
-        bias_precise:     Satellite bias for precise orbits
+        bias_brdc:        Satellite bias for correcting broadcast clocks
+        bias_precise:     Satellite bias for correcting precise clocks
         orb_diff:         Orbit difference
         brdc_sys_freq:    Dictionary with frequency given for GNSS identifier. This is used for selection of correct
                           broadcast orbit ANTEX PCOs.
@@ -446,10 +449,13 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
 
     |System | Type      | Signal   | Broadcast bias | Precise bias                                                      |
     |:------|:----------|:---------|:---------------|:------------------------------------------------------------------|
-    |GPS    | LNAV      | G:L1     | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W} + DCB^s_{C1C-C1W}`|
+    |GPS    | LNAV      | G:L1 C/A | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W} + DCB^s_{C1C-C1W}`|
+    |       | LNAV      | G:L1 P   | tgd            |:math:`-\frac{f^2_{L2}}{f^2_{L1}-f^2_{L2}} DCB^s_{C1W-C2W}`|
     |       |           | G:L1_L2  | 0              |0                                                                  |
     |Galileo| INAV_E1   | E:E1     | bgd_e1_e5b     |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q}`      |
+    |       | INAV      | E:E5b    | :math:`\frac{f^2_{E1}}{f^2_{E15b} bgd_e1_e5b`|  :math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} - DCB^s_{C1C-C7Q}` | 
     |       | INAV      | E:E1_E5b | 0              |:math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} + \frac{f^2_{E5b}}{f^2_{E1}-f^2_{E5b}} DCB^s_{C1C-C7Q}`|
+    |       | FNAV_E5a  | E:E5a    | :math:`\frac{f^2_{E1}}{f^2_{E15a} bgd_e1_e5a`|  :math:`-\frac{f^2_{E5a}}{f^2_{E1}-f^2_{E5a}} DCB^s_{C1C-C5Q} - DCB^s_{C1C-C5Q}` |                                                                |
     |       | FNAV_E5a  | E:E1_E5a | 0              | 0                                                                 |
 
     Args:
@@ -460,9 +466,9 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
         Tuple with following `numpy.ndarray` arrays:
 
     |Elements       | Description                                                                                      |
-    |---------------|--------------------------------------------------------------------------------------------------|
-    | bias_brdc     | Satellite bias for broadcast orbits in [m]                                                       |
-    | bias_precise  | Satellite bias for precise orbits in [m]                                                         |
+    | :------------ | :----------------------------------------------------------------------------------------------- |
+    | bias_brdc     | Satellite bias for correcting broadcast clocks in [m]                                            |
+    | bias_precise  | Satellite bias for correcting precise orbits in [m]                                              |
     """
     bias_brdc = np.zeros(dset.num_obs)
     bias_precise = np.zeros(dset.num_obs)
@@ -474,7 +480,81 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
 
     for sys in dset.unique("system"):
 
-        if (sys == "E") and ("E:E1_E5b" in config.tech.frequencies.list):
+        if (sys == "E") and ("E:E1" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E1.")
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            f_E1 = enums.gnss_freq_E.E1
+            f_E5a = enums.gnss_freq_E.E5a
+
+            for sat in dset.unique("satellite"):
+                if sat.startswith("E"):
+                    idx = dset.filter(satellite=sat)
+                    dcb_c1c_c5q = (
+                        -f_E5a ** 2
+                        / (f_E1 ** 2 - f_E5a ** 2)
+                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                    )
+                    bias = dcb_c1c_c5q * constant.c
+                    bias_precise[idx] = bias
+                    meta_bias_precise[sat] = bias
+
+                    bias = dset_brdc.bgd_e1_e5b[idx] * constant.c
+                    bias_brdc[idx] = bias
+                    meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "E") and ("E:E5a" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E5a.")
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            f_E1 = enums.gnss_freq_E.E1
+            f_E5a = enums.gnss_freq_E.E5a
+
+            for sat in dset.unique("satellite"):
+                if sat.startswith("E"):
+                    idx = dset.filter(satellite=sat)
+                    dcb_c1c_c5q = (
+                        -f_E5a ** 2
+                        / (f_E1 ** 2 - f_E5a ** 2)
+                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                        - dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                    )
+                    bias = dcb_c1c_c5q * constant.c
+                    bias_precise[idx] = bias
+                    meta_bias_precise[sat] = bias
+
+                    bias = f_E1 ** 2 / f_E5a ** 2 * dset_brdc.bgd_e1_e5a[idx] * constant.c
+                    bias_brdc[idx] = bias
+                    meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "E") and ("E:E5b" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E5b.")
+            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
+            f_E1 = enums.gnss_freq_E.E1
+            f_E5b = enums.gnss_freq_E.E5b
+            f_E5a = enums.gnss_freq_E.E5a
+
+            for sat in dset.unique("satellite"):
+                if sat.startswith("E"):
+                    idx = dset.filter(satellite=sat)
+                    dcb_c1c_c5q = (
+                        -f_E5a ** 2
+                        / (f_E1 ** 2 - f_E5a ** 2)
+                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
+                        - dcb.get_dsb(sat, "C1C-C7Q", dset.analysis["rundate"])["estimate"]
+                    )
+                    bias = dcb_c1c_c5q * constant.c
+                    bias_precise[idx] = bias
+                    meta_bias_precise[sat] = bias
+
+                    bias = f_E1 ** 2 / f_E5b ** 2 * dset_brdc.bgd_e1_e5b[idx] * constant.c
+                    bias_brdc[idx] = bias
+                    meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "E") and ("E:E1_E5b" in config.tech.frequencies.list):
+
+            log.info(f"Get bias for GNSS '{sys}' and frequency E1/E5b.")
             dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
             f_E1 = enums.gnss_freq_E.E1
             f_E5a = enums.gnss_freq_E.E5a
@@ -496,31 +576,14 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
                     bias = (dcb_c1c_c5q + dcb_c1c_c7q) * constant.c
                     bias_precise[idx] = bias
                     meta_bias_precise[sat] = bias
+                    
+        elif (sys == "E") and ("E:E1_E5a" in config.tech.frequencies.list):
 
-        elif (sys == "E") and ("E:E1" in config.tech.frequencies.list):
-
-            dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
-            f_E1 = enums.gnss_freq_E.E1
-            f_E5a = enums.gnss_freq_E.E5a
-
-            for sat in dset.unique("satellite"):
-                if sat.startswith("E"):
-                    idx = dset.filter(satellite=sat)
-                    dcb_c1c_c5q = (
-                        -f_E5a ** 2
-                        / (f_E1 ** 2 - f_E5a ** 2)
-                        * dcb.get_dsb(sat, "C1C-C5Q", dset.analysis["rundate"])["estimate"]
-                    )
-                    bias = dcb_c1c_c5q * constant.c
-                    bias_precise[idx] = bias
-                    meta_bias_precise[sat] = bias
-
-                    bias = dset_brdc.bgd_e1_e5b[idx] * constant.c
-                    bias_brdc[idx] = bias
-                    meta_bias_brdc[sat] = np.mean(bias)
-
+            log.info(f"No bias correction needed for GNSS '{sys}' and frequency E1/E5a.")
+                    
         elif (sys == "G") and ("G:L1" in config.tech.frequencies.list):
-
+        
+            log.info(f"Get bias for GNSS '{sys}' and frequency L1.")
             dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
             f_L1 = enums.gnss_freq_G.L1
             f_L2 = enums.gnss_freq_G.L2
@@ -541,6 +604,10 @@ def _get_bias(dset: "Dataset", dset_brdc: "Dataset") -> Tuple[np.ndarray, np.nda
                     bias = dset_brdc.tgd[idx] * constant.c
                     bias_brdc[idx] = bias
                     meta_bias_brdc[sat] = np.mean(bias)
+                    
+        elif (sys == "G") and ("G:L1_L2" in config.tech.frequencies.list):
+
+            log.info(f"No bias correction needed for GNSS '{sys}' and frequency L1/L2.")
 
     # Add bias information to Dataset 'meta'
     dset.meta["bias_brdc"] = meta_bias_brdc
@@ -572,7 +639,8 @@ def _get_bias_has(dset: "Dataset") -> np.ndarray:
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
 
-        if (sys == "E") and ("E:E1_E5b" in frequencies):    
+        if (sys == "E") and ("E:E1_E5b" in frequencies): 
+            log.info(f"Get bias for GNSS '{sys}' and frequency E1/E5b.")   
             correction[idx] = gnss.ionosphere_free_linear_combination(
                 dset.has_code_bias_c1c[idx], 
                 dset.has_code_bias_c7q[idx], 
@@ -581,6 +649,7 @@ def _get_bias_has(dset: "Dataset") -> np.ndarray:
             )
             
         elif (sys == "G") and ("G:L1_L2" in frequencies):
+            log.info(f"Get bias for GNSS '{sys}' and frequency L1/L2.")
             dcb = apriori.get("gnss_bias", rundate=dset.analysis["rundate"])
             for sat in dset.unique("satellite"):
                 if not sys == sat[0:1]:
@@ -670,7 +739,11 @@ def _get_common_brdc_precise_ephemeris(dset: "Dataset") -> Tuple["Dataset", "Dat
     brdc.calculate_orbit(dset)
     
     # Read, edit and calculate precise orbit
-    precise = apriori.get("orbit", rundate=dset.analysis["rundate"], apriori_orbit="precise")
+    precise = apriori.get(
+        "orbit",
+        rundate=dset.analysis["rundate"],
+        apriori_orbit="precise",
+    )
     precise.dset_raw.vars = dset.vars.copy()
     precise.dset_raw.analysis = dset.analysis.copy()
     if util.check_write_level("analysis"):

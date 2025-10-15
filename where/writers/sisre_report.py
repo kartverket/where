@@ -32,7 +32,6 @@ from where.writers._report import Report
 
 FIGURE_DPI = 200
 FIGURE_FORMAT = "png"
-GNSS_NAME = {"C": "BeiDou", "E": "Galileo", "G": "GPS", "I": "IRNSS", "J": "QZSS", "R": "GLONASS"}
 
 SubplotConfig = namedtuple("SubplotConfig", ["ylabel", "color", "ydata"])
 SubplotConfig.__doc__ = """A convenience class for defining a field for subplot configuration
@@ -89,7 +88,7 @@ FIELDS = (
     PlotField(
         "clk_diff_with_dt_mean",
         "",
-        "Satellite clock correction difference $\Delta t$",
+        "Satellite clock correction difference $\\Delta t$",
     ),
     PlotField(
         "bias_brdc",
@@ -104,13 +103,12 @@ FIELDS = (
 )
     
 
-# TODO: Maybe better to write a SisreReport class.
 @plugins.register
-def sisre_report(dset):
+def sisre_report(dset: "Dataset") -> None:
     """Write SISRE report
 
     Args:
-        dset (Dataset):       A dataset containing the data.
+        dset:       A dataset containing the data.
     """
     file_vars = {**dset.vars, **dset.analysis}
 
@@ -129,18 +127,15 @@ def sisre_report(dset):
         rpt.title_page()
         _write_information(fid)
         rpt.write_config()
-        # rpt.add_text("\n# Satellite status\n\n")
-        # _unhealthy_satellites(fid, dset)
-        # _eclipse_satellites(fid, dset)
+        #rpt.add_text("\n# Satellite status\n\n")
+        #_unhealthy_satellites(fid, dset)
+        #_eclipse_satellites(fid, dset)
         
         # Generate figure directory to save figures generated for SISRE report
         rpt.add_text("\n# SISRE analysis results\n\n")
         figure_dir = config.files.path("output_sisre_report_figure", file_vars=file_vars)
         figure_dir.mkdir(parents=True, exist_ok=True)
         
-        _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset) #TODO: move to _add_to_report
-        _plot_scatter_sisre(fid, figure_dir, dset)  #TODO: move to _add_to_report
-        _plot_histogram_sisre(fid, figure_dir, dset) #TODO: move to _add_to_report
         _add_to_report(dset, rpt, figure_dir)
         
         _satellite_statistics_and_plot(fid, figure_dir, dset, rpt) #TODO: move to _add_to_report
@@ -160,22 +155,51 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
     """
 
     plt = GnssPlot(dset, figure_dir)
-    
+
+    #
+    # Scatter plots
+    #               
+    for figure_path in _plot_scatter_orbit_and_clock_differences(dset, figure_dir):
+        system = figure_path.stem.split(".")[0][-1] 
+        rpt.add_figure(
+            figure_path=figure_path, 
+            caption=f"Difference between precise and broadcast orbits given in along-track, cross-track and radial "
+                    f"direction and satellite clock corrections for all {enums.gnss_id_to_name[system].value} satellites.", 
+            clearpage=True,
+        ) 
+
+    for figure_path in _plot_scatter_sisre(dset, figure_dir):
+        system = figure_path.stem.split(".")[0][-1] 
+        rpt.add_figure(
+            figure_path=figure_path, 
+            caption=f"Orbit-only SISRE, clock-only SISRE and SISRE results for all "
+                    f"{enums.gnss_id_to_name[system].value} satellites. ",
+            clearpage=True,
+        ) 
+
+    #
+    # Histogram plot
+    #
+    rpt.add_figure(
+        figure_path=_plot_histogram_sisre(dset, figure_dir), 
+        caption="Histrogram of SISRE results",
+        clearpage=True,
+    )
+     
     #
     # Field plots
     #     
     for field in FIELDS:
         
         if f"{field.collection}.{field.name}" in dset.fields or f"{field.name}" in dset.fields:                
-            for figure_path in plt.plot_field(field.name, field.collection):
+            for figure_path in plt.plot_field(field.name, field.collection, colormap="jet"):
                 system, _ = figure_path.stem.split("_")[2:4] 
                 rpt.add_figure(
                     figure_path=figure_path, 
                     caption=f"{field.caption} for {enums.gnss_id_to_name[system].value} observation", 
                     clearpage=True,
                 ) 
-                
-                  
+                                  
     #
     # Galileo HAS plots
     #
@@ -189,6 +213,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
                             f"correction)", 
                     clearpage=True,
             )
+
 
 def _eclipse_satellites(fid, dset):
     """Write overview over satellites in eclipse
@@ -439,41 +464,52 @@ def _plot_histogram_subplot(data, axis, system):
     """
     axis.hist(data, density=True, bins=30)
     axis.set(xlabel="SISRE [m]", ylabel="Frequency")
-    axis.set_title(f"{GNSS_NAME[system]}")
+    axis.set_title(f"{enums.gnss_id_to_name[system].value}")
     mean = np.mean(data)
     std = np.std(data)
     axis.text(
         0.98,
         0.98,
-        f"$mean={mean:5.3f}\ \pm {std:5.3f}$ m",
+        f"$mean={mean:5.3f}\\ \\pm {std:5.3f}$ m",
         horizontalalignment="right",
         verticalalignment="top",
         transform=axis.transAxes,
     )
 
 
-def _plot_histogram_sisre(fid, figure_dir, dset):
+def _plot_histogram_sisre(dset: "Dataset", figure_dir: PosixPath) -> PosixPath:
     """Plot histogram based on SISRE dataset field
 
     Args:
-       fid (_io.TextIOWrapper):  File object.
-       figure_dir (PosixPath):   Figure directory
-       dset (Dataset):           A dataset containing the data.
-    """
-    import math
+       dset:         A dataset containing the data.
+       figure_dir:   Figure directory
 
-    # TODO: How to handle for example 3 subplots?
-    nrows = math.ceil(len(dset.unique("system")) / 2)
-    ncols = 2 if len(dset.unique("system")) > 1 else 1
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True, squeeze=False)
+    Returns:
+        Figure path of plot
+    """
+    from math import ceil
+    nrows = ceil(len(dset.unique("system")) / 2)
+    ncols = len(dset.unique("system"))
+    figure_path = figure_dir / f"plot_histogram_sisre.{FIGURE_FORMAT}"
+    log.debug(f"Plot {figure_path}.")
+
+    fig, axes = plt.subplots(
+                    #figsize= (6, 10) if ncols > 2 else (5,5),
+                    nrows=nrows, 
+                    ncols=ncols, 
+                    sharex=True, 
+                    sharey=True, 
+                    squeeze=False,
+    )
+
     for sys, ax in zip(dset.unique("system"), axes.flatten()):
         idx = dset.filter(system=sys)
         _plot_histogram_subplot(dset.sisre[idx], ax, sys)
-    plt.savefig(figure_dir / f"plot_histogram_sisre.{FIGURE_FORMAT}", dpi=FIGURE_DPI)
+    plt.tight_layout()
+    plt.savefig(figure_path, dpi=FIGURE_DPI)
     plt.clf()  # clear the current figure
 
-    fid.write(f"![Histrogram of SISRE results]({figure_dir}/plot_histogram_sisre.{FIGURE_FORMAT})\n")
-    fid.write("\n\\clearpage\n\n")
+    return figure_path
 
 
 #
@@ -493,12 +529,12 @@ def _plot_scatter_satellite_bias(fid, figure_dir, dset):
 
         for field, orbit in {"bias_brdc": "Broadcast", "bias_precise": "Precise"}.items():
             if np.sum(dset[field][idx]) != 0:
-                figure_path = figure_dir / f"plot_scatter_{field}_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
+                figure_path = figure_dir / f"plot_scatter_{field}_{enums.gnss_id_to_name[sys].value.lower()}.{FIGURE_FORMAT}"
                 plt.scatter(dset.time.gps.datetime[idx], dset[field][idx], alpha=0.7)
                 plt.ylabel(f"{orbit} satellite bias [dset.unit(field)[0]]")
                 plt.xlim([min(dset.time.gps.datetime[idx]), max(dset.time.gps.datetime[idx])])
                 plt.xlabel("Time [GPS]")
-                plt.title(f"{GNSS_NAME[sys]}")
+                plt.title(f"{enums.gnss_id_to_name[sys].value}")
                 plt.savefig(figure_path, dpi=FIGURE_DPI)
                 plt.clf()  # clear the current figure
 
@@ -599,7 +635,7 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
     for idx, ax in enumerate(axes):
         ax.set(ylabel=subplots[idx].ylabel)
         ax.set_xlim([min(xdata), max(xdata)])  # otherwise time scale of x-axis is not correct -> Why?
-        text = f"mean $= {np.mean(subplots[idx].ydata):.2f} \pm {np.std(subplots[idx].ydata):.2f}$ m"
+        text = f"mean $= {np.mean(subplots[idx].ydata):.2f} \\pm {np.std(subplots[idx].ydata):.2f}$ m"
         ax.text(0.98, 0.98, text, horizontalalignment="right", verticalalignment="top", transform=ax.transAxes)
         ax.scatter(xdata, subplots[idx].ydata, marker=marker, color=subplots[idx].color)
         ax.set(xlabel=xlabel)
@@ -611,68 +647,103 @@ def _plot_scatter_subplots(xdata, subplots, figure_path, xlabel="", title=""):
     plt.clf()  # clear the current figure
 
 
-def _plot_scatter_orbit_and_clock_differences(fid, figure_dir, dset):
+def _plot_scatter_orbit_and_clock_differences(
+                        dset: "Dataset",
+                        figure_dir: PosixPath,
+) -> List[PosixPath]:
     """Scatter subplot of orbit and clock differences between broadcast and precise orbit and clock products
 
     Args:
-       fid (_io.TextIOWrapper):  File object.
-       figure_dir (PosixPath):   Figure directory
-       dset (Dataset):           A dataset containing the data.
+       dset:         A dataset containing the data.
+       figure_dir:   Figure directory
+
+    Returns:
+        List with figure path of plots. File name includes GNSS identifier (e.g. 'E', 'G') and field name, for example
+       'plot_scatter_subplot_orbit_clock_differences_E.png'.
     """
+    figure_paths = list()
+
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
         figure_path = (
-            figure_dir / f"plot_scatter_subplot_orbit_clock_differences_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
+            figure_dir / f"plot_scatter_subplot_orbit_clock_differences_{sys}.{FIGURE_FORMAT}"
         )
 
-        # Define configuration of subplots
-        subplots = (
-            SubplotConfig("Δalong-track [m]", "paleturquoise", dset.orb_diff.acr.along[idx]),
-            SubplotConfig("Δcross-track [m]", "deepskyblue", dset.orb_diff.acr.cross[idx]),
-            SubplotConfig("Δradial [m]", "royalblue", dset.orb_diff.acr.radial[idx]),
-            SubplotConfig("Δclock [m]", "tomato", dset.clk_diff_with_dt_mean[idx]),
+        plt = MatPlotExt()
+        plt.plot_subplots(
+            x_array=dset.time.gps.datetime[idx],
+            y_arrays=[
+                    dset.orb_diff.acr.along[idx],
+                    dset.orb_diff.acr.cross[idx],
+                    dset.orb_diff.acr.radial[idx],
+                    dset.clk_diff_with_dt_mean[idx],
+            ],
+            xlabel="Time [GPS]",
+            ylabels=["Δalong-track", "Δcross-track", "Δradial", "Δclock"],
+            colors=["steelblue", "darkorange", "limegreen", "red"],
+            y_units=["m", "m", "m", "m"],
+            figure_path=figure_path,
+            options={
+                "figsize": (7, 8),
+                "plot_to": "file",
+                "sharey": True,
+                "title": f"{enums.gnss_id_to_name[sys].value}",
+                "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+            },
         )
 
-        _plot_scatter_subplots(
-            dset.time.gps.datetime[idx], subplots, figure_path, xlabel="Time [GPS]", title=f"{GNSS_NAME[sys]}"
-        )
+        figure_paths.append(figure_path)
 
-        fid.write(
-            f"![Difference between precise and broadcast orbits given in along-track, cross-track and radial direction and satellite clock corrections for all satellites.]({figure_path})\n"
-        )
-        fid.write("\n\\clearpage\n\n")
+    return figure_paths
 
 
-def _plot_scatter_sisre(fid, figure_dir, dset):
+def _plot_scatter_sisre(
+                dset: "Dataset",
+                figure_dir: PosixPath,
+) -> List[PosixPath]:
     """Scatter subplot of orbit-only SISRE, clock-only SISRE and SISRE
 
     Args:
-       fid (_io.TextIOWrapper):  File object.
-       figure_dir (PosixPath):   Figure directory
-       dset (Dataset):           A dataset containing the data.
+       dset:         A dataset containing the data.
+       figure_dir:   Figure directory
+
+    Returns:
+        List with figure path of plots. File name includes GNSS identifier (e.g. 'E', 'G') and field name, for example
+       'plot_scatter_subplot_orbit_clock_differences_E.png'.
     """
+    figure_paths = list()
 
     for sys in dset.unique("system"):
         idx = dset.filter(system=sys)
-        figure_path = figure_dir / f"plot_scatter_subplot_sisre_{GNSS_NAME[sys].lower()}.{FIGURE_FORMAT}"
-
-        # Define configuration of subplots
-        subplots = (
-            SubplotConfig("orbit-only SISRE [m]", "paleturquoise", dset.sisre_orb[idx]),
-            SubplotConfig("clock-only SISRE [m]", "deepskyblue", dset.sisre[idx] - dset.sisre_orb[idx]),
-            SubplotConfig("SISRE [m]", "royalblue", dset.sisre[idx]),
+        figure_path = (
+            figure_dir / f"plot_scatter_subplot_sisre_{sys}.{FIGURE_FORMAT}"
         )
 
-        _plot_scatter_subplots(
-                    dset.time.gps.datetime[idx], 
-                    subplots, 
-                    figure_path, 
-                    xlabel="Time [GPS]", 
-                    title=f"{GNSS_NAME[sys]}",
+        plt = MatPlotExt()
+        plt.plot_subplots(
+            x_array=dset.time.gps.datetime[idx],
+            y_arrays=[
+                    dset.sisre_orb[idx],
+                    dset.sisre[idx] - dset.sisre_orb[idx],
+                    dset.sisre[idx],
+            ],
+            xlabel="Time [GPS]",
+            ylabels=["orbit-only SISRE", "clock-only SISRE", "SISRE"],
+            colors=["steelblue", "darkorange", "limegreen"],
+            y_units=["m", "m", "m"],
+            figure_path=figure_path,
+            options={
+                "figsize": (7, 8),
+                "plot_to": "file",
+                "sharey": True,
+                "title": f"{enums.gnss_id_to_name[sys].value}",
+                "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
+            },
         )
 
-        fid.write(f"![Orbit-only SISRE, clock-only SISRE and SISRE results for all satellites.]({figure_path})\n")
-        fid.write("\n\\clearpage\n\n")
+        figure_paths.append(figure_path)
+
+    return figure_paths
 
 
 #
@@ -680,23 +751,21 @@ def _plot_scatter_sisre(fid, figure_dir, dset):
 #
 
 
-def _generate_satellite_index_dataframe(dset):
+def _generate_satellite_index_dataframe(dset: "Dataset"):
     """Generate field DataFrames with the satellites as indices and functional values (rms, mean, ...) as columns
 
     Args:
-        dset (Dataset):             Dataset
+        dset:   Dataset
 
     Returns:
 
         tuple:  with following elements
 
-    ==================  ============================================================================================
-     Elements            Description
-    ==================  ============================================================================================
-     field_dfs           Dictionary with field names as keys and dataframe as value. The dataframes have satellite
-                         as indices and statistical information as columns (rms, mean, std, min, max, 95th percentile)
-     extra_rows_names    List with extra row names like GNSS and satellite type
-    ==================  ============================================================================================
+    | Elements         |   Description                                                                                |
+    | :--------------- | :------------------------------------------------------------------------------------------- |
+    | field_dfs        | Dictionary with field names as keys and dataframe as value. The dataframes have satellite    |
+    |                  | as indices and statistical information as columns (rms, mean, std, min, max, 95th percentile)|
+    | extra_rows_names | List with extra row names like GNSS and satellite type                                       |
 
     """
     rms = lambda x: np.sqrt(np.mean(np.square(x)))
@@ -853,12 +922,12 @@ def _write_information(fid):
 For the signal-in-space range error (SISRE) analysis it is common to apply the average contribution over all points of the Earth within the visibility cone of the satellite (Montenbruck el al., 2014), which is called global averaged SISRE. The SISRE analysis in Where is based on the global averaged SISRE:
 
 \\begin{equation}
-     \\text{SISRE}^s = \sqrt{(w_r \cdot \Delta r^s - \Delta t^s)^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
+     \\text{SISRE}^s = \\sqrt{(w_r \\cdot \\Delta r^s - \\Delta t^s)^2 + w_{a,c}^2 \\cdot (\\Delta {a^s}^2 + \\Delta {c^s}^2)}
   \\label{eq:sisre}
 \\end{equation}
 
 \\begin{equation}
-     \\text{SISRE(orb)}^s = \sqrt{w_r^2 \cdot \Delta {r^s}^2 + w_{a,c}^2 \cdot (\Delta {a^s}^2 + \Delta {c^s}^2)}
+     \\text{SISRE(orb)}^s = \\sqrt{w_r^2 \\cdot \\Delta {r^s}^2 + w_{a,c}^2 \\cdot (\\Delta {a^s}^2 + \\Delta {c^s}^2)}
   \\label{eq:sisre_orb}
 \\end{equation}
 
@@ -870,15 +939,15 @@ For the signal-in-space range error (SISRE) analysis it is common to apply the a
 \\begin{tabular}{lll}
 with\\\\
  & $\\text{SISRE}^s$        & Global averaged SISRE for satellite $s$, \\\\
- & $\\text{SISRE(orb)}^s$   & Orbit-only SISRE (SISRE\_ORB) for satellite $s$, \\\\
+ & $\\text{SISRE(orb)}^s$   & Orbit-only SISRE (SISRE\\_ORB) for satellite $s$, \\\\
  & $\\text{SISRE(clk)}^s$   & Clock-only SISRE for satellite $s$, \\\\
- &$\Delta a^s$, $\Delta c^s$, $\Delta r^s$   & Satellite coordinate differences between broadcast\\\\
+ &$\\Delta a^s$, $\\Delta c^s$, $\\Delta r^s$   & Satellite coordinate differences between broadcast\\\\
  &                                           & and precise ephemeris in along-track, cross-track \\\\
  &                                           & and radial for satellite $s$,\\\\
- &$\Delta t^s$              & Satellite clock correction difference related to CoM \\\\
+ &$\\Delta t^s$              & Satellite clock correction difference related to CoM \\\\
  &                          & of satellite $s$ and corrected for satellite biases and \\\\
  &                          & averaged clock offset in each epoch\\\\
- &                          & (CLK\_DIFF\_SYS),\\\\
+ &                          & (CLK\\_DIFF\\_SYS),\\\\
  &$w_r$                     & SISRE weight factor for radial errors (see Table 1),\\\\
  &$w_{a,c}$                 & SISRE weight factor for along-track and cross-track \\\\
  &                          & errors (see Table 1).\\\\
@@ -888,7 +957,7 @@ It should be noted that we have neglected the uncertainty of precise ephemeris a
 
 The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is caculated as follows:
 \\begin{equation}
-     \\text{ORB\_DIFF\_3D}^s = \sqrt{(\Delta {r^s}^2 + \Delta {a^s}^2 + \Delta {c^s}^2)}
+     \\text{ORB\\_DIFF\\_3D}^s = \\sqrt{(\\Delta {r^s}^2 + \\Delta {a^s}^2 + \\Delta {c^s}^2)}
   \\label{eq:orb_diff_3d}
 \\end{equation}
 
@@ -904,7 +973,7 @@ The SISRE report presents also the 3D orbit error (ORB_DIFF_3D), which is cacula
                  & $5^{\\circ}$ & $0.984$ & $0.124$ \\\\
     \\hline
   \\end{tabular}
-  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\circ}$ based on Table 4 in \cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an defined elevation mask of $E_{min}$ based on Table 4 in Montenbruck et al. 2018.}
+  \\caption[The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an elevation mask of $0^{\\circ}$ based on Table 4 in \\cite{montenbruck2018}.]{The global averaged SISRE weight factors for radial ($w_r$) and along-track and cross-track errors ($w_{a,c}$). The weight factors are given for an defined elevation mask of $E_{min}$ based on Table 4 in Montenbruck et al. 2018.}
   \\label{tab:sisre_weight_factors}
 \\end{center}
 \\end{table}

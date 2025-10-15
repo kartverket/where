@@ -206,10 +206,8 @@ def solve_neq(dset):
     # Update statistics for solution after constraints are added
     v_c = H @ x  # Sinex Format description appendix equation 10
     dset.meta["statistics"]["square sum of residuals"] += (v_c.T @ P_h @ v_c).item()
-    dset.meta["statistics"]["degrees of freedom"] += len(H) + num_abs_constraints + num_rel_constraints
-    dset.meta["statistics"]["variance factor"] = (
-        np.float64(dset.meta["statistics"]["square sum of residuals"]) / np.float64(dset.meta["statistics"]["degrees of freedom"])
-    )
+    dset.meta["statistics"]["degrees of freedom"] += len(H) + int(num_abs_constraints) + int(num_rel_constraints)
+    dset.meta["statistics"]["variance factor"] = dset.meta["statistics"]["square sum of residuals"] / dset.meta["statistics"]["degrees of freedom"]
 
     variance_factor = dset.meta["statistics"]["variance factor"]
     deg_freedom = dset.meta["statistics"]["degrees of freedom"]
@@ -468,7 +466,7 @@ def _compute_helmert_parameters(dset, B, stations, source=None):
     else:
         log.info(f"Session Kalman Filter Helmert parameters with regards to {reference_frame.upper()}")
     for i, (field, factor, unit) in enumerate(zip(fields, factors, units)):
-        dset.meta.add(field, (hp[i] * factor, unit), section=section)
+        dset.meta.add(field, (float(hp[i] * factor), unit), section=section)
         log.info(
             f"{field:{width}} = {dset.meta[section][field][0]: 6.4f} [{dset.meta[section][field][1]}]"
         )
