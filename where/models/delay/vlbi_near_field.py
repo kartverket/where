@@ -147,7 +147,6 @@ def vlbi_near_field_delay(dset):
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
 
-
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
     # Equations are in BCRS. Ephemerides use TDB.
@@ -174,7 +173,6 @@ def vlbi_near_field_delay(dset):
     delay_bodies = 0
     for body in bodies:
         RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
-        RB_T0 = eph.pos_gcrs(body, time=t0_tilde) # body pos at t0 in GCRS
         RB_T1 = eph.pos_bcrs(body) # body pos at t1 in BCRS
 
         R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
