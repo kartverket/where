@@ -105,9 +105,12 @@ def get_grc_csv_row(
     # TODO: Better solution? dset.meta["obstypes"] handling has to be improved.
     mode_def = {
             "e1": "E1",
+            "e5a": "E5a",
+            "e5b": "E5b",
             "e1e5a": "E1/E5a",
             "e1e5b": "E1/E5b",
             "l1":    "L1",
+            "l2":    "L2",
             "l1l2":  "L1/L2",
     }
 
@@ -204,7 +207,7 @@ def get_grc_csv_row(
             "vpe": "",
     }
 
-    type_ = "Single" if len(mode) == 2 else "Dual" # TODO: Better solution?
+    type_ = "Single" if len(mode) <= 3 else "Dual" # TODO: Better solution?
 
     unit_def = {
             "hpe": "m",
