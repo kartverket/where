@@ -390,6 +390,70 @@ def edit(stage: str, dset: "Dataset") -> None:
 def calculate_estimate(stage: str, dset: "Dataset") -> None:
     """Calculate model parameters and estimate
 
+    Following Dataset fields are generated in dependeny of chosen models and estimation parameters:
+
+    Following Dataset fields are generated in dependeny of chosen models and estimation parameters:
+
+    | Field                         | Type          | Description                                                    |
+    | :---------------------------- | :------------ | :------------------------------------------------------------- |
+    | calc                          | numpy.ndarray | Sum of delay based on all given GNSS delay model corrections   |
+    |                               |               | in [m]                                                         |
+    | delay.<model>                 | numpy.ndarray | Corrections based on GNSS delay models in [m], whereby <model> |
+    |                               |               | is placeholder for:                                            |
+    |                               |               |    gnss_ionosphere  - Delay of ionospheric refraction          |
+    |                               |               |    gnss_range  - Distance between station and satellite        | 
+    |                               |               |    gnss_relativistic_clock  - Relativistic clock effet due to  |
+    |                               |               |       orbit eccentricity                                       |
+    |                               |               |    gnss_satellite_clock  - Satellite clock                     |
+    |                               |               |    gnss_total_group_delay  - Total group delay                 |
+    |                               |               |    troposphere_radio  - Tropospheric delay                     |
+    |                               |               |                                                                |
+    | estimate_apriori_<parameter>  | numpy.ndarray | Apriori parameter values in [m], whereby <parameter> is        |     
+    |                               |               | a placeholder for estimated parameters                         |
+    | estimate_convergence          | numpy.ndarray | Information about estimation convergence in each epoch         |
+    |                               |               | (1: True, 0: False)                                            |
+    | estimate_cov_<parameter>      | numpy.ndarray | Covariance of estimated parameters, whereby <parameter> is     |     
+    |                               |               | a placeholder for estimated parameters                         |
+    | estimate_degree_of_freedom    | numpy.ndarray | Degree of freedom, which is the difference between number of   |
+    |                               |               | observation and estimated parameters for each epoch            |
+    | estimate_number_of_observations | numpy.ndarray | Number of observations used in each epoch for estimation     |
+    | estimate_number_of_unknowns   | numpy.ndarray |  Number of unknowns (number of estimated parameters)           |
+    | estimate_sigma_<parameter>    | numpy.ndarray |  Standard deviation of estimated parameter in [m], whereby     |     
+    |                               |               |  <parameter> is a placeholder for estimated parameters         |
+    | estimate_variance_factor      | numpy.ndarray | Variance factor of estimation                                  |
+    | estimate_<parameter>          | numpy.ndarray | Estimated parameter values in [m], whereby <parameter> is      |     
+    |                               |               | a placeholder for estimated parameters                         |
+    | gdop                          | numpy.ndarray | Geometric dilution of precision                                |
+    | hdop                          | numpy.ndarray | Horizontal dilution of precision                               |
+    | observed                      | numpy.ndarray | Observations used in estimation process in [m]                 |
+    | partial.<parameter>           | numpy.ndarray | Partial derivatives of estimated parameters, whereby           |
+    |                               |               | <parameter> is  a placeholder for estimated parameters         |     
+    | pdop                          | numpy.ndarray | Position dilution of precision                                 |
+    | residual                      | numpy.ndarray | Post-fit residuals in [m]                                      |
+    | residual_prefit               | numpy.ndarray | Pre-fit residuals in [m]                                       |
+    | site.<model>                  | numpy.ndarray | Corrections based on site models in [m], whereby <model> is    |
+    |                               |               | placeholder for site displacement due to:                      |
+    |                               |               |    atm_tides       - Atmospheric loading tides                 |
+    |                               |               |    nt_atm_loading  - Non-tidal atmospheric loading             |
+    |                               |               |    ocean_ptides    - Ocean pole tides                          |
+    |                               |               |    ocean_tides     - Ocean loading tides                       |
+    |                               |               |    solid_ptides    - Solid pole tides                          |
+    |                               |               |    solid_tides     - Solid tides                               |
+    |                               |               |                                                                |
+    | tdop                          | numpy.ndarray | Time dilution of precision                                     |
+    | troposphere_<suffix>          | numpy.ndarray | Tropospheric delay parameters, whereby <suffix> is a           |
+    |                               |               | placeholder for:                                               |
+    |                               |               |    dT   - Total tropospheric delay                             |
+    |                               |               |    ge   - East gradient                                        |
+    |                               |               |    gn   - North gradient                                       |
+    |                               |               |    mg   - gradient mapping function values                     |
+    |                               |               |    mh   - hydrostatic mapping function values                  |
+    |                               |               |    mw   - wet mapping function values                          |
+    |                               |               |    zhd  - Tropospheric zenith hydrostatic (dry) delay in [m]   |
+    |                               |               |    zwd  - Tropospheric zenith wet delay in [m]                 |
+    |                               |               |                                                                |
+    | vdop                          | numpy.ndarray | Vertical dilution of precision                                 |
+
     Args:
         stage:  Name of current stage.
         dset:   A dataset containing the data.
@@ -473,6 +537,7 @@ def calculate_estimate(stage: str, dset: "Dataset") -> None:
 
         if iter_num >= max_iterations:
             break
+
 
     # MURKS: better to save dataset after each estimation step
     # Store last estimate results
