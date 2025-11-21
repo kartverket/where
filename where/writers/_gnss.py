@@ -190,6 +190,7 @@ def get_grc_csv_row(
             "cpvg": "Cap-Vert (Cabo Verde)",
             "koug": "Kourou (French Guiana)",
             "hofs": "Hoefn (Iceland)",
+            "hof2": "Hoefn (Iceland)",
             "hons": "Honningsvag (Norway)",
             "janm": "Jan Mayen (Norway)",
             "krss": "Kristiansand (Norway)",
