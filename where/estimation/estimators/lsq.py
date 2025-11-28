@@ -154,14 +154,14 @@ def _get_estimate(lsq: "LsqEstimator") -> np.ndarray:
         tuple(row)
         for row in np.vstack(
             (
-                np.repeat(lsq.x0[None, :], lsq.num_obs, axis=0).T,
-                np.repeat(lsq.x_hat[None, :], lsq.num_obs, axis=0).T,
-                np.repeat(lsq.sigmax[None, :], lsq.num_obs, axis=0).T,
-                np.repeat(lsq.num_obs, lsq.num_obs).T,
-                np.repeat(lsq.num_unknowns, lsq.num_obs).T,
-                np.repeat(lsq.degree_of_freedom, lsq.num_obs).T,
-                np.repeat(lsq.sigma0, lsq.num_obs).T,
-                lsq.v,
+                np.repeat(lsq.x0[None, :], lsq.num_obs, axis=0).T,     # Apriori parameter value
+                np.repeat(lsq.x_hat[None, :], lsq.num_obs, axis=0).T,  # Estimated parameter value
+                np.repeat(lsq.sigmax[None, :], lsq.num_obs, axis=0).T, # Standard deviation of estimated parameter
+                np.repeat(lsq.num_obs, lsq.num_obs).T,                 # Number of observations used for estimation
+                np.repeat(lsq.num_unknowns, lsq.num_obs).T,            # Number of unknowns (number of estimated parameters)
+                np.repeat(lsq.degree_of_freedom, lsq.num_obs).T,       # Degree of freedom (difference between number of observations and unknowns)
+                np.repeat(lsq.sigma0, lsq.num_obs).T,                  # Variance factor
+                lsq.v,                                                 # Post-fit residuals
             )
         ).T
     ]

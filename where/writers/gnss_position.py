@@ -354,7 +354,7 @@ def gnss_position(dset: "Dataset") -> None:
     else:
         # Get position solution for first observation
         idx = np.squeeze(np.array(np.nonzero(dset.time.gps.mjd)) == 0)  # first observation -> TODO: Better solution?
-        output_list = [tuple([get_field(dset, idx, f.field, f.attrs, f.unit)[idx][0] for f in FIELDS])]
+        output_list = [tuple([get_field(dset, f.field, f.attrs, f.unit)[idx][0] for f in FIELDS])]
 
     output_array = np.array(output_list, dtype=[(f.name, f.dtype) for f in FIELDS])
 

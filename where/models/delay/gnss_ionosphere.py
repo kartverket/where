@@ -62,7 +62,7 @@ def gnss_ionosphere(dset: "Dataset") -> np.ndarray:
     for sys in dset.unique("system"):
 
         if config.tech.freq_type.str != "single":
-            log.warn(f"Ionosphere models can only be used for one-frequency observations.")
+            log.warn(f"Ionosphere models can only be used for single-frequency observations.")
             return corrections
 
         sys_idx = dset.filter(system=sys)
