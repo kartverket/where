@@ -25,7 +25,7 @@ from where import apriori
 
 def plot(x, ys, errors, colors, labels, name, station):
     num_plots = len(ys)
-    fig, axs = plt.subplots(num_plots, figsize=(12, 6), dpi=150, sharex=True)
+    fig, axs = plt.subplots(num_plots, figsize=(12, 6), dpi=150, sharex=True, layout="constrained")
     for i, (y, e, l) in enumerate(zip(ys, errors, labels)):
         axs[i].errorbar(x, y, yerr=e, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
         im = axs[i].scatter(x, y, c=colors, zorder=100)
@@ -34,7 +34,8 @@ def plot(x, ys, errors, colors, labels, name, station):
         axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
         axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
         axs[i].grid(axis="y", linestyle="--")
-    cbar = fig.colorbar(im, ax=axs.ravel().tolist(), use_gridspec=True)
+    #cbar = fig.colorbar(im, ax=axs.ravel().tolist(), use_gridspec=True)
+    cbar = fig.colorbar(im, ax=axs, location="right")
     cbar.set_label("Number of observations used in solution")
     fig.autofmt_xdate()
     #fig.suptitle(station)
@@ -171,7 +172,7 @@ def plot_residual_rms(dates, dates1, dates2, rms, rms1, rms2, sta_1, sta_2, colo
     labels = ["All stations", sta_1, sta_2]
     norm = mcolors.Normalize(np.min(np.concatenate(colors)), np.max(np.concatenate(colors)))
     im = cm.ScalarMappable(norm=norm)
-    fig, axs = plt.subplots(num_plots, figsize=(12, 6), dpi=150, sharex=True)
+    fig, axs = plt.subplots(num_plots, figsize=(12, 6), dpi=150, sharex=True, layout="constrained")
     for i, (d, y, l) in enumerate(zip(ds, ys, labels)):
         #color = np.full(len(y), fill_value=np.nan)
         #color[~np.isnan(y)] = colors[i][colors[i]!=0]
@@ -184,7 +185,7 @@ def plot_residual_rms(dates, dates1, dates2, rms, rms1, rms2, sta_1, sta_2, colo
         axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
         axs[i].grid(axis="y", linestyle="--")
 
-    cbar = fig.colorbar(im, ax=axs.ravel().tolist(), use_gridspec=True)
+    cbar = fig.colorbar(im, ax=axs, location="right")
     cbar.set_label("Number of observations used in solution")
     plt.suptitle("Root Mean Square of Postfit Residuals  [m]")
     #plt.tight_layout()
@@ -194,7 +195,7 @@ def plot_residual_rms(dates, dates1, dates2, rms, rms1, rms2, sta_1, sta_2, colo
 
 
 def plot_statistics(dates, dof, variance_factor, colors):
-    fig, axs = plt.subplots(2, figsize=(12, 6), dpi=150, sharex=True)
+    fig, axs = plt.subplots(2, figsize=(12, 6), dpi=150, sharex=True, layout="constrained")
 
     axs[0].set_ylabel('Degrees of freedom')
     #axs[0].set_ylim((1500, 14500))
@@ -212,7 +213,7 @@ def plot_statistics(dates, dof, variance_factor, colors):
     axs[1].scatter(dates, variance_factor, c=colors)
     axs[1].grid(axis="y", linestyle="--")
     
-    cbar = fig.colorbar(im, ax=axs.ravel().tolist(), use_gridspec=True)
+    cbar = fig.colorbar(im, ax=axs, location="right")
     cbar.set_label("Number of observations used in solution")
     fig.autofmt_xdate()
     #fig.tight_layout()
