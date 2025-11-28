@@ -134,8 +134,8 @@ for i, (rundate, session_code) in enumerate(zip(dates[idx2], session_codes)):
         acc_r[s] += r
         acc_e[s] += e
         acc_a[s] += a
-        if args.session_wise:
-            plot_skycoverage(r, e, a, s, label=rundate)
+        if args.session_wise and r:
+            plot_skycoverage(r, e, a, s, label=f"{rundate}_{session_code}")
 
 for s in stations:
     plot_skycoverage(acc_r[s], acc_e[s], acc_a[s], s, label=f"{start}_{end}")
