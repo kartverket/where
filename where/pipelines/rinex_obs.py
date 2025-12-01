@@ -65,7 +65,6 @@ def file_vars(file_vars=None):
     Returns:
         Dict:  File variables special for this technique.
     """
-
     # Determine correct interval based on given sampling rate
     sampling_rate = config.tech.sampling_rate.int
     if sampling_rate < 59: # seconds
@@ -79,7 +78,18 @@ def file_vars(file_vars=None):
     elif sampling_rate > 8639999:
         log.fatal(f"Interval based sampling_rate {sampling_rate} is not defined.")
 
-    return dict(interval=interval, STATION=file_vars["station"].upper())
+    # Check station name
+    station = file_vars["station"]
+    if not len(station) == 9:
+        log.fatal(f"Uncorrect station name '{station}'. Use RINEX3 convention <ssssmmccc> (e.g. ALES00NOR) with "
+                  f"4-digit station name, marker number, receiver number and country code.")
+        
+    return dict(
+            interval=interval, 
+            STATION=station.upper(),
+            station_4d=station.lower()[0:4],
+            STATION_4D=station.upper()[0:4],
+    )
 
 
 #
@@ -122,7 +132,7 @@ def read(stage, dset):
 
     dset.update_from(parser.as_dataset())
 
-    if util.check_write_level("analysis"):                    
+    if util.check_write_level("operational"):                    
         dset.write_as(stage=stage)
 
 
