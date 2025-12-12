@@ -194,7 +194,7 @@ def _nequick(
         dset:           Model data.
         sys_idx:        Index mask array for selecting Dataset observation for given GNSS.
         freq:           Frequency in Hz.
-        nequick_para:   Nequick ionospheric parameters.
+        nequick_para:   Nequick ionospheric coefficients.
 
     Returns:
         Ionospheric corrections
@@ -236,7 +236,7 @@ def _ntcm(
         dset:           Model data.
         sys_idx:        Index mask array for selecting Dataset observation for given GNSS.
         freq:           Frequency in Hz.
-        ntcm_para:      NTCM ionospheric parameters.
+        ntcm_para:      NTCM ionospheric coefficients.
 
     Returns:
         Ionospheric corrections
