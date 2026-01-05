@@ -186,7 +186,7 @@ def _nequick(
             dset: "Dataset", 
             sys_idx: np.ndarray, 
             freq: Enum, 
-            nequick_para,
+            nequick_para: List[float],
     ) -> np.ndarray:
     """Get Nequick ionospheric correction for a Dataset subset
     
@@ -199,7 +199,7 @@ def _nequick(
     Returns:
         Ionospheric corrections
     """
-    
+
     # Initialze gnss_iono_models object
     nq = gnss_iono_models.NeQuickG(error_devices=("console",))
     
