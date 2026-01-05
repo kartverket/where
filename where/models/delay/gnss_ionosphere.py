@@ -71,7 +71,7 @@ def gnss_ionosphere(dset: "Dataset") -> np.ndarray:
         # Use of Nequick model
         if (
             sys == "E" or config.tech.gnss_ionosphere.model.str == "nequick"
-        ) and not config.tech.gnss_ionosphere.model.str == "klobuchar":
+        ) and not (config.tech.gnss_ionosphere.model.str == "klobuchar" or config.tech.gnss_ionosphere.model.str == "ntcm"):
             log.info("Nequick ionosphere model is used.")
             sys = "E" if sys in ["C", "G", "J"] else sys  # Use Galileo ionosphere parameters for GPS, BeiDou or QZSS
             if config.tech.gnss_ionosphere.filekey_para.str:
