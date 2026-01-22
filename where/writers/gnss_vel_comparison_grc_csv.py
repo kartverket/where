@@ -42,7 +42,7 @@ def gnss_vel_comparison_grc_csv(dset: "Dataset") -> None:
 
     # Get file path
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech.gnss_comparison_report.solution.str.lower()
+    file_vars["solution"] = config.tech.gnss_vel_comparison_report.solution.str.lower()
     file_path = config.files.path("output_gnss_vel_comparison_grc_csv", file_vars=file_vars)
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
