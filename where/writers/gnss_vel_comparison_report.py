@@ -37,6 +37,9 @@ from where.lib import log
 from where.postprocessors.gnss_velocity_fields import gnss_velocity_fields
 from where.writers._report import Report
 
+# Name of section in configuration
+_SECTION = "_".join(__name__.split(".")[-1:])
+
 FIGURE_FORMAT = "png"
 FILE_NAME = __name__.split(".")[-1]
 
@@ -50,7 +53,7 @@ def gnss_vel_comparison_report(dset: Dict[str, "Dataset"]) -> None:
     """
     dset_first = dset[list(dset.keys())[0]]
     file_vars = {**dset_first.vars, **dset_first.analysis}
-    file_vars["solution"] = config.tech.gnss_vel_comparison_report.solution.str.lower()
+    file_vars["solution"] = config.tech[_SECTION].solution.str.lower()
 
     # Generate figure directory to save figures generated for GNSS report
     figure_dir = config.files.path("output_gnss_vel_comparison_report_figure", file_vars=file_vars)
@@ -140,7 +143,7 @@ def _add_to_report(
 
     for type_ in dfs_day.keys():
         
-        for sample in config.tech.gnss_vel_comparison_report.samples.list:
+        for sample in config.tech[_SECTION].samples.list:
     
             sample = sample.capitalize()
             rpt.add_text(f"\n# {sample} {text_def[type_]} for given solutions\n\n")
@@ -344,18 +347,18 @@ def _plot_velocity_error(
         "plot_to": "file",
         "plot_type": "plot",
         # "statistic": ["rms", "mean", "std", "min", "max", "percentile"], #TODO: Is only shown for data, which are plotted at last.
-        "title": config.tech.gnss_vel_comparison_report.title.str.upper(),
+        "title": config.tech[_SECTION].title.str.upper(),
     }
 
     colors = (
-        config.tech.gnss_vel_comparison_report.colors.list
-        if config.tech.gnss_vel_comparison_report.colors.list
+        config.tech[_SECTION].colors.list
+        if config.tech[_SECTION].colors.list
         else ["orange", "red", "violet", "blue", "green"]
     )
 
     colors = (
-        config.tech.gnss_vel_comparison_report.colors.list
-        if config.tech.gnss_vel_comparison_report.colors.list
+        config.tech[_SECTION].colors.list
+        if config.tech[_SECTION].colors.list
         else ["orange", "red", "violet", "blue", "green"]
     )
 
@@ -364,7 +367,7 @@ def _plot_velocity_error(
 
         # Get used samples
         samples = dict()
-        for sample in config.tech.gnss_vel_comparison_report.samples.list:
+        for sample in config.tech[_SECTION].samples.list:
             if "daily" == sample:
                 samples["daily"] = dfs_day[type_]
             elif "monthly" == sample:
@@ -380,11 +383,11 @@ def _plot_velocity_error(
                 
                 # Get y-range limits
                 if field == "site_vel_h":
-                    ylim = config.tech.gnss_vel_comparison_report.ylim_site_vel_h.list
+                    ylim = config.tech[_SECTION].ylim_site_vel_h.list
                 elif field == "site_vel_3d":
-                    ylim = config.tech.gnss_vel_comparison_report.ylim_site_vel_3d.list
+                    ylim = config.tech[_SECTION].ylim_site_vel_3d.list
                 else:
-                    ylim = config.tech.gnss_vel_comparison_report.ylim.list
+                    ylim = config.tech[_SECTION].ylim.list
                     
                 options["ylim"] = [float(ylim[0]), float(ylim[1])] if ylim else ylim
     
