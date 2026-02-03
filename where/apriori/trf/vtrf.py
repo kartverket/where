@@ -106,6 +106,11 @@ class Vtrf(trf.TrfFactory):
             Dict:  Dictionary containing data about each site defined in this reference frame.
         """
         data = parsers.parse_file("trf_snx", file_path=self.file_paths["snx"]).as_dict()
+        # A station may be defined in the sinex file but not in included in the solution/estimate block.
+        # These stations are discarded
+        missing_posvel = [key for key in data.keys() if "ref_epoch" not in data[key]]
+        for site_key in missing_posvel:
+            del data[site_key]
 
         for site_key, site_dict in data.items():
             min_soln = min(site_dict["pos_vel"].keys())
