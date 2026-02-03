@@ -159,14 +159,7 @@ def validate_args(rundate, session_code=None, **kwargs):
 
     master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
     master_sessions = master_schedule.list_sessions(rundate)
-    transition_date = date(2023, 1, 1) # New naming convention for vgosdb files and master file format implemented
     if session_code not in master_sessions:
-        if rundate < transition_date:
-            raise exceptions.InvalidArgsError(
-                f"Session {session_code} is not listed in master file for {rundate:{config.FMT_date}}. "
-                f"This is required for sessions older than {transition_date}. "
-                f"Available sessions are {', '.join(master_sessions)}."
-            )
         log.warn(
             f"Session '{session_code}' is not listed in master file for {rundate:{config.FMT_date}}. "
             f"Available sessions are {', '.join(master_sessions)}."
@@ -190,11 +183,6 @@ def file_vars(file_vars=None):
 
     _file_vars["session_code_lowercase"] = file_vars["session_code"].lower()
     
-    # Add DBC code from master file to support old naming convention
-    rundate = datetime.strptime(file_vars["rundate"], config.FMT_date).date()
-    master_schedule = apriori.get("vlbi_master_schedule", rundate=rundate)
-    _file_vars["dbc"] = master_schedule[file_vars["session_code"]]["dbc"]
-
 
     # Add obs_version for ngs
     if config.tech.get("obs_format").str == "ngs":
