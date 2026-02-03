@@ -312,7 +312,20 @@ class SinexBlocks:
         self.fid.write("*Code PT SBIN T Data_Start__ Data_End____ typ Apr --> Benchmark (m)_____\n")
 
         fieldnames = config.tech.eccentricity.identifier.list
-        keys = np.array([self.dset.unique(f, sort=False) for f in fieldnames]).T
+        try:
+            keys = np.array([self.dset.unique(f, sort=False) for f in fieldnames]).T
+        except ValueError:
+            # This may occur if the fields are not unique (for instance two stations with same cdp number)
+            keys = set()
+            stations = self.dset.unique("station", sort=False)
+
+            for sta in stations:
+                for _ in self.dset.for_each_suffix("station"):
+                    idx = self.dset.filter(station=sta)
+                    key = [np.unique(self.dset[f][idx])[0] for f in ["station", "site_id"] if idx.any()]
+                    if key:
+                        keys.add(tuple(key))
+
 
         for sta, key in zip(self.dset.unique("station", sort=False), keys):
             site_id = self.dset.meta["station"][sta]["site_id"]
