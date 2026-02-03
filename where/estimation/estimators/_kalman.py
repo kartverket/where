@@ -12,6 +12,7 @@ algorithm is listed in :cite:`gibbs2011`.
 # External library imports
 import numpy as np
 import h5py
+from scipy import sparse
 
 # Standard library import
 import os
@@ -160,7 +161,7 @@ class KalmanFilter(object):
         g = self.x_hat[dset.num_obs - 1, normal_idx, :]
         deg_freedom = dset.num_obs - num_unknowns
         v = dset.residual[:, None]
-        P = np.diag(1 / self.r[: dset.num_obs])
+        P = sparse.diags(1 / self.r[: dset.num_obs])
         sq_sum_residuals = (v.T @ P @ v).item()
         sq_sum_omc_terms = (2 * b.T @ g - g.T @ N @ g).item()
         variance_factor = sq_sum_residuals / deg_freedom if deg_freedom != 0 else np.inf
