@@ -8,8 +8,8 @@ TODO
 # Standard liberay imports
 from dataclasses import dataclass
 from collections import namedtuple
-import pathlib
-from typing import List, Tuple, Union
+from pathlib import Path, PosixPath
+from typing import Dict, List, Tuple, Union
 
 # External liberary imports
 import numpy as np
@@ -50,7 +50,7 @@ class GnssPlot:
     def __init__(
         self, 
         dset: "Dataset",
-        figure_dir: pathlib.PosixPath,
+        figure_dir: PosixPath,
         figure_format: str="png",
     ) -> None:
         """Set up a new GNSS plot object
@@ -66,14 +66,16 @@ class GnssPlot:
         
         
     def plot_dop(self,
-                  figure_name: str="plot_dop.{FIGURE_FORMAT}",
-    ) -> pathlib.PosixPath:
+                  figure_name: str="plot_dop.{figure_format}",
+    ) -> PosixPath:
         """Plot DOP
     
         Args:
             figure_name: File name of figure.
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        figure_path = self._replace_file_variables(
+                            file_pattern = self.figure_dir / figure_name,
+        )
         log.debug(f"Plot {figure_path}.")
     
         plt = MatPlotExt()
@@ -103,9 +105,9 @@ class GnssPlot:
 
     def plot_epoch_by_epoch_difference(
                             self, 
-                            figure_name: str="plot_epoch_by_epoch_difference_{solution}.{FIGURE_FORMAT}",
+                            figure_name: str="plot_epoch_by_epoch_difference_{solution}.{figure_format}",
 
-    ) -> List[pathlib.PosixPath]:
+    ) -> List[PosixPath]:
         """Plot epoch by epoch difference of observations
         
         Args:
@@ -130,7 +132,10 @@ class GnssPlot:
                 if np.all(np.isnan(self.dset.diff_epo[field][idx_sys])):
                     continue
                                   
-                figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}").replace("{FIGURE_FORMAT}", self.figure_format)
+                figure_path = self._replace_file_variables(
+                                    file_pattern = self.figure_dir / figure_name,
+                                    file_vars = {"solution": f"{sys}_{field}"},
+                )
                 figure_paths.append(figure_path)
                 log.debug(f"Plot {figure_path}.")
     
@@ -170,12 +175,12 @@ class GnssPlot:
                     self, 
                     field: str,
                     collection: Union[str, None] = None, 
-                    figure_name: str="plot_field_{solution}.{FIGURE_FORMAT}",
+                    figure_name: str="plot_field_{solution}.{figure_format}",
                     use_labels: bool=True,
                     colormap: str="tab20",
                     suffix: str="",
 
-    ) -> List[pathlib.PosixPath]:
+    ) -> List[PosixPath]:
         """Plot field
         
         Args:
@@ -275,7 +280,10 @@ class GnssPlot:
             if np.all(np.isnan(self.dset[fieldname][idx_sys])):
                 continue
                               
-            figure_path = self.figure_dir / figure_name.replace("{solution}", f"{sys}_{field}{suffix}").replace("{FIGURE_FORMAT}", self.figure_format)
+            figure_path = self._replace_file_variables(
+                                file_pattern = self.figure_dir / figure_name,
+                                file_vars = {"solution": f"{sys}_{field}{suffix}"},
+            )
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
 
@@ -332,8 +340,8 @@ class GnssPlot:
     
     def plot_gnss_signal_in_space_status(
                         self,
-                        figure_name: str="plot_signal_in_space_status_{solution}.{FIGURE_FORMAT}",
-    ) -> List[pathlib.PosixPath]:
+                        figure_name: str="plot_{date}_signal_in_space_status_{solution}.{figure_format}",
+    ) -> List[PosixPath]:
         """Generate GNSS Signal-in-Space (SIS) status plot for each GNSS based on GNSS signal health status (SHS) 
         and for Galileo in addition based on SIS Accuracy (SISA) and data validity status (DVS) given in RINEX 
         navigation file.
@@ -341,7 +349,7 @@ class GnssPlot:
         The SIS status can be:
     
          | CODE | SIS STATUS      | PLOTTED COLOR | DESCRIPTION                     |
-         |------|-----------------|---------------|---------------------------------|
+         | :--- | :-------------- | :------------ | :------------------------------ |
          |   0  | healthy         |         green | SIS status used by all GNSS     |
          |   1  | marginal (SISA) |        yellow | SIS status only used by Galileo |
          |   2  | marignal (DVS)  |        orange | SIS status only used by Galileo |
@@ -385,7 +393,10 @@ class GnssPlot:
                 y_arrays = []
                 
                 solution = f"{enums.gnss_id_to_name[sys].value.lower()}_{signal}" if signal else f"{enums.gnss_id_to_name[sys].value.lower()}"
-                figure_path=self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
+                figure_path = self._replace_file_variables(
+                                    file_pattern = self.figure_dir / figure_name,
+                                    file_vars = {"solution": solution},
+                )
                 figure_paths.append(figure_path)
                 
                 for status in status_def[sys]:
@@ -436,14 +447,14 @@ class GnssPlot:
     
     def plot_gnss_signal_in_space_status_overview(
                     self,
-                    figure_name: str="plot_gnss_signal_in_space_status.{FIGURE_FORMAT}",
-    ) -> pathlib.PosixPath:
+                    figure_name: str="plot_{date}_gnss_signal_in_space_status.{figure_format}",
+    ) -> PosixPath:
         """Generate GNSS Signal-in-Space (SIS) status overview plot based on SIS status given in RINEX navigation file
     
         The SIS status can be:
     
          | CODE | SIS STATUS      | PLOTTED COLOR | DESCRIPTION                     |
-         |------|-----------------|---------------|---------------------------------|
+         | :--- | :-------------- | :------------ | :------------------------------ |
          |   0  | healthy         |         green | SIS status used by all GNSS     |
          |   1  | marginal (SISA) |        yellow | SIS status only used by Galileo |
          |   2  | marignal (DVS)  |        orange | SIS status only used by Galileo |
@@ -452,7 +463,9 @@ class GnssPlot:
         Args:
             figure_name: File name of figure.
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        figure_path = self._replace_file_variables(
+                            file_pattern = self.figure_dir / figure_name,
+        )
         colors = ["green", "yellow", "orange", "red"]
         labels = ["healthy", "marginal (sisa)", "marginal (dvs)", "unhealthy"]
         status_def = [0, 1, 2, 3]
@@ -511,9 +524,9 @@ class GnssPlot:
              
     def plot_linear_combinations(
                             self, 
-                            figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
+                            figure_name: str="plot_{solution}.{figure_format}",
 
-    ) -> List[pathlib.PosixPath]:
+    ) -> List[PosixPath]:
         """Plot linear combinations of observations
         
         Args:
@@ -537,7 +550,10 @@ class GnssPlot:
                     y_arrays = []
                     labels = []                    
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
+                    figure_path = self._replace_file_variables(
+                                        file_pattern = self.figure_dir / figure_name,
+                                        file_vars = {"solution": solution},
+                    )
                     log.debug(f"Plot {figure_path}.")
                     figure_info.append(FigureInfo(
                                         figure_path, 
@@ -584,7 +600,10 @@ class GnssPlot:
                     y_arrays = []
                     labels = []
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
+                    figure_path = self._replace_file_variables(
+                                        file_pattern = self.figure_dir / figure_name,
+                                        file_vars = {"solution": solution},
+                    )
                     figure_info.append(FigureInfo(
                                         figure_path, 
                                         field.replace("_f1", " ").replace("_f2", " "), 
@@ -630,7 +649,10 @@ class GnssPlot:
                     y_arrays = []
                     labels = []
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
+                    figure_path = self._replace_file_variables(
+                                        file_pattern = self.figure_dir / figure_name,
+                                        file_vars = {"solution": solution},
+                    )
                     log.debug(f"Plot {figure_path}.")
                     figure_info.append(FigureInfo(
                                         figure_path, 
@@ -677,7 +699,10 @@ class GnssPlot:
                     y_arrays = []
                     labels = []
                     solution = f"{field}_{sys}_{'_'.join(self.dset.meta['linear_combination'][field][sys])}"
-                    figure_path = self.figure_dir / figure_name.replace("{solution}", solution).replace("{FIGURE_FORMAT}", self.figure_format)
+                    figure_path = self._replace_file_variables(
+                                        file_pattern = self.figure_dir / figure_name,
+                                        file_vars = {"solution": solution},
+                    )
                     log.debug(f"Plot {figure_path}.")
                     figure_info.append(FigureInfo(
                                         figure_path, 
@@ -725,8 +750,8 @@ class GnssPlot:
 
     def plot_number_of_satellites(
                         self, 
-                        figure_name: str="plot_gnss_number_of_satellites_epoch.{FIGURE_FORMAT}",
-    ) -> pathlib.PosixPath:
+                        figure_name: str="plot_gnss_number_of_satellites_epoch.{figure_format}",
+    ) -> PosixPath:
         """Plot number of satellites based for each GNSS
         
         Args:
@@ -740,7 +765,9 @@ class GnssPlot:
         x_arrays = []
         y_arrays = []
         labels = []
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        figure_path = self._replace_file_variables(
+                            file_pattern = self.figure_dir / figure_name,
+        )
         log.debug(f"Plot {figure_path}.")
     
         for sys in sorted(self.dset.unique("system")):
@@ -780,8 +807,8 @@ class GnssPlot:
     
     def plot_number_of_satellites_used(
             self, 
-            figure_name: str="plot_number_of_satellites_used.{FIGURE_FORMAT}",
-    ) -> pathlib.PosixPath:
+            figure_name: str="plot_number_of_satellites_used.{figure_format}",
+    ) -> PosixPath:
         """Plot available number of satellites against used number
     
         Args:
@@ -790,7 +817,9 @@ class GnssPlot:
         Returns:
             Figure path.
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        figure_path = self._replace_file_variables(
+                            file_pattern = self.figure_dir / figure_name,
+        )
         log.debug(f"Plot {figure_path}.")
     
         if "num_satellite_used" not in self.dset.fields:
@@ -827,8 +856,8 @@ class GnssPlot:
         
     def plot_obstype_availability(
                             self, 
-                            figure_name: str="plot_obstype_availability_{system}.{FIGURE_FORMAT}",
-    ) -> List[pathlib.PosixPath]:
+                            figure_name: str="plot_obstype_availability_{system}.{figure_format}",
+    ) -> List[PosixPath]:
         """Generate GNSS observation type observation type availability based on RINEX observation file
  
         Args:
@@ -848,7 +877,10 @@ class GnssPlot:
             idx_sys = self.dset.filter(system=sys)
             num_sat = len(set(self.dset.satellite[idx_sys]))
             
-            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", self.figure_format)
+            figure_path = self._replace_file_variables(
+                                file_pattern = self.figure_dir / figure_name,
+                                file_vars = {"system": sys},
+            )
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
             
@@ -893,8 +925,8 @@ class GnssPlot:
 
     def plot_satellite_availability(
                             self, 
-                            figure_name: str="plot_satellite_availability.{FIGURE_FORMAT}",
-    ) -> pathlib.PosixPath:
+                            figure_name: str="plot_satellite_availability.{figure_format}",
+    ) -> PosixPath:
         """Generate GNSS satellite observation availability overview based on RINEX observation file
  
         Args:
@@ -908,7 +940,9 @@ class GnssPlot:
         x_arrays = []
         y_arrays = []
         labels = []
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        figure_path = self._replace_file_variables(
+                            file_pattern = self.figure_dir / figure_name,
+        )
         log.debug(f"Plot {figure_path}.")
     
         time, satellite, system = self._sort_by_satellite()
@@ -950,8 +984,8 @@ class GnssPlot:
         
     def plot_skyplot(
                     self,
-                    figure_name: str="plot_skyplot_{system}.{FIGURE_FORMAT}",
-    ) -> List[pathlib.PosixPath]:
+                    figure_name: str="plot_skyplot_{system}.{figure_format}",
+    ) -> List[PosixPath]:
         """Plot skyplot for each GNSS
         
         Args:
@@ -980,7 +1014,10 @@ class GnssPlot:
             y_arrays = []
             labels = []
            
-            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", self.figure_format)
+            figure_path = self._replace_file_variables(
+                                file_pattern = self.figure_dir / figure_name,
+                                file_vars = {"system": sys},
+            )
             figure_paths.append(figure_path)
             
             for sat in sorted(self.dset.unique("satellite")):
@@ -1024,8 +1061,8 @@ class GnssPlot:
     
     def plot_satellite_elevation(
                     self,
-                    figure_name: str="plot_satellite_elevation_{system}.{FIGURE_FORMAT}",
-    ) -> List[pathlib.PosixPath]:
+                    figure_name: str="plot_satellite_elevation_{system}.{figure_format}",
+    ) -> List[PosixPath]:
         """Plot satellite elevation for each GNSS
     
         Args:
@@ -1053,7 +1090,10 @@ class GnssPlot:
             y_arrays = []
             labels = []
             
-            figure_path = self.figure_dir / figure_name.replace("{system}", sys).replace("{FIGURE_FORMAT}", self.figure_format)
+            figure_path = self._replace_file_variables(
+                                file_pattern = self.figure_dir / figure_name,
+                                file_vars = {"system": sys},
+            )
             figure_paths.append(figure_path)
             log.debug(f"Plot {figure_path}.")
     
@@ -1094,8 +1134,8 @@ class GnssPlot:
 
     def plot_satellite_overview(
                     self,
-                    figure_name: str="plot_satellite_overview.{FIGURE_FORMAT}",
-    ) -> Union[pathlib.PosixPath, None]:
+                    figure_name: str="plot_satellite_overview.{figure_format}",
+    ) -> Union[PosixPath, None]:
         """Plot satellite observation overview
     
         Args:
@@ -1105,7 +1145,9 @@ class GnssPlot:
         Returns:
            Figure path or None if necessary datasets could not be read
         """
-        figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format)
+        figure_path = self._replace_file_variables(
+                            file_pattern = self.figure_dir / figure_name,
+        )
         log.debug(f"Plot {figure_path}.")
     
         # Limit x-axis range to rundate
@@ -1160,9 +1202,9 @@ class GnssPlot:
         
     def plot_tgd_comparison(
                             self, 
-                            figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
+                            figure_name: str="plot_{date}_{solution}.{figure_format}",
 
-    ) -> List[pathlib.PosixPath]:
+    ) -> List[PosixPath]:
         """Plot total/broadcast group delay (TGD/BGD) comparison results
         
         Args:
@@ -1234,7 +1276,10 @@ class GnssPlot:
                     tgd_dcb_sat_percentile.append(np.nanpercentile((np.absolute(tgd_dcb_sat)), 95))
             
                 # Plot average of TGD and DCB by satellite in one plot
-                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb")
+                figure_path = self._replace_file_variables(
+                                    file_pattern = self.figure_dir / figure_name,
+                                    file_vars = {"solution": f"{sys}_{field}_dcb"},
+                )
                 figure_paths.append(figure_path)
                 log.debug(f"Plot {figure_path}.")
                          
@@ -1262,7 +1307,10 @@ class GnssPlot:
                 )
                                
                 # Plot difference average of TGD and DCB by satellite 
-                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb_diff")
+                figure_path = self._replace_file_variables(
+                                    file_pattern = self.figure_dir / figure_name,
+                                    file_vars = {"solution": f"{sys}_{field}_dcb_diff"},
+                )
                 figure_paths.append(figure_path)
                 log.debug(f"Plot {figure_path}.")
                 plt = MatPlotExt()
@@ -1289,7 +1337,10 @@ class GnssPlot:
                 )
                 
                 # RMS
-                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb_diff_rms")
+                figure_path = self._replace_file_variables(
+                                    file_pattern = self.figure_dir / figure_name,
+                                    file_vars = {"solution": f"{sys}_{field}_dcb_diff_rms"},
+                )
                 figure_paths.append(figure_path)
                 log.debug(f"Plot {figure_path}.")
                 plt = MatPlotExt()
@@ -1313,7 +1364,10 @@ class GnssPlot:
                 )
                 
                 # Percentile
-                figure_path = self.figure_dir / figure_name.replace("{FIGURE_FORMAT}", self.figure_format).replace("{solution}", f"{sys}_{field}_dcb_diff_percentile")
+                figure_path = self._replace_file_variables(
+                                    file_pattern = self.figure_dir / figure_name,
+                                    file_vars = {"solution": f"{sys}_{field}_dcb_diff_percentile"},
+                )
                 figure_paths.append(figure_path)
                 log.debug(f"Plot {figure_path}.")
                 plt = MatPlotExt()
@@ -1336,23 +1390,22 @@ class GnssPlot:
                     },
                 )
                 
-
         #
         # Plot TGD, TGD-DCB and TGD_mean - DCB_mean by time
         #         
         for field in tgd_def: 
             
             if field in self.dset.fields:
-                figure_paths = figure_paths + self.plot_field(field)
+                figure_paths = figure_paths + self.plot_field(field, figure_name="plot_{date}_field_{solution}.{figure_format}")
             
             if f"{field}_dcb" in self.dset.fields:
-                figure_paths = figure_paths + self.plot_field(f"{field}_dcb")
+                figure_paths = figure_paths + self.plot_field(f"{field}_dcb", figure_name="plot_{date}_field_{solution}.{figure_format}")
             
             if f"{field}_diff" in self.dset.fields:
-                figure_paths = figure_paths + self.plot_field(f"{field}_diff")
+                figure_paths = figure_paths + self.plot_field(f"{field}_diff", figure_name="plot_{date}_field_{solution}.{figure_format}")
     
             if f"{field}_diff_mean" in self.dset.fields:
-                figure_paths = figure_paths + self.plot_field(f"{field}_diff_mean")
+                figure_paths = figure_paths + self.plot_field(f"{field}_diff_mean", figure_name="plot_{date}_field_{solution}.{figure_format}")
         
         return figure_paths
 
@@ -1502,6 +1555,27 @@ class GnssPlot:
         """
         return np.sqrt(np.nanmean(np.square(x)))
         
+
+    def _replace_file_variables(self, file_pattern: Union[str, PosixPath], file_vars: Dict[str, str] = dict() ) -> PosixPath:
+        """Replace file variables
+        
+        Args:
+            file_pattern:  File pattern with placeholders (e.g. {date})
+            file_vars:     Define additional file variables
+            
+        Returns:
+            File path with replaced placeholders
+        """
+        file_vars = {**self.dset.vars, **self.dset.analysis, **file_vars, "figure_format": self.figure_format}
+        file_path = str(file_pattern)
+
+        for key, value in file_vars.items():
+            key = "{"+key+"}"
+            if key in str(file_pattern):
+                file_path = file_path.replace(key, value)
+                
+        return Path(file_path)
+
         
     def _select_gnss_signal(self, system: Union[str, None]=None) -> Tuple[List[str], str]:
         """Select GNSS signal depending on given data in Dataset
