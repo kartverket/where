@@ -161,7 +161,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
                 else:
                     file_path = self.file_path
 
-                log.debug(f"Parse broadcast orbit file {file_path}")
+                log.info(f"READ: {file_path}")
 
                 # Generate temporary Dataset with orbit file data
                 dset_temp = dataset.Dataset(
