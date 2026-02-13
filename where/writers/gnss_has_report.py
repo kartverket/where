@@ -125,7 +125,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: PosixPath) -> Non
 
         # Plots are only generated for Galileo
         for figure_path in plt.plot_gnss_signal_in_space_status():
-            gnss = figure_path.stem.split("_")[5]
+            gnss = figure_path.stem.split("_")[6]
             if gnss == "galileo":
                 caption=f"Galileo signal-in-space (SIS) status for signal {figure_path.stem.split('_')[-1].upper()}"
             else:
@@ -172,7 +172,7 @@ def _generate_latency_data(
         as values
         
        | Element             | Type                         | Description                                                     |
-       |---------------------|------------------------------|-----------------------------------------------------------------|
+       | :------------------ | :--------------------------- | :-------------------------------------------------------------- |
        | x_arrays            | Dict[str, List[np.ndarray]]  | Time entries for each satellite used as x-array                 |
        | y_arrays            | Dict[str, List[np.ndarray]]  | Latency entries for each satellites used as y-array             |
        | labels              | Dict[str, List[np.ndarray]]  | Satellite labels                                                |
@@ -307,7 +307,7 @@ def _get_galileo_has_orbit_status_data(
     correction are not available otherwise they are available.
 
      | Type  | ORBIT STATUS                 | 
-     |-------|------------------------------|
+     | :---- | :--------------------------- |
      | float | data available               |
      | NaN   | data not available           | 
      
@@ -344,15 +344,12 @@ def _get_galileo_has_orbit_status_data(
 def _plot_has_clock_availability(
                         dset: "Dataset",
                         figure_dir:  PosixPath,
-                        figure_name: str="plot_galileo_has_clock_availability_{system}.{FIGURE_FORMAT}",
-
 ) -> List[PosixPath]:
     """Plot Galileo HAS clock correction availability
     
     Args:
         dset:        A dataset containing the data.
         figure_dir:  Figure directory.
-        figure_name: File name of figure.
     
     Returns:
         List with figure path for Galileo HAS clock correction availability plots. File name ends with GNSS 
@@ -366,7 +363,7 @@ def _plot_has_clock_availability(
     
     for system in dset.unique("system"):
         
-        figure_path = figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT).replace("{system}", system)
+        figure_path = figure_dir / f"plot_galileo_has_clock_availability_{system}.{FIGURE_FORMAT}"
         
         # Generate time and satellite data for given Galileo HAS clock correction status
         x_arrays = []
@@ -418,15 +415,12 @@ def _plot_has_clock_availability(
 def _plot_has_orbit_availability(
                         dset: "Dataset", 
                         figure_dir: PosixPath,
-                        figure_name: str="plot_galileo_has_orbit_availability_{system}.{FIGURE_FORMAT}",
-
 ) -> List[PosixPath]:
     """Plot Galileo HAS orbit correction availability
     
     Args:
         dset:        A dataset containing the data.
         figure_dir:  Figure directory.
-        figure_name: File name of figure.
     
     Returns:
         List with figure path for Galileo HAS orbit correction availability plots. File name ends with GNSS 
@@ -439,7 +433,7 @@ def _plot_has_orbit_availability(
     
     for system in dset.unique("system"):
                   
-        figure_path = figure_dir / figure_name.replace("{FIGURE_FORMAT}", FIGURE_FORMAT).replace("{system}", system)
+        figure_path = figure_dir / f"plot_galileo_has_orbit_availability_{system}.{FIGURE_FORMAT}" 
         
         # Generate time and satellite data for given Galileo HAS orbit correction status
         x_arrays = []
@@ -492,15 +486,12 @@ def _plot_has_orbit_availability(
 def _plot_has_correction(
                         dset: "Dataset",
                         figure_dir: PosixPath,
-                        figure_name: str="plot_{solution}.{FIGURE_FORMAT}",
-
 ) -> List[PosixPath]:
     """Plot Galileo HAS correction results
     
     Args:
         dset:        A dataset containing the data.
         figure_dir:  Figure directory.
-        figure_name: File name of figure.
     
     Returns:
         List with figure path for Galileo HAS correction plots. File name includes GNSS identifier
