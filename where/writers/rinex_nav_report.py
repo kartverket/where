@@ -99,7 +99,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
 
         # Plots are only generated for Galileo
         for figure_path in plt.plot_gnss_signal_in_space_status():
-            gnss = figure_path.stem.split("_")[5]
+            gnss = figure_path.stem.split("_")[6]
             if gnss == "galileo":
                 caption=f"Galileo signal-in-space (SIS) status for signal {figure_path.stem.split('_')[-1].upper()}"
             else:
@@ -124,7 +124,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
 
         # Plot GNSS navigation message overview (except if only Galileo system is available)
         if not (len(dset.unique("system")) == 1 and dset.unique("system")[0] == "E"):
-            path = figure_dir / f"plot_bar_navigation_num_msg.{FIGURE_FORMAT}"
+            path = figure_dir / f"plot_{dset.analysis['date']}_bar_navigation_num_msg.{FIGURE_FORMAT}"
             plt = MatPlotExt()
             plt.plot_bar_dataframe_columns(
                 df,
@@ -157,7 +157,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
             for column in ylabel.keys():
                 if sum(df[column]) == 0:  # Skip plotting
                     continue
-                path = figure_dir / f"plot_bar_navigation_{column}.{FIGURE_FORMAT}"
+                path = figure_dir / f"plot_{dset.analysis['date']}_bar_navigation_{column}.{FIGURE_FORMAT}"
                 plt = MatPlotExt()
                 plt.plot_bar_dataframe_columns(
                     df_galileo, 
@@ -191,7 +191,7 @@ def _add_to_report(dset: "Dataset", rpt: "Report", figure_dir: "pathlib.PosixPat
             plt = GnssPlot(dset, figure_dir, figure_format=FIGURE_FORMAT)
             for figure_path in plt.plot_tgd_comparison():
                 words = figure_path.stem.split("_")
-                gnss = words[2] if words[1] == "field" else words[1]
+                gnss = words[3] if words[2] == "field" else words[2]
 
                 if str(figure_path.stem).startswith("plot_field") and "dcb." in str(figure_path): 
                     caption=f"TGD/BGD determined based on postprocessed DCBs for {enums.gnss_id_to_name[gnss].value}"               
