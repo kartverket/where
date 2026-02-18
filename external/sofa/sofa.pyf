@@ -160,6 +160,29 @@ python module sofa ! in
             double precision, intent(in) :: refb
             double precision dimension(30), intent(out) :: astrom
         end subroutine iau_apio
+        subroutine iau_atcc13(rc,dc,pr,pd,px,rv,date1,date2,ra,da) ! in :sofa:atcc13.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(out) :: ra
+            double precision, intent(out) :: da
+        end subroutine iau_atcc13
+        subroutine iau_atccq(rc,dc,pr,pd,px,rv,astrom,ra,da) ! in :sofa:atccq.for
+            double precision, intent(in) :: rc
+            double precision, intent(in) :: dc
+            double precision, intent(in) :: pr
+            double precision, intent(in) :: pd
+            double precision, intent(in) :: px
+            double precision, intent(in) :: rv
+            double precision dimension(30), intent(in) :: astrom
+            double precision, intent(out) :: ra
+            double precision, intent(out) :: da
+        end subroutine iau_atccq
         subroutine iau_atci13(rc,dc,pr,pd,px,rv,date1,date2,ri,di,eo) ! in :sofa:atci13.for
             double precision, intent(in) :: rc
             double precision, intent(in) :: dc
@@ -532,7 +555,7 @@ python module sofa ! in
             double precision, intent(out) :: d2
             integer, intent(out) :: j
         end subroutine iau_dtf2d
-        subroutine iau_eceq06(date1, date2, dl, db, dr, dd) ! in :sofa:eceq06.for
+        subroutine iau_eceq06(date1,date2,dl,db,dr,dd) ! in :sofa:eceq06.for
         	double precision, intent(in) :: date1
         	double precision, intent(in) :: date2
         	double precision, intent(in) :: dl
@@ -540,11 +563,11 @@ python module sofa ! in
         	double precision, intent(out) :: dr
         	double precision, intent(out) :: dd
         end subroutine iau_eceq06
-        subroutine iau_ecm06(date1,date2,rm) ! in ecm06.for
-    		double precision, intent(in) :: date1
-    		double precision, intent(in) :: date2
-    		double precision dimension(3,3), intent(out) :: rm
-		end subroutine iau_ecm06
+        subroutine iau_ecm06(date1,date2,rm) ! in :sofa:ecm06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,3), intent(out) :: rm
+        end subroutine iau_ecm06
         function iau_ee00a(date1,date2) ! in :sofa:ee00a.for
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
@@ -615,14 +638,14 @@ python module sofa ! in
             double precision dimension(3,2), intent(out) :: pvb
             integer, intent(out) :: jstat
         end subroutine iau_epv00
-        subroutine iau_eqec06(date1,date2,dr,dd,dl,db) ! in eqec06.for
-    		double precision, intent(in) :: date1
-    		double precision, intent(in) :: date2
-    		double precision, intent(in) :: dr
-    		double precision, intent(in) :: dd
-    		double precision, intent(out) :: dl
-    		double precision, intent(out) :: db
-		end subroutine iau_eqec06
+        subroutine iau_eqec06(date1,date2,dr,dd,dl,db) ! in :sofa:eqec06.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision, intent(in) :: dr
+            double precision, intent(in) :: dd
+            double precision, intent(out) :: dl
+            double precision, intent(out) :: db
+        end subroutine iau_eqec06
         function iau_eqeq94(date1,date2) ! in :sofa:eqeq94.for
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
@@ -689,6 +712,41 @@ python module sofa ! in
             double precision, intent(in) :: t
             double precision, intent(out) :: iau_fave03
         end function iau_fave03
+        subroutine iau_fk425(r1950,d1950,dr1950,dd1950,p1950,v1950,r2000,d2000,dr2000,dd2000,p2000,v2000) ! in :sofa:fk425.for
+            double precision, intent(in)  :: r1950
+            double precision, intent(in) :: d1950
+            double precision, intent(in) :: dr1950
+            double precision, intent(in) :: dd1950
+            double precision, intent(in) :: p1950
+            double precision, intent(in) :: v1950
+            double precision, intent(out) :: r2000
+            double precision, intent(out) :: d2000
+            double precision, intent(out) :: dr2000
+            double precision, intent(out) :: dd2000
+            double precision, intent(out) :: p2000
+            double precision, intent(out) :: v2000
+        end subroutine iau_fk425
+        subroutine iau_fk45z(r1950,d1950,bepoch,r2000,d2000) ! in :sofa:fk45z.for
+            double precision, intent(in) :: r1950
+            double precision, intent(in) :: d1950
+            double precision, intent(in) :: bepoch
+            double precision, intent(out) :: r2000
+            double precision, intent(out) :: d2000
+        end subroutine iau_fk45z
+        subroutine iau_fk524(r2000,d2000,dr2000,dd2000,p2000,v2000,r1950,d1950,dr1950,dd1950,p1950,v1950) ! in :sofa:fk524.for
+            double precision, intent(in) :: r2000
+            double precision, intent(in) :: d2000
+            double precision, intent(in) :: dr2000
+            double precision, intent(in) :: dd2000
+            double precision, intent(in) :: p2000
+            double precision, intent(in) :: v2000
+            double precision, intent(out) :: r1950
+            double precision, intent(out) :: d1950
+            double precision, intent(out) :: dr1950
+            double precision, intent(out) :: dd1950
+            double precision, intent(out) :: p1950
+            double precision, intent(out) :: v1950
+        end subroutine iau_fk524
         subroutine iau_fk52h(r5,d5,dr5,dd5,px5,rv5,rh,dh,drh,ddh,pxh,rvh) ! in :sofa:fk52h.for
             double precision, intent(in) :: r5
             double precision, intent(in) :: d5
@@ -703,6 +761,15 @@ python module sofa ! in
             double precision, intent(out) :: pxh
             double precision, intent(out) :: rvh
         end subroutine iau_fk52h
+        subroutine iau_fk54z(r2000,d2000,bepoch,r1950,d1950,dr1950,dd1950) ! in :sofa:fk54z.for
+            double precision, intent(in) :: r2000
+            double precision, intent(in) :: d2000
+            double precision, intent(in) :: bepoch
+            double precision, intent(out) :: r1950
+            double precision, intent(out) :: d1950
+            double precision, intent(out) :: dr1950
+            double precision, intent(out) :: dd1950
+        end subroutine iau_fk54z
         subroutine iau_fk5hip(r5h,s5h) ! in :sofa:fk5hip.for
             double precision dimension(3,3), intent(out) :: r5h
             double precision dimension(3), intent(out) :: s5h
@@ -905,40 +972,45 @@ python module sofa ! in
             double precision, intent(in) :: em
             double precision dimension(3), intent(out) :: p1
         end subroutine iau_ldsun
-        subroutine iau_lteceq(epj,dl,db,dr,dd) ! in lteceq.for
-		    double precision, intent(in) :: epj
-		    double precision, intent(in) :: dl
-		    double precision, intent(in) :: db
-		    double precision, intent(out) :: dr
-		    double precision, intent(out) :: dd
-		end subroutine iau_lteceq
-		subroutine iau_ltecm(epj,rm) ! in ltecm.for
-		    double precision, intent(in) :: epj
-		    double precision dimension(3,3), intent(out) :: rm
-		end subroutine iau_ltecm
-		subroutine iau_lteqec(epj,dr,dd,dl,db) ! in lteqec.for
-		    double precision, intent(in) :: epj
-		    double precision, intent(in) :: dr
-		    double precision, intent(in) :: dd
-		    double precision, intent(out) :: dl
-		    double precision, intent(out) :: db
-		end subroutine iau_lteqec
-		subroutine iau_ltpb(epj,rpb) ! in ltpb.for
-		    double precision, intent(in) :: epj
-		    double precision dimension(3,3), intent(out) :: rpb
-		end subroutine iau_ltpb
-		subroutine iau_ltpecl(epj,vec) ! in ltpecl.for
-		    double precision, intent(in) :: epj
-		    double precision dimension(3), intent(out) :: vec
-		end subroutine iau_ltpecl
-		subroutine iau_ltpequ(epj,veq) ! in ltpequ.for
-		    double precision, intent(in) :: epj
-		    double precision dimension(3), intent(out) :: veq
-		end subroutine iau_ltpequ
-		subroutine iau_ltp(epj,rp) ! in ltp.for
-		    double precision, intent(in) :: epj
-		    double precision dimension(3,3), intent(out) :: rp
-		end subroutine iau_ltp
+        subroutine iau_lteceq(epj,dl,db,dr,dd) ! in :sofa:lteceq.for
+            double precision, intent(in) :: epj
+            double precision, intent(in) :: dl
+            double precision, intent(in) :: db
+            double precision, intent(out) :: dr
+            double precision, intent(out) :: dd
+        end subroutine iau_lteceq
+        subroutine iau_ltecm(epj,rm) ! in :sofa:ltecm.for
+            double precision, intent(in) :: epj
+            double precision dimension(3,3), intent(out) :: rm
+        end subroutine iau_ltecm
+        subroutine iau_lteqec(epj,dr,dd,dl,db) ! in :sofa:lteqec.for
+            double precision, intent(in) :: epj
+            double precision, intent(in) :: dr
+            double precision, intent(in) :: dd
+            double precision, intent(out) :: dl
+            double precision, intent(out) :: db
+        end subroutine iau_lteqec
+        subroutine iau_ltpb(epj,rpb) ! in :sofa:ltpb.for
+            double precision, intent(in) :: epj
+            double precision dimension(3,3), intent(out) :: rpb
+        end subroutine iau_ltpb
+        subroutine iau_ltpecl(epj,vec) ! in :sofa:ltpecl.for
+            double precision, intent(in) :: epj
+            double precision dimension(3), intent(out) :: vec
+        end subroutine iau_ltpecl
+        subroutine iau_ltpequ(epj,veq) ! in :sofa:ltpequ.for
+            double precision, intent(in) :: epj
+            double precision dimension(3), intent(out) :: veq
+        end subroutine iau_ltpequ
+        subroutine iau_ltp(epj,rp) ! in :sofa:ltp.for
+            double precision, intent(in) :: epj
+            double precision dimension(3,3), intent(out) :: rp
+        end subroutine iau_ltp
+        subroutine iau_moon98(date1,date2,pv) ! in :sofa:moon98.for
+            double precision, intent(in) :: date1
+            double precision, intent(in) :: date2
+            double precision dimension(3,2), intent(out) :: pv
+        end subroutine iau_moon98
         subroutine iau_num00a(date1,date2,rmatn) ! in :sofa:num00a.for
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
@@ -1197,11 +1269,10 @@ python module sofa ! in
             double precision, intent(in) :: date2
             double precision dimension(3,3), intent(out) :: rbpn
         end subroutine iau_pnm00b
-        subroutine iau_pnm06a(date1,date2,rnpb) ! in :sofa:pnm06a.for
+        subroutine iau_pnm06a(date1,date2,rbpn) ! in :sofa:pnm06a.for
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
-            double precision dimension(3,3), intent(out) :: rnpb
-        end subroutine iau_pnm06a
+            double precision dimension(3,3), intent(out) :: rbpn
         subroutine iau_pnm80(date1,date2,rmatpn) ! in :sofa:pnm80.for
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
