@@ -46,14 +46,20 @@ config.read_pipeline(pipeline)
 
 # Get data from timeseries dataset
 dset_ts = dataset.Dataset.read(rundate=date(1970,1,1), pipeline=pipeline, stage="timeseries", label="0", session_code="", id=dset_id)
+idx_scale = dset_ts.filter(station="all")
+
+if "vlbi_scale" in dset_ts.fields:
+    scale = dset_ts.vlbi_scale.reshape(-1)
+else:
+    scale = dset_ts.neq_helmert_scale
 
 # Select and discard sessions
 idx_volume = dset_ts.network_volume > volume_limit
 idx_all_good = dset_ts.filter(station="all", status="unchecked")
-idx_nan = np.isnan(dset_ts.neq_helmert_scale)
+idx_nan = np.isnan(scale)
 idx_1 = np.logical_and(np.logical_and(idx_volume, idx_all_good), ~idx_nan)
-scale_rms = np.sqrt(np.mean(dset_ts.neq_helmert_scale[idx_1]**2))
-idx_rms = np.abs(dset_ts.neq_helmert_scale) < rms_limit*scale_rms
+scale_rms = np.sqrt(np.mean(scale[idx_1]**2))
+idx_rms = np.abs(scale) < rms_limit*scale_rms
 idx_2 = np.logical_and(idx_1, idx_rms)
 sort_idx_2 = np.argsort(dset_ts.rundate[idx_2])
 
@@ -71,12 +77,12 @@ idx_3 = np.logical_and(idx_2, idx_before)
 idx_4 = np.logical_and(idx_2, idx_after)
 
 # Perform linear regression
-result_before = linregress(dset_ts.time.utc.decimalyear[idx_3], dset_ts.neq_helmert_scale[idx_3])
+result_before = linregress(dset_ts.time.utc.decimalyear[idx_3], scale[idx_3])
 fitted_before = result_before.intercept + result_before.slope*dset_ts.time.utc.decimalyear[idx_3]
-result_after = linregress(dset_ts.time.utc.decimalyear[idx_4], dset_ts.neq_helmert_scale[idx_4])
+result_after = linregress(dset_ts.time.utc.decimalyear[idx_4], scale[idx_4])
 fitted_after = result_after.intercept + result_after.slope*dset_ts.time.utc.decimalyear[idx_4]
-mean_scale_before = np.mean(dset_ts.neq_helmert_scale[idx_3])
-mean_scale_after = np.mean(dset_ts.neq_helmert_scale[idx_4])
+mean_scale_before = np.mean(scale[idx_3])
+mean_scale_after = np.mean(scale[idx_4])
 mean_time_before = dset_ts.time[idx_3].mean.utc.datetime
 mean_time_after = dset_ts.time[idx_4].mean.utc.datetime
 print(f"Before {discont_epoch.utc.decimalyear}: Slope: {result_before.slope: 6.4f} [ppb/year], Mean = {mean_scale_before: 6.4f} [ppb]")
@@ -84,7 +90,7 @@ print(f"After {discont_epoch.utc.decimalyear}:  Slope: {result_after.slope: 6.4f
 
 # Plot scale with linear regression
 plt.figure(figsize=(12,8), dpi=150)
-plt.scatter(dset_ts.time.utc.datetime[idx_2][sort_idx_2], dset_ts.neq_helmert_scale[idx_2][sort_idx_2], c=dset_ts.network_volume[idx_2][sort_idx_2], marker=".")
+plt.scatter(dset_ts.time.utc.datetime[idx_2][sort_idx_2], scale[idx_2][sort_idx_2], c=dset_ts.network_volume[idx_2][sort_idx_2], marker=".")
 plt.axvline(discont_epoch.utc.datetime, color="black")
 plt.plot(dset_ts.time.utc.datetime[idx_3], fitted_before, color="red")
 plt.plot(dset_ts.time.utc.datetime[idx_4], fitted_after, color="red")
@@ -107,6 +113,8 @@ plt.close()
 fields = ["neq_helmert_T_X", "neq_helmert_T_Y", "neq_helmert_T_Z", "neq_helmert_alpha", "neq_helmert_beta", "neq_helmert_gamma"]
 units = ["mm", "mm", "mm", "mas", "mas", "mas"]
 for f, u in zip(fields,units):
+    if np.isnan(dset_ts[f]).all():
+        continue
     name = f.replace("neq_helmert_", "")
     plt.figure(figsize=(12,8), dpi=150)
     plt.scatter(dset_ts.time[idx_2][sort_idx_2].utc.datetime, dset_ts[f][idx_2][sort_idx_2], c=dset_ts.network_volume[idx_2][sort_idx_2], marker=".")
@@ -142,11 +150,11 @@ for i, t in enumerate(dset_ts.time[idx_2][sort_idx_2].utc.datetime):
     idx_time_upper = dset_ts.time[idx_2][sort_idx_2].utc.datetime < time_upper_limit
     idx_interval = np.logical_and(idx_time_lower, idx_time_upper)
     #print(f"{np.sum(idx_interval)} sessions in interval {time_lower_limit:%Y-%m-%d}-{time_upper_limit:%Y-%m-%d}")
-    running_median[i] = np.median(dset_ts.neq_helmert_scale[idx_2][sort_idx_2][idx_interval])
+    running_median[i] = np.median(scale[idx_2][sort_idx_2][idx_interval])
 
 plt.figure(figsize=(12,8), dpi=150)
 plt.plot(dset_ts.time[idx_2][sort_idx_2].utc.datetime, running_median, color="red")
-plt.scatter(dset_ts.time[idx_2][sort_idx_2].utc.datetime, dset_ts.neq_helmert_scale[idx_2][sort_idx_2], c=dset_ts.network_volume[idx_2][sort_idx_2], marker=".")
+plt.scatter(dset_ts.time[idx_2][sort_idx_2].utc.datetime, scale[idx_2][sort_idx_2], c=dset_ts.network_volume[idx_2][sort_idx_2], marker=".")
 cbar = plt.colorbar()
 cbar.set_label(f"Network volume [Mm^3]")
 plt.title(f"VLBI Scale with running median ({days} days)")
