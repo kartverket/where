@@ -1,4 +1,5 @@
 import argparse
+import calendar
 from datetime import date, datetime, timedelta
 import os
 
@@ -22,10 +23,12 @@ parser.add_argument("--combined", help="Enable this flag to plot all stations in
 parser.add_argument("--export_to_csv", help="Save data to one csv file per station.", action="store_true")
 parser.add_argument("--years", help="Which year to create plots for. Default is all years found in result files.", nargs="+", type=int)
 parser.add_argument("--same_scale", help="Enable this flag to force all plots to use the same scale.", action="store_true")
-
+parser.add_argument("--stack", help="Enable this flag to stack all months on from different years", action="store_true")
+parser.add_argument("--extension", help="File extension for saved images", default="{ext}")
 args = parser.parse_args()
 
 dset_id = args.id
+ext = args.extension
 stations = sorted(args.stations)
 pipeline = "vlbi"
 
@@ -75,6 +78,10 @@ if args.years:
 else:
     years = list(range(min_year, max_year+1))
 
+# Used if args.stack is set    
+stacked = {}
+MONTHS = list(calendar.month_abbr)[1:]
+
 for year in years:
     
     if args.combined:
@@ -99,7 +106,7 @@ for year in years:
     
         fig.suptitle(f"Absolute number of observations for {year}")
         fig.subplots_adjust(top=0.95)
-        plt.savefig(f"{img_dir}/Num_obs_{'_'.join(stations)}_{year}_{dset_id}.png", bbox_inches="tight")
+        plt.savefig(f"{img_dir}/Num_obs_{'_'.join(stations)}_{year}_{dset_id}.{ext}", bbox_inches="tight")
         plt.close()
 
     if args.combined and args.normalized:
@@ -126,7 +133,7 @@ for year in years:
     
         fig.suptitle(f"Normalized number of observations for {year}")
         fig.subplots_adjust(top=0.95)
-        plt.savefig(f"{img_dir}/Num_obs_{'_'.join(stations)}_normalized_{year}_{dset_id}.png", bbox_inches="tight")
+        plt.savefig(f"{img_dir}/Num_obs_{'_'.join(stations)}_normalized_{year}_{dset_id}.{ext}", bbox_inches="tight")
         plt.close()
 
     # Default. Always plot at least these plots
@@ -153,7 +160,7 @@ for year in years:
 
         fig.suptitle(f"Absolute number of observations for {year}")
         #fig.subplots_adjust(top=0.95)
-        plt.savefig(f"{img_dir}/Num_obs_{station}_{year}_{dset_id}.png", bbox_inches="tight")
+        plt.savefig(f"{img_dir}/Num_obs_{station}_{year}_{dset_id}.{ext}", bbox_inches="tight")
         plt.close()
 
     if args.normalized:
@@ -181,9 +188,32 @@ for year in years:
     
             plt.suptitle(f"Normalized number of observations for {year}")
             #fig.subplots_adjust(top=0.95)
-            plt.savefig(f"{img_dir}/Num_obs_{station}_normalized_{year}_{dset_id}.png", bbox_inches="tight")
+            plt.savefig(f"{img_dir}/Num_obs_{station}_normalized_{year}_{dset_id}.{ext}", bbox_inches="tight")
             plt.close()
 
+    if args.stack:
+        for station in stations:
+            sta_dict = stacked.setdefault(station, {})
+            sta_dict.setdefault("scheduled", np.zeros(len(MONTHS)))
+            sta_dict.setdefault("correlated", np.zeros(len(MONTHS)))
+            sta_dict.setdefault("used", np.zeros(len(MONTHS)))
+            for i, m in enumerate(MONTHS):
+                #month_dict = sta_dict.setdefault(m, {})
+                start = datetime(year, i+1, 1)
+                end = datetime(year, i+1, calendar.monthrange(year, i+1)[1])
+                idx = np.logical_and(data[station]["date"] >= start, data[station]["date"] <= end)
+                #month_dict.setdefault("scheduled", 0)
+                #month_dict.setdefault("correlated", 0)
+                #month_dict.setdefault("used", 0)
+                #import IPython; IPython.embed()
+                # Ignore sessions without information about shedule
+                idx_nan = np.isnan(data[station]["scheduled"][idx])
+                sta_dict["scheduled"][i] += np.nansum(data[station]["scheduled"][idx][~idx_nan])
+                sta_dict["correlated"][i] += np.nansum(data[station]["correlated"][idx][~idx_nan])
+                sta_dict["used"][i] += np.nansum(data[station]["used"][idx][~idx_nan])
+    
+    
+        
     if args.export_to_csv:
         for station in stations:
             with open(f"{csv_dir}/num_obs_{station}.csv", "w") as fid:
@@ -195,3 +225,28 @@ for year in years:
                 dates = data[station]["date"]
                 for sc, d, s, r, u in zip(session_codes, dates, scheduled, correlated, used): 
                     fid.write(f"{sc:8}, {d:%Y-%m-%d}, {int(s)}, {int(r)}, {int(u)} \n")
+
+if args.stack:
+    for station in stacked.keys():
+        #import IPython; IPython.embed()
+        plt.bar(MONTHS, stacked[station]["scheduled"], label="Scheduled")
+        plt.bar(MONTHS, stacked[station]["correlated"], label="Correlated")
+        plt.bar(MONTHS, stacked[station]["used"], label="Used")
+        plt.legend()
+        plt.ylabel("Number of observations per month")
+        plt.title(f"{station} from {min_year} to {max_year}")
+        plt.savefig(f"{img_dir}/Num_obs_per_month_{station}_{min_year}_{max_year}_{dset_id}.{ext}", bbox_inches="tight")
+        plt.close()
+        
+        # Normalized 
+        norm_factor = 100/stacked[station]["scheduled"]
+        plt.bar(MONTHS, stacked[station]["scheduled"]*norm_factor, label="Scheduled")
+        plt.bar(MONTHS, stacked[station]["correlated"]*norm_factor, label="Correlated")
+        plt.bar(MONTHS, stacked[station]["used"]*norm_factor, label="Used")
+        plt.legend()
+        plt.ylabel("Normalized number of observations per month")
+        plt.title(f"{station} from {min_year} to {max_year}")
+        plt.savefig(f"{img_dir}/Num_obs_per_month_{station}_normalized_{min_year}_{max_year}_{dset_id}.{ext}", bbox_inches="tight")
+        plt.close()
+        
+        
