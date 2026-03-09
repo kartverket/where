@@ -24,7 +24,7 @@ parser.add_argument("--export_to_csv", help="Save data to one csv file per stati
 parser.add_argument("--years", help="Which year to create plots for. Default is all years found in result files.", nargs="+", type=int)
 parser.add_argument("--same_scale", help="Enable this flag to force all plots to use the same scale.", action="store_true")
 parser.add_argument("--stack", help="Enable this flag to stack all months on from different years", action="store_true")
-parser.add_argument("--extension", help="File extension for saved images", default="{ext}")
+parser.add_argument("--extension", help="File extension for saved images", default="png")
 args = parser.parse_args()
 
 dset_id = args.id
@@ -75,6 +75,8 @@ ylim = (0, max_ylim + max_ylim * 0.01)
 
 if args.years:
     years = args.years
+    min_year = max([min(years)] + [min_year])
+    max_year = min([max(years)] + [max_year])
 else:
     years = list(range(min_year, max_year+1))
 
@@ -248,5 +250,3 @@ if args.stack:
         plt.title(f"{station} from {min_year} to {max_year}")
         plt.savefig(f"{img_dir}/Num_obs_per_month_{station}_normalized_{min_year}_{max_year}_{dset_id}.{ext}", bbox_inches="tight")
         plt.close()
-        
-        
