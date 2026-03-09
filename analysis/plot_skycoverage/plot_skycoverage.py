@@ -24,7 +24,6 @@ def get_residuals(dset_session, station):
     residuals = np.concatenate((residual1, residual2))
     elevation = np.concatenate((elevation1, elevation2))
     azimuth = np.concatenate((azimuth1, azimuth2))
-
     #el1 = np.degrees(elevation1) < 15
     #el2 = np.degrees(elevation2) < 15
     #if station == "NYALE13S" and (any(el1) or any(el2)):
@@ -72,14 +71,14 @@ def plot_skycoverage(residuals, elevation, azimuth, station, label):
     ax.set_thetagrids(range(0, 360, 45), theta_labels)
     cbar = plt.colorbar(im, use_gridspec=True, pad=0.1)
     cbar.set_label("Absolute value of residual after estimation [m]")
-    fig.savefig(f"img/{dset_id}/Skyplot_{station}_{label}_{dset_id}.png", bbox_inches="tight")
+    fig.savefig(f"img/{dset_id}/Skyplot_{station}_{label}_{dset_id}.{extension}", bbox_inches="tight")
     plt.close()
 
 def plot_residual_vs_angle(residuals, angle, angle_txt, station, label):
-    plt.scatter(np.degrees(azimuth), residuals, marker='.')
+    plt.scatter(np.degrees(angle), residuals, marker='.')
     plt.xlabel(f"{angle_txt} angle (degrees)")
     plt.ylabel(f"Residuals")
-    plt.savefig(f"img/{dset_id}/Residual_vs_{angle_txt}_{station}_{label}_{dset_id}.png", bbox_inches="tight")
+    plt.savefig(f"img/{dset_id}/Residual_vs_{angle_txt}_{station}_{label}_{dset_id}.{extension}", bbox_inches="tight")
     plt.close()
 
 # Program starts execution here
@@ -92,13 +91,15 @@ parser.add_argument("--start", help="Start date to look for sessions in master f
 parser.add_argument("--end", help="End date to look for sessions in master files. Format:YYYY-mm-dd", type=date.fromisoformat, default=date.max)
 parser.add_argument("--station", help="Name of a station", nargs="+", type=str, default="NYALE13S")
 parser.add_argument("--session_wise", help="Enable this to get one plot per session. This is time consuming if the time window is large", action="store_true", default=False)
-parser.add_argument("--check_correcation", help="Enable this to look at correlation between residuals and azimuth/elevation", action="store_true", default=False)
+parser.add_argument("--check_correlation", help="Enable this to look at correlation between residuals and azimuth/elevation", action="store_true", default=False)
+parser.add_argument("--extension", help="File extension for image file", default="png")
 args = parser.parse_args()
 
 dset_id = args.id
 stations = list(args.station) if isinstance(args.station, str) else args.station
 start = args.start
 end = args.end
+extension = args.extension
 
 pipeline = "vlbi"
 os.makedirs(f"img/{dset_id}", exist_ok=True)
@@ -150,8 +151,8 @@ for s in stations:
         r, p_value = scipy.stats.pearsonr(acc_r[s], acc_a[s])
         print(f"{dset_id}:The correlation coefficient (r) between residuals and azimuth for {s} is: {r}")
         print(f"{dset_id}:The p-value is: {p_value}")
-        plot_residual_vs_azimuth(acc_r[s], acc_a[s], "Azimuth", s, label=f"{start}_{end}")
+        plot_residual_vs_angle(acc_r[s], acc_a[s], "Azimuth", s, label=f"{start}_{end}")
         r, p_value = scipy.stats.pearsonr(acc_r[s], acc_e[s])
         print(f"{dset_id}:The correlation coefficient (r) between residuals and elevation for {s} is: {r}")
         print(f"{dset_id}:The p-value is: {p_value}")
-        plot_residual_vs_azimuth(acc_r[s], acc_e[s], "Elevation", s, label=f"{start}_{end}")
+        plot_residual_vs_angle(acc_r[s], acc_e[s], "Elevation", s, label=f"{start}_{end}")
