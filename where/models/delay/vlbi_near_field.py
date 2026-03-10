@@ -26,7 +26,7 @@ from where.lib import log
 
 # Constants for shorter equations
 GAMMA = 1 # PPN parameter. Equal to 1 in general relativity 
-C = C
+C = constant.c
 L_G = constant.L_G
 L_C = constant.L_C
 
@@ -60,7 +60,6 @@ def vlbi_near_field_delay(dset):
         "sun",
     ]
     bodies = ["sun", "earth"] # Test only earth
-
     GM = {}
     # Get GM for the celestial bodies
     for body in bodies:
@@ -119,7 +118,7 @@ def vlbi_near_field_delay(dset):
     # Convert to TimeDelta objects
     delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
     delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
-    
+
     t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
@@ -189,7 +188,6 @@ def vlbi_near_field_delay(dset):
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
     # Convert from TT to TCG since the Jaron, et. al (2017) equations work with this
     t_g01 = t_g01_TDB / (1 - L_G)
-
 
     # Save TT(=TDB) value to dset
     _save_detail_to_dataset(dset, "vlbi_nf_grav_1", t_g01_TDB * C, dset.add_float, unit="meter")
@@ -319,3 +317,4 @@ def _save_detail_to_dataset(dset, field, value, func, **kwargs):
         func(field, value, write_level="detail", **kwargs)
 
     return delay * C
+
