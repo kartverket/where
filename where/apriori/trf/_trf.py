@@ -80,7 +80,7 @@ class Trf(collections.UserDict):
         Returns:
             TrfSite: Site closest to the given position. Raises `ValueError` if no site is found within `max_distance`.
         """
-        distances = {k: self[k].distance_to(pos) for k in self.sites if self[k].real}
+        distances = {k: self[k].distance_to(pos) for k in self.data.keys() if self[k].real}
         closest = min(distances, key=distances.get)
 
         # Check that distance is within threshold
@@ -99,8 +99,11 @@ class Trf(collections.UserDict):
         """Find site with given name
         """
         for k in self.sites:
-            if name == self[k].name:
-                return self[k]
+            try:
+                if name == self[k].name:
+                    return self[k]
+            except KeyError:
+                pass
         raise ValueError(f"No site found with name {name} in '{self!r}'")
 
     #

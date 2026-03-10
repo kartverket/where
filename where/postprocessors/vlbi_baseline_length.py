@@ -83,7 +83,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
                     dset.meta["normal equation"]["solution"][y_idx],
                     dset.meta["normal equation"]["solution"][z_idx],
                 ]
-            except AttributeError:
+            except (AttributeError, ValueError):
                 log_and_write("# " + f"{bl_sorted:18} {sta_1} position not estimated", bl_str)
                 continue
 
@@ -97,7 +97,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
                     dset.meta["normal equation"]["solution"][y_idx],
                     dset.meta["normal equation"]["solution"][z_idx],
                 ]
-            except AttributeError:
+            except (AttributeError, ValueError):
                 log_and_write("# " + f"{bl_sorted:18} {sta_2} position not estimated", bl_str)
                 continue
 
@@ -132,7 +132,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
             elif f"vlbi_baseline-{bl_rsorted}" in neq_params:
                 param_idx = neq_params.index(f"vlbi_baseline-{bl_rsorted}")
             else:
-                log_and_write(f"# Baseline {bl_sorted} not estimated")
+                log_and_write(f"# Baseline {bl_sorted} not estimated", bl_str)
                 continue
 
             apriori_bl_length = (pos_apriori_2 - pos_apriori_1).length
@@ -141,7 +141,7 @@ def vlbi_baseline_length(dset: "Dataset") -> None:
             bl_length_ferr = np.sqrt(dset.meta["normal equation"]["covariance"][param_idx][param_idx])
 
         else:
-            log_and_write("No station position or baseline lengths are estimated")
+            log_and_write("No station position or baseline lengths are estimated", bl_str)
             return
 
         dset.meta.add("baseline_length", float(bl_length), section=bl_sorted)

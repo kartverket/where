@@ -72,8 +72,12 @@ class VlbiStationCodesParser(ChainParser):
             name = "---" + line["ivscode"] + "---"
             line["name"] = name
 
-        # If there are multiple entries with the same cdp number use the first
+        # If there are multiple entries with the same cdp number assume the first entry is the real station
         if cdp not in self.data:
             # Store data twice with different keys
             self.data[cdp] = line
             self.data[name] = line_copy
+            self.data[name]["real"] = True
+        else:
+            self.data[name] = line_copy
+            self.data[name]["real"] = False
