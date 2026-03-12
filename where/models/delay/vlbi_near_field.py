@@ -319,76 +319,37 @@ def grav_delay(dset):
         Numpy array: Gravitational delay in meters for each observation.
     """
     
-    eph = apriori.get("ephemerides", time=dset.time)
-    grav_delay = np.zeros(dset.num_obs)
-    
-    # List of celestial bodies. Major moons are also recommended, like Titan, Ganymedes, ...
-    bodies = [
-        "mercury barycenter",
-        "venus barycenter",
-        "earth",
-        "moon",
-        "mars barycenter",
-        "jupiter barycenter",
-        "saturn barycenter",
-        "uranus barycenter",
-        "neptune barycenter",
-        "pluto barycenter",
-        "sun",
-    ]
-    
-    #TODO
-    return 0
-    
-    gamma = 1 # PPN parameter. Equal to 1 in general relativity
-    
-    factor = (1 + gamma)/constant.c**2 # Multiplication factor repeated frequently in equation
-    GM_sun = constant.get("sun", source=eph.ephemerides)
-    
-    S_factor = factor * constant.G * GM_sun # S is short for Sun
-    # index 0 is satelitte
-    # index 1 or 2 is station
-    # index 01 and 02 is vector between station and satellite
-    # Capital R is barycentric position/vector
-    
-    # TODO: Confirm this. What about time scale?
-    # Ref. IERS 2010 conventions eq. 11.6 used for grav delay in consensus model
-    # Transformation between BCRS and GRCS is approximated by X_bcrs = X_earth + X_gcrs
-    R_S_T0 = eph.pos_bcrs("sun")
-    R_S_T1 = eph.pos_brcs("sun")
-    R_1 = eph.pos_bcrs("earth") + dset.site_pos_1.gcrs.pos.val
-    R_0 = eph.pos_bcrs("earth") + dset.sat_pos.gcrs.pos.val
-    
-    R_01 = R_1 - R_0
-    R_0_S = R_0 - R_S # eq. 16
-    R_1_S = R_1 - R_S # eq. 16
-    grav_delay_sun = S_factor/constant.c * \
-        np.log((R_0_S + R_1_S + R_01_S + S_factor)/(R_0_S + R_1_S - R_01_S + S_factor))
-
-    import matplotlib.pyplot as plt; from datetime import datetime
-    for bl in dset.unique("baseline"):
-        idx = dset.filter(baseline=bl)
-        alpha = np.ones(np.sum(idx))
-        alpha[dset.sat_visible[idx] == False] = 0.1
-        for body in bodies + ["sun"]:
-            plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_1"][idx]/C, alpha=alpha, label=f"{body}_1")
-            #plt.scatter(t1.datetime[idx], dset.vlbi_nf_grav_sun_1[idx]/C, alpha=alpha, label="sun_1")
-            plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_2"][idx]/C, alpha=alpha, label=f"{body}_2")
-            #plt.scatter(t1.datetime[idx], dset.vlbi_nf_grav_sun_2[idx]/C, alpha=alpha, label="sun_2")
-        plt.legend(ncol=2, loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.title(bl)
-        plt.show()
+    ## For debugging. See if satellite is above horizon for both stations
+    debug = False
+    if debug:
+        e1 = dset.site_pos_1.elevation_to(dset.sat_pos)
+        e2 = dset.site_pos_2.elevation_to(dset.sat_pos)
+        sat_visible = (e1 > 0) & (e2 > 0)
         
-        for body in bodies + ["sun"]:
-            y = (dset[f"vlbi_nf_grav_{body}_2"][idx] - dset[f"vlbi_nf_grav_{body}_1"][idx])/C
-        #plt.scatter(t1.datetime[idx], (dset.vlbi_nf_grav_earth_2 - dset.vlbi_nf_grav_earth_1)[idx]/C, alpha=alpha, label="diff_earth")
-        #plt.scatter(t1.datetime[idx], (dset.vlbi_nf_grav_sun_2 - dset.vlbi_nf_grav_sun_1)[idx]/C, alpha=alpha, label="diff_sun")
-        plt.scatter(t1.datetime[idx], y, alpha=alpha, label=f"diff_{body}")
-        plt.legend(ncol=1, loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.title(bl)
-        plt.show()
-
-    #import IPython; IPython.embed()
+        _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
+    
+        import matplotlib.pyplot as plt; from datetime import datetime
+        for bl in dset.unique("baseline"):
+            idx = dset.filter(baseline=bl)
+            alpha = np.ones(np.sum(idx))
+            alpha[dset.sat_visible[idx] == False] = 0.1
+            for body in bodies + ["sun"]:
+                plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_1"][idx]/C, alpha=alpha, label=f"{body}_1")
+                plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_2"][idx]/C, alpha=alpha, label=f"{body}_2")
+            plt.legend(ncol=2, loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.title(bl)
+            plt.tight_layout()
+            plt.show()
+            
+            for body in bodies + ["sun"]:
+                y = (dset[f"vlbi_nf_grav_{body}_2"][idx] - dset[f"vlbi_nf_grav_{body}_1"][idx])/C
+                plt.scatter(t1.datetime[idx], y, alpha=alpha, label=f"diff_{body}")
+            plt.legend(ncol=1, loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.title(bl)
+            plt.tight_layout()
+            plt.show()
+    
+        #import IPython; IPython.embed()
 
     return delay * C # Convert to meter
 
@@ -397,3 +358,4 @@ def _save_detail_to_dataset(dset, field, value, func, **kwargs):
         dset[field][:] = value
     else:
         func(field, value, write_level="detail", **kwargs)
+
