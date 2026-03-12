@@ -21,6 +21,9 @@ mg_position.register_attribute(mg_position.VelocityDeltaArray, "time")
 mg_position.register_attribute(mg_position.PositionDeltaArray, "time")
 mg_position.register_attribute(mg_position.PosVelDeltaArray, "time")
 
+# test new stuff
+mg_position.register_attribute(mg_position.PosVelArray, "other_2")
+
 #
 # New position systems
 #
