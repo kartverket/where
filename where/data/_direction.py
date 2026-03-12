@@ -351,10 +351,18 @@ class DirectionArray(np.ndarray):
         """Unit vector"""
         return np.asarray(self)
 
-    def direction_from(self, _):
+    def direction_from(self, site_pos):
         """Calcualte direction vector from position ignoring the motion of the Earth"""
         # Ignore station position
-        return self.unit_vector
+        direction = self.unit_vector
+        #import IPython; IPython.embed()
+        if site_pos.other_2 is not None:
+            direction_2 = site_pos.direction_to(site_pos.other_2)
+            # TODO: Make sure direction is NaN when observing satellites
+            idx_other_2 = np.isnan(direction)
+            direction[idx_other_2] = direction_2[idx_other_2]
+
+        return direction
 
     def __hash__(self):
         return hash(self.tobytes())
