@@ -275,38 +275,36 @@ def vlbi_near_field_delay(dset):
 
     
     ## For debugging. See if satellite is above horizon for both stations
-    s1 = dset.site_pos_1.copy()
-    s1.other = dset.sat_pos
-    s2 = dset.site_pos_2.copy()
-    s2.other = dset.sat_pos
-    sat_visible = (s1.elevation > 0) & (s2.elevation > 0)
-    
-    _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
-
-    import matplotlib.pyplot as plt; from datetime import datetime
-    for bl in dset.unique("baseline"):
-        idx = dset.filter(baseline=bl)
-        alpha = np.ones(np.sum(idx))
-        alpha[dset.sat_visible[idx] == False] = 0.1
-        for body in bodies + ["sun"]:
-            plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_1"][idx]/C, alpha=alpha, label=f"{body}_1")
-            #plt.scatter(t1.datetime[idx], dset.vlbi_nf_grav_sun_1[idx]/C, alpha=alpha, label="sun_1")
-            plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_2"][idx]/C, alpha=alpha, label=f"{body}_2")
-            #plt.scatter(t1.datetime[idx], dset.vlbi_nf_grav_sun_2[idx]/C, alpha=alpha, label="sun_2")
-        plt.legend(ncol=2, loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.title(bl)
-        plt.show()
+    debug = False
+    if debug:
+        e1 = dset.site_pos_1.elevation_to(dset.sat_pos)
+        e2 = dset.site_pos_2.elevation_to(dset.sat_pos)
+        sat_visible = (e1 > 0) & (e2 > 0)
         
-        for body in bodies + ["sun"]:
-            y = (dset[f"vlbi_nf_grav_{body}_2"][idx] - dset[f"vlbi_nf_grav_{body}_1"][idx])/C
-        #plt.scatter(t1.datetime[idx], (dset.vlbi_nf_grav_earth_2 - dset.vlbi_nf_grav_earth_1)[idx]/C, alpha=alpha, label="diff_earth")
-        #plt.scatter(t1.datetime[idx], (dset.vlbi_nf_grav_sun_2 - dset.vlbi_nf_grav_sun_1)[idx]/C, alpha=alpha, label="diff_sun")
-        plt.scatter(t1.datetime[idx], y, alpha=alpha, label=f"diff_{body}")
-        plt.legend(ncol=1, loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.title(bl)
-        plt.show()
-
-    #import IPython; IPython.embed()
+        _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
+    
+        import matplotlib.pyplot as plt; from datetime import datetime
+        for bl in dset.unique("baseline"):
+            idx = dset.filter(baseline=bl)
+            alpha = np.ones(np.sum(idx))
+            alpha[dset.sat_visible[idx] == False] = 0.1
+            for body in bodies + ["sun"]:
+                plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_1"][idx]/C, alpha=alpha, label=f"{body}_1")
+                plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_2"][idx]/C, alpha=alpha, label=f"{body}_2")
+            plt.legend(ncol=2, loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.title(bl)
+            plt.tight_layout()
+            plt.show()
+            
+            for body in bodies + ["sun"]:
+                y = (dset[f"vlbi_nf_grav_{body}_2"][idx] - dset[f"vlbi_nf_grav_{body}_1"][idx])/C
+                plt.scatter(t1.datetime[idx], y, alpha=alpha, label=f"diff_{body}")
+            plt.legend(ncol=1, loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.title(bl)
+            plt.tight_layout()
+            plt.show()
+    
+        #import IPython; IPython.embed()
 
     return delay * C # Convert to meter
 
@@ -315,6 +313,4 @@ def _save_detail_to_dataset(dset, field, value, func, **kwargs):
         dset[field][:] = value
     else:
         func(field, value, write_level="detail", **kwargs)
-
-    return delay * C
 
