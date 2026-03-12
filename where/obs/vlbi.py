@@ -220,6 +220,8 @@ def _write_to_dataset(parser, dset, rundate, session_code):
     pos = orbit[sat]["pos"](dset.time)
     vel = orbit[sat]["vel"](dset.time)
     dset.add_posvel("sat_pos", np.concatenate((pos,vel), axis=1), system="trs", time=dset.time)
+    dset.site_pos_1.other_2 = dset.sat_pos
+    dset.site_pos_2.other_2 = dset.sat_pos
     #
     # ## Test
     # import matplotlib.pyplot as plt
