@@ -417,8 +417,7 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
         Matplotlib configuration options
     """
     # Change fontsize of labels
-    fontsize = config.where.gnss_plot.get("fontsize", default=10).str
-    fontsize = 9 if not fontsize else int(fontsize)
+    fontsize = 9 
     plt.rcParams["axes.titlesize"] = fontsize
     plt.rcParams["axes.labelsize"] = fontsize
     plt.rcParams["font.size"] = fontsize
@@ -429,22 +428,20 @@ def _set_plot_config(title: str) -> Dict[str, Any]:
 
     # Define additional matplotlib/plot configuration
     options = {
-        "alpha": config.where.gnss_plot.get("alpha", default=1).int,
-        "dpi": config.where.gnss_plot.get("dpi", default=200).int,
-        "color": config.where.gnss_plot.get("color", default="").str,
-        "colormap": config.where.gnss_plot.get("colormap", default="tab10").str,
-        "figsize": tuple([int(v) for v in config.where.gnss_plot.get("figsize", default="8,6").list]),
+        "alpha": 1,
+        "dpi": 200,
+        "color": "",
+        "colormap": "tab10",
+        "figsize": tuple([8,6]),
         "fontsize": fontsize,
-        "legend": config.where.gnss_plot.get("legend", default=True).bool,
-        "marker": config.where.gnss_plot.get("marker", default=".").str,
-        "markersize": config.where.gnss_plot.get("markersize", default=9).int,
+        "legend": True,
+        "marker": ".",
+        "markersize": 5,
         "plot_to": "file",
         "sharey": False,
         "statistic": ["rms", "mean", "std", "min", "max", "percentile"],
-        "subplot": config.where.gnss_plot.get("subplot", default=True).bool,
-        "title": config.where.gnss_plot.get("title", default=" ").str
-        if config.where.gnss_plot.get("title", default=" ").str
-        else title,
+        "subplot": True,
+        "title": "",
     }
 
     return options
