@@ -107,13 +107,19 @@ class CorrelationReportParser(Parser):
         self.data["stations"].update(sta2letter)
         self.data["stations"].update(name2letter)
         
-        self.data["qcodes"] = {}
-        # Skip the 'total' column and 'total' row
+        # Skip the 'total' column and 'total' row (Explains [:-1] indexing)
         keys = list(self.raw["QCODES"].keys())[:-1]
-        data_type = [(k, "i4") for k in keys[1:]]
-        data_type.insert(0, (keys[0], "U5"))
-        num_entries = len(self.raw["QCODES"][keys[0]][:-1])
+        keys0 = keys.pop(0)
+        bl, band = keys0.split(":")
+        data_type = [(k, "i4") for k in keys]
+        data_type.insert(0, (band, "U2"))
+        data_type.insert(0, (bl, "U2"))
+        num_entries = len(self.raw["QCODES"][keys[-1]][:-1])
         self.data["qcodes"] = np.empty(num_entries, dtype=data_type)
         for k in keys:
             self.data["qcodes"][k] = self.raw["QCODES"][k][:-1]
 
+        split_bl_band = np.char.split(self.raw["QCODES"]["bl:band"][:-1], ":")
+        bl_data, band_data = np.array(list(zip(*split_bl_band)))
+        self.data["qcodes"][bl] = bl_data
+        self.data["qcodes"][band] = band_data
