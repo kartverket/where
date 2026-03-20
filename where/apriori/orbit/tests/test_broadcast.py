@@ -42,7 +42,6 @@ class TestBroadcast(unittest.TestCase):
              .865800000000D+05  .000000000000D+00  .000000000000D+00  .000000000000D+00
         */
 
-
         The second test set up compares results from Where against gLAB solution for satellite G20 and epoch
         2016-03-01 00:00:00.0.
 
@@ -71,6 +70,10 @@ class TestBroadcast(unittest.TestCase):
              3.120000000000e+00 0.000000000000e+00-2.328306436539e-08 0.000000000000e+00
              1.735000000000e+05 
 
+
+        Reference:
+            Remondi, B. W. (2004): Computing satellite velocity using the broadcast ephemeris, 
+            GPS Solutions (2004) 8:181–183, DOI 10.1007/s10291-004-0094-6 
         """
 
         # Get GNSS ephemeris data for testing
@@ -86,7 +89,13 @@ class TestBroadcast(unittest.TestCase):
             self.system = "G"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat = 86400.00
+            #self.t_sat = 86400.00
+            self.transmission_time = Time(
+                    val=1886, # GPS week
+                    val2=86400.00,  # Transmission time in GPS seconds
+                    scale="gps", 
+                    fmt="gps_ws",
+            )
 
         elif TEST == "test_2":
             file_key = "test_apriori_orbit_broadcast_2"
@@ -100,7 +109,13 @@ class TestBroadcast(unittest.TestCase):
             self.system = "G"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat = 172799.92312317
+            #DELETE self.t_sat = 172799.92312317         
+            self.transmission_time = Time(
+                    val=1886, # GPS week
+                    val2=172799.92312317,  # Transmission time in GPS seconds
+                    scale="gps", 
+                    fmt="gps_ws",
+            )
 
         elif TEST == "test_3":
             file_key = "test_apriori_orbit_broadcast_3"
@@ -114,7 +129,13 @@ class TestBroadcast(unittest.TestCase):
             self.system = "E"  # GNSS identifier
 
             # Satellite transmission time
-            self.t_sat = 173699.999
+            #DELETE self.t_sat = 173699.999
+            self.transmission_time = Time(
+                    val=1886, # GPS week
+                    val2=173699.999,  # Transmission time in GPS seconds
+                    scale="gps", 
+                    fmt="gps_ws",
+            )
 
         rundate = datetime(year, month, day, hour, minute)
         time = Time(
@@ -127,25 +148,29 @@ class TestBroadcast(unittest.TestCase):
             fmt="isot",
             scale="gps",
         )
-
-        self.brdc = apriori.get(
+        
+        brdc = apriori.get(
             "orbit",
             apriori_orbit="broadcast",
             rundate=rundate,
-            time=time,
-            satellite=tuple({satellite}),
+            #satellite=tuple({satellite}),
             system=tuple({self.system}),
             station="test",
             file_key=file_key,
         )
-
+        
         self.idx = 0  # Broadcast ephemeris index
 
     def test_get_corrected_broadcast_ephemeris(self):
         """
         The test is based on the bc_velo.c program, which is published in :cite:`remondi2004`.
         """
-        brdc_dict = self.brdc._get_corrected_broadcast_ephemeris(self.t_sat, self.idx, self.system)
+        brdc_dict = self.brdc._get_corrected_broadcast_ephemeris(
+                                    self.transmission_time.gps_ws.week, 
+                                    self.transmission_time.gps_ws.seconds,
+                                    self.idx, 
+                                    self.system,
+        )
 
         if TEST == "test_1":
             expected_a = np.array([26561612.084130041])  # Semimajor axis
@@ -220,7 +245,12 @@ class TestBroadcast(unittest.TestCase):
         """
         The test is based on the bc_velo.c program, which is published in :cite:`remondi2004`.
         """
-        sat_pos, sat_vel = self.brdc._get_satellite_position_velocity(self.t_sat, self.idx, self.system)
+        sat_pos, sat_vel = self.brdc._get_satellite_position_velocity(
+                                    self.transmission_time.gps_ws.week, 
+                                    self.transmission_time.gps_ws.seconds,
+                                    self.idx, 
+                                    self.system,        
+        )
 
         if TEST == "test_1":
             expected_sat_pos = np.array([-12611434.19782218677, -13413103.97797041245, 19062913.07357876940])
@@ -260,7 +290,12 @@ class TestBroadcast(unittest.TestCase):
         np.testing.assert_allclose(sat_clk_corr, expected_sat_clk_corr, rtol=0, atol=1e-5)
 
     def test_get_relativistic_clock_correction(self):
-        rel_clk_corr = self.brdc._get_relativistic_clock_correction(self.t_sat, self.idx, self.system)
+        rel_clk_corr = self.brdc._get_relativistic_clock_correction(
+                                    self.transmission_time.gps_ws.week, 
+                                    self.transmission_time.gps_ws.seconds,
+                                    self.idx, 
+                                    self.system,        
+        )
 
         if TEST == "test_1":
             expected_rel_clk_corr = -0.012570413426601913
