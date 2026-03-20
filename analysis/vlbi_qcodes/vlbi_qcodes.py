@@ -1,3 +1,28 @@
+""" Reads vlbi correlator reports and creates csv files for each station
+
+
+QCODES definitions
+* 0        no fringe detected
+
+* 1-9      fringe detected, higher value means better quality
+
+* B        fourfit interpolation error
+
+* D        no data in one or more frequency channels
+
+* E        fringe found at edge of SBD, MBD, or rate window
+
+* F        fork problem in processing
+
+* G        channel amplitude diverges too far from mean amplitude
+
+* H        low phase-cal amplitude in one or more channels
+
+* N        correlation or fringing failed
+
+* -        correlation not attempted
+"""
+
 # Standard library imports
 import argparse
 from datetime import datetime
@@ -16,10 +41,11 @@ from where.lib import config
 
 # Setup input argument parser for script 
 parser = argparse.ArgumentParser(epilog="Example: python vlbi_qcodes.py Nn --start_year=2024 --end_year=2025",
+                                 description="Reads vlbi correlator reports from vgosdb and accumulates the qcodes for each specified station. Results are written to a csv file.",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("station", help="Station name or two letter code", type=str)
-parser.add_argument("--start_year", help="Start year", type=int)
-parser.add_argument("--end_year", help="End year", type=int)
+parser.add_argument("station", help="Station names or two letter codes", nargs="+", type=str)
+parser.add_argument("--start_year", help="Read reports from this year and onwards", type=int, default=1979)
+parser.add_argument("--end_year", help="Read reports up until and including this year", type=int, default=datetime.now().year)
 
 # Setup config to make apriori modules work
 pipeline = "vlbi"
@@ -28,37 +54,51 @@ config.files.profiles = [pipeline]
 config.read_pipeline(pipeline)
 
 args = parser.parse_args()
-start = args.start_year if args.start_year else 1979 
-end = args.end_yaer if args.end_year else datetime.now().year
-station = args.station
+start = args.start_year
+end = args.end_year
+stations = args.station
 
 # Create output directories
 csvdir = "csv"
 os.makedirs(csvdir, exist_ok=True)
-csvfile = f"{csvdir}/qcodes_{station}_{start}_{end}.csv"
 
-QCODES = [ '0',  '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8', '9',  'G',  'H',  'N',  '-']
+QCODES = [ '0',  '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8', '9',  'B', 'D', 'E', 'F', 'G',  'H',  'N',  '-']
 header = ["VgosDB"] + [f"Total_{code}" for code in QCODES]
 header = ",".join(header) + "\n"
 
-with open(csvfile, 'w') as fid:
-    fid.write(header)
-    for year in range(start, end + 1):
-        master = apriori.get("vlbi_master_schedule", rundate=datetime(year,1, 1))
-        for session in master:
-            rundate = datetime.strptime(master[session]["date"],"%Y%m%d")
-            file_vars = config.create_file_vars(rundate, pipeline, session_code=session)
-            config.init(rundate, pipeline, session_code=session)
-            pipeline_file_vars = plugins.call(
-                package_name="where.pipelines", plugin_name=pipeline, part="file_vars", file_vars=file_vars
-            )
-            file_vars.update(pipeline_file_vars)
-            parser = parsers.parse_key(f"vlbi_obs_vgosdb", file_vars)
-            report = parser.data["correlation_report"]
-            
-            sta_letter = report["stations"][station]
+fids = {}
+for s in stations:
+    csvfile = f"{csvdir}/qcodes_{s}_{start}_{end}.csv"
+    fids[s] = open(csvfile, 'w')
+    fids[s].write(header)
+
+
+for year in range(start, end + 1):
+    master = apriori.get("vlbi_master_schedule", rundate=datetime(year,1, 1))
+    for session in master:
+        rundate = datetime.strptime(master[session]["date"],"%Y%m%d")
+        file_vars = config.create_file_vars(rundate, pipeline, session_code=session)
+        vgosdb = f"{master[session]['date']}-{session}"
+        #print(f"Parsing {vgosdb}")
+        parser = parsers.parse_key(f"vlbi_corr_report_vgosdb", file_vars)
+        if not config.files.path(f"vlbi_corr_report_vgosdb", file_vars).exists():
+            print(f"No correlation report found. Skipping {vgosdb}")
+            continue
+        report = parser.data
+        if not report:
+            print(f"No correlation report with supported format. Skipping {vgosdb}")
+            continue
+        for s in stations:
+            try:
+                sta_letter = report["stations"][s]
+            except KeyError:
+                # station not in session
+                continue
             sta_idx = np.char.find(report["qcodes"]["bl"], sta_letter) > 0
-            sum_qcodes = [str(np.sum(report["qcodes"][code][sta_idx])) for code in QCODES]
-            sum_qcodes.insert(0, file_vars["input_data_name"])
+            sum_qcodes = [str(np.sum(report["qcodes"][code][sta_idx])) if code in report["qcodes"].dtype.names else '0' for code in QCODES]
+            sum_qcodes.insert(0, vgosdb)
             line = ','.join(sum_qcodes) + "\n"
-            fid.write(line) 
+            fids[s].write(line)
+
+for fid in fids.values():
+    fid.close()
