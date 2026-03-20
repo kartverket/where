@@ -39,24 +39,27 @@ class AprioriOrbit:
         Args:
             rundate:    Date of model run.
         """
-        # MURKS: Should it be done like that. The technique is normally not given for unittest routines (like
+        # Setting of pipeline, profile and id_ is needed in case of no configuration information is given (e.g. in case
+        # of unit testing)
+        #
+        # TODO: Should it be done like that. The technique is normally not given for unittest routines (like
         #       test_broadcast.py).
         try:
             pipeline = config.tech.pipeline.str
-        except exceptions.MissingEntryError:
+        except (exceptions.MissingEntryError, exceptions.MissingSectionError):
             pipeline = None
 
         # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
         try:
             profile = config.tech.profile.str
-        except exceptions.MissingEntryError:
+        except (exceptions.MissingEntryError, exceptions.MissingSectionError):
             profile = None
 
         try:
             id_ = config.tech.id.str
-        except exceptions.MissingEntryError:
+        except (exceptions.MissingEntryError, exceptions.MissingSectionError):
             id_ = None
-
+        
         self.rundate = rundate
         self.pipeline = pipeline
 
@@ -123,7 +126,6 @@ class AprioriOrbit:
         if not dset.num_obs:
             log.fatal("Dataset is empty. No observation epochs given for calculating orbits.")
 
-        # TODO: Getting of 'id' and 'profile' -> Should it be done like that?
         try:
             profile = config.tech.profile.str
         except exceptions.MissingEntryError:
@@ -133,6 +135,7 @@ class AprioriOrbit:
             id_ = config.tech.id.str
         except exceptions.MissingEntryError:
             id_ = None
+        
 
         self._dset = dataset.Dataset(
                             rundate=self.rundate, 

@@ -16,8 +16,9 @@ Example:
 """
 
 # Standard library imports
-from datetime import timedelta
-from typing import Dict, List, Union
+from datetime import datetime, timedelta
+from pathlib import PosixPath
+from typing import Dict, List, Union, Tuple
 
 # External library imports
 import numpy as np
@@ -86,18 +87,26 @@ class BroadcastOrbit(orbit.AprioriOrbit):
 
     name = "broadcast"
 
-    def __init__(self, rundate, system, station=None, file_key=None, file_path=None, day_offset=1):
+    def __init__(
+                self, 
+                rundate: datetime, 
+                system: Tuple[str], 
+                station: str=None, 
+                file_key: Union[str, None]=None, 
+                file_path: Union[PosixPath, None]=None, 
+                day_offset: int=1
+    ) -> None:
         """Set up a new BroadcastOrbit object, does not parse any data
 
         TODO: Remove dependency on rundate, use time to read correct files. (What to do with dataset?)
 
         Args:
-            rundate (date):     Date of model run.
-            station (str):      4 character station identifier.
-            system (tuple):     List with GNSS system string codes (G, E, R, etc.).
-            file_key (str):     Key to the broadcast orbit file defined in files.conf file.
-            file_path (pathlib.PosixPath):  File path to broadcast orbit file.
-            day_offset (int):   Day offset used to calculate the number of days to read.
+            rundate:      Date of model run.
+            station:      4 character station identifier.
+            system:       List with GNSS system string codes (G, E, R, etc.).
+            file_key:     Key to the broadcast orbit file defined in files.conf file.
+            file_path:    File path to broadcast orbit file.
+            day_offset:   Day offset used to calculate the number of days to read.
         """
         super().__init__(rundate=rundate)
         self.system = system
@@ -113,7 +122,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             self._dset_edit.vars["STATION"] = self._dset_raw.vars["station"].upper()
 
 
-    def _read(self, dset_raw):
+    def _read(self, dset_raw: "Dataset") -> None:
         """Read RINEX navigation file data and save it in a Dataset
 
         Note that beside the given day also the navigation files from the day before and the day after is read.
@@ -200,7 +209,7 @@ class BroadcastOrbit(orbit.AprioriOrbit):
             self._galileo_signal_health_status()
 
 
-    def _edit(self, dset_edit: "Dataset") -> "Dataset":
+    def _edit(self, dset_edit: "Dataset") -> None:
         """Edit RINEX navigation file data and save it in a Dataset
 
         First the navigation messages are sorted after the satellite and time of transmission. Afterwards duplicated
@@ -938,10 +947,10 @@ class BroadcastOrbit(orbit.AprioriOrbit):
         Following equations are based on Table 20-IV. in :cite:`is-gps-200h`.
 
         Args:
-            t_sat_gpsweek (float):   GPS week of satellite transmission time.
-            t_sat_gpssec (float):    GPS seconds of satellite transmission.
-            idx (int):               Index for broadcast ephemeris dataset valid for observation time of receiver
-            sys (str):               GNSS identifier
+            t_sat_gpsweek:   GPS week of satellite transmission time.
+            t_sat_gpssec:    GPS seconds of satellite transmission.
+            idx:             Index for broadcast ephemeris dataset valid for observation time of receiver
+            sys:             GNSS identifier
 
         Returns:
             dict:   Selected and prepared broadcast ephemeris dictionary with following entries:
