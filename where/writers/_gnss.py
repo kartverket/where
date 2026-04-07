@@ -121,7 +121,7 @@ def get_grc_csv_row(
             "SVN45": "D03",
             "SVN48": "A04",
             "SVN50": "E03",
-            "SVN51": "E04",
+            "SVN51": "F05",
             "SVN52": "A02",
             "SVN53": "C04",
             "SVN55": "F02",
@@ -163,7 +163,7 @@ def get_grc_csv_row(
             "GSAT0207": "C06",
             "GSAT0208": "C07",
             "GSAT0209": "C02",
-            "GSAT0210": "A02",
+            "GSAT0210": "A12",
             "GSAT0211": "A06",
             "GSAT0212": "C08",
             "GSAT0213": "C03",
@@ -181,7 +181,7 @@ def get_grc_csv_row(
             "GSAT0225": "C05",
             "GSAT0226": "A02",
             "GSAT0227": "C12",
-            "GSAT0232": "A17",
+            "GSAT0232": "A08",
     }
 
     station_def = {
