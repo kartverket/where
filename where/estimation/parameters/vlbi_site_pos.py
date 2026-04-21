@@ -23,6 +23,10 @@ References:
        https://ntrs.nasa.gov/api/citations/20240007790/downloads/VTD%20Partials%20new%20update%20fmat.pdf
 
 
+
+
+
+
 """
 # External library imports
 import numpy as np
@@ -63,25 +67,13 @@ def site_pos(dset):
     if fix_idx.any():
         stations = stations[np.logical_not(fix_idx)]
 
-    idx = dset.near_field_obs
-    nf_num_obs = np.sum(idx)
+    #import IPython; IPython.embed()
 
     # Calculate partials for far field observations (typically quasars)
-    all_partials = -dset.src_dir.unit_vector[:, None, :][~idx] @ rotation.trs2gcrs(dset.time)[~idx]
-
+    all_partials = -dset.src_dir.unit_vector[:, None, :] @ rotation.trs2gcrs(dset.time)
     # Calculate partials for near field observations (typically satellites)
-    if nf_num_obs > 0:
-        dtau_dx2 = _site_pos_2_near_field(dset)
-        dtau_dx1 = _site_pos_1_near_field(dset)
-    # import matplotlib.pyplot as plt
-    # fig, ax = plt.subplots(3, sharex=True); label = "xyz";
-    # for i in range(3):
-    #     ax[i].scatter(dset.time.mjd[idx], dtau_dx1[:, i, 0], marker=".", alpha=0.5, label="dtau_dx1")
-    #     ax[i].scatter(dset.time.mjd[idx], dtau_dx2[:, i, 0], marker=".", alpha=0.5, label="dtau_dx2")
-    #     ax[i].scatter(dset.time.mjd[~idx], all_partials[:, 0, i], marker=".", alpha=0.5, label="dtau_dx")
-    #     ax[i].set_ylabel(label[i])
-    # plt.xlabel("mjd"); ax[0].legend(); plt.show()
-
+    # TODO
+    all_partials[dset.near_field_obs] = 0
     partials = np.zeros((dset.num_obs, len(stations) * 3))
     for i, station in enumerate(stations):
         filter_1 = dset.filter(station_1=station)
