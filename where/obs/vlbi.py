@@ -203,38 +203,7 @@ def _write_to_dataset(parser, dset, rundate, session_code):
 
 
     # Should be false for quasar observations and true for satelitte observations
-    satellites = data.get("meta",{}).get("satellites")
-    if satellites is not None:
-        # The name of the satellite in the orbit file is not the same as the name in the NGS testfiles
-        # Create a small translation table
-        ngs_to_sp3 = dict()
-        ngs_to_sp3["GEN-01"] = "L01"
-        ngs_to_sp3["LAGEOS-1"] = "L51"
-        ngs_to_sp3["SENTI-6A"] = "L40"
-
-        # This is the case for Near field test data from NGS-files
-        dset.add_bool("near_field_obs", np.char.find(dset.source, satellites) >= 0)
-        days_before = (rundate - dset.time.datetime.min().date()).days
-        days_after = (dset.time.datetime.max().date() - rundate).days
-        orbit = apriori.get("basic_orbit",
-                            file_key="vlbi_orbit_sp3",
-                            rundate=rundate,
-                            days_before=days_before,
-                            days_after=days_after)
-
-        for sat in satellites:
-            satname = ngs_to_sp3[sat]
-            pos = np.full((dset.num_obs, 3), np.nan)
-            vel = np.full((dset.num_obs, 3), np.nan)
-            sat_idx = dset.source == sat
-            pos[sat_idx, :] = orbit[satname]["pos"](dset.time[sat_idx])
-            vel[sat_idx, :] = orbit[satname]["vel"](dset.time[sat_idx])
-            dset.add_posvel("sat_pos", np.concatenate((pos,vel), axis=1), system="trs", time=dset.time)
-            dset.site_pos_1.other_2 = dset.sat_pos
-            dset.site_pos_2.other_2 = dset.sat_pos
-    else:
-        # Normal sessions do not have satellites yet
-        dset.add_bool("near_field_obs", np.zeros(dset.num_obs))
+    dset.add_bool("near_field_obs", np.zeros(dset.num_obs))
 
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish
