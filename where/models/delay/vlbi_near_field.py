@@ -95,7 +95,7 @@ def vlbi_near_field_delay(dset):
         # The gravitational potential at the geocenter, neglecting the effects of the Earth’s mass.
         # At the picosecond level, only the solar potential is needed (IERS Conventions chapter 11)
         U = constant.GM_sun / np.linalg.norm(eph.pos_gcrs("sun"), axis=1)[:, None]
-        # T0 and T2 is sufficiently close to T1 to always use T1 for ephemerdies. Ref. footnote (2) in Jaron2017 
+        # T0 and T2 is sufficiently close to T1 to always use T1 for ephemerdies. Ref. footnote (2) in Jaron2019 
         V_E = eph.vel_bcrs("earth", **kwargs)[:, None, :]
         R_E = eph.pos_bcrs("earth", **kwargs)
         #return R_E + r
@@ -194,14 +194,14 @@ def vlbi_near_field_delay(dset):
     t_g01_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
-    # Convert from TT to TCG since the Jaron, et. al (2017) equations work with this
+    # Convert from TT to TCG since the Jaron, et. al (2019) equations work with this
     t_g01 = t_g01_TDB / (1 - L_G)
 
 
     # Save TT(=TDB) value to dset
     _save_detail_to_dataset(dset, "vlbi_nf_grav_1", t_g01_TDB * C, dset.add_float, unit="meter")
 
-    # eq. 14 in jaron2017
+    # eq. 14 in jaron2019
     x_dot_v_1 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
     x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0] # Intermediate variable
     # Time of emmison of the signal relative to t1
@@ -265,13 +265,13 @@ def vlbi_near_field_delay(dset):
     t_g02_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
-    # Convert from TT to TCG since the Jaron, et. al (2017) equations work with this
+    # Convert from TT to TCG since the Jaron, et. al (2019) equations work with this
     t_g02 = t_g02_TDB / (1 - L_G)
     
     # Save TT(=TDB) value to dset  
     _save_detail_to_dataset(dset, "vlbi_nf_grav_2", t_g02_TDB * C, dset.add_float, unit="meter")
     
-    # eq. 17 in jaron2017
+    # eq. 17 in jaron2019
     x_dot_v_2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
     x02_dot_x02 = (x02[:, None, :] @ x02[:, :, None])[:, 0, 0] # Intermediate variable
 
