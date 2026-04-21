@@ -201,6 +201,10 @@ def _write_to_dataset(parser, dset, rundate, session_code):
             dset.meta["station"].setdefault(sta_name, {})["height"] = height
             dset.meta["station"].setdefault(sta_name, {})["num_obs_read"] = dset.num(station=sta_name)
 
+
+    # Should be false for quasar observations and true for satelitte observations
+    dset.add_bool("near_field_obs", np.zeros(dset.num_obs))
+
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish
     bad_source_idx = ra == 0
