@@ -5,6 +5,10 @@ Description:
 
 Calculate the partial derivatives of the site positions.
 
+For far field targets the partial derivates is implemented based on the equations in cite:`teke2011`
+
+For near field targets the partial derivates is implemented based on the equations in cite:`skeens2024`
+
 
 References:
 -----------
@@ -14,6 +18,10 @@ References:
 
 .. [2] Teke, Kamil, Sub-daily parameter estimation in VLBI data analysis.
        https://geo.tuwien.ac.at/fileadmin/editors/GM/GM87_teke.pdf
+
+.. [3] Skeens, Joe, Implementing a VLBI time delay model for Earth-orbiting satellites: partial derivaties and verification
+       https://ntrs.nasa.gov/api/citations/20240007790/downloads/VTD%20Partials%20new%20update%20fmat.pdf
+
 
 
 
@@ -51,8 +59,13 @@ def site_pos(dset):
     if fix_idx.any():
         stations = stations[np.logical_not(fix_idx)]
 
-    # Calculate partials
+    #import IPython; IPython.embed()
+
+    # Calculate partials for far field observations (typically quasars)
     all_partials = -dset.src_dir.unit_vector[:, None, :] @ rotation.trs2gcrs(dset.time)
+    # Calculate partials for near field observations (typically satellites)
+    # TODO
+    all_partials[dset.near_field_obs] = 0
     partials = np.zeros((dset.num_obs, len(stations) * 3))
     for idx, station in enumerate(stations):
         filter_1 = dset.filter(station_1=station)
