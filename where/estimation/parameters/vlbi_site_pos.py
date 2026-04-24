@@ -73,6 +73,19 @@ def site_pos(dset):
     all_partials = -dset.src_dir.unit_vector[:, None, :] @ rotation.trs2gcrs(dset.time)
     # Calculate partials for near field observations (typically satellites)
     # TODO
+    # TODO if vlbi_near_field not in dset and dset.near_field_obs > 0 -> Error
+    dtau_dx2 = _site_pos_2_near_field(dset)
+    dtau_dx1 = _site_pos_1_near_field(dset)
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(3, sharex=True); label = "xyz";
+    for i in range(3):
+        ax[i].scatter(dset.time.mjd, dtau_dx1[:, i, 0], label="dtau_dx1")
+        ax[i].scatter(dset.time.mjd, dtau_dx2[:, i, 0], label="dtau_dx2")
+        ax[i].scatter(dset.time.mjd, all_partials[:, 0, i], label="dtau_dx")
+        ax[i].set_ylabel(label[i])
+    plt.xlabel("mjd"); ax[0].legend(); plt.show()
+
+    import IPython; IPython.embed()
     all_partials[dset.near_field_obs] = 0
     partials = np.zeros((dset.num_obs, len(stations) * 3))
     for idx, station in enumerate(stations):
