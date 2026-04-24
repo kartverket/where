@@ -227,8 +227,6 @@ def _eclipse_satellites(fid, dset):
     brdc = apriori.get(
         "orbit",
         rundate=dset.analysis["rundate"],
-        time=dset.time,
-        satellite=tuple(dset.satellite),
         system=tuple(dset.system),
         station=dset.dataset_name.upper(),
         apriori_orbit="broadcast",

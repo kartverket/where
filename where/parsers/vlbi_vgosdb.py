@@ -109,6 +109,10 @@ class VgosDbParser(Parser):
                 if "TimeUTC" in file_path.stem:
                     self._parse_time(netcdf_data)
                 data.update(netcdf_data)
+            elif line[-1].endswith(".hist") and name.lower() == "correlator":
+                file_path = self.file_path.parents[0] / directory / line[-1]
+                correlation_report = parsers.parse_file("vlbi_correlation_report", file_path=file_path).as_dict()
+                self.data["correlation_report"] = correlation_report
             else:
                 data = self.raw.setdefault(block, {})
                 if name:
