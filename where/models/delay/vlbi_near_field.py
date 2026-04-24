@@ -214,7 +214,7 @@ def vlbi_near_field_delay(dset):
             np.log((norm_R0_B + norm_R1_B + norm_R01_B)/(norm_R0_B + norm_R1_B - norm_R01_B))
         delay_bodies += delay_body
         
-        _save_detail_to_dataset(dset, f"vlbi_nf_grav_{body}_1", delay_body * C, dset.add_float, unit="meter")
+        _save_detail_to_dataset(dset, f"vlbi_near_field.grav_{body}_1", delay_body * C, dset.add_float, unit="meter")
 
     t_g01_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
@@ -223,7 +223,7 @@ def vlbi_near_field_delay(dset):
     t_g01 = t_g01_TDB / (1 - L_G)
     
     # Save TT(=TDB) value to dset
-    _save_detail_to_dataset(dset, "vlbi_nf_grav_1", t_g01_TDB * C, dset.add_float, unit="meter")
+    _save_detail_to_dataset(dset, "vlbi_near_field.grav_1", t_g01_TDB * C, dset.add_float, unit="meter")
 
     # eq. 14 in jaron2019
     x_dot_v_1 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -262,7 +262,7 @@ def vlbi_near_field_delay(dset):
     delay_sun = sun_factor/C * \
         np.log((norm_R0_S + norm_R2_S + norm_R02_S + sun_factor)/(norm_R0_S + norm_R2_S - norm_R02_S + sun_factor)) 
 
-    _save_detail_to_dataset(dset, "vlbi_nf_grav_sun_2", delay_sun * C, dset.add_float, unit="meter")
+    _save_detail_to_dataset(dset, "vlbi_near_field.grav_sun_2", delay_sun * C, dset.add_float, unit="meter")
 
     delay_bodies = 0
     for body in bodies:
@@ -283,7 +283,7 @@ def vlbi_near_field_delay(dset):
             np.log((norm_R0_B + norm_R2_B + norm_R02_B)/(norm_R0_B + norm_R2_B - norm_R02_B))
         delay_bodies += delay_body 
         
-        _save_detail_to_dataset(dset, f"vlbi_nf_grav_{body}_2", delay_body * C, dset.add_float, unit="meter")
+        _save_detail_to_dataset(dset, f"vlbi_near_field.grav_{body}_2", delay_body * C, dset.add_float, unit="meter")
 
  
     t_g02_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
@@ -293,7 +293,7 @@ def vlbi_near_field_delay(dset):
     t_g02 = t_g02_TDB / (1 - L_G)
     
     # Save TT(=TDB) value to dset  
-    _save_detail_to_dataset(dset, "vlbi_nf_grav_2", t_g02_TDB * C, dset.add_float, unit="meter")
+    _save_detail_to_dataset(dset, "vlbi_near_field.grav_2", t_g02_TDB * C, dset.add_float, unit="meter")
     
     # eq. 17 in jaron2019
     x_dot_v_2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -306,18 +306,15 @@ def vlbi_near_field_delay(dset):
     # Convert from TCG to TT
     delay = (delta_t2 + delta_t0) * (1 - L_G) # eq. 10 
 
-    return delay * constant.c
 
-
-def grav_delay(dset):
-    """
-    Eq. 14 in :cite:`deuv2012`
-    Args:
-        dset:     A Dataset containing model data.
-
-    Returns:
-        Numpy array: Gravitational delay in meters for each observation.
-    """
+    # Save intermediate variables to dataset for reuse in computation of partials
+    dset.add_float("vlbi_near_field.v0_t0_tilde", v0_t0_tilde, unit="(m/s, m/s, m/s)")
+    dset.add_float("vlbi_near_field.v2_t2_tilde", v2_t2_tilde, unit="(m/s, m/s, m/s)")
+    dset.add_float("vlbi_near_field.x01", x01, unit="(m, m, m)")
+    dset.add_float("vlbi_near_field.x02", x02, unit="(m, m, m)")
+    dset.add_float("vlbi_near_field.gamma0", np.sqrt(gamma0_2), unit="dimensionless")
+    dset.add_float("vlbi_near_field.gamma2", np.sqrt(gamma2_2), unit="dimensionless")
+    
     
     ## For debugging. See if satellite is above horizon for both stations
     debug = False
