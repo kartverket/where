@@ -79,7 +79,6 @@ def thermal_deformation_station(dset, temp_funcs):
     cos_a = np.cos(dset.site_pos.azimuth)
     sin_e = np.sin(dset.site_pos.elevation)
     cos_e = np.cos(dset.site_pos.elevation)
-    cos_d = np.cos(dset.src_dir.declination)
 
     for ivsname in dset.unique("ivsname"):
         site_id = dset.meta["station"][ivsname]["site_id"] if ivsname in dset.meta else ""
@@ -114,6 +113,8 @@ def thermal_deformation_station(dset, temp_funcs):
                 T(t - dt_a)[idx] - T_0
             ) * (h_p * sin_e[idx] + AO * cos_e[idx] + h_v - F_a * h_s)
         elif axis_type == "MO_EQUA":
+            # cos_d will fail for near field targets. Only compute if needed.
+            cos_d = np.cos(dset.src_dir.declination)
             delays[idx] = gamma_f * (T(t - dt_f)[idx] - T_0) * (h_f * sin_e[idx]) + gamma_a * (
                 T(t - dt_a)[idx] - T_0
             ) * (h_p * sin_e[idx] + AO * cos_d[idx] + h_v - F_a * h_s)
