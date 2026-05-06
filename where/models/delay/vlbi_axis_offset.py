@@ -59,7 +59,6 @@ def axis_offset_station(dset):
     sin_e = np.sin(dset.site_pos.elevation)
     cos_a = np.cos(dset.site_pos.azimuth)
     cos_e = np.cos(dset.site_pos.elevation)
-    cos_d = np.cos(dset.src_dir.declination)
 
     for ivsname in dset.unique("ivsname"):
         site_id = dset.meta["station"][ivsname]["site_id"] if ivsname in dset.meta else ""
@@ -74,6 +73,8 @@ def axis_offset_station(dset):
         if axis_type == "MO_AZEL":
             delays[idx] = -ao * cos_e[idx]
         elif axis_type == "MO_EQUA":
+            # cos_d will fail for near field targets. Only compute if needed.
+            cos_d = np.cos(dset.src_dir.declination)
             delays[idx] = -ao * cos_d[idx]
         elif axis_type == "MO_XYNO":
             delays[idx] = -ao * np.sqrt(1 - (cos_e[idx] * cos_a[idx]) ** 2)
