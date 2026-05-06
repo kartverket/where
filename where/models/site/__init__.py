@@ -93,13 +93,13 @@ def add(config_key, dset):
             sta_delta = position.PosVelDelta(np.zeros((dset.num_obs, 6)), system="gcrs", ref_pos=dset.site_pos)
 
         if config_key not in dset.fields:
-            return list(sta_delta)
+            delta_pos.append(sta_delta)
+        else:
+            pos_fields = [f for f in dset[config_key]._fields if f.endswith(dset.default_field_suffix)]
 
-        pos_fields = [f for f in dset[config_key]._fields if f.endswith(dset.default_field_suffix)]
-
-        for field in pos_fields:
-            sta_delta += dset[config_key][field]
-        delta_pos.append(sta_delta)
+            for field in pos_fields:
+                sta_delta += dset[config_key][field]
+            delta_pos.append(sta_delta)
 
     return delta_pos
 
