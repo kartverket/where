@@ -45,9 +45,6 @@ def vlbi_grav_delay(dset):
     Returns:
         Numpy array: Gravitational delay in meters for each observation.
     """
-    eph = apriori.get("ephemerides", time=dset.time)
-    grav_delay = np.zeros(dset.num_obs)
-
     # List of celestial bodies. Major moons are also recommended, like Titan, Ganymedes, ...
     bodies = [
         "mercury barycenter",
@@ -62,15 +59,24 @@ def vlbi_grav_delay(dset):
         "pluto barycenter",
         "sun",
     ]
+    # This model is only applicable for far field observations
+    idx = ~dset.near_field_obs
+    time = dset.time[idx]
+    eph = apriori.get("ephemerides", time=time)
+    grav_delay = np.zeros(np.sum(idx))
+    output = np.zeros(dset.num_obs)
 
     bcrs_vel_earth = eph.vel_bcrs("earth")
 
-    baseline_gcrs = dset.site_pos_2.gcrs.pos - dset.site_pos_1.gcrs.pos
-    src_dot_baseline = (dset.src_dir.unit_vector[:, None, :] @ baseline_gcrs.mat)[:, 0, 0]
+    baseline_gcrs = dset.site_pos_2.gcrs.pos[idx] - dset.site_pos_1.gcrs.pos[idx]
+    unit_vector_src = dset.src_dir.unit_vector[idx]
+    src_dot_baseline = (unit_vector_src[:, None, :] @ baseline_gcrs.mat)[:, 0, 0]
+    gcrs_site_vel_2 = dset.site_pos_2.gcrs.vel.val[idx]
+
 
     # Equation 11.6
-    bcrs_site1 = eph.pos_bcrs("earth") + dset.site_pos_1.gcrs.pos.val
-    bcrs_site2 = eph.pos_bcrs("earth") + dset.site_pos_2.gcrs.pos.val
+    bcrs_site1 = eph.pos_bcrs("earth") + dset.site_pos_1.gcrs.pos.val[idx]
+    bcrs_site2 = eph.pos_bcrs("earth") + dset.site_pos_2.gcrs.pos.val[idx]
 
     for body in bodies:
         try:
@@ -86,13 +92,14 @@ def vlbi_grav_delay(dset):
 
         # Equation 11.3
         delta_t = TimeDelta(
-            np.maximum(0, dset.src_dir.unit_vector[:, None, :] @ (bcrs_body_t1 - bcrs_site1)[:, :, None])[:, 0, 0]
+            np.maximum(0, unit_vector_src[:, None, :] @ (bcrs_body_t1 - bcrs_site1)[:, :, None])[:, 0, 0]
             * Unit.second2day
             / constant.c,
             fmt="jd",
             scale="tdb",
         )
-        time_1J = dset.time.tdb - delta_t
+
+        time_1J = time.tdb - delta_t
 
         # Equation 11.4
         bcrs_body_t1J = eph.pos_bcrs(body, time=time_1J)
@@ -103,11 +110,11 @@ def vlbi_grav_delay(dset):
 
         # Needed for equation 11.1
         norm_body_site1 = np.linalg.norm(vector_body_site1, axis=1)
-        src_dot_vector_body_site1 = (dset.src_dir.unit_vector[:, None, :] @ vector_body_site1[:, :, None])[:, 0, 0]
+        src_dot_vector_body_site1 = (unit_vector_src[:, None, :] @ vector_body_site1[:, :, None])[:, 0, 0]
         nomJ = norm_body_site1 + src_dot_vector_body_site1
         denomJ = (
             np.linalg.norm(vector_body_site2, axis=1)
-            + (dset.src_dir.unit_vector[:, None, :] @ vector_body_site2[:, :, None])[:, 0, 0]
+            + (unit_vector_src[:, None, :] @ vector_body_site2[:, :, None])[:, 0, 0]
         )
 
         # Main correction (equation 11.1)
@@ -127,10 +134,11 @@ def vlbi_grav_delay(dset):
     denominator = (
         1
         + (
-            (bcrs_vel_earth + dset.site_pos_2.gcrs.vel.val)[:, None, :]
-            @ dset.src_dir.unit_vector[:, :, None]
+            (bcrs_vel_earth + gcrs_site_vel_2)[:, None, :] @ unit_vector_src[:, :, None]
             / constant.c
         )[:, 0, 0]
     )
 
-    return grav_delay / denominator
+
+    output[idx] = grav_delay / denominator
+    return output

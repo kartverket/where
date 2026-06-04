@@ -40,7 +40,7 @@ class VlbiNgsSourcesParser(ChainParser):
 
         # Each line defines a radio source
         source_parser = ParserDef(
-            end_marker=lambda line, _ln, _n: line == "$END",
+            end_marker=lambda line, _ln, nl: line == "$END" or nl.startswith("satellite"),
             label=lambda line, _ln: line != "$END",
             parser_def={
                 True: {

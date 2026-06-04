@@ -92,6 +92,9 @@ def vlbi_vacuum_delay(dset):
         else:
             dset.add_float(field, values, write_level="detail", unit="meter")
         delay += values
+
+    # This model is only applicable for far field observations
+    delay[dset.near_field_obs] = 0
     return delay
 
 

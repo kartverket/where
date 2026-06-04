@@ -40,4 +40,8 @@ def geometric_delay(dset):
         datm1 = 0
 
     baseline_gcrs_vel = (dset.site_pos_2.gcrs - dset.site_pos_1.gcrs).vel
-    return datm1 * (baseline_gcrs_vel.val[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c)[:, 0, 0]
+    delay = datm1 * (baseline_gcrs_vel.val[:, None, :] @ dset.src_dir.unit_vector[:, :, None] / constant.c)[:, 0, 0]
+
+    # This model is only applicable for far field observations
+    delay[dset.near_field_obs] = 0
+    return delay

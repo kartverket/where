@@ -43,7 +43,30 @@ class VlbiNgsParser(ChainParser):
         header_parser = ParserDef(end_marker=lambda _l, line_num, _n: line_num == 2, label=None, parser_def=None)
 
         station_parser = ParserDef(end_marker=lambda line, _ln, _n: line == "$END", label=None, parser_def=None)
-        source_parser = ParserDef(end_marker=lambda line, _ln, _n: line == "$END", label=None, parser_def=None)
+        source_parser = ParserDef(end_marker=lambda line, _ln, nl: line == "$END" or nl.startswith("satellite"),
+                                  label=None, parser_def=None)
+        satellite_parser = ParserDef(end_marker=lambda line, _ln, nl: line == "$END",
+                                     label=lambda line, _ln: line.strip().split()[0],
+                                     parser_def={
+            "satellite": {
+                "parser": self.parse_sat_name,
+                "fields": {
+                    "sat_name": (10, 18),
+                    }
+                },
+            "1":{
+                "parser": self.parse_tle,
+                "fields": {
+                    "tle_1": (6,80),
+                    }
+                },
+            "2":{
+                "parser": self.parse_tle,
+                "fields":{
+                    "tle_2": (6,80),
+                    }
+                },
+            })
         param_parser = ParserDef(end_marker=lambda line, _ln, _n: line == "$END", label=None, parser_def=None)
 
         # Observations are listed on 9 lines
@@ -116,7 +139,7 @@ class VlbiNgsParser(ChainParser):
         )
 
         return itertools.chain(
-            [header_parser, station_parser, source_parser, param_parser], itertools.repeat(obs_parser)
+            [header_parser, station_parser, source_parser, satellite_parser, param_parser], itertools.repeat(obs_parser)
         )
 
     def parse_obs_meta(self, line, cache):
@@ -198,3 +221,11 @@ class VlbiNgsParser(ChainParser):
             if value.startswith("-999"):
                 line[key] = "nan"
         self.parse_obs()(line, cache)
+
+    def parse_tle(self, line, cache):
+        for k, v in line.items():
+            self.data["meta"].setdefault(k, []).append(v)
+
+    def parse_sat_name(self, line, cache):
+        self.data.setdefault("meta", {})
+        self.data["meta"].setdefault("satellites", []).append(line["sat_name"])
