@@ -59,18 +59,12 @@ def vlbi_grav_bodies(dset):
         "pluto barycenter",
         "sun",
     ]
-    output = np.zeros(dset.num_obs)
-
     # This model is only applicable for far field observations
     idx = ~dset.near_field_obs
-    if np.sum(idx) == 0:
-        # no far field observations. Skip this model
-        return output
-
     time = dset.time[idx]
     eph = apriori.get("ephemerides", time=time)
     grav_delay = np.zeros(np.sum(idx))
-    
+    output = np.zeros(dset.num_obs)
 
     bcrs_vel_earth = eph.vel_bcrs("earth")
 
