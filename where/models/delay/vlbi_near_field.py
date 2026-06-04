@@ -10,6 +10,7 @@ term station and satellite motion. This approximation allows for a analytical so
 expressed in the GCRS. The gravitational effect of celestial bodies on the delay is described in `deuv2012`.
 
 """
+from datetime import datetime
 
 # External library imports
 import numpy as np
@@ -21,7 +22,8 @@ from midgard.math.constant import constant
 # Where imports
 from where import apriori
 from where.data.position import PosVel
-from where.data.time import TimeDelta
+from where.data.time import Time, TimeDelta
+from where.lib import log
 
 # Constants for shorter equations
 GAMMA = 1 # PPN parameter. Equal to 1 in general relativity 
@@ -29,9 +31,17 @@ C = constant.c
 L_G = constant.L_G
 L_C = constant.L_C
 
+# The name of the satellite in the orbit file is not the same as the name in the NGS testfiles
+# Create a small translation table
+ngs_to_sp3 = dict()
+ngs_to_sp3["GEN-01"] = "L01"
+ngs_to_sp3["LAGEOS-1"] = "L51"
+ngs_to_sp3["SENTI-6A"] = "L40"
+
+model = __name__.split(".")[-1]
 
 @plugins.register
-def vlbi_near_field_delay(dset):
+def vlbi_near_field(dset):
     r"""Calculate the theoretical delay dependent on the baseline
 
     TODOTODOTODOTODO :
@@ -77,8 +87,18 @@ def vlbi_near_field_delay(dset):
         Numpy array: Projected baseline in meters for each observation.
 
     """
-    orbit = apriori.get("basic_orbit", rundate=dset.analysis["rundate"], days_before=0, days_after=1)
-    eph = apriori.get("ephemerides", time=dset.time)
+    file_key = "vlbi_orbit_sp3"
+    rundate = dset.analysis["rundate"]
+    days_before = (rundate - dset.time.datetime.min().date()).days
+    days_after = (dset.time.datetime.max().date() - rundate).days
+    orbit = apriori.get("basic_orbit", rundate=rundate,
+                        file_key=file_key, days_before=days_before, days_after=days_after)
+
+    # This model is only applicable for far field observations
+    idx = dset.near_field_obs
+    num_sat_obs = np.sum(idx)
+    time = dset.time[idx]
+    eph = apriori.get("ephemerides", time=time)
     bodies = [
         "mercury",
         "venus",
@@ -131,18 +151,15 @@ def vlbi_near_field_delay(dset):
         r_b = r * (1 - U/C ** 2 - L_C) - 0.5 * ((V_E @ r[:, :, None])/C ** 2  @ V_E)[:, 0, :]
         return R_E + r_b
 
-    # TODO
-    # idx_sat = True when observation is to a satellite
 
-    delay = np.zeros(dset.num_obs)
-    
-    # Apriori values given at epoch t1
-    t1 = dset.time.tcg
-    x1_t1 = dset.site_pos_1.gcrs.pos # station_1 at epoch t1
-    x2_t1 = dset.site_pos_2.gcrs.pos # station_2 at epoch t1
-    x0_t1 = dset.sat_pos.gcrs.pos # satellite position at epoch t1
-    v0_t1 = dset.sat_pos.gcrs.vel.val # satellite velocity at at epoch t1
-    v2_t1 = dset.site_pos_2.gcrs.vel.val # station_2 velocity at epoch t1
+    # Apriori values given at epoch t1 (time of arrival for signal at station 1)
+    t1 = time.tcg
+    x1_t1 = dset.site_pos_1.gcrs.pos[idx] # station_1 at epoch t1
+    x2_t1 = dset.site_pos_2.gcrs.pos[idx] # station_2 at epoch t1
+    x0_t1 = dset.sat_pos.gcrs.pos[idx] # satellite position at epoch t1
+    v0_t1 = dset.sat_pos.gcrs.vel.val[idx] # satellite velocity at at epoch t1
+    v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] # station_2 velocity at epoch t1
+
     
     # First approximation to light travel time
     delta1 = (x1_t1 - x0_t1).length / C # eq. 4 # seconds
@@ -154,19 +171,24 @@ def vlbi_near_field_delay(dset):
     
     t0_tilde = t1 - delta1 # approximation to t0
     tau_tilde = delta2 - delta1 # eq. 7
-    t2_tilde = t1 + tau_tilde # approximation to t2
- 
-    # TODO "loop over satellites in session
-    sat_pos = orbit["G10"]["pos"](t0_tilde)
-    sat_vel = orbit["G10"]["vel"](t0_tilde)
-    sat_posvel = PosVel(np.concatenate((sat_pos, sat_vel), axis=1), system="trs", time=t0_tilde)
+    t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
+
+    satellites = np.unique(dset.source[idx])
+    for sat in satellites:
+        sat_pos = np.zeros((num_sat_obs, 3))
+        sat_vel = np.zeros((num_sat_obs, 3))
+        sat_idx = dset.source[idx] == sat
+        sp3_sat_name = ngs_to_sp3[sat]
+        sat_pos[sat_idx, :] = orbit[sp3_sat_name]["pos"](t0_tilde[sat_idx])
+        sat_vel[sat_idx, :] = orbit[sp3_sat_name]["vel"](t0_tilde[sat_idx])
+        sat_posvel = PosVel(np.concatenate((sat_pos, sat_vel), axis=1), system="trs", time=t0_tilde)
     
     # Satellite position and velocity at t0
     x0_t0_tilde = sat_posvel.gcrs.pos.val
     v0_t0_tilde = sat_posvel.gcrs.vel.val
     
     # Linearized satellite position at t1
-    dt_10 = (t1 - t0_tilde).seconds[:, None]
+    dt_10 = delta1.seconds[:, None]
     x0_bar_t1 = v0_t0_tilde * dt_10 + x0_t0_tilde # eq. 5
     
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
@@ -177,7 +199,7 @@ def vlbi_near_field_delay(dset):
     # Equations are in BCRS. Ephemerides use TDB.
     R0_T0 = bcrs_pos(x0_t0_tilde, time=t0_tilde) # satellite position at t0 in BCRS
     RS_T0 = eph.pos_bcrs("sun", time=t0_tilde) # sun pos at t0 in BCRS
-    R1_T1 = bcrs_pos(dset.site_pos_1.gcrs.pos.val) # station_1 pos at t1 in BCRS
+    R1_T1 = bcrs_pos(x1_t1.val) # station_1 pos at t1 in BCRS
     RS_T1 = eph.pos_bcrs("sun") # sun pos at t1 in BCRS
 
     R0_S = R0_T0 - RS_T0 # eq. 16, i=0, alpha = S
@@ -193,7 +215,7 @@ def vlbi_near_field_delay(dset):
     delay_sun = sun_factor/C * \
         np.log((norm_R0_S + norm_R1_S + norm_R01_S + sun_factor)/(norm_R0_S + norm_R1_S - norm_R01_S + sun_factor)) 
 
-    _save_detail_to_dataset(dset, "vlbi_nf_grav_sun_1", delay_sun * C, dset.add_float, unit="meter")
+    _save_float_to_dset(dset, idx, f"{model}.grav_sun_1", delay_sun * C, unit="meter", write_level="detail")
 
     delay_bodies = 0
     for body in bodies:
@@ -214,7 +236,7 @@ def vlbi_near_field_delay(dset):
             np.log((norm_R0_B + norm_R1_B + norm_R01_B)/(norm_R0_B + norm_R1_B - norm_R01_B))
         delay_bodies += delay_body
         
-        _save_detail_to_dataset(dset, f"vlbi_near_field.grav_{body}_1", delay_body * C, dset.add_float, unit="meter")
+        _save_float_to_dset(dset, idx, f"{model}.grav_{body}_1", delay_body * C, unit="meter", write_level="detail")
 
     t_g01_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
@@ -223,24 +245,24 @@ def vlbi_near_field_delay(dset):
     t_g01 = t_g01_TDB / (1 - L_G)
     
     # Save TT(=TDB) value to dset
-    _save_detail_to_dataset(dset, "vlbi_near_field.grav_1", t_g01_TDB * C, dset.add_float, unit="meter")
+    _save_float_to_dset(dset, idx, f"{model}.grav_1", t_g01_TDB * C, unit="meter", write_level="detail")
 
     # eq. 14 in jaron2019
-    x_dot_v_1 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
-    x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0] # Intermediate variable
+    x01_dot_v0 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
+    x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0]  / C ** 2 # Intermediate variable
     # Time of emmison of the signal relative to t1
-    delta_t0 = gamma0_2 * (x_dot_v_1 - t_g01) - \
-        np.sqrt(gamma0_2 ** 2 * (x_dot_v_1 - t_g01) ** 2 + gamma0_2 * (x01_dot_x01 / C ** 2 - t_g01 ** 2))
+    delta_t0 = gamma0_2 * (x01_dot_v0 - t_g01) - \
+        np.sqrt(gamma0_2 ** 2 * (x01_dot_v0 - t_g01) ** 2 + gamma0_2 * (x01_dot_x01 - t_g01 ** 2))
     
     
     # Assume station_2 has no motion beweteen t1 and t2 in a terrestrial reference system
-    site_pos_2_t2 = PosVel(dset.site_pos_2.val, system="trs", time=t2_tilde)
+    site_pos_2_t2 = PosVel(dset.site_pos_2.val[idx], system="trs", time=t2_tilde)
     # GCRS posiion at t2
-    x2_t2_tilde = site_pos_2_t2.gcrs.pos.val 
+    x2_t2_tilde = site_pos_2_t2.gcrs.pos.val
     v2_t2_tilde = site_pos_2_t2.gcrs.vel.val
     
     # Linearized station_2 position at t1
-    dt_12 = (t1 - t2_tilde).seconds[:, None]
+    dt_12 = - tau_tilde.seconds[:, None]
     x2_bar_t1 = v2_t2_tilde * dt_12 + x2_t2_tilde # eq.8
     
     gamma2_2 = 1/(1 - (v2_t1[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 18 
@@ -262,7 +284,7 @@ def vlbi_near_field_delay(dset):
     delay_sun = sun_factor/C * \
         np.log((norm_R0_S + norm_R2_S + norm_R02_S + sun_factor)/(norm_R0_S + norm_R2_S - norm_R02_S + sun_factor)) 
 
-    _save_detail_to_dataset(dset, "vlbi_near_field.grav_sun_2", delay_sun * C, dset.add_float, unit="meter")
+    _save_float_to_dset(dset, idx, f"{model}.grav_sun_2", delay_sun * C, unit="meter", write_level="detail")
 
     delay_bodies = 0
     for body in bodies:
@@ -283,7 +305,7 @@ def vlbi_near_field_delay(dset):
             np.log((norm_R0_B + norm_R2_B + norm_R02_B)/(norm_R0_B + norm_R2_B - norm_R02_B))
         delay_bodies += delay_body 
         
-        _save_detail_to_dataset(dset, f"vlbi_near_field.grav_{body}_2", delay_body * C, dset.add_float, unit="meter")
+        _save_float_to_dset(dset, idx, f"{model}.grav_{body}_2", delay_body * C, unit="meter", write_level="detail")
 
  
     t_g02_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
@@ -293,28 +315,32 @@ def vlbi_near_field_delay(dset):
     t_g02 = t_g02_TDB / (1 - L_G)
     
     # Save TT(=TDB) value to dset  
-    _save_detail_to_dataset(dset, "vlbi_near_field.grav_2", t_g02_TDB * C, dset.add_float, unit="meter")
+    _save_float_to_dset(dset, idx, f"{model}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
     
     # eq. 17 in jaron2019
-    x_dot_v_2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
-    x02_dot_x02 = (x02[:, None, :] @ x02[:, :, None])[:, 0, 0] # Intermediate variable
+    x02_dot_v2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
+    x02_dot_x02 = (x02[:, None, :] @ x02[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
 
     # Time of reception of the signal relative to t1
-    delta_t2 = - gamma2_2 * (x_dot_v_2 - t_g02) + \
-        np.sqrt(gamma2_2 ** 2 * (x_dot_v_2 - t_g02) ** 2 + gamma2_2 * (x02_dot_x02 / C ** 2 - t_g02 ** 2))
+    delta_t2 = - gamma2_2 * (x02_dot_v2 - t_g02) + \
+        np.sqrt(gamma2_2 ** 2 * (x02_dot_v2 - t_g02) ** 2 + gamma2_2 * (x02_dot_x02 - t_g02 ** 2))
     
     # Convert from TCG to TT
     delay = (delta_t2 + delta_t0) * (1 - L_G) # eq. 10 
 
 
     # Save intermediate variables to dataset for reuse in computation of partials
-    dset.add_float("vlbi_near_field.v0_t0_tilde", v0_t0_tilde, unit="(m/s, m/s, m/s)")
-    dset.add_float("vlbi_near_field.v2_t2_tilde", v2_t2_tilde, unit="(m/s, m/s, m/s)")
-    dset.add_float("vlbi_near_field.x01", x01, unit="(m, m, m)")
-    dset.add_float("vlbi_near_field.x02", x02, unit="(m, m, m)")
-    dset.add_float("vlbi_near_field.gamma0", np.sqrt(gamma0_2), unit="dimensionless")
-    dset.add_float("vlbi_near_field.gamma2", np.sqrt(gamma2_2), unit="dimensionless")
-    
+    _save_float_to_dset(dset, idx, f"{model}.v0_t0_tilde", v0_t0_tilde, unit="(m/s, m/s, m/s)")
+    _save_float_to_dset(dset, idx, f"{model}.v2_t2_tilde", v2_t2_tilde, unit="(m/s, m/s, m/s)")
+    _save_float_to_dset(dset, idx, f"{model}.x01", x01, unit="(m, m, m)")
+    _save_float_to_dset(dset, idx, f"{model}.x02", x02, unit="(m, m, m)")
+    _save_float_to_dset(dset, idx, f"{model}.gamma0", np.sqrt(gamma0_2), unit="dimensionless")
+    _save_float_to_dset(dset, idx, f"{model}.gamma2", np.sqrt(gamma2_2), unit="dimensionless")
+    # Add more variables for debugging purposes
+    _save_time_to_dset(dset, idx, f"{model}.t0_tilde", t0_tilde, write_level="detail")
+    _save_time_to_dset(dset, idx, f"{model}.t2_tilde", t2_tilde, write_level="detail")
+    _save_float_to_dset(dset, idx, f"{model}.delta_t2", delta_t2 * (1 - L_G), write_level="detail", unit="seconds")
+    _save_float_to_dset(dset, idx, f"{model}.delta_t0", delta_t0 * (1 - L_G), write_level="detail", unit="seconds")
     
     ## For debugging. See if satellite is above horizon for both stations
     debug = False
@@ -323,36 +349,47 @@ def vlbi_near_field_delay(dset):
         e2 = dset.site_pos_2.elevation_to(dset.sat_pos)
         sat_visible = (e1 > 0) & (e2 > 0)
         
-        _save_detail_to_dataset(dset, "sat_visible", sat_visible, dset.add_bool)
+        dset.add_bool("sat_visible", sat_visible)
     
-        import matplotlib.pyplot as plt; from datetime import datetime
+        import matplotlib.pyplot as plt;
         for bl in dset.unique("baseline"):
-            idx = dset.filter(baseline=bl)
-            alpha = np.ones(np.sum(idx))
-            alpha[dset.sat_visible[idx] == False] = 0.1
+            bl_idx = dset.filter(baseline=bl)
+            alpha = np.ones(np.sum(bl_idx))
+            alpha[dset.sat_visible[bl_idx] == False] = 0.1
             for body in bodies + ["sun"]:
-                plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_1"][idx]/C, alpha=alpha, label=f"{body}_1")
-                plt.scatter(t1.datetime[idx], dset[f"vlbi_nf_grav_{body}_2"][idx]/C, alpha=alpha, label=f"{body}_2")
+                plt.scatter(dset.time.datetime[bl_idx], dset[f"{model}.grav_{body}_1"][bl_idx]/C, alpha=alpha, label=f"{body}_1")
+                plt.scatter(dset.time.datetime[bl_idx], dset[f"{model}.grav_{body}_2"][bl_idx]/C, alpha=alpha, label=f"{body}_2")
             plt.legend(ncol=2, loc='center left', bbox_to_anchor=(1, 0.5))
             plt.title(bl)
             plt.tight_layout()
             plt.show()
             
             for body in bodies + ["sun"]:
-                y = (dset[f"vlbi_nf_grav_{body}_2"][idx] - dset[f"vlbi_nf_grav_{body}_1"][idx])/C
-                plt.scatter(t1.datetime[idx], y, alpha=alpha, label=f"diff_{body}")
+                y = (dset[f"{model}.grav_{body}_2"][bl_idx] - dset[f"{model}.grav_{body}_1"][bl_idx])/C
+                plt.scatter(dset.time.datetime[bl_idx], y, alpha=alpha, label=f"diff_{body}")
             plt.legend(ncol=1, loc='center left', bbox_to_anchor=(1, 0.5))
             plt.title(bl)
             plt.tight_layout()
             plt.show()
+
     
         #import IPython; IPython.embed()
+    output = np.zeros(dset.num_obs)
+    output[idx] = delay * C # Convert to meter
+    return output
 
-    return delay * C # Convert to meter
+def _save_float_to_dset(dset, idx, field, value, **kwargs):
+    new_shape = tuple([dset.num_obs] + list(value.shape[1:]))
+    full_value = np.full(new_shape, fill_value=np.nan)
+    full_value[idx] = value
+    dset.add_float(field, full_value, **kwargs)
 
-def _save_detail_to_dataset(dset, field, value, func, **kwargs):
-    if field in dset.fields:
-        dset[field][:] = value
-    else:
-        func(field, value, write_level="detail", **kwargs)
+def _save_time_to_dset(dset, idx, field, value, **kwargs):
+    # Use datetime.min to indicate non-value
+    t_min = Time(datetime.min, scale=value.scale, fmt="datetime")
+    jd1 = np.full(dset.num_obs, fill_value=t_min.jd1)
+    jd2 = np.full(dset.num_obs, fill_value=t_min.jd2)
+    jd2[idx] = value.jd2
+    jd1[idx] = value.jd1
+    dset.add_time(field, val=jd1, val2=jd2, scale=value.scale, fmt="jd", **kwargs)
 
