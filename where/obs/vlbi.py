@@ -68,8 +68,8 @@ def _write_to_dataset(parser, dset, rundate, session_code):
 
     # Source directions
     crf = apriori.get("crf", time=dset.time)
-    ra = np.array([crf[s].pos.right_ascension if s in crf else 0 for s in data["source"]])
-    dec = np.array([crf[s].pos.declination if s in crf else 0 for s in data["source"]])
+    ra = np.array([crf[s].pos.right_ascension if s in crf else np.nan for s in data["source"]])
+    dec = np.array([crf[s].pos.declination if s in crf else np.nan for s in data["source"]])
     dset.add_direction("src_dir", ra=ra, dec=dec, time=dset.time, write_level="operational")
     # Replace the characeter "." with the letters "dot" in source names because "." has a special meaning in where
     data["source"] = [s.replace(".", "dot") for s in iers_source_names]
@@ -203,52 +203,45 @@ def _write_to_dataset(parser, dset, rundate, session_code):
 
 
     # Should be false for quasar observations and true for satelitte observations
-    dset.add_bool("near_field_obs", np.zeros(dset.num_obs))
+    satellites = data.get("meta",{}).get("satellites")
+    if satellites is not None:
+        # The name of the satellite in the orbit file is not the same as the name in the NGS testfiles
+        # Create a small translation table
+        ngs_to_sp3 = dict()
+        ngs_to_sp3["GEN-01"] = "L01"
+        ngs_to_sp3["LAGEOS-1"] = "L51"
+        ngs_to_sp3["SENTI-6A"] = "L40"
+
+        # This is the case for Near field test data from NGS-files
+        dset.add_bool("near_field_obs", np.char.find(dset.source, satellites) >= 0)
+        days_before = (rundate - dset.time.datetime.min().date()).days
+        days_after = (dset.time.datetime.max().date() - rundate).days
+        orbit = apriori.get("basic_orbit",
+                            file_key="vlbi_orbit_sp3",
+                            rundate=rundate,
+                            days_before=days_before,
+                            days_after=days_after)
+
+        for sat in satellites:
+            satname = ngs_to_sp3[sat]
+            pos = np.full((dset.num_obs, 3), np.nan)
+            vel = np.full((dset.num_obs, 3), np.nan)
+            sat_idx = dset.source == sat
+            pos[sat_idx, :] = orbit[satname]["pos"](dset.time[sat_idx])
+            vel[sat_idx, :] = orbit[satname]["vel"](dset.time[sat_idx])
+            dset.add_posvel("sat_pos", np.concatenate((pos,vel), axis=1), system="trs", time=dset.time)
+            dset.site_pos_1.other_2 = dset.sat_pos
+            dset.site_pos_2.other_2 = dset.sat_pos
+    else:
+        # Normal sessions do not have satellites yet
+        dset.add_bool("near_field_obs", np.zeros(dset.num_obs))
 
     # Final cleanup
     # If there are more than 300 sources in a NGS-file the source names are gibberish
-    bad_source_idx = ra == 0
+    bad_source_idx = ra == np.nan
+    bad_source_idx = bad_source_idx & ~dset.near_field_obs
     bad_sources = np.array(dset.source)[bad_source_idx]
     for s in np.unique(bad_sources):
         log.warn(f"Unknown source {s}. Observations with this source is discarded")
     dset.subset(np.logical_not(bad_source_idx))
-    
-    # ## Test orbit with satellite G10
-    # TODO: what about site_pos.other when the session is a mix of quasars and satellites?
-    # TODO: use dset.time to set days_before and days_after?
-    orbit = apriori.get("simple_orbit", rundate=rundate, days_before=0, days_after=1)
-    sat = "G10"
-    pos = orbit[sat]["pos"](dset.time)
-    vel = orbit[sat]["vel"](dset.time)
-    dset.add_posvel("sat_pos", np.concatenate((pos,vel), axis=1), system="trs", time=dset.time)
-    dset.site_pos_1.other_2 = dset.sat_pos
-    dset.site_pos_2.other_2 = dset.sat_pos
-    #
-    # ## Test
-    # import matplotlib.pyplot as plt
-    # from where.data.time import Time
-    # from where.data.position import Position
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection="3d")
-    # u = np.linspace(0, 2 * np.pi, 100)
-    # v = np.linspace(0, np.pi, 100)
-    # x = constant.a  * np.outer(np.cos(u), np.sin(v))
-    # y = constant.a * np.outer(np.sin(u), np.sin(v))
-    # z = constant.a * np.outer(np.ones(np.size(u)), np.cos(v))
-    #
-    # # Plot Earth
-    # ax.plot_surface(x, y, z)
-    #
-    # x = Time(np.linspace(60614.9, 60615.2, 40), fmt="mjd", scale="utc")
-    #
-    # for sat in orb.keys():
-    #     try:
-    #         pos = Position(orb[sat]["pos"](dset.time), system="trs", time=dset.time)
-    #         #ax.scatter(pos[:,0], pos[:,1], pos[:,2], label=sat)
-    #         ax.scatter(pos.gcrs.x, pos.gcrs.y, pos.gcrs.z, marker='.', label=sat)
-    #     except exceptions.MissingDataError as err:
-    #         log.warn(f"Not enough orbit data for {sat}: {err}")
-    # plt.legend(ncol=5, loc='center left', bbox_to_anchor=(1, 0.5))
-    # plt.show()
-    #
-    # import IPython; IPython.embed()
+
