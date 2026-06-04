@@ -44,47 +44,14 @@ model = __name__.split(".")[-1]
 def vlbi_near_field(dset):
     r"""Calculate the theoretical delay dependent on the baseline
 
-    TODOTODOTODOTODO :
-    --------------------------------------
-    The implementation is described in IERS Conventions :cite:`iers2010`, section 11.1, in particular equation
-    (11.9). We do not take the gravitational delay into account here (see
-    :mod:`where.models.delay.vlbi_gravitational_delay`), and multiply by :math:`c` to get the correction in
-    meters. Thus, we implement the following equation:
-
-    .. math::
-       \mathrm{correction} = \frac{- \hat K \cdot \vec b \bigl[ 1 - \frac{(1 + \gamma) U}{c^2}
-                             - \frac{| \vec V_\oplus |^2}{2 c^2} - \frac{\vec V_\oplus \cdot \vec w_2}{c^2} \bigr]
-                             - \frac{\vec V_\oplus \cdot \vec b}{c} \bigl[ 1
-                             + \frac{\hat K \cdot \vec V_\oplus}{2 c} \bigr]}{1
-                             + \frac{\hat K \cdot (\vec V_\oplus + \vec w_2)}{c}}
-
-    with
-
-    * :math:`\hat K` -- the unit vector from the barycenter to the source in the absence of gravitational or
-      aberrational bending,
-
-    * :math:`\vec b` -- the GCRS baseline vector at the time :math:`t_1` of arrival, :math:`\vec x_2(t_1) - \vec
-      x_1(t_1)`,
-
-    * :math:`\gamma` -- the parameterized post-Newtonian (PPN) gamma, equal to 1 in general relativity theory,
-
-    * :math:`U` -- the gravitational potential at the geocenter, neglecting the effects of the Earth's mass. At the
-      picosecond level, only the solar potential need be in included in :math:`U` so that :math:`U = G M_\odot / | \vec
-      R_{\oplus_\odot} |` where :math:`\vec R_{\oplus_\odot}` is the vector from the Sun to the geocenter,
-
-    * :math:`\vec V_\oplus` -- the barycentric velocity of the geocenter,
-
-    * :math:`\vec w_2` -- the geocentric velocity of station 2.
-
-    Each term in the correction is calculated in separate functions. and stored in the Dataset in a table called
-    ``vlbi_vacuum_delay``.
     -------------------------------------------------------
 
     Args:
         dset:     A Dataset containing model data.
 
     Returns:
-        Numpy array: Projected baseline in meters for each observation.
+
+        Numpy array: Near field delay for each observation
 
     """
     file_key = "vlbi_orbit_sp3"
@@ -112,7 +79,7 @@ def vlbi_near_field(dset):
         "pluto",
         "sun",
     ]
-    #bodies = ["sun", "earth"] # Test only earth
+    bodies = ["sun", "earth"] # Test only earth
     GM = {}
     # Get GM for the celestial bodies
     for body in bodies:
@@ -168,8 +135,8 @@ def vlbi_near_field(dset):
     # Convert to TimeDelta objects
     delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
     delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
-    
-    t0_tilde = t1 - delta1 # approximation to t0
+
+    t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
 
@@ -243,7 +210,7 @@ def vlbi_near_field(dset):
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
     # Convert from TT to TCG since the Jaron, et. al (2019) equations work with this
     t_g01 = t_g01_TDB / (1 - L_G)
-    
+
     # Save TT(=TDB) value to dset
     _save_float_to_dset(dset, idx, f"{model}.grav_1", t_g01_TDB * C, unit="meter", write_level="detail")
 
