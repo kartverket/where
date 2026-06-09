@@ -154,8 +154,8 @@ def vlbi_near_field(dset):
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
     t1 = time.tcg
-    x1_t1 = dset.site_pos_1.gcrs.pos[idx] # station_1 at epoch t1
-    x2_t1 = dset.site_pos_2.gcrs.pos[idx] # station_2 at epoch t1
+    x1_t1 = dset.site_pos_1.gcrs.pos[idx] # station_1 position at epoch t1
+    x2_t1 = dset.site_pos_2.gcrs.pos[idx] # station_2 position at epoch t1
     x0_t1 = dset.sat_pos.gcrs.pos[idx] # satellite position at epoch t1
     v0_t1 = dset.sat_pos.gcrs.vel.val[idx] # satellite velocity at at epoch t1
     v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] # station_2 velocity at epoch t1
