@@ -1,4 +1,8 @@
-""" Tests for the data.position module"""
+""" Tests for the data.position module
+
+When combining quasar and satellite observations it is important that the other attribute is of type DirectionArray
+and that the other_2 attribute is of type PositionArray or PosVelArray. Changing the order will not work. 
+"""
 
 # Third party imports
 import pytest
@@ -6,6 +10,7 @@ import numpy as np
 
 # Where imports
 from where.data import time, position, direction
+
 
 @pytest.fixture
 def t():
@@ -73,5 +78,32 @@ def test_zenith_distance(site_pos, sat_pos, src_dir):
     z_2_src = site_pos.zenith_distance[1]
     
     assert z_1_sat == z_2_sat
-    assert z_1_src == z_2_src    
-    
+    assert z_1_src == z_2_src
+
+def test_distance(site_pos, sat_pos, src_dir):
+    d_1_sat = site_pos.distance_to(sat_pos)[0]
+    d_1_src = site_pos.distance_to(src_dir)[1]
+
+    site_pos.other = src_dir
+    site_pos.other_2 = sat_pos
+
+    d_2_sat = site_pos.distance[0]
+    d_2_src = site_pos.distance[1]
+
+    assert d_1_sat == d_2_sat
+    assert d_1_src == d_2_src
+
+def test_vector(site_pos, sat_pos, src_dir):
+    v_1_sat = site_pos.vector_to(sat_pos)[0]
+    v_1_src = site_pos.vector_to(src_dir)[1]
+
+    site_pos.other = src_dir
+    site_pos.other_2 = sat_pos
+
+    v_2_sat = site_pos.vector[0]
+    v_2_src = site_pos.vector[1]
+
+    assert (site_pos.gcrs.vector[0] == (sat_pos.gcrs.pos.val[0] - site_pos.gcrs.pos.val[0])).all()
+    assert (site_pos.gcrs.vector[1] == src_dir.gcrs[1].val).all()
+    assert (v_1_sat == v_2_sat).all()
+    assert (v_1_src == v_2_src).all()
