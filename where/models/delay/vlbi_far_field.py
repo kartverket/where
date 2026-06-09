@@ -25,7 +25,7 @@ from midgard.math.constant import constant
 
 
 @plugins.register
-def vlbi_vacuum_delay(dset):
+def vlbi_far_field(dset):
     r"""Calculate the theoretical delay dependent on the baseline
 
     The implementation is described in IERS Conventions :cite:`iers2010`, section 11.1, in particular equation
