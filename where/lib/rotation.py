@@ -31,7 +31,7 @@ def gcrs2trs(time):
 
     According to IERS 2010 Conventions
     """
-    if time.size == 1:
+    if not time.isarray:
         return (Q(time) @ R(time) @ W(time)).transpose()
     else:
         return (Q(time) @ R(time) @ W(time)).transpose(0, 2, 1)
@@ -61,7 +61,7 @@ def dgcrs2trs_dt(time):
 
     dQ/dt and dW/dt is approximated to zero since these matrices change slowly compared to dR/dt
     """
-    if time.size == 1:
+    if not time.isarray:
         return (Q(time) @ dR_dut1(time) @ W(time)).transpose()
     else:
         return (Q(time) @ dR_dut1(time) @ W(time)).transpose(0, 2, 1)
@@ -70,7 +70,10 @@ def dgcrs2trs_dt(time):
 # @lru_cache() # TODO sat_pos unhashable
 def yaw2trs(sat_pos, time):
     """Transformation matrix from yaw-steering reference system to ITRS."""
-    return trs2yaw(sat_pos, time).transpose(0, 2, 1)
+    if not time.isarray:
+        return trs2yaw(sat_pos,time).transpose()
+    else:
+        return trs2yaw(sat_pos, time).transpose(0, 2, 1)
 
 
 # @lru_cache() # TODO sat_pos unhashable
@@ -86,11 +89,13 @@ def trs2yaw(sat_pos, time):
     z_unit = -sat_pos.trs.pos.unit_vector  # unit vector of z-axis
     sat_sun = eph.pos_itrs("sun") - sat_pos.trs.pos  # vector pointing from satellite position to Sun
     y = np.cross(z_unit, sat_sun)
-    y_unit = y / np.linalg.norm(y, axis=1)[:, None]  # unit vector of y-axis
-    x = np.cross(y_unit, z_unit)
-    x_unit = x / np.linalg.norm(x, axis=1)[:, None]  # unit vector of z-axis
 
-    return np.stack((x_unit, y_unit, z_unit), axis=1)
+    axis = 0 if len(sat_pos) == 1 and sat_pos.ndim == 1 else 1
+    y_unit = y / np.expand_dims(np.linalg.norm(y, axis=axis), axis=-1)  # unit vector of y-axis
+    x = np.cross(y_unit, z_unit)
+    x_unit = x / np.expand_dims(np.linalg.norm(x, axis=axis), axis=-1)  # unit vector of z-axis
+
+    return np.stack((x_unit, y_unit, z_unit), axis=axis)
 
 
 #

@@ -33,15 +33,18 @@ def baseline(dset):
     Returns:
         Tuple: Array of partial derivatives, list of their names, and their unit
     """
+    # This parameter is only supported for far field observations
+    idx = ~dset.near_field_obs
     baselines = np.asarray(dset.unique("baseline"))
 
     # Calculate partials
     bs = (dset.site_pos_2 - dset.site_pos_1).pos
-    all_partials = -dset.src_dir.trs.val[:, None, :] @ (bs.val / bs.length[:, None])[:, :, None]
+    all_partials = (-dset.src_dir.trs.val[:, None, :] @ bs.unit_vector[:, :, None])[:, 0, 0]
+    #all_partials = -dset.src_dir.trs.val[:, None, :] @ (bs.val / bs.length[:, None])[:, :, None]
 
     partials = np.zeros((dset.num_obs, len(baselines)))
     for bs_idx, b in enumerate(baselines):
-        dset_idx = dset.filter(baseline=b)
-        partials[dset_idx, bs_idx] = all_partials[dset_idx, 0, 0]
+        dset_idx = dset.filter(baseline=b) & idx
+        partials[dset_idx, bs_idx] = all_partials[dset_idx]
 
     return partials, baselines, "dimensionless"
