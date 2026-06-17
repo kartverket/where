@@ -358,12 +358,16 @@ class DirectionArray(np.ndarray):
     def direction_from(self, site_pos):
         """Calcualte direction vector from position ignoring the motion of the Earth"""
         # Ignore station position for radio source directions
-        direction = self.unit_vector
+        direction = self.unit_vector.copy()
 
         if site_pos.other_2 is not None:
             direction_2 = site_pos.direction_to(site_pos.other_2)
             # self should be NaN for observations to satellites
-            idx_other_2 = np.isnan(direction)
+            if direction.ndim == 2:
+                idx_other_2 = np.isnan(direction[:, 0])
+                direction[idx_other_2] = direction_2[idx_other_2]
+            else:
+                idx_other_2 = np.isnan(direction[0])
             direction[idx_other_2] = direction_2[idx_other_2]
 
         return direction
@@ -377,8 +381,12 @@ class DirectionArray(np.ndarray):
             other_2 = site_pos.other_2.to_system(site_pos.system)
             vector_2 = site_pos.vector_to(other_2)
             # self should be NaN for observations to satellites
-            idx_other_2 = np.isnan(vector[:, 0])
+            if vector.ndim == 2:
+                idx_other_2 = np.isnan(vector[:, 0])
+            else:
+                idx_other_2 = np.isnan(vector[0])
             vector[idx_other_2] = vector_2[idx_other_2]
+
         return vector
 
     def __hash__(self):
