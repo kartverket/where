@@ -213,10 +213,14 @@ class DirectionArray(np.ndarray):
         return list(_SYSTEMS.keys())
 
     @classmethod
+    def _conversions(cls):
+        return list(_CONVERSIONS.keys())
+
+    @classmethod
     def _system_columns(cls):
         return [f"{s}.{c}" for s, sc in _SYSTEMS.items() for c in sc.column_names]
 
-    def to_system(self, system: str) -> "PosDeltaBase":
+    def to_system(self, system: str) -> "DirectionArray":
         """Convert to a different system
 
         Args:
@@ -354,12 +358,16 @@ class DirectionArray(np.ndarray):
     def direction_from(self, site_pos):
         """Calcualte direction vector from position ignoring the motion of the Earth"""
         # Ignore station position for radio source directions
-        direction = self.unit_vector
+        direction = self.unit_vector.copy()
 
         if site_pos.other_2 is not None:
             direction_2 = site_pos.direction_to(site_pos.other_2)
             # self should be NaN for observations to satellites
-            idx_other_2 = np.isnan(direction)
+            if direction.ndim == 2:
+                idx_other_2 = np.isnan(direction[:, 0])
+                direction[idx_other_2] = direction_2[idx_other_2]
+            else:
+                idx_other_2 = np.isnan(direction[0])
             direction[idx_other_2] = direction_2[idx_other_2]
 
         return direction
@@ -373,15 +381,19 @@ class DirectionArray(np.ndarray):
             other_2 = site_pos.other_2.to_system(site_pos.system)
             vector_2 = site_pos.vector_to(other_2)
             # self should be NaN for observations to satellites
-            idx_other_2 = np.isnan(vector[:, 0])
+            if vector.ndim == 2:
+                idx_other_2 = np.isnan(vector[:, 0])
+            else:
+                idx_other_2 = np.isnan(vector[0])
             vector[idx_other_2] = vector_2[idx_other_2]
+
         return vector
 
     def __hash__(self):
         return hash(self.tobytes())
 
     def __eq__(self, other):
-        return self.data.tobytes() == other.data.tobytes()
+        return self.data.tobytes() == other.data.tobytes() and self.ndim == other.ndim
 
     def __deepcopy__(self, memo):
         new_sigma_array = self.__class__(np.asarray(self))
@@ -413,6 +425,9 @@ class DirectionArray(np.ndarray):
             idx = self.column_names.index(key)
             if self.ndim == 1:
                 return self.val[idx]
+            # Special handling of array with one position
+            elif np.squeeze(self).ndim == 1:
+                return self.val[:, idx]
             else:
                 if self.is_transposed:
                     return self.val[idx, :]
@@ -425,7 +440,6 @@ class DirectionArray(np.ndarray):
 
     def __getitem__(self, item):
         """Update attributes with correct shape, used by __array_finalize__"""
-
         # Get column
         if isinstance(item, int) and self.is_transposed:
             return getattr(self, self.column_names[item])
@@ -433,7 +447,7 @@ class DirectionArray(np.ndarray):
         from_super = super().__getitem__(item)
 
         # Get row
-        if isinstance(item, int):
+        if isinstance(item, (int, np.int_, slice)):
             dir_args = {}
             for attr in self._attributes():
                 orig_value = getattr(self, attr, None)

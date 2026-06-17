@@ -37,7 +37,7 @@ def ortho_eop(time):
         tidal variations for polar motion y ( microarcseconds)
         tidal variations for ut1 (microseconds)
     """
-    if time.size == 1:
+    if not time.isarray:
         return iers.ortho_eop(time.tt.mjd)
     else:
         # Only loop over unique epochs
@@ -57,7 +57,7 @@ def utlibr(time):
         libration for lod (microseconds per day)
     """
 
-    if time.size == 1:
+    if not time.isarray:
         return iers.utlibr(time.tt.mjd)
     else:
         # Only loop over unique epochs
@@ -76,7 +76,7 @@ def pmsdnut2(time):
         libration for polar motion x ( microarcseconds)
         libration for polar motion y ( microarcseconds)
     """
-    if time.size == 1:
+    if not time.isarray:
         return iers.pmsdnut2(time.tt.mjd)
     else:
         # Only loop over unique epochs
@@ -99,7 +99,7 @@ def rg_zont2(time):
     # # Julian centuries since J2000
     t_julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
 
-    if time.size == 1:
+    if not time.isarray:
         return iers.rg_zont2(t_julian_centuries)
     else:
         # Only loop over unique epochs

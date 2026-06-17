@@ -38,9 +38,12 @@ If a satellite is completely missing in the sp3 orbits for the given time period
 normal KeyError.
 
 """
-
-import numpy as np
+# Standard library imports
 from datetime import timedelta
+from functools import lru_cache
+
+# Third party imports
+import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
@@ -84,7 +87,7 @@ def get_orbit(rundate, file_key=None, bounds_error=False, days_before=1, days_af
     # TODO: Multiple file keys?
     return _orbit_from_sp3(rundate, file_key, bounds_error, days_before, days_after)
 
-
+@lru_cache()
 def _orbit_from_sp3(rundate, file_key, bounds_error, days_before, days_after):
     date_to_read = rundate - timedelta(days=days_before)
     orb_data = {}
