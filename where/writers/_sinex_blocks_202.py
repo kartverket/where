@@ -227,6 +227,9 @@ class SinexBlocks:
         for iers_name in self.sources:
             # Sourcenames are saved internally with the letters "dot" instead of the character "." which have a special meaning in Where
             real_iers_name = iers_name.replace("dot", ".")
+            if real_iers_name not in crf:
+                # This may be a satellite instead
+                continue
             if real_iers_name in source_names:
                 icrf_name = source_names[real_iers_name]["icrf_name_long"]
             else:

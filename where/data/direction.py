@@ -60,3 +60,8 @@ class GcrsDirection(DirectionArray):
     system = "gcrs"
     column_names = ("x", "y", "z")
     _units = ("unitless", "unitless", "unitless")
+
+
+# Define shorthands for available systems and conversions
+Direction.SYSTEMS = DirectionArray._systems()
+Direction.CONVERSIONS = DirectionArray._conversions()

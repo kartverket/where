@@ -183,7 +183,7 @@ class Eop:
         Returns:
             Dict: EOP data subset to the time period needed.
         """
-        if time.size == 1:
+        if not time.isarray:
             start_time = np.floor(time.utc.mjd) - window // 2
             end_time = np.ceil(time.utc.mjd) + window // 2
         else:
@@ -680,7 +680,7 @@ class Eop:
         Returns:
             Array: Corrections to tabular values, one value for each time epoch.
         """
-        corrections = 0 if self.time.size == 1 else np.zeros(self.time.size)
+        corrections = 0 if not self.time.isarray else np.zeros(self.time.size)
         for name, correction_func, out_idx, factor in correction_models:
             if name not in self.models:
                 continue

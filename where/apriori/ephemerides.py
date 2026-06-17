@@ -267,8 +267,7 @@ class Ephemerides:
 
         g2i = rotation.gcrs2trs(time)
 
-        # return position.Position(gcrs, system="gcrs", time=time).trs.val
-        if time.size == 1:
+        if not time.isarray:
             return g2i @ gcrs
         else:
             return (g2i @ gcrs[:, :, None])[:, :, 0]

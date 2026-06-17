@@ -236,7 +236,7 @@ class TrfSite:
         Returns:
             Array:  1 or self.time.size distances.
         """
-        if self.time.size == 1:
+        if not self.time.isarray:
             return np.linalg.norm(self.pos.trs - other_pos)
         return np.linalg.norm(self.pos.trs - other_pos, axis=1).mean()
 

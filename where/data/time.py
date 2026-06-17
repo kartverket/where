@@ -59,14 +59,14 @@ def delta_tdb_tcb(time: "TimeArray") -> "np_float":
 def delta_tcb_tcg(time: "TimeArray") -> "np_float":
     # See Note 1) in hf2002_iers for time scales explanation
     if time.scale == "tcb":
-        if time.size == 1:
+        if not time.isarray:
             tcb_tcg = iers.hf2002_iers(time.tdb.jd)
         else:
             tcb_tcg = np.array([iers.hf2002_iers(t) for t in time.tdb.jd])
         return -tcb_tcg * Unit.second2day
     else:
         # time scale is tcg
-        if time.size == 1:
+        if not time.isarray:
             tcb_tcg = iers.hf2002_iers(time.tt.jd)
         else:
             tcb_tcg = np.array([iers.hf2002_iers(t) for t in time.tt.jd])

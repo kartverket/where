@@ -56,7 +56,7 @@ def vectorized_xy06(time):
     Returns:
         tuple:  CIP x, y coordinates
     """
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_xy06(time.tt.jd_int, time.tt.jd_frac)
 
     x, y = np.empty(time.shape), np.empty(time.shape)
@@ -77,7 +77,7 @@ def vectorized_s06(time):
     Returns:
         CIO locator s
     """
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_s06(time.tt.jd_int, time.tt.jd_frac, X_model(time), Y_model(time))
 
     return np.array(
@@ -95,7 +95,7 @@ def vectorized_era00(time):
     Returns:
         Earth rotation angle
     """
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_era00(time.ut1.jd_int, time.ut1.jd_frac)
 
     return np.array([sofa.iau_era00(t.jd_int, t.jd_frac) for t in time.ut1])
@@ -111,7 +111,7 @@ def vectorized_sp00(time):
     Returns:
         TIO locator s'
     """
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_sp00(time.tt.jd_int, time.tt.jd_frac)
 
     return np.array([sofa.iau_sp00(t.jd_int, t.jd_frac) for t in time.tt])
@@ -127,7 +127,7 @@ def vectorized_gmst06(time):
     Returns:
             Greenwich mean time in radians
     """
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_gmst06(time.ut1.jd_int, time.ut1.jd_frac, time.tt.jd_int, time.tt.jd_frac)
 
     return np.array([sofa.iau_gmst06(t1.jd_int, t1.jd_frac, t2.jd_int, t2.jd_frac) for t1, t2 in zip(time.ut1, time.tt)])
@@ -144,7 +144,7 @@ def vectorized_gst06(time):
             Greenwich apparent time in radians
     """
 
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_gst06a(time.ut1.jd_int, time.ut1.jd_frac, time.tt.jd_int, time.tt.jd_frac)
 
     return np.array([sofa.iau_gst06a(t.ut1.jd_int, t.ut1.jd_frac, t.tt.jd_int, t.tt.jd_frac) for t in time])
@@ -161,7 +161,7 @@ def vectorized_iau_fal03(time):
            Fundamental argument, mean anomaly of the Moon. In radians.
     """
     julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_fal03(julian_centuries)
     return np.array([sofa.iau_fal03(t) for t in julian_centuries])
 
@@ -177,7 +177,7 @@ def vectorized_iau_falp03(time):
            Fundamental argument, mean anomaly of the Sun. In radians.
     """
     julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_falp03(julian_centuries)
     return np.array([sofa.iau_falp03(t) for t in julian_centuries])
 
@@ -194,7 +194,7 @@ def vectorized_iau_faf03(time):
            longitude of the ascending node. In radians.
     """
     julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_faf03(julian_centuries)
     return np.array([sofa.iau_faf03(t) for t in julian_centuries])
 
@@ -210,7 +210,7 @@ def vectorized_iau_fad03(time):
            Fundamental argument, mean elongation of the Moon from the Sun. In radians.
     """
     julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_fad03(julian_centuries)
     return np.array([sofa.iau_fad03(t) for t in julian_centuries])
 
@@ -226,6 +226,6 @@ def vectorized_iau_faom03(time):
            Fundamental argument, mean longitude of the Moon’s ascending node. In radians.
     """
     julian_centuries = (time.tt.jd - 2_451_545.0) / 36525
-    if time.size == 1:
+    if not time.isarray:
         return sofa.iau_faom03(julian_centuries)
     return np.array([sofa.iau_faom03(t) for t in julian_centuries])

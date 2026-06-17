@@ -54,7 +54,7 @@ def hf_eop_xyu(time):
     """
     timediff = _delta_tt_ut1(time)
 
-    if time.size == 1:
+    if not time.isarray:
         return hf_eop.hfeop_xyu.calc_hf_eop_xyu(time.tt.mjd, timediff)[:, 0]
     else:
         # Only loop over unique epochs
@@ -80,7 +80,7 @@ def hf_eop_xyu_derivative(time):
 
     timediff = _delta_tt_ut1(time)
 
-    if time.size == 1:
+    if not time.isarray:
         return hf_eop.hfeop_xyu.calc_hf_eop_xyu(time.tt.mjd, timediff)[:, 1]
     else:
         # Only loop over unique epochs

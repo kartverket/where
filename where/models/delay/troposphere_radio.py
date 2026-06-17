@@ -1192,7 +1192,7 @@ def vmf1_station_pressure(stations, time):
     
     vmf1 = apriori.get("vmf1_station", time=time)
     
-    if time.size == 1:
+    if not time.isarray:
         try:
             return float(vmf1[stations]["pressure"](time.mjd))
         except KeyError:
