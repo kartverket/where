@@ -53,14 +53,14 @@ def add_to_full_timeseries(dset):
     # TODO: Remove combinations where filter leaves 0 observations
 
     num_obs = len(idx_values[idx_fields[0]])  # Length of any (in this case the first) field
-    mean_epoch = dset.time.mean.utc
+    mean_epoch = dset.time.mean.utc.isot
     rundate_str = dset.analysis["rundate"].strftime(config.FMT_date)
     session_code = dset.vars.get("session_code", "")
     status = dset.meta.get("analysis_status", "unchecked")
     session_type = dset.meta.get("input", dict()).get("where_session_type", "")
 
     dset_session.num_obs = num_obs
-    dset_session.add_time("time", val=[mean_epoch] * num_obs, scale=mean_epoch.scale, fmt=mean_epoch.fmt)
+    dset_session.add_time("time", val=[mean_epoch] * num_obs, scale="utc", fmt="isot")
     dset_session.add_text("rundate", val=[rundate_str] * num_obs)
     dset_session.add_text("status", val=[status] * num_obs)
     dset_session.add_text("session_type", val=[session_type] * num_obs)

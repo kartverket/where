@@ -51,14 +51,15 @@ def geometric_atmos(dset):
     delay[~idx] = atm1[~idx] * (baseline_gcrs_vel[~idx][:, None, :] @ dset.src_dir.unit_vector[~idx][:, :, None])[:, 0, 0]
 
     # Near field model (from Hakan paper (unpublished))
-    k1 = dset.site_pos_1.gcrs.vector[idx]
-    k1_hat = (k1 / np.linalg.norm(k1, axis=1)[:, None])[:, None, :]
-    k2 = dset.site_pos_2.gcrs.vector[idx]
-    k2_hat = k2 / np.linalg.norm(k2, axis=1)[:, None][:, None, :]
-    v0 = dset.sat_pos.gcrs.vel.val[idx][:, :, None]
-    v1 = dset.site_pos_1.gcrs.vel.val[idx][:, :, None]
-    v2 = dset.site_pos_2.gcrs.vel.val[idx][:, :, None]
-    delay[idx] = atm1[idx] * (k2_hat @ (v2 - v0) + k1_hat @ (v0 - v1))[:, 0, 0]
+    if np.sum(idx) > 0:
+        k1 = dset.site_pos_1.gcrs.vector[idx]
+        k1_hat = (k1 / np.linalg.norm(k1, axis=1)[:, None])[:, None, :]
+        k2 = dset.site_pos_2.gcrs.vector[idx]
+        k2_hat = k2 / np.linalg.norm(k2, axis=1)[:, None][:, None, :]
+        v0 = dset.sat_pos.gcrs.vel.val[idx][:, :, None]
+        v1 = dset.site_pos_1.gcrs.vel.val[idx][:, :, None]
+        v2 = dset.site_pos_2.gcrs.vel.val[idx][:, :, None]
+        delay[idx] = atm1[idx] * (k2_hat @ (v2 - v0) + k1_hat @ (v0 - v1))[:, 0, 0]
 
     # Since atm1 is already in meter we do not need to convert from seconds to meter
     return delay

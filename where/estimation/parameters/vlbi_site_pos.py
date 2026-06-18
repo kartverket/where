@@ -74,8 +74,9 @@ def site_pos(dset):
     # Calculate partials for near field observations (typically satellites)
     # TODO
     # TODO if vlbi_near_field not in dset and dset.near_field_obs > 0 -> Error
-    dtau_dx2 = _site_pos_2_near_field(dset)
-    dtau_dx1 = _site_pos_1_near_field(dset)
+    if np.sum(dset.near_field_obs) > 0:
+        dtau_dx2 = _site_pos_2_near_field(dset)
+        dtau_dx1 = _site_pos_1_near_field(dset)
     # import matplotlib.pyplot as plt
     # fig, ax = plt.subplots(3, sharex=True); label = "xyz";
     # for i in range(3):
