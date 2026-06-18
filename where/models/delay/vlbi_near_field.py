@@ -87,6 +87,13 @@ def vlbi_near_field(dset):
         Numpy array: Projected baseline in meters for each observation.
 
     """
+    # This model is only applicable for near field observations
+    idx = dset.near_field_obs
+    num_sat_obs = np.sum(idx)
+    if num_sat_obs == 0:
+        # Skip this model if there are no near field observations
+        return np.zeros(dset.num_obs)
+
     file_key = "vlbi_orbit_sp3"
     rundate = dset.analysis["rundate"]
     days_before = (rundate - dset.time.datetime.min().date()).days
@@ -94,9 +101,6 @@ def vlbi_near_field(dset):
     orbit = apriori.get("basic_orbit", rundate=rundate,
                         file_key=file_key, days_before=days_before, days_after=days_after)
 
-    # This model is only applicable for far field observations
-    idx = dset.near_field_obs
-    num_sat_obs = np.sum(idx)
     time = dset.time[idx]
     eph = apriori.get("ephemerides", time=time)
     bodies = [
