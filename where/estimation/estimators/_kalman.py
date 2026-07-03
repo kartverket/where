@@ -152,16 +152,17 @@ class KalmanFilter(object):
             num_unknowns (Int):   Number of unknowns.
         """
         # Update dataset with state and estimation fields and calculate new residuals
+        num_obs = dset.num_obs
         self._add_fields(dset, param_names)
         dset.residual[:] = dset.est - (dset.obs - dset.calc)
         num_unknowns += dset.meta.get("num_clock_coeff", 0)
 
         # Calculate normal equations, and add statistics about estimation to dataset
-        N, b = self._normal_equations(normal_idx, dset.num_obs - 1)
-        g = self.x_hat[dset.num_obs - 1, normal_idx, :]
-        deg_freedom = dset.num_obs - num_unknowns
+        N, b = self._normal_equations(normal_idx, num_obs - 1)
+        g = self.x_hat[num_obs - 1, normal_idx, :]
+        deg_freedom = num_obs - num_unknowns
         v = dset.residual[:, None]
-        P = sparse.diags(1 / self.r[: dset.num_obs])
+        P = sparse.diags(1 / self.r[: num_obs])
         sq_sum_residuals = (v.T @ P @ v).item()
         sq_sum_omc_terms = (2 * b.T @ g - g.T @ N @ g).item()
         variance_factor = sq_sum_residuals / deg_freedom if deg_freedom != 0 else np.inf
@@ -194,7 +195,7 @@ class KalmanFilter(object):
             cfg.update("analysis_status", "status", dset.meta.get("analysis_status", ""), source=__file__)
 
         # Add information to dset.meta
-        dset.meta.add("number of observations", dset.num_obs, section="statistics")
+        dset.meta.add("number of observations", num_obs, section="statistics")
         dset.meta.add("number of unknowns", num_unknowns, section="statistics")
         dset.meta.add("square sum of residuals", sq_sum_residuals, section="statistics")
         dset.meta.add("degrees of freedom", deg_freedom, section="statistics")

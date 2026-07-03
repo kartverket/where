@@ -10,6 +10,8 @@ Calculate the partial derivatives of the Earth orientation parameter Length of D
 
 
 """
+# External library imports
+import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
@@ -28,13 +30,18 @@ def eop_lod(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
-    column_name = ["lod"]
+    # Only far field observations is used to estimate this parameter
+    idx = ~dset.near_field_obs
 
-    src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
-    dR_dut1 = rotation.dR_dut1(dset.time)
-    dt = (dset.time.jd - dset.time.mean.jd)[:, None, None]
+    column_name = ["lod"]
+    partials = np.zeros((dset.num_obs, 1))
+
+    time = dset.time[idx]
+    src_dir = dset.src_dir.unit_vector[:, None, :][idx]
+    baseline = (dset.site_pos_2.trs.pos[idx] - dset.site_pos_1.trs.pos[idx]).mat
+    dR_dut1 = rotation.dR_dut1(time)
+    dt = (time.jd - time.mean.jd)[:, None, None]
     # lod = - ut1_rate * 1 day -> lod_partial = - ut1_rate_partial / 1 day
-    partials = (src_dir @ rotation.Q(dset.time) @ dR_dut1 @ rotation.W(dset.time) @ baseline @ dt)[:, :, 0]
+    partials[idx] = (src_dir @ rotation.Q(time) @ dR_dut1 @ rotation.W(time) @ baseline @ dt)[:, :, 0]
 
     return partials, column_name, "meter * radians / seconds"
