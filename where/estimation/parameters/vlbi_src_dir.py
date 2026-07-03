@@ -47,9 +47,13 @@ def src_dir(dset):
     Returns:
         Tuple: Array of partial derivatives, list of their names, and their unit
     """
+    # Only far field observations is used to estimate this parameter
+    idx = ~dset.near_field_obs
+    
     column_names = ["ra", "dec"]
-    sources = np.asarray(dset.unique("source"))
-    icrf = apriori.get("crf", time=dset.time)
+    sources = np.unique(dset.source[idx])
+    #sources = np.asarray(dset.unique("source"))
+    icrf = apriori.get("crf", time=dset.time[idx])
 
     # Remove sources that should be fixed
     fix_idx = np.zeros(len(sources))
@@ -72,10 +76,9 @@ def src_dir(dset):
     dK_ddec = dset.src_dir.dsrc_ddec[:, None, :]
     all_partials = np.hstack((-dK_dra @ baseline, -dK_ddec @ baseline))[:, :, 0]
 
-    for idx, src in enumerate(sources):
+    for i, src in enumerate(sources):
         src_idx = dset.filter(source=src)
-        partials[src_idx, idx * 2 : idx * 2 + 2] = all_partials[src_idx]
+        partials[src_idx, i * 2 : i * 2 + 2] = all_partials[src_idx]
 
     column_names = [s + "_" + name for s in sources for name in column_names]
-
     return partials, column_names, "meter"

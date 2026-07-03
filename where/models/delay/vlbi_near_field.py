@@ -9,8 +9,13 @@ The model derived in `jaron2019` is intended for Earth satellites and uses a lin
 term station and satellite motion. This approximation allows for a analytical solution and the equations are 
 expressed in the GCRS. The gravitational effect of celestial bodies on the delay is described in `deuv2012`.
 
+The model derived in `deuv2012` is expressed in the barycentric reference frame and is based on an iterative
+solution of the light time equations. This model is valid for the entire solar system. 
+
 """
+# Standard library imports
 from datetime import datetime
+from typing import Any, Callable, Dict, List, Tuple
 
 # External library imports
 import numpy as np
@@ -23,6 +28,7 @@ from midgard.math.constant import constant
 from where import apriori
 from where.data.position import PosVel
 from where.data.time import Time, TimeDelta
+from where.lib import config
 from where.lib import log
 
 # Constants for shorter equations
@@ -38,7 +44,13 @@ ngs_to_sp3["GEN-01"] = "L01"
 ngs_to_sp3["LAGEOS-1"] = "L51"
 ngs_to_sp3["SENTI-6A"] = "L40"
 
-model = __name__.split(".")[-1]
+MODEL = __name__.split(".")[-1]
+
+MODELS = {}
+
+def register_model(model: Callable) -> Callable:
+    MODELS[model.__name__] = model
+    return model
 
 @plugins.register
 def vlbi_near_field(dset):
@@ -54,6 +66,14 @@ def vlbi_near_field(dset):
         Numpy array: Near field delay for each observation
 
     """
+    near_field_model = config.tech[MODEL].model.str
+    if near_field_model in MODELS:
+        return MODELS[near_field_model](dset)
+    else:
+        log.error(f"Unknown model {near_field_model} for {MODEL} delay model")
+
+@register_model    
+def jaron2019(dset):
     # This model is only applicable for near field observations
     idx = dset.near_field_obs
     num_sat_obs = np.sum(idx)
@@ -68,38 +88,13 @@ def vlbi_near_field(dset):
     orbit = apriori.get("basic_orbit", rundate=rundate,
                         file_key=file_key, days_before=days_before, days_after=days_after)
 
-    time = dset.time[idx]
-    eph = apriori.get("ephemerides", time=time)
-    bodies = [
-        "mercury",
-        "venus",
-        "earth",
-        "moon",
-        "mars",
-        "jupiter",
-        "saturn",
-        "uranus",
-        "neptune",
-        "pluto",
-        "sun",
-    ]
-    bodies = ["sun", "earth"] # Test only earth
-    GM = {}
-    # Get GM for the celestial bodies
-    for body in bodies:
-        try:
-            GM_name = "GM" if body == "earth" else f"GM_{body}"
-            GM[body] = constant.get(GM_name, source=eph.ephemerides)
-        except KeyError:
-            log.warn(
-                f"The GM value of {body} is not defined for {eph.ephemerides}. "
-                f"Correction set to zero."
-            )
-            continue
-    # The sun is treated individually in the following equations so remove it from the list of bodies
-    bodies.remove("sun")
 
-    def bcrs_pos(r, **kwargs):
+    #eph = apriori.get("ephemerides", time=time)
+
+    #bodies = ["earth"]
+    #GM = _get_GM(bodies)
+
+    def bcrs_pos(r, time):
         """ Convert near Earth position expressed in GCRS to BRCS (still geocentric).
 
         Based on equation 11.19 IERS2010 conventions.
@@ -112,18 +107,20 @@ def vlbi_near_field(dset):
         r_b:        Position in BCRS. Dimensions (3, num_obs)
 
         """
+        eph = apriori.get("ephemerides", time=time)
         # The gravitational potential at the geocenter, neglecting the effects of the Earth’s mass.
         # At the picosecond level, only the solar potential is needed (IERS Conventions chapter 11)
-        U = constant.GM_sun / np.linalg.norm(eph.pos_gcrs("sun"), axis=1)[:, None]
+        U = constant.GM_sun / np.linalg.norm(eph.pos_gcrs("sun", time), axis=1)[:, None]
         # T0 and T2 is sufficiently close to T1 to always use T1 for ephemerdies. Ref. footnote (2) in Jaron2019 
-        V_E = eph.vel_bcrs("earth", **kwargs)[:, None, :]
-        R_E = eph.pos_bcrs("earth", **kwargs)
+        V_E = eph.vel_bcrs("earth", time)[:, None, :]
+        R_E = eph.pos_bcrs("earth", time)
         #return R_E + r
         r_b = r * (1 - U/C ** 2 - L_C) - 0.5 * ((V_E @ r[:, :, None])/C ** 2  @ V_E)[:, 0, :]
         return R_E + r_b
 
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
+    time = dset.time[idx]
     t1 = time.tcg
     x1_t1 = dset.site_pos_1.gcrs.pos[idx] # station_1 position at epoch t1
     x2_t1 = dset.site_pos_2.gcrs.pos[idx] # station_2 position at epoch t1
@@ -168,55 +165,56 @@ def vlbi_near_field(dset):
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
     # Based on Deuv, et al (2012) eq. 14, 16, 17
     # Equations are in BCRS. Ephemerides use TDB.
+    bodies = ["earth"]
     R0_T0 = bcrs_pos(x0_t0_tilde, time=t0_tilde) # satellite position at t0 in BCRS
-    RS_T0 = eph.pos_bcrs("sun", time=t0_tilde) # sun pos at t0 in BCRS
-    R1_T1 = bcrs_pos(x1_t1.val) # station_1 pos at t1 in BCRS
-    RS_T1 = eph.pos_bcrs("sun") # sun pos at t1 in BCRS
+    #RS_T0 = eph.pos_bcrs("sun", time=t0_tilde) # sun pos at t0 in BCRS
+    R1_T1 = bcrs_pos(x1_t1.val, time=t1) # station_1 pos at t1 in BCRS
+    #RS_T1 = eph.pos_bcrs("sun") # sun pos at t1 in BCRS
+    t_g01_TDB = _deuv_relativistic_term(R0_T0, R1_T1, t0_tilde, time, bodies)
+    #R0_S = R0_T0 - RS_T0 # eq. 16, i=0, alpha = S
+    #R1_S = R1_T1 - RS_T1 # eq. 16, i=1, alpha = S
+    #R01_S = R1_S - R0_S # eq. 17, alpha = S
 
-    R0_S = R0_T0 - RS_T0 # eq. 16, i=0, alpha = S
-    R1_S = R1_T1 - RS_T1 # eq. 16, i=1, alpha = S
-    R01_S = R1_S - R0_S # eq. 17, alpha = S
-
-    norm_R0_S = np.linalg.norm(R0_S, axis=1)
-    norm_R1_S = np.linalg.norm(R1_S, axis=1)
-    norm_R01_S = np.linalg.norm(R01_S, axis=1)
+    #norm_R0_S = np.linalg.norm(R0_S, axis=1)
+    #norm_R1_S = np.linalg.norm(R1_S, axis=1)
+    #norm_R01_S = np.linalg.norm(R01_S, axis=1)
 
     # eq. 14 (first part)
-    sun_factor = (1 + GAMMA) * GM["sun"]/C ** 2
-    delay_sun = sun_factor/C * \
-        np.log((norm_R0_S + norm_R1_S + norm_R01_S + sun_factor)/(norm_R0_S + norm_R1_S - norm_R01_S + sun_factor)) 
+    #sun_factor = (1 + GAMMA) * GM["sun"]/C ** 2
+    #delay_sun = sun_factor/C * \
+    #    np.log((norm_R0_S + norm_R1_S + norm_R01_S + sun_factor)/(norm_R0_S + norm_R1_S - norm_R01_S + sun_factor)) 
+    #delay_sun = 0
+    #_save_float_to_dset(dset, idx, f"{MODEL}.grav_sun_1", delay_sun * C, unit="meter", write_level="detail")
 
-    _save_float_to_dset(dset, idx, f"{model}.grav_sun_1", delay_sun * C, unit="meter", write_level="detail")
-
-    delay_bodies = 0
-    for body in bodies:
-        RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
-        RB_T1 = eph.pos_bcrs(body) # body pos at t1 in BCRS
-
-        R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
-        R1_B = R1_T1 - RB_T1 # eq. 16, i=1, alpha = B
-        R01_B = R1_B - R0_B # eq. 17, aplha = B
-
-        norm_R0_B = np.linalg.norm(R0_B, axis=1)
-        norm_R1_B = np.linalg.norm(R1_B, axis=1)
-        norm_R01_B = np.linalg.norm(R01_B, axis=1)
-
-        # eq. 14 (last part)
-        factor_body = (1 + GAMMA) * GM[body]/C ** 3
-        delay_body = factor_body * \
-            np.log((norm_R0_B + norm_R1_B + norm_R01_B)/(norm_R0_B + norm_R1_B - norm_R01_B))
-        delay_bodies += delay_body
-        
-        _save_float_to_dset(dset, idx, f"{model}.grav_{body}_1", delay_body * C, unit="meter", write_level="detail")
-
-    t_g01_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
+    # delay_bodies = 0
+    # for body in bodies:
+    #     RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
+    #     RB_T1 = eph.pos_bcrs(body) # body pos at t1 in BCRS
+    #
+    #     R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
+    #     R1_B = R1_T1 - RB_T1 # eq. 16, i=1, alpha = B
+    #     R01_B = R1_B - R0_B # eq. 17, aplha = B
+    #
+    #     norm_R0_B = np.linalg.norm(R0_B, axis=1)
+    #     norm_R1_B = np.linalg.norm(R1_B, axis=1)
+    #     norm_R01_B = np.linalg.norm(R01_B, axis=1)
+    #
+    #     # eq. 14 (last part)
+    #     factor_body = (1 + GAMMA) * GM[body]/C ** 3
+    #     delay_body = factor_body * \
+    #         np.log((norm_R0_B + norm_R1_B + norm_R01_B)/(norm_R0_B + norm_R1_B - norm_R01_B))
+    #     delay_bodies += delay_body
+    #
+    #     _save_float_to_dset(dset, idx, f"{MODEL}.grav_{body}_1", delay_body * C, unit="meter", write_level="detail")
+    #
+    # t_g01_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
     # Convert from TT to TCG since the Jaron, et. al (2019) equations work with this
     t_g01 = t_g01_TDB / (1 - L_G)
 
     # Save TT(=TDB) value to dset
-    _save_float_to_dset(dset, idx, f"{model}.grav_1", t_g01_TDB * C, unit="meter", write_level="detail")
+    _save_float_to_dset(dset, idx, f"{MODEL}.grav_1", t_g01_TDB * C, unit="meter", write_level="detail")
 
     # eq. 14 in jaron2019
     x01_dot_v0 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -243,50 +241,50 @@ def vlbi_near_field(dset):
     # Based on Deuv, et al (2012) eq. 14, 16, 17
     # Equations are in BCRS. Ephemerides use TDB.  
     R2_T2 = bcrs_pos(x2_t2_tilde, time=t2_tilde) # station_2 pos at t2 in BCRS
-    RS_T2 = eph.pos_bcrs("sun", time=t2_tilde) # sun pos at t2 in BCRS
+    #RS_T2 = eph.pos_bcrs("sun", time=t2_tilde) # sun pos at t2 in BCRS
+    t_g02_TDB = _deuv_relativistic_term(R0_T0, R2_T2, t2_tilde, time, bodies)
+    #R2_S = R2_T2 - RS_T2 # eq. 16, i=2, alpha = S
+    #R02_S = R2_S - R0_S # eq. 17, alpha = S
 
-    R2_S = R2_T2 - RS_T2 # eq. 16, i=2, alpha = S
-    R02_S = R2_S - R0_S # eq. 17, alpha = S
-
-    norm_R2_S = np.linalg.norm(R2_S, axis=1)
-    norm_R02_S = np.linalg.norm(R02_S, axis=1)
+    #norm_R2_S = np.linalg.norm(R2_S, axis=1)
+    #norm_R02_S = np.linalg.norm(R02_S, axis=1)
 
     # eq. 14 (first part)
-    delay_sun = sun_factor/C * \
-        np.log((norm_R0_S + norm_R2_S + norm_R02_S + sun_factor)/(norm_R0_S + norm_R2_S - norm_R02_S + sun_factor)) 
-
-    _save_float_to_dset(dset, idx, f"{model}.grav_sun_2", delay_sun * C, unit="meter", write_level="detail")
-
-    delay_bodies = 0
-    for body in bodies:
-        RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
-        RB_T2 = eph.pos_bcrs(body, time=t2_tilde) # body pos at t2 in BCRS
-
-        R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
-        R2_B = R2_T2 - RB_T2 # eq. 16, i=2, alpha = B
-        R02_B = R2_B - R0_B # eq. 17, aplha = B
-
-        norm_R0_B = np.linalg.norm(R0_B, axis=1)
-        norm_R2_B = np.linalg.norm(R2_B, axis=1)
-        norm_R02_B = np.linalg.norm(R02_B, axis=1)
-
-        # eq. 14 (last part)
-        factor_body = (1 + GAMMA) * GM[body]/C ** 3
-        delay_body = factor_body * \
-            np.log((norm_R0_B + norm_R2_B + norm_R02_B)/(norm_R0_B + norm_R2_B - norm_R02_B))
-        delay_bodies += delay_body 
-        
-        _save_float_to_dset(dset, idx, f"{model}.grav_{body}_2", delay_body * C, unit="meter", write_level="detail")
-
- 
-    t_g02_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
+    #delay_sun = sun_factor/C * \
+    #    np.log((norm_R0_S + norm_R2_S + norm_R02_S + sun_factor)/(norm_R0_S + norm_R2_S - norm_R02_S + sun_factor)) 
+    # delay_sun = 0
+    # #_save_float_to_dset(dset, idx, f"{MODEL}.grav_sun_2", delay_sun * C, unit="meter", write_level="detail")
+    #
+    # delay_bodies = 0
+    # for body in bodies:
+    #     RB_T0 = eph.pos_bcrs(body, time=t0_tilde) # body pos at t0 in BCRS
+    #     RB_T2 = eph.pos_bcrs(body, time=t2_tilde) # body pos at t2 in BCRS
+    #
+    #     R0_B = R0_T0 - RB_T0 # eq. 16, i=0, alpha = B
+    #     R2_B = R2_T2 - RB_T2 # eq. 16, i=2, alpha = B
+    #     R02_B = R2_B - R0_B # eq. 17, aplha = B
+    #
+    #     norm_R0_B = np.linalg.norm(R0_B, axis=1)
+    #     norm_R2_B = np.linalg.norm(R2_B, axis=1)
+    #     norm_R02_B = np.linalg.norm(R02_B, axis=1)
+    #
+    #     # eq. 14 (last part)
+    #     factor_body = (1 + GAMMA) * GM[body]/C ** 3
+    #     delay_body = factor_body * \
+    #         np.log((norm_R0_B + norm_R2_B + norm_R02_B)/(norm_R0_B + norm_R2_B - norm_R02_B))
+    #     delay_bodies += delay_body 
+    #
+    #     _save_float_to_dset(dset, idx, f"{MODEL}.grav_{body}_2", delay_body * C, unit="meter", write_level="detail")
+    #
+    #
+    # t_g02_TDB = delay_sun + delay_bodies # eq. 14 in deuv2012
     # According to Kaplan 2005: "TDB advance, on average, at the same rate as TT". 
     # -> Assume delay in TDB is the same as the delay in TT for this purpose
     # Convert from TT to TCG since the Jaron, et. al (2019) equations work with this
     t_g02 = t_g02_TDB / (1 - L_G)
     
     # Save TT(=TDB) value to dset  
-    _save_float_to_dset(dset, idx, f"{model}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
+    _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
     
     # eq. 17 in jaron2019
     x02_dot_v2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -301,17 +299,18 @@ def vlbi_near_field(dset):
 
 
     # Save intermediate variables to dataset for reuse in computation of partials
-    _save_float_to_dset(dset, idx, f"{model}.v0_t0_tilde", v0_t0_tilde, unit="(m/s, m/s, m/s)")
-    _save_float_to_dset(dset, idx, f"{model}.v2_t2_tilde", v2_t2_tilde, unit="(m/s, m/s, m/s)")
-    _save_float_to_dset(dset, idx, f"{model}.x01", x01, unit="(m, m, m)")
-    _save_float_to_dset(dset, idx, f"{model}.x02", x02, unit="(m, m, m)")
-    _save_float_to_dset(dset, idx, f"{model}.gamma0", np.sqrt(gamma0_2), unit="dimensionless")
-    _save_float_to_dset(dset, idx, f"{model}.gamma2", np.sqrt(gamma2_2), unit="dimensionless")
+    # All variables are TCG compatible
+    _save_float_to_dset(dset, idx, f"{MODEL}.v0_t0_tilde", v0_t0_tilde, unit="(m/s, m/s, m/s)")
+    _save_float_to_dset(dset, idx, f"{MODEL}.v2_t2_tilde", v2_t2_tilde, unit="(m/s, m/s, m/s)")
+    _save_float_to_dset(dset, idx, f"{MODEL}.x01", x01, unit="(m, m, m)")
+    _save_float_to_dset(dset, idx, f"{MODEL}.x02", x02, unit="(m, m, m)")
+    _save_float_to_dset(dset, idx, f"{MODEL}.gamma0", np.sqrt(gamma0_2), unit="dimensionless")
+    _save_float_to_dset(dset, idx, f"{MODEL}.gamma2", np.sqrt(gamma2_2), unit="dimensionless")
+    _save_float_to_dset(dset, idx, f"{MODEL}.delta_t0", delta_t0, unit="seconds")
     # Add more variables for debugging purposes
-    _save_time_to_dset(dset, idx, f"{model}.t0_tilde", t0_tilde, write_level="detail")
-    _save_time_to_dset(dset, idx, f"{model}.t2_tilde", t2_tilde, write_level="detail")
-    _save_float_to_dset(dset, idx, f"{model}.delta_t2", delta_t2 * (1 - L_G), write_level="detail", unit="seconds")
-    _save_float_to_dset(dset, idx, f"{model}.delta_t0", delta_t0 * (1 - L_G), write_level="detail", unit="seconds")
+    _save_time_to_dset(dset, idx, f"{MODEL}.t0_tilde", t0_tilde, write_level="detail")
+    _save_time_to_dset(dset, idx, f"{MODEL}.t2_tilde", t2_tilde, write_level="detail")
+    _save_float_to_dset(dset, idx, f"{MODEL}.delta_t2", delta_t2, write_level="detail", unit="seconds")
     
     ## For debugging. See if satellite is above horizon for both stations
     debug = False
@@ -328,15 +327,15 @@ def vlbi_near_field(dset):
             alpha = np.ones(np.sum(bl_idx))
             alpha[dset.sat_visible[bl_idx] == False] = 0.1
             for body in bodies + ["sun"]:
-                plt.scatter(dset.time.datetime[bl_idx], dset[f"{model}.grav_{body}_1"][bl_idx]/C, alpha=alpha, label=f"{body}_1")
-                plt.scatter(dset.time.datetime[bl_idx], dset[f"{model}.grav_{body}_2"][bl_idx]/C, alpha=alpha, label=f"{body}_2")
+                plt.scatter(dset.time.datetime[bl_idx], dset[f"{MODEL}.grav_{body}_1"][bl_idx]/C, alpha=alpha, label=f"{body}_1")
+                plt.scatter(dset.time.datetime[bl_idx], dset[f"{MODEL}.grav_{body}_2"][bl_idx]/C, alpha=alpha, label=f"{body}_2")
             plt.legend(ncol=2, loc='center left', bbox_to_anchor=(1, 0.5))
             plt.title(bl)
             plt.tight_layout()
             plt.show()
             
             for body in bodies + ["sun"]:
-                y = (dset[f"{model}.grav_{body}_2"][bl_idx] - dset[f"{model}.grav_{body}_1"][bl_idx])/C
+                y = (dset[f"{MODEL}.grav_{body}_2"][bl_idx] - dset[f"{MODEL}.grav_{body}_1"][bl_idx])/C
                 plt.scatter(dset.time.datetime[bl_idx], y, alpha=alpha, label=f"diff_{body}")
             plt.legend(ncol=1, loc='center left', bbox_to_anchor=(1, 0.5))
             plt.title(bl)
@@ -348,6 +347,94 @@ def vlbi_near_field(dset):
     output = np.zeros(dset.num_obs)
     output[idx] = delay * C # Convert to meter
     return output
+
+def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
+    #bodies = ["mercury", "venus", "earth", "moon", "mars", "jupiter", "saturn", "uranus", "neptune", "pluto", "sun"]
+    GM = _get_GM(bodies)
+
+    eph_T_sat = apriori.get("ephemerides", time=T_sat)
+    eph_T_site = apriori.get("ephemerides", time=T_site)
+    
+    R_sun_T_sat = eph_T_sat.pos_bcrs("sun")
+    R_sun_T_site = eph_T_site.pos_bcrs("sun")
+    
+    R_sat_sun = R_sat - R_sun_T_sat # eq. 16, i = 0, alpha = sun
+    R_site_sun = R_site - R_sun_T_site # eq. 16, i = 1 or 2, alpha = sun
+    R_sat_site_sun = R_site_sun - R_sat_sun # eq. 17, alpha = sun
+
+    norm_R_sat_sun = np.linalg.norm(R_sat_sun, axis=1)
+    norm_R_site_sun = np.linalg.norm(R_site_sun, axis=1)
+    norm_R_sat_site_sun = np.linalg.norm(R_sat_site_sun, axis=1)
+    
+    delay_sun = 0
+    if "sun" in bodies:
+        # The sun is treated individually in the following equations so remove it from the list of bodies
+        bodies.remove("sun")
+
+        # eq. 14 (first part)
+        factor_sun = (1 + GAMMA) * GM["sun"] / C**3
+        delay_sun = (factor_sun * C 
+            * np.log((norm_R_sat_sun + norm_R_site_sun + norm_R_sat_site_sun + factor_sun) 
+                     / (norm_R_sat_sun + norm_R_site_sun - norm_R_sat_site_sun + factor_sun)))
+
+    delay_bodies = 0
+    for body in bodies:
+        
+        R_body_T_sat = eph_T_sat.pos_bcrs(body)
+        R_body_T_site = eph_T_site.pos_bcrs(body)
+        
+        R_sat_body = R_sat - R_body_T_sat # eq. 16, i = 0, alpha = body
+        R_site_body = R_site  - R_body_T_site # eq. 16, i = 1 or 2, alpha = body
+        R_sat_site_body = R_site_body - R_sat_body # eq. 17, alpha = body
+        
+        norm_R_sat_body = np.linalg.norm(R_sat_body, axis=1)
+        norm_R_site_body = np.linalg.norm(R_site_body, axis=1)
+        norm_R_sat_site_body = np.linalg.norm(R_sat_site_body, axis=1)
+        
+        # eq. 14 (last part)
+        factor_body = (1 + GAMMA) * GM[body]/C ** 3
+        delay_body = (factor_body 
+            * np.log((norm_R_sat_body + norm_R_site_body + norm_R_sat_site_body)
+                     / (norm_R_sat_body + norm_R_site_body - norm_R_sat_site_body)))
+        delay_bodies += delay_body
+        
+        
+    return delay_sun + delay_bodies # delay in TDB
+
+@register_model
+def deuv2012(dset):
+    
+    # This model is only applicable for near field observations
+    idx = dset.near_field_obs
+
+    T1 = dset.time.tdb[idx]
+    bodies = ["mercury", "venus", "earth", "moon", "mars", "jupiter", "saturn", "uranus", "neptune", "pluto", "sun"]
+    # TODO
+    # Initial condition
+    TO = T1.copy()
+    RLT_01 = _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies)
+    
+    output = np.zeros(dset.num_obs)
+    output[idx] = delay * C # Convert to meter
+    return output
+
+def _get_GM(bodies):
+    GM = {}
+    # Get GM for the celestial bodies
+    for body in bodies:
+        try:
+            GM_name = "GM" if body == "earth" else f"GM_{body}"
+            ephemerides = config.tech.ephemerides.str
+            GM[body] = constant.get(GM_name, source=ephemerides)
+        except KeyError:
+            log.warn(
+                f"The GM value of {body} is not defined for {ephemerides}. "
+                f"Correction set to zero."
+            )
+            continue
+    return GM
+
+# Helper functions
 
 def _save_float_to_dset(dset, idx, field, value, **kwargs):
     new_shape = tuple([dset.num_obs] + list(value.shape[1:]))
