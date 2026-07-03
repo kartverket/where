@@ -30,18 +30,21 @@ def eop_pm_rate(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
+    # Only far field observations is used to estimate this parameter
+    idx = ~dset.near_field_obs
+
     column_names = ["dxp", "dyp"]
     partials = np.zeros((dset.num_obs, 2))
 
-    time = dset.time
-    src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
+    time = dset.time[idx]
+    src_dir = dset.src_dir.unit_vector[:, None, :][idx]
+    baseline = (dset.site_pos_2.trs.pos[idx] - dset.site_pos_1.trs.pos[idx]).mat
     dt = (time.jd - time.mean.jd)[:, None, None]
 
     # x-pole
-    partials[:, 0] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dxp(time) @ baseline @ dt)[:, 0, 0]
+    partials[idx, 0] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dxp(time) @ baseline @ dt)[:, 0, 0]
 
     # y-pole
-    partials[:, 1] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
+    partials[idx, 1] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
 
     return partials, column_names, "meter * days / radian"

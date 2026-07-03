@@ -245,3 +245,8 @@ def _write_to_dataset(parser, dset, rundate, session_code):
         log.warn(f"Unknown source {s}. Observations with this source is discarded")
     dset.subset(np.logical_not(bad_source_idx))
 
+    # TEST
+    # Reduce dataset for quicker testing
+    #keep_idx = np.zeros(dset.num_obs, dtype=bool)
+    #keep_idx[0:4000] = True
+    #dset.subset(keep_idx)

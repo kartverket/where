@@ -27,15 +27,20 @@ def eop_nut(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
+    # Only far field observations is used to estimate this parameter
+    idx = ~dset.near_field_obs
+
     column_names = ["x", "y"]
     partials = np.zeros((dset.num_obs, 2))
-    src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
 
-    partials[:, 0] = -(src_dir @ rotation.dQ_dX(dset.time) @ rotation.R(dset.time) @ rotation.W(dset.time) @ baseline)[
+    time = dset.time[idx]   
+    src_dir = dset.src_dir.unit_vector[:, None, :][idx]
+    baseline = (dset.site_pos_2.trs.pos[idx] - dset.site_pos_1.trs.pos[idx]).mat
+
+    partials[idx, 0] = -(src_dir @ rotation.dQ_dX(time) @ rotation.R(time) @ rotation.W(time) @ baseline)[
         :, 0, 0
     ]
-    partials[:, 1] = -(src_dir @ rotation.dQ_dY(dset.time) @ rotation.R(dset.time) @ rotation.W(dset.time) @ baseline)[
+    partials[idx, 1] = -(src_dir @ rotation.dQ_dY(time) @ rotation.R(time) @ rotation.W(time) @ baseline)[
         :, 0, 0
     ]
 

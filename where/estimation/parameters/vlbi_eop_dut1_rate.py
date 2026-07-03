@@ -10,6 +10,8 @@ Calculate the partial derivatives of the rate of the :math:`UT1 - UTC` Earth ori
 
 
 """
+# External library imports
+import numpy as np
 
 # Midgard imports
 from midgard.dev import plugins
@@ -28,12 +30,17 @@ def eop_dut1_rate(dset):
     Returns:
         Tuple: Array of partial derivatives, and list of names of derivatives
     """
+    # Only far field observations is used to estimate this parameter
+    idx = ~dset.near_field_obs
+    
     column_name = ["ddut1"]
+    partials = np.zeros((dset.num_obs, 1))
 
-    src_dir = dset.src_dir.unit_vector[:, None, :]
-    baseline = (dset.site_pos_2.trs.pos - dset.site_pos_1.trs.pos).mat
-    dR_dut1 = rotation.dR_dut1(dset.time)
-    dt = (dset.time.jd - dset.time.mean.jd)[:, None, None]
-    partials = -(src_dir @ rotation.Q(dset.time) @ dR_dut1 @ rotation.W(dset.time) @ baseline @ dt)[:, :, 0]
+    time = dset.time[idx]
+    src_dir = dset.src_dir.unit_vector[:, None, :][idx]
+    baseline = (dset.site_pos_2.trs.pos[idx] - dset.site_pos_1.trs.pos[idx]).mat
+    dR_dut1 = rotation.dR_dut1(time)
+    dt = (time.jd - time.mean.jd)[:, None, None]
+    partials[idx] = -(src_dir @ rotation.Q(time) @ dR_dut1 @ rotation.W(time) @ baseline @ dt)[:, :, 0]
 
     return partials, column_name, "meter * radians * days / seconds"
