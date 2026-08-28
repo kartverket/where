@@ -204,8 +204,19 @@ def calculate_temperature_functions(dset):
             log.warn(f"Few datapoints, applying constant temperature for {ivsname} ({site_id}).")
             coeff = [0, 0, np.mean(temp), 0]
         temperature_funcs[ivsname] = _get_temperature_func(*coeff)
+
+        if ivsname == "WESTFORD":
+            temperature_funcs["WESTFORD"] = _get_westford_func(temperature_funcs["WESTFORD"])
     return temperature_funcs
 
+def _get_westford_func(temp_func):
+    def temperature_func(time):
+        # See comment in antenna-info.txt:
+        ## Westford radome interior temperature:
+        ## Arthur Niell reports the following radome temperature model
+        ## temp_radome = 20.d0 + 0.6*(temp_sta(ista)- 20.d0)
+        return 20 + 0.6 * (temp_func(time)- 20)
+    return temperature_func
 
 def _get_temperature_func(amplitude, phase, offset, trend):
     def temperature_func(time):

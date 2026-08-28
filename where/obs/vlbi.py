@@ -74,7 +74,7 @@ def _write_to_dataset(parser, dset, rundate, session_code):
     # Replace the characeter "." with the letters "dot" in source names because "." has a special meaning in where
     data["source"] = [s.replace(".", "dot") for s in iers_source_names]
 
-
+    #import IPython; IPython.embed()
     for field, values in data.items():
         values = np.array(values)
         if values.dtype.kind in {"U", "S"}:
@@ -248,5 +248,6 @@ def _write_to_dataset(parser, dset, rundate, session_code):
     # TEST
     # Reduce dataset for quicker testing
     #keep_idx = np.zeros(dset.num_obs, dtype=bool)
-    #keep_idx[0:4000] = True
+    #keep_idx[4700:10000] = True
+    #keep_idx = (dset.filter(baseline="RAEGYEB/WETTZ13N") | dset.filter(baseline="RAEGYEB/WETTZ13N")) & dset.near_field_obs
     #dset.subset(keep_idx)

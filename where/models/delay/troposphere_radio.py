@@ -33,6 +33,7 @@ from midgard.math.unit import Unit
 from where import apriori
 from where.ext import iers_2010 as iers
 from where.ext import gpt2w as ext_gpt2w
+from where.ext import gpt3 as ext_gpt3
 from where.lib import config
 from where.lib import log
 
@@ -40,8 +41,8 @@ from where.lib import log
 MODEL = __name__.split(".")[-1]
 
 # Available troposphere models
-MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "vmf1_gridded", "vmf1_station"]
-METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "site_pressure", "default"]
+MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "gpt3", "vmf1_gridded", "vmf1_station"]
+METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "gp3", "site_pressure", "default"]
 ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded", "vmf1_station"]
 ZENITH_HYDROSTATIC_DELAY_MODELS = ["saastamoinen", "vmf1_gridded", "vmf1_station"]
 GRADIENT_MODELS = ["none", "apg"]
@@ -52,6 +53,8 @@ _GPT2 = dict()
 # Cache for GPT2W model
 _GPT2W = dict()
 
+# Cache for GPT3 model
+_GPT3 = dict()
 
 @plugins.register
 def troposphere_for_all_stations(dset):
@@ -120,7 +123,7 @@ def troposphere(dset):
                                                               time, obs_pressure, obs_temp, 
                                                               obs_e, obs_tm, obs_lambd)
     #import IPython; IPython.embed()
-    mh, mw = mapping_function(latitude, longitude, height, time, zenith_distance)
+    mh, mw = mapping_function(stations, latitude, longitude, height, time, zenith_distance)
     mg, gn, ge = gradient_model(latitude, longitude, azimuth, elevation)
     zhd = zenith_hydrostatic_delay(stations, latitude, longitude, height, time, pressure)
     zwd = zenith_wet_delay(stations, latitude, longitude, height, time, temperature, e, tm, lambd)
@@ -224,6 +227,8 @@ def meteorological_data(stations, latitude, longitude, height, time,
             model_tm, model_lambd = None, None, 
         elif model == "gpt2w":
             model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt2w_meteo(latitude, longitude, height, time)
+        elif model == "gpt3":
+            model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt3_meteo(latitude, longitude, height, time)
         elif model == "site_pressure":
             model_pressure = obs_pressure
             model_temp, model_e, model_tm, model_lambd = None, None, None, None
@@ -306,10 +311,11 @@ def gradient_model(latitude, longitude, azimuth, elevation):
     return mg, gn, ge
 
 
-def mapping_function(latitude, longitude, height, time, zenith_distance):
+def mapping_function(stations, latitude, longitude, height, time, zenith_distance):
     """Calculates hydrostatic and wet mapping functions based on configuration file definition
 
     Args:
+        stations (numpy.ndarray):        Station name for each observation
         latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
         longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
         height (numpy.ndarray):          Orthometric height for each observation in [m]
@@ -345,11 +351,13 @@ def mapping_function(latitude, longitude, height, time, zenith_distance):
             model_mh, model_mw = gpt2_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "gpt2w":
             model_mh, model_mw = gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance)
+        elif model == "gpt3":
+            model_mh, model_mw = gpt3_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_gridded":
             model_mh, model_mw = vmf1_gridded_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_station":
-            model_mh, model_mw = vmf1_station_mapping_function(latitude, longitude, height, time, zenith_distance)
-    
+            model_mh, model_mw = vmf1_station_mapping_function(latitude, stations, time, zenith_distance)
+
         else:
             log.fatal(
                 f"Unknown troposphere mapping function {model}. "
@@ -955,6 +963,170 @@ def gpt2w_wrapper(mjd, latitude, longitude, hell):
     # Linear interpolation between two daily GPT2W solutions
     mjd_int, mjd_frac = divmod(mjd, 1)
     output = _GPT2W[mjd_int] + mjd_frac * (_GPT2W[mjd_int + 1] - _GPT2W[mjd_int])
+
+    return output
+
+
+def gpt3_meteo(latitude, longitude, height, time):
+    """Calculates meteorological data based on GPT3 model
+
+    The GPT3 model is described in Landskron et al. 2018 
+
+    Args:
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+
+    Returns:
+        tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
+
+    ============  ===========  =======================================================
+     Element       Unit         Description
+    ============  ===========  =======================================================
+     pressure      hPa          Pressure value
+     temperature   Celsius      Temperature values
+     dt            degree/km    Temperature lapse rate
+     tm            K            Mean temperature of the water vapor
+     e             hPa          Water vapor pressure
+     la                         Water vapor decrease factor
+     geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
+    ============  ===========  =======================================================
+    """
+    num_obs = len(time)
+    press = np.empty(num_obs)
+    temp = np.empty(num_obs)
+    dt = np.empty(num_obs)
+    tm = np.empty(num_obs)
+    e = np.empty(num_obs)
+    ah = np.empty(num_obs)
+    aw = np.empty(num_obs)
+    la = np.empty(num_obs)
+    undu = np.empty(num_obs)
+
+    mjd = time.utc.mjd
+
+    # Determine GPT3 values for each observation by interpolating between two unique
+    # daily solutions
+    for obs in range(num_obs):
+        # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
+        # linear interpolation
+        (press[obs], temp[obs], dt[obs], tm[obs], e[obs], ah[obs], aw[obs], la[obs], undu[obs], _, _, _, _) = gpt3_wrapper(
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
+        )
+
+    return press, temp, dt, tm, e, la, undu
+
+def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance):
+    """Calculates meteorological data and mapping function coefficients based on GPT3 model
+
+    The GPT3 model is described in Landskron et al. 2018 
+
+    Args:
+        latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
+        longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
+        height (numpy.ndarray):          Orthometric height for each observation in [m]
+        time (Time):                     Epoch of each observation
+        zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
+
+    Returns:
+        tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
+
+    ============  ===========  =======================================================
+     Element       Unit         Description
+    ============  ===========  =======================================================
+     pressure      hPa          Pressure value
+     temperature   Celsius      Temperature values
+     dt            degree/km    Temperature lapse rate
+     tm            K            Mean temperature of the water vapor
+     e             hPa          Water vapor pressure
+     mh                         Hydrostatic mapping function coefficient ah
+     mw                         Wet mapping function coefficient aw
+     la                         Water vapor decrease factor
+     geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
+    ============  ===========  =======================================================
+    """
+    num_obs = len(time)
+    ah = np.empty(num_obs)
+    aw = np.empty(num_obs)
+    mh = np.empty(num_obs)
+    mw = np.empty(num_obs)
+
+    mjd = time.utc.mjd
+
+    # Determine GPT3 values for each observation by interpolating between two unique
+    # daily solutions
+    for obs in range(num_obs):
+        # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
+        # linear interpolation
+        _, _, _, _, _, ah[obs], aw[obs], _, _, _, _, _, _ = gpt3_wrapper(
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
+        )
+        # Determine mapping function values based on coefficients 'ah' and 'aw'
+        mh[obs], mw[obs] = ext_gpt3.vmf3_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], longitude[obs], height[obs], zenith_distance[obs])
+
+    return mh, mw
+
+
+
+def gpt3_wrapper(mjd, latitude, longitude, hell):
+    """Calculates meteorological data and mapping function coefficients based on GPT3 model
+
+    The functions calls the GPT3 library routine ``gpt3_10.f90`` (see
+    http://ggosatm.hg.tuwien.ac.at/DELAY/SOURCE/GPT2w). The Fortran routine ``gpt2w_1w.f`` reads the grid file
+    ``gpt2_1wA.grd``, which should be available in the same folder, where the Fortran programs runs. Therefore we
+    change the current directory to the GPT2w source directory, so that ``gpt2w_1w.f`` can read the grid file.
+
+    Due to performance reasons the GPT2w values are not determined for each observation. The call of the Fortran
+    routine ``gpt2w_1w.f`` takes time, because the grid file ``gpt2_1wA.grd`` has to be read for each
+    observation. Instead the GPT2w values are calculated only once for each unique day (modified Julian date rounded to
+    integer) and saved in the cache _GPT2W. The final GPT2W values are computed by a linear interpolation of the daily
+    determined GPT2W values.  The difference between the use of routine ``gpt2w_1w.f`` for each observation and the
+    linear interpolation between daily solution is on the submillimeter level and can therefore be neglected.
+
+    Args:
+        mjd (numpy.float64):  Modified Julian date.
+        latitude (list):      Array with latitude for each station in [rad].
+        longitude (list):     Array with longitude for each station in [rad].
+        hell (list):          Array with height for each station in [m].
+
+    Returns:
+        numpy.ndarray:  Array with following entries:
+
+    =======  ===========  =======================================================
+     Index    Unit         Description
+    =======  ===========  =======================================================
+     [0]      hPa          Pressure value
+     [1]      Celsius      Temperature values
+     [2]      degree/km    Temperature lapse rate
+     [3]      K            Mean temperature of the water vapor
+     [4]      hPa          Water vapor pressure
+     [5]                   Hydrostatic mapping function coefficient ah
+     [6]                   Wet mapping function coefficient aw
+     [7]                   Water vapor decrease factor
+     [8]      m            Geoid undulation (based on 9x9 EGM model)
+    =======  ===========  =======================================================
+    """
+    it = 0  # Use of time variations (annual and semiannual terms)
+
+    if not (len(latitude) == len(longitude) == len(hell)):
+        log.fatal("Length of latitude, longitute and ellipsoidal height array is not equal.")
+
+    # Change directory so that gpt3_.f90 can read the gpt3_1.grd-file in the GPT3 source directory
+    current_dir = os.getcwd()
+    os.chdir(config.files.path(ext_gpt3.__name__))
+
+    # Loop over all unique dates (rounded to integer value)
+
+    for date in _rounded_dates(mjd):
+        # Check if date is already included in cache
+        if date not in _GPT3:
+            _GPT3[date] = np.array(ext_gpt3.gpt3_1(date, latitude, longitude, hell, it)).reshape(-1)
+    os.chdir(current_dir)
+
+    # Linear interpolation between two daily GPT3 solutions
+    mjd_int, mjd_frac = divmod(mjd, 1)
+    output = _GPT3[mjd_int] + mjd_frac * (_GPT3[mjd_int + 1] - _GPT3[mjd_int])
 
     return output
 
