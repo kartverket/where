@@ -41,8 +41,8 @@ from where.lib import log
 MODEL = __name__.split(".")[-1]
 
 # Available troposphere models
-MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "gpt3_1", "gpt3_5", "vmf1_gridded", "vmf1_station"]
-METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "gpt3_1", "gpt3_5", "site_pressure", "default"]
+MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "gpt3", "vmf1_gridded", "vmf1_station"]
+METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "gp3", "site_pressure", "default"]
 ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded", "vmf1_station"]
 ZENITH_HYDROSTATIC_DELAY_MODELS = ["saastamoinen", "vmf1_gridded", "vmf1_station"]
 GRADIENT_MODELS = ["none", "apg"]
@@ -227,9 +227,8 @@ def meteorological_data(stations, latitude, longitude, height, time,
             model_tm, model_lambd = None, None, 
         elif model == "gpt2w":
             model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt2w_meteo(latitude, longitude, height, time)
-        elif model == "gpt3_1" or model == "gpt3_5":
-            grid = model[-1]
-            model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt3_meteo(latitude, longitude, height, time, grid)
+        elif model == "gpt3":
+            model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt3_meteo(latitude, longitude, height, time)
         elif model == "site_pressure":
             model_pressure = obs_pressure
             model_temp, model_e, model_tm, model_lambd = None, None, None, None
@@ -352,9 +351,8 @@ def mapping_function(stations, latitude, longitude, height, time, zenith_distanc
             model_mh, model_mw = gpt2_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "gpt2w":
             model_mh, model_mw = gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance)
-        elif model == "gpt3_1" or model == "gpt3_5":
-            grid = model[-1]
-            model_mh, model_mw = gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, grid)
+        elif model == "gpt3":
+            model_mh, model_mw = gpt3_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_gridded":
             model_mh, model_mw = vmf1_gridded_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_station":
@@ -969,7 +967,7 @@ def gpt2w_wrapper(mjd, latitude, longitude, hell):
     return output
 
 
-def gpt3_meteo(latitude, longitude, height, time, grid):
+def gpt3_meteo(latitude, longitude, height, time):
     """Calculates meteorological data based on GPT3 model
 
     The GPT3 model is described in Landskron et al. 2018 
@@ -993,7 +991,6 @@ def gpt3_meteo(latitude, longitude, height, time, grid):
      e             hPa          Water vapor pressure
      la                         Water vapor decrease factor
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
-     grid (str):                Either "1" or "5" depending on wanted grid size
     ============  ===========  =======================================================
     """
     num_obs = len(time)
@@ -1012,14 +1009,15 @@ def gpt3_meteo(latitude, longitude, height, time, grid):
     # Determine GPT3 values for each observation by interpolating between two unique
     # daily solutions
     for obs in range(num_obs):
+        # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
         # linear interpolation
         (press[obs], temp[obs], dt[obs], tm[obs], e[obs], ah[obs], aw[obs], la[obs], undu[obs], _, _, _, _) = gpt3_wrapper(
-            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
         )
 
     return press, temp, dt, tm, e, la, undu
 
-def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, grid):
+def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance):
     """Calculates meteorological data and mapping function coefficients based on GPT3 model
 
     The GPT3 model is described in Landskron et al. 2018 
@@ -1046,7 +1044,6 @@ def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, gr
      mw                         Wet mapping function coefficient aw
      la                         Water vapor decrease factor
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
-     grid (str):                Either "1" or "5" depending on wanted grid size
     ============  ===========  =======================================================
     """
     num_obs = len(time)
@@ -1060,9 +1057,10 @@ def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, gr
     # Determine GPT3 values for each observation by interpolating between two unique
     # daily solutions
     for obs in range(num_obs):
+        # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
         # linear interpolation
         _, _, _, _, _, ah[obs], aw[obs], _, _, _, _, _, _ = gpt3_wrapper(
-            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
         )
         # Determine mapping function values based on coefficients 'ah' and 'aw'
         mh[obs], mw[obs] = ext_gpt3.vmf3_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], longitude[obs], height[obs], zenith_distance[obs])
@@ -1071,7 +1069,7 @@ def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, gr
 
 
 
-def gpt3_wrapper(mjd, latitude, longitude, hell, grid):
+def gpt3_wrapper(mjd, latitude, longitude, hell):
     """Calculates meteorological data and mapping function coefficients based on GPT3 model
 
     The functions calls the GPT3 library routine ``gpt3_10.f90`` (see
@@ -1091,7 +1089,6 @@ def gpt3_wrapper(mjd, latitude, longitude, hell, grid):
         latitude (list):      Array with latitude for each station in [rad].
         longitude (list):     Array with longitude for each station in [rad].
         hell (list):          Array with height for each station in [m].
-        grid (str):           Either "1" or "5" depending on wanted grid size
 
     Returns:
         numpy.ndarray:  Array with following entries:
@@ -1115,7 +1112,7 @@ def gpt3_wrapper(mjd, latitude, longitude, hell, grid):
     if not (len(latitude) == len(longitude) == len(hell)):
         log.fatal("Length of latitude, longitute and ellipsoidal height array is not equal.")
 
-    # Change directory so that gpt3_*.f90 can read the gpt3_*.grd-file in the GPT3 source directory
+    # Change directory so that gpt3_.f90 can read the gpt3_1.grd-file in the GPT3 source directory
     current_dir = os.getcwd()
     os.chdir(config.files.path(ext_gpt3.__name__))
 
@@ -1124,10 +1121,7 @@ def gpt3_wrapper(mjd, latitude, longitude, hell, grid):
     for date in _rounded_dates(mjd):
         # Check if date is already included in cache
         if date not in _GPT3:
-            if grid == "1":
-                _GPT3[date] = np.array(ext_gpt3.gpt3_1(date, latitude, longitude, hell, it)).reshape(-1)
-            elif grid == "5":
-                _GPT3[date] = np.array(ext_gpt3.gpt3_5(date, latitude, longitude, hell, it)).reshape(-1)
+            _GPT3[date] = np.array(ext_gpt3.gpt3_1(date, latitude, longitude, hell, it)).reshape(-1)
     os.chdir(current_dir)
 
     # Linear interpolation between two daily GPT3 solutions
