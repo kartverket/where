@@ -248,5 +248,6 @@ def _write_to_dataset(parser, dset, rundate, session_code):
     # TEST
     # Reduce dataset for quicker testing
     #keep_idx = np.zeros(dset.num_obs, dtype=bool)
-    #keep_idx[0:4000] = True
+    #keep_idx[4700:10000] = True
+    #keep_idx = (dset.filter(baseline="RAEGYEB/WETTZ13N") | dset.filter(baseline="RAEGYEB/WETTZ13N")) & dset.near_field_obs
     #dset.subset(keep_idx)

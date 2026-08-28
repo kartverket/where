@@ -56,7 +56,6 @@ _GPT2W = dict()
 # Cache for GPT3 model
 _GPT3 = dict()
 
-
 @plugins.register
 def troposphere_for_all_stations(dset):
     """Calculate tropospheric delay for all stations
@@ -352,9 +351,8 @@ def mapping_function(stations, latitude, longitude, height, time, zenith_distanc
             model_mh, model_mw = gpt2_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "gpt2w":
             model_mh, model_mw = gpt2w_mapping_function(latitude, longitude, height, time, zenith_distance)
-        elif model == "gpt3_1" or model == "gpt3_5":
-            grid = model[-1]
-            model_mh, model_mw = gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_distance, grid)
+        elif model == "gpt3":
+            model_mh, model_mw = gpt3_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_gridded":
             model_mh, model_mw = vmf1_gridded_mapping_function(latitude, longitude, height, time, zenith_distance)
         elif model == "vmf1_station":
@@ -1019,13 +1017,12 @@ def gpt3_meteo(latitude, longitude, height, time):
 
     return press, temp, dt, tm, e, la, undu
 
-def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_distance, grid):
+def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance):
     """Calculates meteorological data and mapping function coefficients based on GPT3 model
 
     The GPT3 model is described in Landskron et al. 2018 
 
     Args:
-        station name (np.dnarray):       Text with station name
         latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
         longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
         height (numpy.ndarray):          Orthometric height for each observation in [m]
@@ -1047,7 +1044,6 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
      mw                         Wet mapping function coefficient aw
      la                         Water vapor decrease factor
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
-     grid (str):                Either "1" or "5" depending on wanted grid size
     ============  ===========  =======================================================
     """
     num_obs = len(time)
@@ -1064,13 +1060,16 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
         # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
         # linear interpolation
         _, _, _, _, _, ah[obs], aw[obs], _, _, _, _, _, _ = gpt3_wrapper(
-            stations[obs], mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid)
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
+        )
         # Determine mapping function values based on coefficients 'ah' and 'aw'
         mh[obs], mw[obs] = ext_gpt3.vmf3_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], longitude[obs], height[obs], zenith_distance[obs])
 
     return mh, mw
 
-def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
+
+
+def gpt3_wrapper(mjd, latitude, longitude, hell):
     """Calculates meteorological data and mapping function coefficients based on GPT3 model
 
     The functions calls the GPT3 library routine ``gpt3_10.f90`` (see
@@ -1086,7 +1085,6 @@ def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
     linear interpolation between daily solution is on the submillimeter level and can therefore be neglected.
 
     Args:
-        station (str):        Station name
         mjd (numpy.float64):  Modified Julian date.
         latitude (list):      Array with latitude for each station in [rad].
         longitude (list):     Array with longitude for each station in [rad].
@@ -1122,19 +1120,13 @@ def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
 
     for date in _rounded_dates(mjd):
         # Check if date is already included in cache
-        key = (date, station)
-        if key not in _GPT3:
-            if grid == "1":
-                _GPT3[key] = np.array(ext_gpt3.gpt3_1(date, latitude, longitude, hell, it)).reshape(-1)
-            elif grid == "5":
-                _GPT3[key] = np.array(ext_gpt3.gpt3_5(date, latitude, longitude, hell, it)).reshape(-1)
+        if date not in _GPT3:
+            _GPT3[date] = np.array(ext_gpt3.gpt3_1(date, latitude, longitude, hell, it)).reshape(-1)
     os.chdir(current_dir)
 
     # Linear interpolation between two daily GPT3 solutions
     mjd_int, mjd_frac = divmod(mjd, 1)
-    key_1 = (mjd_int, station)
-    key_2 = (mjd_int + 1, station)
-    output = _GPT3[key_1] + mjd_frac * (_GPT3[key_2] - _GPT3[key_1])
+    output = _GPT3[mjd_int] + mjd_frac * (_GPT3[mjd_int + 1] - _GPT3[mjd_int])
 
     return output
 
