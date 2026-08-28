@@ -30,6 +30,7 @@ from where.lib import exceptions
 from where.lib import log
 from where import parsers
 
+TRF = __name__.split(".")[-1]
 
 @plugins.register
 class Itrf(TrfFactory):
@@ -174,7 +175,8 @@ class Itrf(TrfFactory):
         pos_trs = Position(np.squeeze(pos), system="trs", ellipsoid=ell, time=self.time)
 
         # Post-seismic deformations, see Appendix C in :cite:'itrf2014'
-        if "psd" in station_info:
+        ignore_psd = config.tech[TRF].ignore_psd.bool
+        if "psd" in station_info and not ignore_psd:
             # In ITRF2014 the up component is called H
             # In ITRF2020 and its updates the up component is called U
             enu = "ENH" if self.version == "2014" else "ENU"
@@ -198,25 +200,6 @@ class Itrf(TrfFactory):
                         denu[L][idx] += a * np.log(1 + delta_t[idx] / t)
 
             denu = np.stack([denu[l] for l in denu], axis=1)
-            #psd = station_info["psd"]
-            #denu = dict(U=np.zeros(self.time.size), E=np.zeros(self.time.size), N=np.zeros(self.time.size))
-            #for param in psd.values():
-            #    t_0 = Time(param["epoch"], fmt="datetime", scale="utc")
-            #    delta_t = (self.time - t_0).jd * Unit.day2julian_years
-            #    if isinstance(delta_t, float):
-            #        delta_t = np.array([delta_t])
-            #    idx = delta_t > 0
-            #    for L in "ENU":
-            #        aexp = np.array(param.get("AEXP_" + L, list()))
-            #        texp = np.array(param.get("TEXP_" + L, list()))
-            #        for a, t in zip(aexp, texp):
-            #            denu[L][idx] += a * (1 - np.exp(-delta_t[idx] / t))
-            #        alog = np.array(param.get("ALOG_" + L, list()))
-            #        tlog = np.array(param.get("TLOG_" + L, list()))
-            #        for a, t in zip(alog, tlog):
-            #            denu[L][idx] += a * np.log(1 + delta_t[idx] / t)
-            #
-            #denu = np.vstack((denu["E"], denu["N"], denu["U"])).T
 
             pos_delta = PositionDelta(np.squeeze(denu), system="enu", ellipsoid=ell, ref_pos=pos_trs, time=self.time)
             pos_trs += pos_delta.trs

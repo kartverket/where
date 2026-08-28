@@ -17,9 +17,10 @@ SOFADIR = $(CURDIR)/external/sofa/src
 IERSDIR = $(CURDIR)/external/iers/src
 HFEOPDIR = $(CURDIR)/external/iers/hfeop
 GPT2WDIR = $(CURDIR)/external/gpt2w/src
+GPT3DIR = $(CURDIR)/external/gpt3/src
 
 # Define phony targets (targets that are not files)
-.PHONY: all develop install cython doc test typing format external sofa iers_2010 hf_eop gpt2w
+.PHONY: all develop install cython doc test typing format external sofa iers_2010 hf_eop gpt2w gpt3
 
 # Everything needed for installation
 all:	external cython develop local_config
@@ -122,3 +123,12 @@ $(GPT2WDIR)/gpt2w.pyf:
 
 $(EXTDIR)/gpt2w$(F2PYEXTENSION):	$(GPT2WDIR)/gpt2w.pyf $(shell find $(GPT2WDIR) -type f -name *.f)
 	( cd $(EXTDIR) && $(F2PY) -c $(GPT2WDIR)/gpt2w.pyf $(GPT2WDIR)/*.f )
+
+# GPT3
+gpt3:	$(EXTDIR)/gpt3$(F2PYEXTENSION)
+
+$(GPT3DIR)/gpt3.pyf:
+	python download.py gpt3
+
+$(EXTDIR)/gpt3$(F2PYEXTENSION):	$(GPT3DIR)/gpt3.pyf $(shell find $(GPT3DIR) -type f -name *.f90)
+	( cd $(EXTDIR) && $(F2PY) -c --f90flags='-ffree-line-length-none' $(GPT3DIR)/gpt3.pyf $(GPT3DIR)/*.f90 )

@@ -1,0 +1,44 @@
+Installation and update instructions for using the GPT3 library in WHERE
+=========================================================================
+
+To download or update the GPT3 library, run the download.py script as follows:
+
+    cd ~/where
+    python download.py gpt3
+
+See the file ~/where/config/download_gpt3.conf for details about what is being
+downloaded.
+
+At first install, we also created and manually updated the gpt3.pyf-signature
+file needed by the F2PY compiler. Creation of the signature file was done as
+follows (do NOT do this):
+
+    # cd ~/where/external/gpt3/src
+    # f2py -h ../gpt3.pyf *.f
+
+You should NOT do this when updating the library, as this will overwrite the
+manually updated, existing signature file. Instead, add any new gpt2w routines
+to the existing gpt2w.pyf-signature file by hand.
+
+The following manual preparation of the signature file was carried out:
+
+1. Indication if arguments are input or output arguments by using intent(in) or
+   intent(out)
+ 
+2. An indication of the resulting module is needed. This is done by adding:
+         python module gpt3 ! in
+            interface  ! in :gpt3
+                subroutine gpt3_1(....)
+                ...
+                end subroutine gpt3_1
+            end interface
+         end python module gpt3
+
+In order to simplify compilation, we have added gpt3 as an external target in
+the WHERE Makefile. This will typically not need any changes when updating the
+library. This also includes downloading the source code if necessary. Thus, the
+library can be updated by running:
+
+    cd ~/where
+    make gpt3
+

@@ -45,15 +45,14 @@ def delta_ut1_utc(time: "TimeArray", models=None) -> "np_float":
 
 
 def delta_tdb_tcb(time: "TimeArray") -> "np_float":
+    # Equation (10.3) in IERS Conventions 2010. Separate terms to avoid loss of precision
+    dt = time.jd1 - constant.T_0_jd1 + time.jd2 - constant.T_0_jd2
+    delta = constant.TDB_0 * Unit.second2day - dt * constant.L_B
+
     if time.scale == "tdb":
-        # Equation (10.3) in IERS Conventions 2010. Separate terms to avoid loss of precision
-        dt = constant.T_0_jd1 - time.jd1 + constant.T_0_jd2 - time.jd2
-        return constant.TDB_0 * Unit.second2day + dt * constant.L_B / (1 - constant.L_B)
+        return -delta
     else:
-        # time scale is tcb
-        # Equation (10.3) in IERS Conventions 2010. Separate terms to avoid loss of precision
-        dt = time.jd1 - constant.T_0_jd1 + time.jd2 - constant.T_0_jd2
-        return constant.TDB_0 * Unit.second2day - dt * constant.L_B
+        return delta
 
 
 def delta_tcb_tcg(time: "TimeArray") -> "np_float":
