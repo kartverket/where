@@ -384,6 +384,8 @@ def calculate(stage, dset):
     dset.add_float("calc", val=delta_delay, unit=delay_unit, write_level="operational")
     dset.add_float("residual", val=dset.obs - dset.calc, unit=delay_unit, write_level="operational")
     log.blank()
+    
+    import IPython; IPython.embed()
 
     # Estimate clock polynomial
     log.info(f"Calculating clock polynomials")

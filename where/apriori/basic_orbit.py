@@ -136,7 +136,7 @@ def _orbit_from_sp3(rundate, file_key, bounds_error, days_before, days_after):
     time_sys = parser.meta["time_sys"]
     if time_sys not in ("GPS", "UTC"):
         log.warn(f"System Time Indicator {time_sys} in SP3 file {parser.file_path} is not supported.")
-    time_sys = "gps" # Force time sys to be gps even though sp3 file says utc # lageos-1 debugging
+    #time_sys = "gps" # Force time sys to be gps even though sp3 file says utc # lageos-1 debugging
     for sat in satellites:
         sat_dict = orb.setdefault(sat, {})
         sat_time = Time(orb_data[sat]["time"], fmt="isot", scale=time_sys.lower())
@@ -193,7 +193,7 @@ def _get_derived_velocity_func(pos_func):
         """time: where.data.time.Time"""
         # Estimate velocity based on position right before and after given epoch
         dt = 1.0 # 1 second
-        dt = TimeDelta(np.array([dt]*len(time)), scale=time.scale, fmt="seconds")
+        dt = TimeDelta(np.array([dt] * len(time)), scale=time.scale, fmt="seconds")
         return (pos_func(time - dt) - pos_func(time + dt))/(2 * dt.val[:, None])
     return velocity
 

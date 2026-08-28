@@ -30,6 +30,7 @@ from where.lib import exceptions
 from where.lib import log
 from where import parsers
 
+TRF = __name__.split(".")[-1]
 
 @plugins.register
 class Itrf(TrfFactory):
@@ -174,7 +175,8 @@ class Itrf(TrfFactory):
         pos_trs = Position(np.squeeze(pos), system="trs", ellipsoid=ell, time=self.time)
 
         # Post-seismic deformations, see Appendix C in :cite:'itrf2014'
-        if "psd" in station_info:
+        ignore_psd = config.tech[TRF].ignore_psd.bool
+        if "psd" in station_info and not ignore_psd:
             psd = station_info["psd"]
             denu = dict(H=np.zeros(self.time.size), E=np.zeros(self.time.size), N=np.zeros(self.time.size))
             for param in psd.values():

@@ -1,0 +1,42 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module gpt3 ! in
+    interface  ! in :gpt3
+		subroutine gpt3_1(mjd,lat,lon,h_ell,n_stat,it,p,t,dt,tm,e,ah,aw,la,undu,gn_h,ge_h,gn_w,ge_w) ! in gpt3_1.f90
+		    double precision intent(in) :: mjd
+		    double precision dimension(n_stat),intent(in) :: lat
+		    double precision dimension(n_stat),intent(in),depend(n_stat) :: lon
+		    double precision dimension(n_stat),intent(in),depend(n_stat) :: h_ell
+		    integer, optional,intent(in),check(shape(lat, 0) == n_stat),depend(lat) :: n_stat=shape(lat, 0)
+		    integer intent(in) :: it
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: p
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: t
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: dt
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: tm
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: e
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: ah
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: aw
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: la
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: undu
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: gn_h
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: ge_h
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: gn_w
+		    double precision dimension(n_stat),intent(out),depend(n_stat) :: ge_w
+		end subroutine gpt3_1
+		subroutine vmf3_ht(ah,aw,mjd,lat,lon,h_ell,zd,mfh,mfw) ! in vmf3_ht.f90
+		    double precision intent(in) :: ah
+		    double precision intent(in) :: aw
+		    double precision intent(in) :: mjd
+		    double precision intent(in) :: lat
+		    double precision intent(in) :: lon
+		    double precision intent(in) :: h_ell
+		    double precision intent(in) :: zd
+		    double precision intent(out) :: mfh
+		    double precision intent(out) :: mfw
+		end subroutine vmf3_ht
+    end interface
+end python module gpt3
+! This file was auto-generated with f2py (version:2.3.3).
+! See:
+! https://web.archive.org/web/20140822061353/http://cens.ioc.ee/projects/f2py2e
