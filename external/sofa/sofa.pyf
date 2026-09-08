@@ -1273,6 +1273,7 @@ python module sofa ! in
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
             double precision dimension(3,3), intent(out) :: rbpn
+        end subroutine iau_pnm06a
         subroutine iau_pnm80(date1,date2,rmatpn) ! in :sofa:pnm80.for
             double precision, intent(in) :: date1
             double precision, intent(in) :: date2
