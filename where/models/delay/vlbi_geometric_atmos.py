@@ -42,8 +42,8 @@ def geometric_atmos(dset):
         # The division by speed on light is a part of the model and not a unit conversion in this case
         atm1 = dset.troposphere_dT_1 / constant.c
     else:
-        log.warn("Missing troposphere data. Correction set to zero")
-        atm1 = 0
+        log.warn("Missing troposphere data. Atmospheric aberration correction set to zero")
+        atm1 = np.zeros(dset.num_obs)
 
     # Far field model (from IERS 2010 Conventions)
     # Geometric delay due to the atmosphere in equation (11.11)

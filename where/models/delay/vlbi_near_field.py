@@ -71,6 +71,10 @@ def vlbi_near_field(dset):
     #j_delay = jaron2019(dset)
     #d_delay = deuv2012(dset)
     #import IPython; IPython.embed()
+    if np.sum(dset.near_field_obs) == 0:
+        # Skip this model if there are no near field observations
+        return np.zeros(dset.num_obs)
+    
     if near_field_model in MODELS:
         return MODELS[near_field_model](dset)
     else:
@@ -85,47 +89,48 @@ def jaron2019(dset):
     This model is expressed in the GCRS and uses TGC-compatible values. This has some consequences (see Hakan et al. 2026
     for explainations):
         Gravitational effects on the delay should only account for the planet Earth
-        Apriori values for station and satellite positions are usually TT-compatible and needs to be scaled properly
+        Apriori values for station and satellite positions are usually TT-compatible and needs to be scaled to TCG
         The final output needs to be scaled to TT
+
+        or the whole model could be computed in TT-compatible values
     """
     # This model is only applicable for near field observations
     idx = dset.near_field_obs
-    num_sat_obs = np.sum(idx)
-    if num_sat_obs == 0:
-        # Skip this model if there are no near field observations
-        return np.zeros(dset.num_obs)
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
     time = dset.time[idx]
-    t1 = time.tcg
+    #t1 = time.tcg
+    t1 = time.tt
     x1_t1 = dset.site_pos_1.gcrs.pos[idx] # station_1 position at epoch t1
     x2_t1 = dset.site_pos_2.gcrs.pos[idx] # station_2 position at epoch t1
     x0_t1 = dset.sat_pos.gcrs.pos[idx] # satellite position at epoch t1
-    v0_t1 = dset.sat_pos.gcrs.vel.val[idx] / ((1 - L_G)) # satellite velocity at at epoch t1
-    v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] / ((1 - L_G)) # station_2 velocity at epoch t1
+    v0_t1 = dset.sat_pos.gcrs.vel.val[idx] #/ ((1 - L_G)) # satellite velocity at at epoch t1
+    v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] #/ ((1 - L_G)) # station_2 velocity at epoch t1
 
     # First approximation to light travel time
-    delta1 = (x1_t1 - x0_t1).length / C / ((1 - L_G)) # eq. 4 # seconds
-    delta2 = (x2_t1 - x0_t1).length / C / ((1 - L_G)) # eq. 6 # seconds
-    
+    delta1 = (x1_t1 - x0_t1).length / C #/ ((1 - L_G)) # eq. 4 # seconds
+    delta2 = (x2_t1 - x0_t1).length / C #/ ((1 - L_G)) # eq. 6 # seconds
+
     # Convert to TimeDelta objects
-    delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
-    delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
+    #delta1 = TimeDelta(delta1, fmt="seconds", scale="tcg")
+    #delta2 = TimeDelta(delta2, fmt="seconds", scale="tcg")
+    delta1 = TimeDelta(delta1, fmt="seconds", scale="tt")
+    delta2 = TimeDelta(delta2, fmt="seconds", scale="tt")
 
     t0_tilde = t1 - delta1 # approximation to t0 (time of emission of signal from satellite)
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
 
     sat_posvel = _sat_posvel(dset, t0_tilde) 
-    
+
     # Satellite position and velocity at t0
-    x0_t0_tilde = sat_posvel.gcrs.pos.val / ((1 - L_G))
-    v0_t0_tilde = sat_posvel.gcrs.vel.val / ((1 - L_G))
-    
+    x0_t0_tilde = sat_posvel.gcrs.pos.val #/ ((1 - L_G))
+    v0_t0_tilde = sat_posvel.gcrs.vel.val #/ ((1 - L_G))
+
     # Linearized satellite position at t1
     dt_10 = delta1.seconds[:, None]
     x0_bar_t1 = v0_t0_tilde * dt_10 + x0_t0_tilde # eq. 5
-    
+
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
 
@@ -136,7 +141,8 @@ def jaron2019(dset):
     R0_T0 = _g2b_pos(x0_t0_tilde, t0_tilde) # satellite position at t0 in BCRS
     R1_T1 = _g2b_pos(x1_t1.val, t1) # station_1 pos at t1 in BCRS
     t_g01_TDB = _deuv_relativistic_term(R0_T0, R1_T1, t0_tilde, time, bodies)
-    t_g01 = t_g01_TDB / (1 - L_G)
+    # TODO: how to convert from TDB to TT? And is it needed at this precision level?
+    t_g01 = t_g01_TDB #/ (1 - L_G)
 
     # Save TT(=TDB) value to dset
     _save_float_to_dset(dset, idx, f"{MODEL}.grav_1", t_g01_TDB * C, unit="meter", write_level="detail")
@@ -147,28 +153,29 @@ def jaron2019(dset):
     # Time of emmison of the signal relative to t1
     delta_t0 = gamma0_2 * (x01_dot_v0 - t_g01) - \
         np.sqrt(gamma0_2 ** 2 * (x01_dot_v0 - t_g01) ** 2 + gamma0_2 * (x01_dot_x01 - t_g01 ** 2))
-    
-    
+
+
     # Assume station_2 has no motion beweteen t1 and t2 in a terrestrial reference system
     site_pos_2_t2 = PosVel(dset.site_pos_2.val[idx], system="trs", time=t2_tilde)
     # GCRS posiion at t2
-    x2_t2_tilde = site_pos_2_t2.gcrs.pos.val / ((1 - L_G))
-    v2_t2_tilde = site_pos_2_t2.gcrs.vel.val / ((1 - L_G))
-    
+    x2_t2_tilde = site_pos_2_t2.gcrs.pos.val #/ ((1 - L_G))
+    v2_t2_tilde = site_pos_2_t2.gcrs.vel.val #/ ((1 - L_G))
+
     # Linearized station_2 position at t1
     dt_12 = - tau_tilde.seconds[:, None]
     x2_bar_t1 = v2_t2_tilde * dt_12 + x2_t2_tilde # eq.8
-    
+
     gamma2_2 = 1/(1 - (v2_t1[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 18 
     x02 = x0_bar_t1 - x2_bar_t1 + (v0_t1 - v2_t1) * delta_t0[:, None] # eq. 19
-    
+
     # Compute t_g02: Relativistic effects on delay from satellite to station 2
     # Based on Deuv, et al (2012) eq. 14, 16, 17
     # Equations are in BCRS. Ephemerides use TDB.  
     R2_T2 = _g2b_pos(x2_t2_tilde, t2_tilde) # station_2 pos at t2 in BCRS
     t_g02_TDB = _deuv_relativistic_term(R0_T0, R2_T2, t2_tilde, time, bodies)
-    t_g02 = t_g02_TDB / (1 - L_G)
-    
+    # TODO: how to convert from TDB to TT? And is it needed at this precision level?
+    t_g02 = t_g02_TDB #/ (1 - L_G)
+
     # Save TT(=TDB) value to dset  
     _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
     
@@ -179,13 +186,13 @@ def jaron2019(dset):
     # Time of reception of the signal relative to t1
     delta_t2 = - gamma2_2 * (x02_dot_v2 - t_g02) + \
         np.sqrt(gamma2_2 ** 2 * (x02_dot_v2 - t_g02) ** 2 + gamma2_2 * (x02_dot_x02 - t_g02 ** 2))
-    
+
     # Convert from TCG to TT
-    delay = (delta_t2 + delta_t0) * (1 - L_G) # eq. 10 
+    delay = (delta_t2 + delta_t0) #* (1 - L_G) # eq. 10 
 
 
     # Save intermediate variables to dataset for reuse in computation of partials
-    # All variables are TCG compatible
+    # All variables are TT compatible
     _save_float_to_dset(dset, idx, f"{MODEL}.v0_t0_tilde", v0_t0_tilde, unit="(m/s, m/s, m/s)")
     _save_float_to_dset(dset, idx, f"{MODEL}.v2_t2_tilde", v2_t2_tilde, unit="(m/s, m/s, m/s)")
     _save_float_to_dset(dset, idx, f"{MODEL}.x01", x01, unit="(m, m, m)")
@@ -197,8 +204,9 @@ def jaron2019(dset):
     _save_time_to_dset(dset, idx, f"{MODEL}.t0_tilde", t0_tilde, write_level="detail")
     _save_time_to_dset(dset, idx, f"{MODEL}.t2_tilde", t2_tilde, write_level="detail")
     _save_float_to_dset(dset, idx, f"{MODEL}.delta_t2", delta_t2, write_level="detail", unit="seconds")
-    _save_posvel_to_dset(dset, idx, f"{MODEL}.j_sat_posvel", sat_posvel, write_level="detail")
-    
+    _save_posvel_to_dset(dset, idx, f"{MODEL}.j_sat_posvel", sat_posvel.gcrs, write_level="detail")
+    _save_posvel_to_dset(dset, idx, f"{MODEL}.site_pos_2_t2", site_pos_2_t2.gcrs, write_level="detail")
+
     ## For debugging. See if satellite is above horizon for both stations
     debug = False
     if debug:
@@ -306,6 +314,9 @@ def _g2b_vel(v, t):
 
 
 def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
+    """
+
+    """
     GM = _get_GM(bodies)
 
     eph_T_sat = apriori.get("ephemerides", time=T_sat)
@@ -328,10 +339,10 @@ def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
         bodies.remove("sun")
 
         # eq. 14 (first part)
-        factor_sun = (1 + GAMMA) * GM["sun"] / C**3
-        delay_sun = (factor_sun * C 
-            * np.log((norm_R_sat_sun + norm_R_site_sun + norm_R_sat_site_sun + factor_sun) 
-                     / (norm_R_sat_sun + norm_R_site_sun - norm_R_sat_site_sun + factor_sun)))
+        factor_sun = (1 + GAMMA) * GM["sun"] / C ** 3
+        delay_sun = (factor_sun
+            * np.log((norm_R_sat_sun + norm_R_site_sun + norm_R_sat_site_sun + factor_sun * C) 
+                     / (norm_R_sat_sun + norm_R_site_sun - norm_R_sat_site_sun + factor_sun * C)))
 
     delay_bodies = 0
     for body in bodies:
@@ -348,7 +359,7 @@ def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
         norm_R_sat_site_body = np.linalg.norm(R_sat_site_body, axis=1)
         
         # eq. 14 (last part)
-        factor_body = (1 + GAMMA) * GM[body]/C ** 3
+        factor_body = (1 + GAMMA) * GM[body] / C ** 3
         delay_body = (factor_body 
             * np.log((norm_R_sat_body + norm_R_site_body + norm_R_sat_site_body)
                      / (norm_R_sat_body + norm_R_site_body - norm_R_sat_site_body)))
@@ -361,14 +372,12 @@ def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
 def deuv2012(dset):
     """
     Implementation based on 
-        Deuv et al. 2012 : Spacecraft VLBI and Doppler tracking: algorithmns and implementations 
+        Deuv et al. 2012 : Spacecraft VLBI and Doppler tracking: algorithmns and implementations
+    
+    Does not work yet!
     """
     # This model is only applicable for near field observations
     idx = dset.near_field_obs
-    num_sat_obs = np.sum(idx)
-    if num_sat_obs == 0:
-        # Skip this model if there are no near field observations
-        return np.zeros(dset.num_obs)
 
     # This model is expressed in BCRS and should include all solar system bodies
     bodies = ["mercury", "venus", "earth", "moon", "mars", "jupiter", "saturn", "uranus", "neptune", "pluto", "sun"]
@@ -462,7 +471,7 @@ def deuv2012(dset):
                 (1 + V_E_dot_v_2 / C ** 2))
 
     #import IPython; IPython.embed()
-    _save_posvel_to_dset(dset, idx, f"{MODEL}.d_sat_posvel", sat_posvel, write_level="detail")
+    _save_posvel_to_dset(dset, idx, f"{MODEL}.d_sat_posvel", sat_posvel.gcrs, write_level="detail")
     _save_time_to_dset(dset, idx, f"{MODEL}.T_0", T_0, write_level="detail")
     _save_time_to_dset(dset, idx, f"{MODEL}.T_2", T_2, write_level="detail")
     _save_float_to_dset(dset, idx, f"{MODEL}.LT1", LT1, write_level="detail", unit="seconds")
