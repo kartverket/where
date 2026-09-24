@@ -14,7 +14,7 @@ file needed by the F2PY compiler. Creation of the signature file was done as
 follows (do NOT do this):
 
     # cd ~/where/external/gpt3/src
-    # f2py -h ../gpt3.pyf *.f
+    # f2py -h ../gpt3.pyf *.f90
 
 You should NOT do this when updating the library, as this will overwrite the
 manually updated, existing signature file. Instead, add any new gpt2w routines
