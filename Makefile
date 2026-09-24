@@ -75,7 +75,7 @@ black:
 ######################################################################
 
 # External libraries
-external:	sofa iers_2010 gpt2w hf_eop
+external:	sofa iers_2010 gpt2w hf_eop gpt3
 
 # SOFA
 sofa:	$(EXTDIR)/sofa$(F2PYEXTENSION)
