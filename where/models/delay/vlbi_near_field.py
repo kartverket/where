@@ -9,6 +9,7 @@ The model derived in `jaron2019` is intended for Earth satellites and uses a lin
 term station and satellite motion. This approximation allows for a analytical solution and the equations are 
 expressed in the GCRS. The gravitational effect of celestial bodies on the delay is described in `deuv2012`.
 
+
 The model derived in `deuv2012` is expressed in the barycentric reference frame and is based on an iterative
 solution of the light time equations. This model is valid for the entire solar system. 
 
@@ -521,4 +522,3 @@ def _save_time_to_dset(dset, idx, field, value, **kwargs):
     jd2[idx] = value.jd2
     jd1[idx] = value.jd1
     dset.add_time(field, val=jd1, val2=jd2, scale=value.scale, fmt="jd", **kwargs)
-
