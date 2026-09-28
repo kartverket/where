@@ -23,13 +23,13 @@ from where.lib import rotation
 from where import apriori
 
 
-def plot(x, ys, errors, colors, labels, name, station):
+def plot(x, ys, errors, colors, labels, name, station, limit):
     num_plots = len(ys)
     fig, axs = plt.subplots(num_plots, figsize=(12, 6), dpi=150, sharex=True, layout="constrained")
     for i, (y, e, l) in enumerate(zip(ys, errors, labels)):
         axs[i].errorbar(x, y, yerr=e, fmt="o", marker=None, zorder=0, mew=0, ecolor="tab:gray")
         im = axs[i].scatter(x, y, c=colors, zorder=100)
-        axs[i].set_ylim((-0.1, 0.1))
+        axs[i].set_ylim((-limit, limit))
         axs[i].set(ylabel=l)
         axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
         axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
@@ -66,12 +66,55 @@ def plot_sta_param(x, ys, num, labels, title, ylabel):
     plt.savefig(f"img/{dset_id}/{sub_dir}/{title}_{dset_id}.png", bbox_inches='tight')
     plt.close()
 
+def plot_stations_ref_pos(dset_ts, stations, idx_date, idx_all):
+    # Select data from dataset
+    trf_ref_epoch = Time(val=datetime(2020, 1, 1), fmt="datetime", scale="utc") # Ref. epoch for ITRF2020-u2024
+    trf_ref = apriori.get("trf", time=trf_ref_epoch, reference_frames="itrf:2020-u2024, vtrf, custom")
+    names = apriori.get("vlbi_station_codes")
+
+    idx = idx_date & idx_all
+    fig, axs = plt.subplots(3, figsize=(12, 6), dpi=150, sharex=True, layout="constrained")
+    for sta in stations:
+        idx_sta = dset_ts.filter(station=sta, idx=idx_date)
+        station_dates = dset_ts.time[idx_sta]
+        t = Time(val=station_dates, scale="utc", fmt="jd")
+        trf = apriori.get("trf", time=t, reference_frames="itrf:2020-u2024, vtrf, custom")
+
+        pos = trf[names[sta]["cdp"]].pos
+        lat, lon, _ = pos.llh.T
+        trs2enu = rotation.enu2trs(lat, lon)
+        enu2trs = rotation.trs2enu(lat, lon)
+
+        ref_pos = trf_ref[names[sta]["cdp"]].pos
+        ref_dpos = pos - ref_pos
+
+        dpos = PositionDelta(val=np.squeeze(dset_ts.neq_vlbi_site_pos[idx_sta]), system="trs", ref_pos=pos)
+        dpos_cov_xyz = dset_ts.neq_vlbi_site_pos_cov_[idx_sta]
+        dpos_ferr_xyz = np.sqrt(dpos_cov_xyz.diagonal(axis1=1, axis2=2))
+        dpos_cov_enu = trs2enu @ dpos_cov_xyz @ enu2trs
+        dpos_ferr_enu = np.sqrt(dpos_cov_enu.diagonal(axis1=1, axis2=2))
+
+        total_dpos = dpos + ref_dpos
+
+        for i, l in enumerate(["E [m]", "N [m]", "U [m]"]):
+            axs[i].scatter(t.datetime, total_dpos.enu.val.T[i], alpha=0.5, label=sta)
+            axs[i].set(ylabel=l)
+            axs[i].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+            axs[i].xaxis.set_major_locator(mt.LinearLocator(numticks=7))
+            axs[i].grid(axis="y", linestyle="--")
+    fig.suptitle(f"Total position change since {trf_ref_epoch:%Y-%m-%d}")
+    plt.legend()
+    fig.autofmt_xdate()
+    plt.savefig(f"img/{dset_id}/Total_Position_enu_{'_'.join(stations)}_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
+    plt.close()
+
 
 def plot_station_pos(dset_ts, station, idx_date, idx_all):
     # Select data from dataset
     idx = idx_date & idx_all
     idx_sta = dset_ts.filter(station=station, idx=idx_date)
-    station_dates = dset_ts.rundate[idx_sta]
+    station_rundates = dset_ts.rundate[idx_sta]
+    station_dates = dset_ts.time[idx_sta]
     station_sc = dset_ts.session_code[idx_sta]
     num_obs = np.zeros(np.sum(idx))
     colors = dset_ts.num_obs_estimate[idx_sta]
@@ -81,8 +124,10 @@ def plot_station_pos(dset_ts, station, idx_date, idx_all):
     num_obs[idx2] = colors
     session_code = dset_ts.session_code[idx_sta]
     
-    t = Time(val=station_dates, scale="utc", fmt="date")
-    trf = apriori.get("trf", time=t, reference_frames="itrf:2020, vtrf, custom")
+    t = Time(val=station_dates, scale="utc", fmt="jd")
+    trf_ref_epoch = Time(val=datetime(2020, 1, 1), fmt="datetime", scale="utc") # Ref. epoch for ITRF2020-u2024
+    trf_ref = apriori.get("trf", time=trf_ref_epoch, reference_frames="itrf:2020-u2024, vtrf, custom")
+    trf = apriori.get("trf", time=t, reference_frames="itrf:2020-u2024, vtrf, custom")
     names = apriori.get("vlbi_station_codes")
 
     pos = trf[names[station]["cdp"]].pos
@@ -90,22 +135,29 @@ def plot_station_pos(dset_ts, station, idx_date, idx_all):
     trs2enu = rotation.enu2trs(lat, lon)
     enu2trs = rotation.trs2enu(lat, lon)
 
+    ref_pos = trf_ref[names[station]["cdp"]].pos
+    ref_dpos = pos - ref_pos
+
     dpos = PositionDelta(val=np.squeeze(dset_ts.neq_vlbi_site_pos[idx_sta]), system="trs", ref_pos=pos)
     dpos_cov_xyz = dset_ts.neq_vlbi_site_pos_cov_[idx_sta]
     dpos_ferr_xyz = np.sqrt(dpos_cov_xyz.diagonal(axis1=1, axis2=2))
     dpos_cov_enu = trs2enu @ dpos_cov_xyz @ enu2trs
     dpos_ferr_enu = np.sqrt(dpos_cov_enu.diagonal(axis1=1, axis2=2))
 
+    total_dpos = dpos + ref_dpos
+
     # Plot timeseries of estimated station coordinate corrections
-    plot(t.datetime, dpos.val.T, dpos_ferr_xyz.T, colors, ["X [m]", " Y [m]", "Z [m]"], "xyz", station)
-    plot(t.datetime, dpos.enu.val.T, dpos_ferr_enu.T, colors, ["E [m]", " N [m]", "U [m]"], "enu", station)
+    plot(t.datetime, dpos.val.T, dpos_ferr_xyz.T, colors, ["X [m]", " Y [m]", "Z [m]"], "xyz", station, limit=0.1)
+    plot(t.datetime, total_dpos.val.T, dpos_ferr_xyz.T, colors, ["X [m]", "Y [m]", "Z [m]"], "ref_xyz", station, limit=0.3)
+    plot(t.datetime, dpos.enu.val.T, dpos_ferr_enu.T, colors, ["E [m]", " N [m]", "U [m]"], "enu", station, limit=0.1)
+    plot(t.datetime, total_dpos.enu.val.T, dpos_ferr_enu.T, colors, ["E [m]", "N [m]", "U [m]"], "ref_enu", station, limit=0.3)
 
     print(f"High formal errors for {station}")
     for i, enu in enumerate(["East", "North", "Up"]):
         print(f"{enu}:")
         idx_ferr_high = dpos_ferr_enu[:,i] > 0.05 # meter
         ferr = dpos_ferr_enu[:,i][idx_ferr_high]
-        ferr_dates = station_dates[idx_ferr_high]
+        ferr_dates = station_rundates[idx_ferr_high]
         ferr_sc = station_sc[idx_ferr_high]
 
         for ferr_, ferr_dates_, ferr_sc_ in zip(ferr, ferr_dates, ferr_sc):
@@ -218,6 +270,7 @@ def plot_statistics(dates, dof, variance_factor, colors):
     fig.autofmt_xdate()
     #fig.tight_layout()
     plt.savefig(f"img/{dset_id}/Statistics_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
+    plt.close()
 
 def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos, sta_1, sta_2, local_tie):
     t = Time(dates, fmt="datetime", scale="utc")
@@ -375,10 +428,14 @@ plot_residual_rms(dates, dates_sta_1, dates_sta_2, rms, rms_sta_1, rms_sta_2, st
 # Plot per session
 for rundate, session_code in zip(dates, session_codes):
     print(f"{rundate:%Y-%m-%d} {session_code}")
-
-    dset_session = dataset.Dataset.read(
-        rundate=rundate, pipeline=pipeline, stage="postprocess", label="last", session_code=session_code, id=dset_id
-    )
+    
+    try:
+        dset_session = dataset.Dataset.read(
+            rundate=rundate, pipeline=pipeline, stage="postprocess", label="last", session_code=session_code, id=dset_id
+        )
+    except ValueError:
+        # Failed to parse the session for some reason. Skip it
+        continue
 
     if args.plot_trop:
         # Zenith wet delay
@@ -435,3 +492,4 @@ plot_baseline(baseline_dates, baseline_length, baseline_length_ferr, num_obs_bs,
 # Plot timeseries of estimated station coordinate corrections
 plot_station_pos(dset_ts, station1, idx_date, idx_all)
 plot_station_pos(dset_ts, station2, idx_date, idx_all)
+plot_stations_ref_pos(dset_ts, [station1, station2], idx_date, idx_all)
