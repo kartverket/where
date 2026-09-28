@@ -1046,7 +1046,10 @@ def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, gr
      mw                         Wet mapping function coefficient aw
      la                         Water vapor decrease factor
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
+<<<<<<< HEAD
      grid (str):                Either "1" or "5" depending on wanted grid size
+=======
+>>>>>>> 43392724b0af0123efdbccdbde4fc8bba5b638fd
     ============  ===========  =======================================================
     """
     num_obs = len(time)
@@ -1062,14 +1065,11 @@ def gpt3_mapping_function(latitude, longitude, height, time, zenith_distance, gr
     for obs in range(num_obs):
         # linear interpolation
         _, _, _, _, _, ah[obs], aw[obs], _, _, _, _, _, _ = gpt3_wrapper(
-            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid
-        )
+            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid)
         # Determine mapping function values based on coefficients 'ah' and 'aw'
         mh[obs], mw[obs] = ext_gpt3.vmf3_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], longitude[obs], height[obs], zenith_distance[obs])
 
     return mh, mw
-
-
 
 def gpt3_wrapper(mjd, latitude, longitude, hell, grid):
     """Calculates meteorological data and mapping function coefficients based on GPT3 model
