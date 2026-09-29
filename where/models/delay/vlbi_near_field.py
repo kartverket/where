@@ -162,6 +162,7 @@ def jaron2019(dset):
     # eq. 14 in jaron2019
     x01_dot_v0 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
     x01_dot_x01 = (x01[:, None, :] @ x01[:, :, None])[:, 0, 0]  / C ** 2 # Intermediate variable
+
     # Time of emmison of the signal relative to t1
     delta_t0 = gamma0_2 * (x01_dot_v0 - t_g01) - \
         np.sqrt(gamma0_2 ** 2 * (x01_dot_v0 - t_g01) ** 2 + gamma0_2 * (x01_dot_x01 - t_g01 ** 2))
@@ -191,7 +192,7 @@ def jaron2019(dset):
 
     # Save TT(=TDB) value to dset  
     _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
-    
+
     # eq. 17 in jaron2019
     x02_dot_v2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
     x02_dot_x02 = (x02[:, None, :] @ x02[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -359,7 +360,6 @@ def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
 
     delay_bodies = 0
     for body in bodies:
-        
         R_body_T_sat = eph_T_sat.pos_bcrs(body)
         R_body_T_site = eph_T_site.pos_bcrs(body)        
         R_sat_body = R_sat - R_body_T_sat # eq. 16, i = 0, alpha = body
@@ -533,3 +533,4 @@ def _save_time_to_dset(dset, idx, field, value, **kwargs):
     jd2[idx] = value.jd2
     jd1[idx] = value.jd1
     dset.add_time(field, val=jd1, val2=jd2, scale=value.scale, fmt="jd", **kwargs)
+

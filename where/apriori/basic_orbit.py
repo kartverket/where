@@ -33,6 +33,9 @@ The positions and velocities are computed in a terrestrial reference system (trs
 
 Unless bounds_error is set to False, the time input argument to the functions must be covered by the time period
 in the apriori.get call. Otherwise the functions will raise a MissingDataError exception.
+    
+The time input argument to the functions must be covered by the time period in the apriori.get call.
+Otherwise the functions will raise a MissingDataError exception.
 
 If a satellite is completely missing in the sp3 orbits for the given time period the call will result in a
 normal KeyError.
@@ -44,6 +47,9 @@ from functools import lru_cache
 
 # Third party imports
 import numpy as np
+
+import numpy as np
+from datetime import timedelta
 
 # Midgard imports
 from midgard.dev import plugins
@@ -70,7 +76,7 @@ def get_orbit(rundate, file_key=None, bounds_error=False, days_before=1, days_af
     conditions when the orbit time scale is different from used time scale. This might
     happen because time.utc is not guaranteed to be identical to time.gps.utc due to the
     utc_tai conversion that is not numerically symmertric.
-
+    
     Args:
         rundate (date):     Date of model run.
         file_key:           Which file_key to read
@@ -94,6 +100,10 @@ def _orbit_from_sp3(rundate, file_key, bounds_error, days_before, days_after):
     
     sat_vel = None
     parsed_files = []
+    
+    date_to_read = rundate - timedelta(days=days_before)
+    orb_data = {}
+    
     # Read the files for all the days and collect it in orb_data
     while date_to_read <= rundate + timedelta(days=days_after):
         file_vars=config.date_vars(date_to_read)
