@@ -35,7 +35,7 @@ where/models/orbit/*.html
 # External libraries source
 external/gl_library/
 external/gpt2w/src/
-external/gpt3/src
+external/gpt3/src/
 external/iers/hfeop/
 external/iers/src_2010/
 external/sofa/00READ.ME
