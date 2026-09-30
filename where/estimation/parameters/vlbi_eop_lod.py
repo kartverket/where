@@ -33,8 +33,13 @@ def eop_lod(dset):
     # Only far field observations is used to estimate this parameter
     idx = ~dset.near_field_obs
 
-    column_name = ["lod"]
+    column_names = ["lod"]
     partials = np.zeros((dset.num_obs, 1))
+    partials_unit = "meter * radians / seconds"
+
+    if np.sum(idx) == 0:
+        # This parameter cannot be estimated
+        return np.zeros((dset.num_obs, 0)), [], partials_unit
 
     time = dset.time[idx]
     src_dir = dset.src_dir.unit_vector[:, None, :][idx]
@@ -44,4 +49,4 @@ def eop_lod(dset):
     # lod = - ut1_rate * 1 day -> lod_partial = - ut1_rate_partial / 1 day
     partials[idx] = (src_dir @ rotation.Q(time) @ dR_dut1 @ rotation.W(time) @ baseline @ dt)[:, :, 0]
 
-    return partials, column_name, "meter * radians / seconds"
+    return partials, column_names, partials_unit

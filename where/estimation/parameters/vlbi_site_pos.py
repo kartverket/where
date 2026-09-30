@@ -66,6 +66,10 @@ def site_pos(dset):
     idx = dset.near_field_obs
     nf_num_obs = np.sum(idx)
 
+    column_names = [s + "_" + xyz for s in stations for xyz in "xyz"]
+    partials = np.zeros((dset.num_obs, len(stations) * 3))
+    partials_unit = "dimensionless"
+
     # Calculate partials for far field observations (typically quasars)
     all_partials = -dset.src_dir.unit_vector[:, None, :][~idx] @ rotation.trs2gcrs(dset.time)[~idx]
 
@@ -73,16 +77,7 @@ def site_pos(dset):
     if nf_num_obs > 0:
         dtau_dx2 = _site_pos_2_near_field(dset)
         dtau_dx1 = _site_pos_1_near_field(dset)
-    # import matplotlib.pyplot as plt
-    # fig, ax = plt.subplots(3, sharex=True); label = "xyz";
-    # for i in range(3):
-    #     ax[i].scatter(dset.time.mjd[idx], dtau_dx1[:, i, 0], marker=".", alpha=0.5, label="dtau_dx1")
-    #     ax[i].scatter(dset.time.mjd[idx], dtau_dx2[:, i, 0], marker=".", alpha=0.5, label="dtau_dx2")
-    #     ax[i].scatter(dset.time.mjd[~idx], all_partials[:, 0, i], marker=".", alpha=0.5, label="dtau_dx")
-    #     ax[i].set_ylabel(label[i])
-    # plt.xlabel("mjd"); ax[0].legend(); plt.show()
 
-    partials = np.zeros((dset.num_obs, len(stations) * 3))
     for i, station in enumerate(stations):
         filter_1 = dset.filter(station_1=station)
         partials[filter_1 & ~idx, i * 3 : i * 3 + 3] = all_partials[filter_1[~idx]][:, 0] * -1
@@ -92,9 +87,7 @@ def site_pos(dset):
             partials[filter_1 & idx, i * 3 : i * 3 + 3] = dtau_dx1[filter_1[idx]][:, :, 0]
             partials[filter_2 & idx, i * 3 : i * 3 + 3] = dtau_dx2[filter_2[idx]][:, :, 0]
 
-    column_names = [s + "_" + xyz for s in stations for xyz in "xyz"]
-
-    return partials, column_names, "dimensionless"
+    return partials, column_names, partials_unit
 
 def  _site_pos_1_near_field(dset):
     """ Compute partial of near field observations with regards to station 1

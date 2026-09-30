@@ -34,10 +34,16 @@ def scale(dset):
     """
     # Only far field observations are used to estimate this parameter (for now)
     idx = ~dset.near_field_obs
+
+    column_name = ["scale"]
     partials = np.zeros((dset.num_obs, 1))
+    partials_unit = "meter"
+
+    if np.sum(idx) == 0:
+        return partials, column_name, partials_unit
 
     src_dir = dset.src_dir[idx].unit_vector[:, None, :]
     baseline = (dset.site_pos_2[idx].trs.pos - dset.site_pos_1[idx].trs.pos).mat
     partials[idx, :] = -(src_dir @ rotation.trs2gcrs(dset.time[idx]) @ baseline)[:, :, 0]
 
-    return partials, ["scale"], "meter"
+    return partials, column_name, partials_unit

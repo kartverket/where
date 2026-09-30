@@ -42,7 +42,7 @@ L_G = constant.L_G
 L_C = constant.L_C
 
 @plugins.register
-def site_pos(dset):
+def sat_vel(dset):
     """Calculate the partial derivative of the satellite position for each satellite
 
     Args:
@@ -51,43 +51,24 @@ def site_pos(dset):
     Returns:
         Tuple:    Array of partial derivatives, list of their names, and their unit
     """
-    # Remove stations that should be fixed
-    # stations = np.asarray(dset.unique("station"))
-    # fix_stations = config.tech[PARAMETER].fix_stations.list
-    # fix_idx = np.in1d(stations, fix_stations)
-    # if fix_idx.any():
-    #     stations = stations[np.logical_not(fix_idx)]
-
     idx = dset.near_field_obs
-    nf_num_obs = np.sum(idx)
-    
     satellites = np.unique(dset.source[dset.near_field_obs])
 
-    # Calculate partials for near field observations (typically satellites)
-    if nf_num_obs > 0:
-        dtau_dv0 = _sat_vel(dset)
-    # import matplotlib.pyplot as plt
-    # fig, ax = plt.subplots(3, sharex=True); label = "xyz";
-    # for i in range(3):
-    #     ax[i].scatter(dset.time.mjd[idx], dtau_dx1[:, i, 0], marker=".", alpha=0.5, label="dtau_dx1")
-    #     ax[i].scatter(dset.time.mjd[idx], dtau_dx2[:, i, 0], marker=".", alpha=0.5, label="dtau_dx2")
-    #     ax[i].scatter(dset.time.mjd[~idx], all_partials[:, 0, i], marker=".", alpha=0.5, label="dtau_dx")
-    #     ax[i].set_ylabel(label[i])
-    # plt.xlabel("mjd"); ax[0].legend(); plt.show()
-
+    column_names = [s + "_" + xyz for s in satellites for xyz in ["vx", "vy", "vz"]]
     partials = np.zeros((dset.num_obs, len(satellites) * 3))
+    partials_unit = "seconds"
+
+    if np.sum(idx) == 0:
+        return partials, column_names, partials_unit
+
+    # Calculate partials for near field observations (typically satellites)
+    dtau_dv0 = _sat_vel(dset)
+
     for i, sat in enumerate(satellites):
         filter = dset.filter(source=sat)
-        #partials[filter_1 & ~idx, i * 3 : i * 3 + 3] = all_partials[filter_1[~idx]][:, 0] * -1
-        #filter_2 = dset.filter(source=sat)
-        #partials[filter_2 & ~idx, i * 3 : i * 3 + 3] = all_partials[filter_2[~idx]][:, 0]
-        if nf_num_obs > 0:
-            partials[filter & idx, i * 3 : i * 3 + 3] = dtau_dv0[filter[idx]][:, :, 0]
-            #partials[filter_2 & idx, i * 3 : i * 3 + 3] = dtau_dx2[filter_2[idx]][:, :, 0]
+        partials[filter & idx, i * 3 : i * 3 + 3] = dtau_dv0[filter[idx]][:, :, 0]
 
-    column_names = [s + "_" + xyz for s in satellites for xyz in ["vx", "vy", "vz"]]
-
-    return partials, column_names, "seconds"
+    return partials, column_names, partials_unit
 
 def  _sat_vel(dset):
     """ Compute partial of near field observations with regards to the satellite

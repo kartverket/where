@@ -35,6 +35,11 @@ def eop_pm_rate(dset):
 
     column_names = ["dxp", "dyp"]
     partials = np.zeros((dset.num_obs, 2))
+    partials_unit = "meter * days / radian"
+
+    if np.sum(idx) == 0:
+        # This parameter cannot be estimated
+        return np.zeros((dset.num_obs, 0)), [], partials_unit
 
     time = dset.time[idx]
     src_dir = dset.src_dir.unit_vector[:, None, :][idx]
@@ -47,4 +52,4 @@ def eop_pm_rate(dset):
     # y-pole
     partials[idx, 1] = -(src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dyp(time) @ baseline @ dt)[:, 0, 0]
 
-    return partials, column_names, "meter * days / radian"
+    return partials, column_names, partials_unit

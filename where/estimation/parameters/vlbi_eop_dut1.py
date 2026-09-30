@@ -33,8 +33,13 @@ def eop_dut1(dset):
     # Only far field observations is used to estimate this parameter
     idx = ~dset.near_field_obs
 
-    column_name = ["dut1"]
+    column_names = ["dut1"]
     partials = np.zeros((dset.num_obs, 1))
+    partials_unit = "meter * (radians per second)"
+
+    if np.sum(idx) == 0:
+        # This parameter cannot be estimated
+        return np.zeros((dset.num_obs, 0)), [], partials_unit
 
     time = dset.time[idx]
     src_dir = dset.src_dir.unit_vector[:, None, :][idx]
@@ -42,4 +47,4 @@ def eop_dut1(dset):
     dR_dut1 = rotation.dR_dut1(time)
     partials[idx] = -(src_dir @ rotation.Q(time) @ dR_dut1 @ rotation.W(time) @ baseline)[:, :, 0]
 
-    return partials, column_name, "meter * (radians per second)"
+    return partials, column_names, partials_unit

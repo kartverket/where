@@ -33,6 +33,11 @@ def eop_pm(dset):
 
     column_names = ["xp", "yp"]
     partials = np.zeros((dset.num_obs, 2))
+    partials_unit = "meter per radian"
+
+    if np.sum(idx) == 0:
+        # This parameter cannot be estimated
+        return np.zeros((dset.num_obs, 0)), [], partials_unit
 
     time = dset.time[idx]
     src_dir = dset.src_dir.unit_vector[:, None, :][idx]
@@ -48,4 +53,4 @@ def eop_pm(dset):
         src_dir @ rotation.Q(time) @ rotation.R(time) @ rotation.dW_dyp(time) @ baseline
     )[:, 0, 0]
 
-    return partials, column_names, "meter per radian"
+    return partials, column_names, partials_unit

@@ -49,10 +49,15 @@ def src_dir(dset):
     """
     # Only far field observations is used to estimate this parameter
     idx = ~dset.near_field_obs
-    
-    column_names = ["ra", "dec"]
     sources = np.unique(dset.source[idx])
-    #sources = np.asarray(dset.unique("source"))
+
+    column_names = ["ra", "dec"]
+    partials = np.zeros((dset.num_obs, len(sources) * 2))
+    partials_unit = "meter"
+
+    if np.sum(idx) == 0:
+        return partials, column_names, partials_unit
+
     icrf = apriori.get("crf", time=dset.time[idx])
 
     # Remove sources that should be fixed
@@ -70,7 +75,7 @@ def src_dir(dset):
     sources = sources[np.logical_not(fix_idx)]
 
     # Calculate partials
-    partials = np.zeros((dset.num_obs, len(sources) * 2))
+
     baseline = (dset.site_pos_2.gcrs.pos - dset.site_pos_1.gcrs.pos).mat
     dK_dra = dset.src_dir.dsrc_dra[:, None, :]
     dK_ddec = dset.src_dir.dsrc_ddec[:, None, :]
@@ -81,4 +86,4 @@ def src_dir(dset):
         partials[src_idx, i * 2 : i * 2 + 2] = all_partials[src_idx]
 
     column_names = [s + "_" + name for s in sources for name in column_names]
-    return partials, column_names, "meter"
+    return partials, column_names, partials_unit
