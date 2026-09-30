@@ -228,8 +228,9 @@ def meteorological_data(stations, latitude, longitude, height, time,
             model_tm, model_lambd = None, None, 
         elif model == "gpt2w":
             model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt2w_meteo(latitude, longitude, height, time)
-        elif model == "gpt3":
-            model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt3_meteo(latitude, longitude, height, time)
+        elif model == "gpt3_1" or model == "gpt3_5":
+            grid = model[-1]
+            model_pressure, model_temp, _, model_tm, model_e, model_lambd, _ = gpt3_meteo(stations, latitude, longitude, height, time, grid)
         elif model == "site_pressure":
             model_pressure = obs_pressure
             model_temp, model_e, model_tm, model_lambd = None, None, None, None
@@ -969,16 +970,18 @@ def gpt2w_wrapper(mjd, latitude, longitude, hell):
     return output
 
 
-def gpt3_meteo(latitude, longitude, height, time):
+def gpt3_meteo(stations, latitude, longitude, height, time, grid):
     """Calculates meteorological data based on GPT3 model
 
     The GPT3 model is described in Landskron et al. 2018 
 
     Args:
+        stations (numpy.ndarray):        Station name for each observation
         latitude (numpy.ndarray):        Geodetic latitude for each observation in [rad]
         longitude (numpy.ndarray):       Geodetic longitude for each observation in [rad]
         height (numpy.ndarray):          Orthometric height for each observation in [m]
         time (Time):                     Epoch of each observation
+        grid (str):                      Either "1" or "5" depending on wanted grid size
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -1011,10 +1014,8 @@ def gpt3_meteo(latitude, longitude, height, time):
     # Determine GPT3 values for each observation by interpolating between two unique
     # daily solutions
     for obs in range(num_obs):
-        # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
-        # linear interpolation
         (press[obs], temp[obs], dt[obs], tm[obs], e[obs], ah[obs], aw[obs], la[obs], undu[obs], _, _, _, _) = gpt3_wrapper(
-            mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]]
+            stations[obs], mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid
         )
 
     return press, temp, dt, tm, e, la, undu
@@ -1031,6 +1032,7 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
         height (numpy.ndarray):          Orthometric height for each observation in [m]
         time (Time):                     Epoch of each observation
         zenith_distance (numpy.ndarray): Zenith distance for each observation in [rad]
+        grid (str):                      Either "1" or "5" depending on wanted grid size
 
     Returns:
         tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
@@ -1047,7 +1049,6 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
      mw                         Wet mapping function coefficient aw
      la                         Water vapor decrease factor
      geoid_undu    m            Geoid undulation (based on 9x9 EGM model)
-     grid (str):                Either "1" or "5" depending on wanted grid size
     ============  ===========  =======================================================
     """
     num_obs = len(time)
@@ -1061,8 +1062,6 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
     # Determine GPT3 values for each observation by interpolating between two unique
     # daily solutions
     for obs in range(num_obs):
-        # Start 'gpt3_1.f90' day-by-day in folder where 'gpt3_1.grd' is placed and carry out
-        # linear interpolation
         _, _, _, _, _, ah[obs], aw[obs], _, _, _, _, _, _ = gpt3_wrapper(
             stations[obs], mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid)
         # Determine mapping function values based on coefficients 'ah' and 'aw'
@@ -1073,16 +1072,15 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
 def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
     """Calculates meteorological data and mapping function coefficients based on GPT3 model
 
-    The functions calls the GPT3 library routine ``gpt3_10.f90`` (see
-    http://ggosatm.hg.tuwien.ac.at/DELAY/SOURCE/GPT2w). The Fortran routine ``gpt2w_1w.f`` reads the grid file
-    ``gpt2_1wA.grd``, which should be available in the same folder, where the Fortran programs runs. Therefore we
-    change the current directory to the GPT2w source directory, so that ``gpt2w_1w.f`` can read the grid file.
+    The functions calls the GPT3 library routine ``gpt3_*.f90``. The Fortran routine ``gpt3_*.f90`` reads the grid file
+    ``gpt3_*.grd``, which should be available in the same folder, where the Fortran programs runs. Therefore we
+    change the current directory to the GPT3 source directory, so that the routine can read the grid file.
 
-    Due to performance reasons the GPT2w values are not determined for each observation. The call of the Fortran
-    routine ``gpt2w_1w.f`` takes time, because the grid file ``gpt2_1wA.grd`` has to be read for each
-    observation. Instead the GPT2w values are calculated only once for each unique day (modified Julian date rounded to
-    integer) and saved in the cache _GPT2W. The final GPT2W values are computed by a linear interpolation of the daily
-    determined GPT2W values.  The difference between the use of routine ``gpt2w_1w.f`` for each observation and the
+    Due to performance reasons the GPT3 values are not determined for each observation. The call of the Fortran
+    routine ``gpt3_*.f90`` takes time, because the grid file has to be read for each
+    observation. Instead the GPT3 values are calculated only once for each unique day (modified Julian date rounded to
+    integer) and saved in the cache _GPT3. The final GPT3 values are computed by a linear interpolation of the daily
+    determined GPT3 values. The difference between the use of the routine ``gpt3_*.f`` for each observation and the
     linear interpolation between daily solution is on the submillimeter level and can therefore be neglected.
 
     Args:
@@ -1091,6 +1089,7 @@ def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
         latitude (list):      Array with latitude for each station in [rad].
         longitude (list):     Array with longitude for each station in [rad].
         hell (list):          Array with height for each station in [m].
+        grid (str):           Either "1" or "5" depending on wanted grid size
 
     Returns:
         numpy.ndarray:  Array with following entries:
