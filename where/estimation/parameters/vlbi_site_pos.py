@@ -24,6 +24,9 @@ References:
 
 
 """
+# Standard library imports
+from copy import deepcopy
+
 # External library imports
 import numpy as np
 
@@ -34,8 +37,9 @@ from midgard.math.constant import constant
 # Where imports
 from where.lib import config
 from where.lib import rotation
-from where.data.position import PosVel
+from where.data.position import PosVel, PosVelDelta
 from where.data.time import TimeDelta
+from where.models.delay.vlbi_near_field import vlbi_near_field
 
 # Name of parameter
 PARAMETER = __name__.split(".")[-1]
@@ -75,17 +79,22 @@ def site_pos(dset):
 
     # Calculate partials for near field observations (typically satellites)
     if nf_num_obs > 0:
-        dtau_dx2 = _site_pos_2_near_field(dset)
-        dtau_dx1 = _site_pos_1_near_field(dset)
+        numerical_partials = config.tech[PARAMETER].numerical_partials.bool
+        if numerical_partials:
+            dtau_dx1, dtau_dx2 = _numerical_partials_near_field(dset)
+        else:
+            dtau_dx2 = _site_pos_2_near_field(dset)
+            dtau_dx1 = _site_pos_1_near_field(dset)
 
+    # Create partials matrix
     for i, station in enumerate(stations):
         filter_1 = dset.filter(station_1=station)
         partials[filter_1 & ~idx, i * 3 : i * 3 + 3] = all_partials[filter_1[~idx]][:, 0] * -1
         filter_2 = dset.filter(station_2=station)
         partials[filter_2 & ~idx, i * 3 : i * 3 + 3] = all_partials[filter_2[~idx]][:, 0]
         if nf_num_obs > 0:
-            partials[filter_1 & idx, i * 3 : i * 3 + 3] = dtau_dx1[filter_1[idx]][:, :, 0]
-            partials[filter_2 & idx, i * 3 : i * 3 + 3] = dtau_dx2[filter_2[idx]][:, :, 0]
+            partials[filter_1 & idx, i * 3 : i * 3 + 3] = dtau_dx1[filter_1[idx]]
+            partials[filter_2 & idx, i * 3 : i * 3 + 3] = dtau_dx2[filter_2[idx]]
 
     return partials, column_names, partials_unit
 
@@ -96,14 +105,14 @@ def  _site_pos_1_near_field(dset):
         data:     A Dataset containing model data
     
     Returns:
-        np.array: Array with partial values. Dimensions (num_near_field_obs, num_parameters, 1)
+        np.array: Array with partial values. Dimensions (num_near_field_obs, 3)
     """
     idx = dset.near_field_obs
     num_obs = np.sum(idx)
 
     # Apriori values given at epoch t1 (time of arrival for signal at station 1)
-    x1_t1 = dset.site_pos_1.gcrs.pos[idx] # station_1 at epoch t1
-    x0_t1 = dset.sat_pos.gcrs.pos[idx] # satellite position at epoch t1
+    x1_t1 = dset.site_pos_1.gcrs.pos.val[idx] # station_1 at epoch t1
+    x0_t1 = dset.sat_pos.gcrs.pos.val[idx] # satellite position at epoch t1
     v0_t1 = dset.sat_pos.gcrs.vel.val[idx] # satellite velocity at at epoch t1
     v2_t1 = dset.site_pos_2.gcrs.vel.val[idx] # station_2 velocity at epoch t1
 
@@ -114,9 +123,9 @@ def  _site_pos_1_near_field(dset):
     gamma0 = dset.vlbi_near_field.gamma0[idx, None, None]
     gamma2 = dset.vlbi_near_field.gamma2[idx, None, None]
 
-    x1_x0 = x1_t1.val - x0_t1.val
-    ddelta_tilde_1_dx1 = (x1_x0) / (C * np.linalg.norm(x1_x0, axis=1)[:, None]) # Eq 25 (skeens2024)
-    dtau_tilde_dx1 = - ddelta_tilde_1_dx1 # Eq 32 (skeens2024)
+    x1_x0 = x1_t1 - x0_t1
+    ddelta_tilde_1_dx1 = x1_x0 / (C * np.linalg.norm(x1_x0, axis=1)[:, None]) # Eq 25 (skeens2024)
+    dtau_tilde_dx1 = - ddelta_tilde_1_dx1 # Eq 32 (skeens2024) ***
 
     dx01_dx1 = v0_t0_tilde[:, : , None] @ ddelta_tilde_1_dx1[:, None, :] - I # Eq 24 (skeens2024)
 
@@ -138,11 +147,14 @@ def  _site_pos_1_near_field(dset):
 
     ddeltat2_dx1 = (- 1 / C ** 2 * dx02_dx1 @ v2_t1[:, :, None]
         + gamma2 / C * (dx02_dx1 @ x02[:, :, None] + x02_dot_v2 * dx02_dx1 @ v2_t1[:, :, None] / C ** 2) 
-        / np.sqrt(norm_x02 ** 2 + (x02_dot_v2)[:, 0, 0] ** 2 / C ** 2)[:, None, None]) # Eq 29 (skeens2024)
+        / np.sqrt(norm_x02 ** 2 + (x02_dot_v2[:, 0, 0]) ** 2 / C ** 2)[:, None, None]) # Eq 29 (skeens2024)
 
-    dtau_dx1 = (ddeltat0_dx1 + ddeltat2_dx1) * (1 - L_G) # Eq 22 (skeens)
+    # Do not convert to TCG-compatible values (skip (1 - L_G) from equation)
+    dtau_dx1 = (ddeltat0_dx1 + ddeltat2_dx1) # Eq 22 (skeens)
 
-    return dtau_dx1 * C # Convert from seconds to meter
+    g2t = rotation.gcrs2trs(dset.time[idx])
+
+    return (g2t @ dtau_dx1 * C)[:, :, 0] # Transform to trs and convert from seconds to meter
 
 def _site_pos_2_near_field(dset):
     """ Compute partial of near field observations with regards to station 2
@@ -151,7 +163,7 @@ def _site_pos_2_near_field(dset):
         data:     A Dataset containing model data
     
     Returns:
-        np.array: Array with partial values. Dimensions (num_near_field_obs, num_parameters, 1)
+        np.array: Array with partial values. Dimensions (num_near_field_obs, 3)
     """
     idx = dset.near_field_obs
     num_obs = np.sum(idx)
@@ -179,7 +191,63 @@ def _site_pos_2_near_field(dset):
         + (gamma2 / C * (dx02_dx2 @ x02[:, :, None] + x02_dot_v2[:, None, None] * dx02_dx2 @ v2_t1[:, :, None] / C ** 2))  
         / np.sqrt(norm_x02 ** 2 + (x02_dot_v2 / C) ** 2)[:, None, None]) # Eq 26 (skeens2024)
 
-    # ddeltat0_dx2 = 0 according to eq 30 (skeens)
-    dtau_dx2 = ddeltat2_dx2 * (1 - L_G) # Eq 22 (skeens2024)
+    # ddeltat0_dx2 = 0 according to eq 30 (skeens2024)
 
-    return dtau_dx2 * C # Convert from seconds to meter
+    # Do not convert to TCG-compatible values (skip (1 - L_G) from equation)
+    dtau_dx2 = ddeltat2_dx2 # Eq 22 (skeens2024)
+
+    g2t = rotation.gcrs2trs(dset.time[idx])
+    return (g2t @ dtau_dx2  * C)[:, :, 0] # Transform to trs and convert from seconds to meter
+
+def _numerical_partials_near_field(dset):
+    """Compute numerical partial derivates for the near field delay.
+
+    Uses the same near field model that was applied a priori.
+
+    Args:
+        dset                        A Dataset containing model data
+
+    Returns:
+        list [dtau_dx1, dtau_dx2]   Partial for station 1 and station 2. 
+                                    Dimensions for each partial (num_near_field_obs x 3)
+    """
+  
+    def _compute_numerical_partial(i):
+        """Compute numerical partial for one coordinate component for one station
+
+        Default field suffix determines which station
+
+        Args:
+            i (int)    0, 1 or 2 representing x, y, z
+
+        Returns:
+            dtau_dx_i
+        """
+        dx = np.zeros((dset.num_obs, 6))
+        delta = 0.1
+        dx[:, i] = delta
+        dx = PosVelDelta(dx, system="trs", ref_pos=dset.site_pos)
+
+        dset_1 = deepcopy(dset)
+        dset_1.analysis = dset.analysis
+        dset_1.default_field_suffix = dset.default_field_suffix
+        dset_1.site_pos[:] -= dx
+        d1 = vlbi_near_field(dset_1)
+
+        dset_2 = deepcopy(dset)
+        dset_2.analysis = dset.analysis
+        dset_2.default_field_suffix = dset.default_field_suffix
+        dset_2.site_pos[:] += dx
+        d2 = vlbi_near_field(dset_2)
+
+        return (d2 - d1) / (2 * delta)
+
+    dtau_dx = []
+    for _ in dset.for_each_suffix("station"):
+        dtau_dx_i = np.zeros((dset.num_obs, 3))
+        for i in range(3):
+            dtau_dx_i[:, i] = _compute_numerical_partial(i)
+        dtau_dx.append(dtau_dx_i)
+
+    return dtau_dx
+
