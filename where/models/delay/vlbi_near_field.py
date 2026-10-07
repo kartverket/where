@@ -213,10 +213,10 @@ def jaron2019(dset):
     _save_float_to_dset(dset, idx, f"{MODEL}.x02", x02, unit="(m, m, m)")
     _save_float_to_dset(dset, idx, f"{MODEL}.gamma0", np.sqrt(gamma0_2), unit="dimensionless")
     _save_float_to_dset(dset, idx, f"{MODEL}.gamma2", np.sqrt(gamma2_2), unit="dimensionless")
-    _save_float_to_dset(dset, idx, f"{MODEL}.delta_t0", delta_t0, unit="seconds")
     # Add more variables for debugging purposes
     _save_time_to_dset(dset, idx, f"{MODEL}.t0_tilde", t0_tilde, write_level="detail")
     _save_time_to_dset(dset, idx, f"{MODEL}.t2_tilde", t2_tilde, write_level="detail")
+    _save_float_to_dset(dset, idx, f"{MODEL}.delta_t0", delta_t0, write_level="detail", unit="seconds")
     _save_float_to_dset(dset, idx, f"{MODEL}.delta_t2", delta_t2, write_level="detail", unit="seconds")
     _save_posvel_to_dset(dset, idx, f"{MODEL}.j_sat_posvel", sat_posvel.gcrs, write_level="detail")
     _save_posvel_to_dset(dset, idx, f"{MODEL}.site_pos_2_t2", site_pos_2_t2.gcrs, write_level="detail")
