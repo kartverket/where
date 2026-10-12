@@ -125,7 +125,7 @@ def  _site_pos_1_near_field(dset):
 
     x1_x0 = x1_t1 - x0_t1
     ddelta_tilde_1_dx1 = x1_x0 / (C * np.linalg.norm(x1_x0, axis=1)[:, None]) # Eq 25 (skeens2024)
-    dtau_tilde_dx1 = - ddelta_tilde_1_dx1 # Eq 32 (skeens2024) ***
+    dtau_tilde_dx1 = - ddelta_tilde_1_dx1 # Eq 32 (skeens2024)
 
     dx01_dx1 = v0_t0_tilde[:, : , None] @ ddelta_tilde_1_dx1[:, None, :] - I # Eq 24 (skeens2024)
 

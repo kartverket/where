@@ -107,16 +107,14 @@ def  _sat_vel(dset):
     norm_x01 = np.linalg.norm(x01, axis=1)
     x01_dot_v0 = x01[:, None, :] @ v0_t1[:, :, None]  # Intermediate variable
     sqrt_x01_v0 = np.sqrt(norm_x01 ** 2 + (x01_dot_v0[:, 0, 0]) ** 2 / C ** 2)[:, None, None] # Intermediate variable
-    
-    # TODO: test dimensions
-    
+
     ddeltat0_dv0 = (1 / C ** 2 * x01[:, :, None]
         - 1 / C * dgamma0_dv0 * sqrt_x01_v0 
         - gamma0 / C * (x01_dot_v0 * x01[:, :, None] / C ** 2) 
         / sqrt_x01_v0) # Eq 58 simplified (skeens2024)
 
     delta_t0 = dset.vlbi_near_field.delta_t0[idx]
-    
+
     dx02_dv0 = (delta_t0[:, None, None] * I
         + (v0_t1 - v2_t1)[:, :, None] @ ddeltat0_dv0[:, :, 0][:, None, :]) # Eq 62 (skeens)
 
@@ -130,4 +128,5 @@ def  _sat_vel(dset):
 
     dtau_dv0 = (ddeltat0_dv0 + ddeltat2_dv0) * (1 - L_G) # Eq 50 (skeens)
 
-    return dtau_dv0 * C # Convert from seconds to meter
+    g2t = rotation.gcrs2trs(dset.time[idx])
+    return g2t @ dtau_dv0 * C # Transform to trs and convert from seconds to meter

@@ -128,4 +128,6 @@ def  _sat_pos(dset):
 
     dtau_dx0 = (ddeltat0_dx0 + ddeltat2_dx0) * (1 - L_G) # Eq 48 (skeens)
 
-    return dtau_dx0 * C # Convert from seconds to meter
+
+    g2t = rotation.gcrs2trs(dset.time[idx])
+    return g2t @ dtau_dx0 * C # Transform to trs and convert from seconds to meter
