@@ -46,6 +46,11 @@ def get_atmospheric_tides():
     lon = np.unique(lon)
     _, idx = np.unique(lat, return_index=True)
 
+    double_entry = False
+    if lon[0] == 0 and lon[-1] == 360:
+        # 0 degrees and 360 degrees is the same angle. Remove the 360 data point
+        double_entry = True
+
     # Restore original order
     lat = lat[np.sort(idx)]
 
@@ -53,8 +58,9 @@ def get_atmospheric_tides():
 
     # Latitude is given from 90 degrees to -90 degrees
     lat = lat[::-1]
-    # Strip the last longtitude to avoid double entry for 0 degrees
-    lon = lon[:-1]
+    if double_entry:
+        # Strip the last longtitude to avoid double entry for 0 degrees
+        lon = lon[:-1]
     # Shift longtitude -180 degrees
     lon = (lon + 180) % 360 - 180
     idx = lon.argsort()
@@ -68,8 +74,9 @@ def get_atmospheric_tides():
 
         # Latitude is given from 90 degrees to -90 degrees
         values = values[::-1, :]
-        # Strip the last longtitude to avoid double entry for 0 degrees
-        values = values[:, :-1]
+        if double_entry:
+            # Strip the last longtitude to avoid double entry for 0 degrees
+            values = values[:, :-1]
         # Shift longtitude -180 degrees
         values = values[:, idx]
 
