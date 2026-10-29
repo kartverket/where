@@ -66,8 +66,11 @@ def _calculate_model(calculate_func, config_key, dset_in, dset_out, write_levels
 
 
 def add(config_key, dset):
-    delay_fields = [f for f in dset[config_key]._fields]
     delta_delay = np.zeros(dset.num_obs)
+    if config_key not in dset._fields:
+        return delta_delay
+
+    delay_fields = [f for f in dset[config_key]._fields]
     for field in delay_fields:
         delta_delay += dset[config_key][field]
 
