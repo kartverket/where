@@ -80,6 +80,7 @@ def site_pos(dset):
     # Calculate partials for near field observations (typically satellites)
     if nf_num_obs > 0:
         numerical_partials = config.tech[PARAMETER].numerical_partials.bool
+        # TODO: which partials to call if another model is implemented? How to test?
         if numerical_partials:
             dtau_dx1, dtau_dx2 = _numerical_partials_near_field(dset)
         else:
