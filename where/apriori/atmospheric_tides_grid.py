@@ -21,7 +21,7 @@ from where import parsers
 
 
 @plugins.register
-def get_atmospheric_tides():
+def get_atmospheric_tides(model=None, origin=None):
     """Create interpolators for atmospheric tides coefficients
 
     Reads the atmospheric tides coefficents from file using the
@@ -36,8 +36,9 @@ def get_atmospheric_tides():
     Returns:
         A dictionary of interpolator functions.
     """
-    model = config.tech.atmospheric_tides.str
-    file_key = "atmospheric_tides_" + model if model else "atmospheric_tides"
+    origin = origin if origin else config.tech.atm_tides.origin.str
+    model = model if model else config.tech.atm_tides.model.str
+    file_key = "atmospheric_tides_grid_" + model + "_" + origin
     at_data = parsers.parse_key(file_key=file_key).as_dict()
 
     interpolators = dict()

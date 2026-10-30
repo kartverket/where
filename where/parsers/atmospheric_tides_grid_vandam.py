@@ -3,7 +3,12 @@
 Description:
 ------------
 
-Reads atmospheric tide coefficients. Gridded coefficients for the S1 and S2 atmospheric tides.
+Reads atmospheric tide coefficients from University of Luxembourg (van Dam). The model is expressed in
+a center of mass (cm) frame.
+
+Gridded coefficients for the S1 and S2 atmospheric tides.
+
+This is the model recommended in the IERS 2010 Conventions.
 
 """
 # Midgard imports
@@ -12,7 +17,7 @@ from midgard.parsers._parser_line import LineParser
 
 
 @plugins.register
-class AtmosphericTidesParser(LineParser):
+class VanDamGridAtmosphericTidesParser(LineParser):
     """A parser for reading gridded coefficents for atmospheric tides
     """
 
