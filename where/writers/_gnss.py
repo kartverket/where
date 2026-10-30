@@ -202,6 +202,7 @@ def get_grc_csv_row(
     }
 
     station_identifier = {
+            "alti": "ALTI00NOR",
             "altc": "ALTC00NOR",
             "brux": "BRUX00BEL",
             "cpvg": "CPVG00CPV",
