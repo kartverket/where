@@ -11,8 +11,6 @@ from typing import List
 
 # Where imports
 from where import apriori
-from where.lib import config
-from midgard.dev.exceptions import MissingSectionError
 
 def get_grc_csv_header_former() -> List[str]:
     """Get header line of GRC CSV format
@@ -40,17 +38,14 @@ def get_grc_csv_header_former() -> List[str]:
             "Result",
     ]
 
-def get_grc_csv_header() -> List[str]:
+def get_grc_csv_header(former_version : bool = False) -> List[str]:
     """Get header line of GRC CSV format
 
     Returns:
         Header line of GRC CSV format
     """
-    try:
-        if config.tech.old_kpi:
-           return get_grc_csv_header_former()
-    except MissingSectionError:
-        pass
+    if former_version:
+        return get_grc_csv_header_former()
     return [
             "Constellation",
             "Performance Indicator Code",
@@ -295,6 +290,7 @@ def get_grc_csv_row(
             station: str="",
             satellite: str="",
             has: bool = False,
+            former_version : bool = False,
 ) -> List[str]:
     """Create row in GRC CSV format in dependency of given arguments
 
@@ -310,19 +306,16 @@ def get_grc_csv_row(
     Returns:
         Line in GRC CSV format as list
     """
-    try:
-        if config.tech.old_kpi:
-            return get_grc_csv_row_former(
-                constellation,
-                kpi,
-                mode,
-                date,
-                result,
-                station,
-                satellite
-            )
-    except MissingSectionError:
-        pass
+    if former_version:
+        return get_grc_csv_row_former(
+            constellation,
+            kpi,
+            mode,
+            date,
+            result,
+            station,
+            satellite
+        )
     batch = ""
     svn = ""
     slot = ""
