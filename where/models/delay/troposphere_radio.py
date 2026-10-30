@@ -45,7 +45,7 @@ MAPPING_FUNCTIONS = ["gmf", "gpt2", "gpt2w", "gpt3", "vmf1_gridded", "vmf1_stati
 METEOROLOGICAL_MODELS = ["vmf1_gridded", "vmf1_station", "gpt", "gpt2", "gpt2w", "gp3", "site_pressure", "default"]
 ZENITH_WET_DELAY_MODELS = ["none", "askne", "davis", "saastamoinen", "vmf1_gridded", "vmf1_station"]
 ZENITH_HYDROSTATIC_DELAY_MODELS = ["saastamoinen", "vmf1_gridded", "vmf1_station"]
-GRADIENT_MODELS = ["none", "apg"]
+GRADIENT_MODELS = ["none", "apg", "vlbi_dao"]
 
 # Cache for GPT2 model
 _GPT2 = dict()
@@ -125,7 +125,7 @@ def troposphere(dset):
                                                               obs_e, obs_tm, obs_lambd)
     #import IPython; IPython.embed()
     mh, mw = mapping_function(stations, latitude, longitude, height, time, zenith_distance)
-    mg, gn, ge = gradient_model(latitude, longitude, azimuth, elevation)
+    mg, gn, ge = gradient_model(stations, latitude, longitude, azimuth, elevation)
     zhd = zenith_hydrostatic_delay(stations, latitude, longitude, height, time, pressure)
     zwd = zenith_wet_delay(stations, latitude, longitude, height, time, temperature, e, tm, lambd)
 
@@ -269,7 +269,7 @@ def meteorological_data(stations, latitude, longitude, height, time,
     return pressure, temperature, e, tm, lambd
 
 
-def gradient_model(latitude, longitude, azimuth, elevation):
+def gradient_model(stations, latitude, longitude, azimuth, elevation):
     """Calculates asymmetric delay based on gradient model given in configuration file
 
     Args:
@@ -303,6 +303,9 @@ def gradient_model(latitude, longitude, azimuth, elevation):
             model_ge = np.zeros(num_obs)
         elif model == "apg":
             model_gn, model_ge = apg_gradient_model(latitude, longitude, azimuth, elevation)
+        elif model == "vlbi_dao":
+            # Note that this model is only defined for (some) VLBI stations
+            model_gn, model_ge = vlbi_dao_gradient_model(stations)
         else:
             log.fatal(f"Unknown troposphere gradient model {model}. Available models are {', '.join(GRADIENT_MODELS)}")
     
@@ -501,6 +504,34 @@ def apg_gradient_model(latitude, longitude, azimuth, elevation):
     for obs in range(num_obs):
         # Get horizontal gradients G_N and G_E
         _, gn[obs], ge[obs] = iers.apg(latitude[obs], longitude[obs], azimuth[obs], elevation[obs])
+
+    return gn * Unit.mm2m, ge * Unit.mm2m
+
+def vlbi_dao_gradient_model(stations):
+    """Gets precomputed gradients for VLBI stations
+
+    Args:
+        stations :    List of station names (length: num_obs)
+
+    Returns:
+        tuple of Numpy Arrays: Includes the following elements, each with entries for each observation
+
+    ============  ===========  =====================================================================================
+     Element       Unit         Description
+    ============  ===========  =====================================================================================
+     gn            m            Horizontal delay gradient in the North direction
+     ge            m            Horizontal delay gradient in the East direction
+    ============  ===========  =====================================================================================
+    """
+    grad = apriori.get("vlbi_troposphere_gradients_dao")
+
+    gn = np.full(len(stations), fill_value=np.nan)
+    ge = np.full(len(stations), fill_value=np.nan)
+    for station in np.unique(stations):
+        sta_idx = np.where(station == stations)
+        if station in grad:
+            gn[sta_idx] = grad[station]["gn"]
+            ge[sta_idx] = grad[station]["ge"]
 
     return gn * Unit.mm2m, ge * Unit.mm2m
 
@@ -1064,6 +1095,7 @@ def gpt3_mapping_function(stations, latitude, longitude, height, time, zenith_di
     for obs in range(num_obs):
         _, _, _, _, _, ah[obs], aw[obs], _, _, _, _, _, _ = gpt3_wrapper(
             stations[obs], mjd[obs], [latitude[obs]], [longitude[obs]], [height[obs]], grid)
+
         # Determine mapping function values based on coefficients 'ah' and 'aw'
         mh[obs], mw[obs] = ext_gpt3.vmf3_ht(ah[obs], aw[obs], mjd[obs], latitude[obs], longitude[obs], height[obs], zenith_distance[obs])
 
@@ -1118,7 +1150,6 @@ def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
     os.chdir(config.files.path(ext_gpt3.__name__))
 
     # Loop over all unique dates (rounded to integer value)
-
     for date in _rounded_dates(mjd):
         # Check if date is already included in cache
         key = (date, station)
@@ -1137,6 +1168,106 @@ def gpt3_wrapper(station, mjd, latitude, longitude, hell, grid):
 
     return output
 
+def gpt3_wrapper_slow(station, mjd, latitude, longitude, hell, grid):
+    """Calculates meteorological data and mapping function coefficients based on GPT3 model
+
+    Same as gpt3_wrapper but no interpolation is involved. Repeating epoch and station combination 
+    is picked from cache.
+
+    Not in use. Just for testing.
+
+    Args:
+        station (str):        Station name
+        mjd (numpy.float64):  Modified Julian date.
+        latitude (list):      Array with latitude for each station in [rad].
+        longitude (list):     Array with longitude for each station in [rad].
+        hell (list):          Array with height for each station in [m].
+        grid (str):           Either "1" or "5" depending on wanted grid size
+
+    Returns:
+        numpy.ndarray:  Array with following entries:
+
+    =======  ===========  =======================================================
+     Index    Unit         Description
+    =======  ===========  =======================================================
+     [0]      hPa          Pressure value
+     [1]      Celsius      Temperature values
+     [2]      degree/km    Temperature lapse rate
+     [3]      K            Mean temperature of the water vapor
+     [4]      hPa          Water vapor pressure
+     [5]                   Hydrostatic mapping function coefficient ah
+     [6]                   Wet mapping function coefficient aw
+     [7]                   Water vapor decrease factor
+     [8]      m            Geoid undulation (based on 9x9 EGM model)
+    =======  ===========  =======================================================
+    """
+    it = 0  # Use of time variations (annual and semiannual terms)
+
+    if not (len(latitude) == len(longitude) == len(hell)):
+        log.fatal("Length of latitude, longitute and ellipsoidal height array is not equal.")
+
+    # Change directory so that gpt3_.f90 can read the gpt3_1.grd-file in the GPT3 source directory
+    current_dir = os.getcwd()
+    os.chdir(config.files.path(ext_gpt3.__name__))
+
+    # Check if date is already included in cache
+    key = (mjd, station)
+    if key not in _GPT3:
+        if grid == "1":
+            _GPT3[key] = np.array(ext_gpt3.gpt3_1(mjd, latitude, longitude, hell, it)).reshape(-1)
+        elif grid == "5":
+            _GPT3[key] = np.array(ext_gpt3.gpt3_5(mjd, latitude, longitude, hell, it)).reshape(-1)
+    os.chdir(current_dir)
+    return _GPT3[key]
+
+def gpt3_wrapper_super_slow(station, mjd, latitude, longitude, hell, grid):
+    """Calculates meteorological data and mapping function coefficients based on GPT3 model
+
+    Same as gpt3_wrapper but no caching or interpolation is involved and all epochs are computed explicitly.
+
+    Not in use. Just for testing.
+
+    Args:
+        station (str):        Station name
+        mjd (numpy.float64):  Modified Julian date.
+        latitude (list):      Array with latitude for each station in [rad].
+        longitude (list):     Array with longitude for each station in [rad].
+        hell (list):          Array with height for each station in [m].
+        grid (str):           Either "1" or "5" depending on wanted grid size
+
+    Returns:
+        numpy.ndarray:  Array with following entries:
+
+    =======  ===========  =======================================================
+     Index    Unit         Description
+    =======  ===========  =======================================================
+     [0]      hPa          Pressure value
+     [1]      Celsius      Temperature values
+     [2]      degree/km    Temperature lapse rate
+     [3]      K            Mean temperature of the water vapor
+     [4]      hPa          Water vapor pressure
+     [5]                   Hydrostatic mapping function coefficient ah
+     [6]                   Wet mapping function coefficient aw
+     [7]                   Water vapor decrease factor
+     [8]      m            Geoid undulation (based on 9x9 EGM model)
+    =======  ===========  =======================================================
+    """
+    it = 0  # Use of time variations (annual and semiannual terms)
+
+    if not (len(latitude) == len(longitude) == len(hell)):
+        log.fatal("Length of latitude, longitute and ellipsoidal height array is not equal.")
+
+    # Change directory so that gpt3_.f90 can read the gpt3_1.grd-file in the GPT3 source directory
+    current_dir = os.getcwd()
+    os.chdir(config.files.path(ext_gpt3.__name__))
+
+    # Check if date is already included in cache
+    if grid == "1":
+        output = np.array(ext_gpt3.gpt3_1(mjd, latitude, longitude, hell, it)).reshape(-1)
+    elif grid == "5":
+        output = np.array(ext_gpt3.gpt3_5(mjd, latitude, longitude, hell, it)).reshape(-1)
+    os.chdir(current_dir)
+    return output
 
 def pressure_zhd(zhd, latitude, height):
     """Calculates atmospheric pressure based on zenith hydrostatic troposphere delay
