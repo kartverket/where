@@ -313,7 +313,7 @@ class AntennaCorrection(UserDict):
         }
 
 
-    def satellite_type(self, dset: "Dataset") -> np.core.defchararray.chararray:
+    def satellite_type(self, dset: "Dataset") -> np.ndarray:
         """Get satellite type from ANTEX file (e.g. BLOCK IIF, GALILEO-1, GALILEO-2, GLONASS-M, BEIDOU-2G, ...)
 
         Args:
