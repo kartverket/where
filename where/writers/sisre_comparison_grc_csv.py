@@ -63,12 +63,10 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
     # 
     # Example:
     #
-    # Service Line,Service Category,Business Service,Batch,Satellite,PRN,Slot,GSS Site,Service,Type,Mode,Target,Unit,Month/Year,Result
-    #   Open Service,Ranging Domain,SDD-OS-0012 SIS Ranging Accuracy over All Satellites over Month,,,,,,,OS,Single,E1,2,m,21-Jul,0.14685266875382683
-    #   Open Service,Ranging Domain,SDD-OS-0012 SIS Ranging Accuracy over All Satellites over Month,,,,,,,OS,Dual,E1/E5b,2,m,21-Jul,0.12860206883303776
-    #   Open Service,Ranging Domain,SDD-OS-0012 SIS Ranging Accuracy over All Satellites over Month,,,,,,,OS,Dual,E1/E5a,2,m,21-Jul,0.1318876874345714
-    #   Open Service,Ranging Domain,SDD-OS-0013 SIS Ranging Accuracy per Satellite over Month,FOC,E01,GSAT210,A02,,,OS,Single,E1,7,m,21-Jul,0.22263083688024857
-    #   Open Service,Ranging Domain,SDD-OS-0013 SIS Ranging Accuracy per Satellite over Month,FOC,E02,GSAT211,A06,,,OS,Single,E1,7,m,21-Jul,0.29602410930897965
+    # Constellation;Performance Indicator Code;Performance Indicator Name;Batch;Satellite;PRN;Slot;Station Identifier;Navigation Message;Signal Combination;Signal Dissemination mean;Target;Unit;Date;Result 
+    #   Galileo;GNSS-OS-KPI-09;SIS Ranging Accuracy at GA over all Satellites over Month;;;;;;FNAV;Dual;E1/E5a;SIS;2.0;m;2023-Jul;0.165
+    #   GPS;GNSS-OS-KPI-09;SIS Ranging Accuracy at GA over all Satellites over Month;;;;;;LNAV;Single;L1;SIS;m;2026-Jan;0.229 
+    #   Galileo;GNSS-OS-KPI-10;SIS Ranging Accuracy at GA per Satellite over Month;FOC;GSAT0211;E02;A06;;FNAV;Dual;E1/E5a;SIS;7.0;m;2023-Jul;0.236
     #
     with open(file_path, "w") as csvfile:
         writer = csv.writer(csvfile, delimiter=";")
@@ -121,7 +119,7 @@ def sisre_comparison_grc_csv(dset: "Dataset") -> None:
 
             df_mode = df[idx].pivot(index="time_gps", columns="satellite", values=mode)
             df_mode = df_mode.resample("M").apply(lambda x: np.nanpercentile(x, q=95))
-            df_mode.index = df_mode.index.strftime("%Y-%b")
+            df_mode.index = df_mode.index.strftime("%Y-%m")
             df_mode.index.name = "date"
             df_mode = df_mode.reset_index()
 
