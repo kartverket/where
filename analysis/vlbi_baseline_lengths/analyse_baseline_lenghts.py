@@ -59,32 +59,6 @@ def read_session_baseline(dset_id=None):
     return {k1:{k2:np.array(v2) for k2, v2 in v1.items()} for k1,v1 in baselines.items()}
 
 
-def read_baselines(id_txt="default"):
-    """Read baseline files from 'txt' directories.
-
-    Args:
-        id_txt:    String with dataset id
-
-    Returns:
-        Dictionary with data from files. Key: Baseline name. Value: Dictionary with data
-    """
-    print(f"Reading baseline files in txt/{id_txt}")
-    
-    files = glob.glob(f"txt/{id_txt}/Baseline_*_{id_txt}.txt")
-    files.remove(f"txt/{id_txt}/Baseline_length_repeatability_{id_txt}.txt")
-    baselines = {}
-    for bl_file in files:
-        with open(bl_file) as fid:
-            baseline = fid.readline().strip("#").strip()
-        
-        str2date = lambda x: datetime.strptime(x.decode('utf-8'), DATE_FMT)
-        #print(f"Reading {bl_file}")
-        data = np.genfromtxt(bl_file, names="date, session_code, num_obs, length, ferr", dtype="object, U7, i8, f8, f8", converters={0: str2date})
-        data = np.atleast_1d(data)
-        baselines[baseline] = {k:np.array(data[k]) for k in data.dtype.names}
-    return baselines
-
-
 def save_baselines(baselines, id_txt):
     """Save baseline length for each baseline in a text file.
 
@@ -380,11 +354,6 @@ def parse_args():
         help="Enable this option to plot baseline vs time with one baseline per plot",
     )
     parser.add_argument(
-        "--read_txt",
-        action="store_true",
-        help="Enable this option to read baseline results from 'txt' directory instead of session work directory",
-    )
-    parser.add_argument(
         "--save_repeatability",
         action="store_true",
         help="Enable this option to save the computed repeatabilities in a text file",
@@ -438,11 +407,7 @@ def main():
     if args.delete_txt:
         delete_files(".txt", id_txt)
 
-    if args.read_txt:
-        baselines = read_baselines(id_txt)
-    else:
-        baselines = read_session_baseline(dset_id=args.id)
-
+    baselines = read_session_baseline(dset_id=args.id)
     compute_repeatability(baselines)
     
     if args.plot_repeatability:
