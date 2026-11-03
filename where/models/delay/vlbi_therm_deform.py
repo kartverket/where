@@ -14,7 +14,8 @@ References:
 
 .. [2] http://hpiers.obspm.fr/combinaison/documentation/articles/Thermal_Expansion_Modelling_Radio_Telescopes_Nothnagel.pdf
 
-
+.. [3] Sovers, O. J., JPL Publications 83-39, Rev. 4,
+       Observation Model and Parameter Partials for the JPL VLBI Parameter Estimation Software "MODEST", 1991
 
 """
 # External library imports
@@ -26,6 +27,7 @@ from midgard.dev import plugins
 
 # Where imports
 from where import apriori
+from where.lib import config
 from where.lib import log
 
 
@@ -68,17 +70,25 @@ def thermal_deformation_station(dset, temp_funcs):
     Returns:
         Numpy array with delay caused by thermal deformation in meters.
     """
+    refraction_corr = config.tech.refraction_correction.bool
     antenna_info = apriori.get("vlbi_antenna_info")
-
     # time delay for antenna and foundation
     dt_a = 2 / 24  # unit.hours2days
     dt_f = 6 / 24  # unit.hours2days
     delays = np.zeros(dset.num_obs)
 
+    if refraction_corr:
+        # Refraction of the viewing angle towards the source due to the atmosphere
+        # Appromimate model from "Modest Handbook" Eq 2.173
+        de = 0.000313 / np.tan(dset.site_pos.elevation)
+        de[de > np.pi/2] *= -1
+    else:
+        de = np.zeros(dset.num_obs)
+
     sin_a = np.sin(dset.site_pos.azimuth)
     cos_a = np.cos(dset.site_pos.azimuth)
-    sin_e = np.sin(dset.site_pos.elevation)
-    cos_e = np.cos(dset.site_pos.elevation)
+    sin_e = np.sin(dset.site_pos.elevation + de)
+    cos_e = np.cos(dset.site_pos.elevation + de)
 
     for ivsname in dset.unique("ivsname"):
         site_id = dset.meta["station"][ivsname]["site_id"] if ivsname in dset.meta else ""
@@ -215,7 +225,7 @@ def _get_westford_func(temp_func):
         ## Westford radome interior temperature:
         ## Arthur Niell reports the following radome temperature model
         ## temp_radome = 20.d0 + 0.6*(temp_sta(ista)- 20.d0)
-        return 20 + 0.6 * (temp_func(time)- 20)
+        return 20 + 0.6 * (temp_func(time) - 20)
     return temperature_func
 
 def _get_temperature_func(amplitude, phase, offset, trend):
