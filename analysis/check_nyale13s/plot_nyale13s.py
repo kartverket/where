@@ -38,7 +38,7 @@ def plot(x, ys, errors, colors, labels, name, station, limit):
     cbar = fig.colorbar(im, ax=axs, location="right")
     cbar.set_label("Number of observations used in solution")
     fig.autofmt_xdate()
-    #fig.suptitle(station)
+    fig.suptitle(station)
     #plt.tight_layout()
     plt.savefig(f"img/{dset_id}/Position_{station}_{name}_{dset_id}_{start:%Y-%m-%d}_{end:%Y-%m-%d}.png", bbox_inches='tight')
     plt.close()
@@ -286,9 +286,12 @@ def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos
     num_sx = np.sum(~vgos)
 
     if local_tie:
-        print(f"{dset_id}: Weighted mean: {wmean: 6.4f} [m], Local tie offset: {(wmean - local_tie)*Unit.m2mm: 6.2f} [mm]")
+        offset =  (wmean - local_tie) * Unit.m2mm
+        print(f"{dset_id}: Weighted mean: {wmean: 6.4f} [m], Local tie offset: {offset: 6.2f} [mm]")
+        title = f"Weighted Baseline Length Repeatability: {_wblr*Unit.meter2millimeter:4.2f} [mm], Local tie offset: {offset: 6.2f} [mm]"
     else:
         print(f"{dset_id}: Weighted mean: {wmean: 16.4f} [m]")
+        title = f"Weighted Baseline Length Repeatability: {_wblr*Unit.meter2millimeter:4.2f} [mm]"
     print(f"{dset_id}: Weighted blr (using weighted mean): {_wblr*Unit.m2mm: 6.2f} [mm]")
     print(f"Number of S/X sessions: {num_sx}")
     print(f"Number of VGOS sessions: {num_vgos}")
@@ -309,7 +312,7 @@ def plot_baseline(dates, baseline_length, baseline_length_ferr, num_obs_bs, vgos
        plt.axhline(local_tie, c="blue", label="Local tie vector")
     #plt.xlim(xlim)
     plt.ylim(ylim)
-    plt.title(f"Weighted Baseline Length Repeatability: {_wblr*Unit.meter2millimeter:4.2f} [mm]")
+    plt.title(title)
     plt.ylabel(f"Baseline length [m]")
     plt.legend()
     plt.gca().get_xaxis().set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
