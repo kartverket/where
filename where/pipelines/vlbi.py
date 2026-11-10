@@ -251,32 +251,35 @@ def log_prefix(rundate, session_code="", **kwargs):
 def _matplotlib_map(dset):
     # Local imports since only this function uses plotting
     import cartopy.crs as ccrs
-    from matplotlib import cm
+    from matplotlib import cm, colors
     import matplotlib.pyplot as plt
 
     stations = dset.unique("station")
     baselines = dset.unique("baseline")
-    b_width = {b: dset.num(baseline=b) / dset.num_obs * 40 for b in baselines}
-    s_size = [int(dset.num(station=s) / dset.num_obs * 400) for s in stations]
+    b_width = {b: dset.num(baseline=b) / dset.num_obs * 100 for b in baselines}
+    s_size = [int(dset.num(station=s) / dset.num_obs * 600) for s in stations]
 
     lat = np.degrees([dset.meta["station"][station]["latitude"] for station in stations])
     lon = np.degrees([dset.meta["station"][station]["longitude"] for station in stations])
 
-    rms = [dset.rms("residual", station=station) for station in stations] if "residual" in dset._fields else None
+    s_rms = np.array([dset.rms("residual", station=station) for station in stations]) if "residual" in dset._fields else None
+    b_rms = np.array([dset.rms("residual", baseline=bl) for bl in baselines]) if "residual" in dset._fields else None
+
     plt.figure()
     ax = plt.axes(projection=ccrs.Mollweide())
     ax.set_global()
     ax.coastlines()
+
+    norm = colors.Normalize(vmax=max(np.concatenate((s_rms, b_rms))), vmin=0)
     cmap = cm.get_cmap(config.there.colormap.str)
 
-    for baseline in baselines:
+    for i, baseline in enumerate(baselines):
         sta_1, _, sta_2 = baseline.partition("/")
         sta_1_lon = np.degrees(dset.meta["station"][sta_1]["longitude"])
         sta_2_lon = np.degrees(dset.meta["station"][sta_2]["longitude"])
         sta_1_lat = np.degrees(dset.meta["station"][sta_1]["latitude"])
         sta_2_lat = np.degrees(dset.meta["station"][sta_2]["latitude"])
-        b_rms = dset.rms("residual", baseline=baseline) if "residual" in dset._fields else 0
-        color = cmap(b_rms)
+        color = cmap(norm(b_rms[i]))
         plt.plot(
             [sta_1_lon, sta_2_lon],
             [sta_1_lat, sta_2_lat],
@@ -286,13 +289,12 @@ def _matplotlib_map(dset):
             transform=ccrs.Geodetic(),
             zorder=0,
         )
-    plt.scatter(lon, lat, c=rms, transform=ccrs.PlateCarree(), cmap=cmap, s=s_size, zorder=10)
-    plt.title(f"{dset.meta['input']['session_code']}")
+    plt.scatter(lon, lat, c=cmap(norm(s_rms)), transform=ccrs.PlateCarree(), s=s_size, zorder=10)
+    plt.title(f"{dset.meta['input']['file']}")
     plt.figtext(0.99, 0.01, "Size: number of observations", horizontalalignment="right")
-    if rms is not None:
-        cbar = plt.colorbar()
-        cbar.set_label("RMS of residual [m]")
-
+    cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=plt.gca())
+    cbar.set_label("RMS of residual [m]")
+    plt.tight_layout()
     plt.show()
 
 
