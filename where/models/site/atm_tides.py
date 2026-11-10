@@ -130,6 +130,8 @@ def atmospheric_tides_station(dset):
     return pos_correction.gcrs
 
 def get_coefficients(dset):
+    """Get S1 and S2 coefficients from configured source """
+
     model_type = config.tech[MODEL].type.str
 
     stations = dset.unique("station")
@@ -158,6 +160,7 @@ def get_coefficients(dset):
         model = config.tech[MODEL].model.str
         origin = config.tech[MODEL].origin.str
         missing_sta = set()
+
         try:
             file_key = f"atmospheric_tides_station_{model}_{origin}"
             coeff_sta = apriori.get(file_key)
@@ -171,8 +174,9 @@ def get_coefficients(dset):
                         missing_sta.add(sta)
         except exceptions.MissingSectionError:
             log.error(f"Unknown model. No file_key found for {file_key}")
+
         if missing_sta:
-            log.warn(f"Missing APL coefficients for {', '.join(missing_sta)} for {file_key}. Using grid_{model}_ce as backup.")
-            _grid_coeff(missing_sta, model=model, origin="ce")
+            log.warn(f"Missing APL coefficients for {', '.join(missing_sta)} for {file_key}. Using grid_{model}_{origin} as backup.")
+            _grid_coeff(missing_sta, model=model, origin=origin)
 
     return output
