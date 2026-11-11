@@ -131,8 +131,7 @@ def jaron2019(dset):
     tau_tilde = delta2 - delta1 # eq. 7
     t2_tilde = t1 + tau_tilde # approximation to t2 (time of arrival for signal at station 2)
 
-    sat_posvel = _sat_posvel(dset, t0_tilde) 
-
+    sat_posvel = _sat_posvel(dset, t0_tilde)
 
     # Satellite position and velocity at t0
     x0_t0_tilde = sat_posvel.gcrs.pos.val #/ ((1 - L_G))
@@ -145,19 +144,11 @@ def jaron2019(dset):
     gamma0_2 = 1/(1 - (v0_t1[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2) # eq. 15
     x01 = x0_bar_t1 - x1_t1.val # eq. 16
 
-
     # Compute t_g01: Relativistic effects on delay from satellite to station 1
-    # Based on Deuv, et al (2012) eq. 14, 16, 17
-    # Equations are in BCRS. Ephemerides use TDB.
-    bodies = ["earth"] # This model is expressed in GCRS and should only include the gravitational effect from the Earth
-    R0_T0 = _g2b_pos(x0_t0_tilde, t0_tilde) # satellite position at t0 in BCRS
-    R1_T1 = _g2b_pos(x1_t1.val, t1) # station_1 pos at t1 in BCRS
-    t_g01_TDB = _deuv_relativistic_term(R0_T0, R1_T1, t0_tilde, time, bodies)
-    # TODO: how to convert from TDB to TT? And is it needed at this precision level?
-    t_g01 = t_g01_TDB #/ (1 - L_G)
+    t_g01 =  _deuv_relativistic_term_tt(x0_t0_tilde, x1_t1)
 
-    # Save TT(=TDB) value to dset
-    _save_float_to_dset(dset, idx, f"{MODEL}.grav_1", t_g01_TDB * C, unit="meter", write_level="detail")
+    # Save TT value to dset
+    _save_float_to_dset(dset, idx, f"{MODEL}.grav_1", t_g01 * C, unit="meter", write_level="detail")
 
     # eq. 14 in jaron2019
     x01_dot_v0 = (x01[:, None, :] @ v0_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -182,16 +173,10 @@ def jaron2019(dset):
     x02 = x0_bar_t1 - x2_bar_t1 + (v0_t1 - v2_t1) * delta_t0[:, None] # eq. 19
 
     # Compute t_g02: Relativistic effects on delay from satellite to station 2
-    # Based on Deuv, et al (2012) eq. 14, 16, 17
-    # Equations are in BCRS. Ephemerides use TDB.  
-    R2_T2 = _g2b_pos(x2_t2_tilde, t2_tilde) # station_2 pos at t2 in BCRS
-    t_g02_TDB = _deuv_relativistic_term(R0_T0, R2_T2, t2_tilde, time, bodies)
-    # TODO: how to convert from TDB to TT? And is it needed at this precision level?
-    t_g02 = t_g02_TDB #/ (1 - L_G)
+    t_g02 = _deuv_relativistic_term_tt(x0_t0_tilde, x2_t2_tilde)
 
-
-    # Save TT(=TDB) value to dset  
-    _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02_TDB * C, unit="meter", write_level="detail")
+    # Save TT value to dset
+    _save_float_to_dset(dset, idx, f"{MODEL}.grav_2", t_g02 * C, unit="meter", write_level="detail")
 
     # eq. 17 in jaron2019
     x02_dot_v2 = (x02[:, None, :] @ v2_t1[:, :, None])[:, 0, 0] / C ** 2 # Intermediate variable
@@ -299,7 +284,7 @@ def _g2b_pos(r, t):
     U = constant.GM_sun / np.linalg.norm(eph.pos_gcrs("sun"), axis=1)[:, None]
     V_E = eph.vel_bcrs("earth")[:, None, :]
     R_E = eph.pos_bcrs("earth")
-    #return R_E + r
+
     r_b = r * (1 - U / C ** 2 - L_C) - 0.5 * ((V_E @ r[:, :, None]) / C ** 2  @ V_E)[:, 0, :]
     return R_E + r_b
 
@@ -326,8 +311,33 @@ def _g2b_vel(v, t):
             + V_E * (1 - 1/(2 * C ** 2) * V_E_dot_v))
     return v_b
 
+def _deuv_relativistic_term_tt(r_sat, r_site):
+    """Solve relativistic term in deuv2012, but in a geocentric TT-frame to get output in TT-compatible values
 
-def _deuv_relativistic_term(R_sat, R_site, T_sat, T_site, bodies):
+    Assumptions:
+    - Position of planet Earth in this frame is always zero.
+    - Only the relativstic effect from the planet Earth should be considered.
+
+    Equations in Deuv2012 are simplified based on these assumptions
+    """
+    GM = _get_GM(["earth"], source="iers_2010") # TCG-compatible
+    GM_earth = GM["earth"] * (1 - L_G) # TT-compatible
+
+    r_sat_site = r_site - r_sat
+    norm_r_sat = np.linalg.norm(r_sat, axis=1)
+    norm_r_site = np.linalg.norm(r_site, axis=1)
+    norm_r_sat_site = np.linalg.norm(r_sat_site, axis=1)
+
+    # eq. 14 (last part)
+    factor_earth = (1 + GAMMA) * GM_earth / C ** 3
+    delay_earth = (factor_earth
+        * np.log((norm_r_sat + norm_r_site + norm_r_sat_site)
+                 / (norm_r_sat + norm_r_site - norm_r_sat_site)))
+
+    return delay_earth # delay in TT-compatible value
+
+
+def _deuv_relativistic_term_tdb(R_sat, R_site, T_sat, T_site, bodies):
     """
 
     """
@@ -495,18 +505,17 @@ def deuv2012(dset):
     output[idx] = delay_TT * C # Convert to meter
     return output
 
-def _get_GM(bodies):
+def _get_GM(bodies, source=None):
     GM = {}
     # Get GM for the celestial bodies
     for body in bodies:
         try:
             GM_name = "GM" if body == "earth" else f"GM_{body}"
-            ephemerides = config.tech.ephemerides.str
-            GM[body] = constant.get(GM_name, source=ephemerides)
+            source = source if source is not None else config.tech.ephemerides.str
+            GM[body] = constant.get(GM_name, source=source)
         except KeyError:
-            log.warn(
-                f"The GM value of {body} is not defined for {ephemerides}. "
-                f"Correction set to zero."
+            log.error(
+                f"The GM value of {body} is not defined for {source}. "
             )
             continue
     return GM
