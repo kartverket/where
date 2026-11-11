@@ -13,7 +13,7 @@ References:
 -----------
 
 .. [1] Notes from the high frequency EOP working group: 
-       https://ivscc.gsfc.nasa.gov/hfeop_wg/software/
+       https://ivscc.gsfc.nasa.gov/hfeop_wg/memos/HF_EOP_models_v2017Dec03.pdf
 
 .. [2] Petit, G. and Luzum, B. (eds.), IERS Conventions (2010),
        IERS Technical Note No. 36, BKG (2010).
