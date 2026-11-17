@@ -393,7 +393,6 @@ def _plot_bar_sisre_satellite_percentile(
     """
     # Get user types by keeping order
     user_types = list(df.columns)
-
     for value in ["satellite", "system", "time_gps"]:
         user_types.remove(value)
 

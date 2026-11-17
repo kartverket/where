@@ -165,11 +165,6 @@ def _concatenate_datasets(
                 continue
 
             with Timer(f"Finish extend for day {date_to_read} in", logger=log.time):
-                #+MURKS
-                #if "has_gnssiod_code_bias" in dset.fields:
-                #    if dset.unit("has_gnssiod_code_bias") is None:
-                #        dset._fields["has_gnssiod_code_bias"].set_unit("has_gnssiod_code_bias", "meters")
-                #-MURKS
                 dset_merged.extend(dset)
 
         date_to_read += timedelta(days=1)
