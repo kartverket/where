@@ -140,13 +140,13 @@ def get_grc_csv_row_former(
     }
 
     slot_def = {
-            "SVN41": "B03",
-            "SVN43": "F06",
+            "SVN41": "B03", #Decommissioned
+            "SVN43": "F06", #Decommissioned
             "SVN44": "B03",
-            "SVN45": "D03",
+            "SVN45": "D03", #Decommissioned
             "SVN48": "A04",
             "SVN50": "E03",
-            "SVN51": "F05",
+            "SVN51": "F05", #Decommissioned
             "SVN52": "A02",
             "SVN53": "C04",
             "SVN55": "F02",
@@ -156,8 +156,8 @@ def get_grc_csv_row_former(
             "SVN59": "C05",
             "SVN61": "D01",
             "SVN62": "B02",
-            "SVN63": "D02",
-            "SVN64": "A03",
+            "SVN63": "D02", #Decommissioned
+            "SVN64": "A03", 
             "SVN65": "A01",
             "SVN66": "C02",
             "SVN67": "D04",
@@ -175,15 +175,17 @@ def get_grc_csv_row_former(
             "SVN79": "A06",
             "SVN80": "D02",
             "SVN81": "E06",
+            "SVN82": "F05",
+            "SVN83": "A05",
             "GSAT0101": "B05",
             "GSAT0102": "B06",
             "GSAT0103": "C04",
-            "GSAT0104": "C14",
+            "GSAT0104": "C14", # decommissioned
             "GSAT0201": "EXT01",
             "GSAT0202": "EXT02",
             "GSAT0203": "B08",
             "GSAT0204": "B14",
-            "GSAT0205": "A08",
+            "GSAT0205": "A08", # decommissioned
             "GSAT0206": "A05",
             "GSAT0207": "C06",
             "GSAT0208": "C07",
@@ -207,10 +209,13 @@ def get_grc_csv_row_former(
             "GSAT0226": "A02",
             "GSAT0227": "C12",
             "GSAT0232": "A08",
+            "GSAT0233": "C13",
+            "GSAT0234": "C17",
     }
 
     station_def = {
             "altc": "Alta (Norway)",
+            "alti": "Alta (Norway)",
             "brux": "Brussels (Belgium)",
             "cpvg": "Cap-Vert (Cabo Verde)",
             "koug": "Kourou (French Guiana)",

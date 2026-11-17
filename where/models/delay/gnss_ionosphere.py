@@ -29,7 +29,7 @@ from where.lib import config
 from where.lib import log
 
 # gl_library imports
-from åsgard.glpy import gnss_iono_models
+from asgard.glpy import gnss_iono_models
 
 
 @plugins.register
